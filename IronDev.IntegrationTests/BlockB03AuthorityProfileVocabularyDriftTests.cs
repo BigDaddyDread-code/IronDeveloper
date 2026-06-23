@@ -66,6 +66,32 @@ public sealed class BlockB03AuthorityProfileVocabularyDriftTests
         RunAuthorityOperationKind.DurableEventWrite
     ];
 
+    private static readonly RunAuthorityOperationKind[] ExpectedBoundedRunAuthorityAllowedOperations =
+    [
+        .. ExpectedProposalOnlyAllowedOperations,
+        RunAuthorityOperationKind.SourceApply,
+        RunAuthorityOperationKind.DurableSourceMutation,
+        RunAuthorityOperationKind.Rollback,
+        RunAuthorityOperationKind.Commit,
+        RunAuthorityOperationKind.Push,
+        RunAuthorityOperationKind.DraftPullRequest
+    ];
+
+    private static readonly RunAuthorityOperationKind[] ExpectedBoundedRunAuthorityForbiddenOperations =
+    [
+        RunAuthorityOperationKind.ReadyForReview,
+        RunAuthorityOperationKind.Merge,
+        RunAuthorityOperationKind.Release,
+        RunAuthorityOperationKind.Deployment,
+        RunAuthorityOperationKind.MemoryPromotion,
+        RunAuthorityOperationKind.WorkflowContinuation,
+        RunAuthorityOperationKind.ApprovalRequestCreate,
+        RunAuthorityOperationKind.PolicySatisfaction,
+        RunAuthorityOperationKind.ProviderMutation,
+        RunAuthorityOperationKind.PackagePublication,
+        RunAuthorityOperationKind.DurableEventWrite
+    ];
+
     [TestMethod]
     public void BlockB03_AuthorityProfileKind_IsOnlyCanonicalProfileKind()
     {
@@ -228,17 +254,32 @@ public sealed class BlockB03AuthorityProfileVocabularyDriftTests
     }
 
     [TestMethod]
-    public void BlockB03_BoundedRunAuthority_RemainsUnsupportedForRunProfileValidation()
+    public void BlockB03_BoundedRunAuthority_IsSupportedOnlyByBoundedLaneShape()
     {
-        var profile = AskBeforeMutationProfile() with { Kind = AuthorityProfileKind.BoundedRunAuthority };
+        var profile = BoundedRunAuthorityProfile();
         var validation = RunAuthorityProfileValidator.Validate(profile);
-        var decision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.SourceApply);
+        var commitDecision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.Commit);
+        var releaseDecision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.Release);
 
-        Assert.IsFalse(validation.IsValid);
-        AssertContains(validation.Issues, "AuthorityProfileKindUnsupported:BoundedRunAuthority");
-        Assert.IsFalse(decision.IsAllowedByProfile);
-        AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid");
-        AssertContains(decision.ForbiddenActions, "do not proceed from invalid run authority profile");
+        Assert.IsTrue(validation.IsValid, string.Join(", ", validation.Issues));
+        CollectionAssert.AreEquivalent(
+            ExpectedBoundedRunAuthorityAllowedOperations,
+            RunAuthorityProfileValidator.BoundedRunAuthorityAllowedOperations.ToArray());
+        CollectionAssert.AreEquivalent(
+            ExpectedBoundedRunAuthorityForbiddenOperations,
+            RunAuthorityProfileValidator.BoundedRunAuthorityForbiddenOperations.ToArray());
+        Assert.IsTrue(commitDecision.IsAllowedByProfile, string.Join(", ", commitDecision.BlockedReasons));
+        Assert.IsFalse(releaseDecision.IsAllowedByProfile);
+        AssertContains(releaseDecision.BlockedReasons, "BoundedRunAuthority does not allow Release.");
+
+        var widenedProfile = profile with
+        {
+            AllowedOperations = [.. ExpectedBoundedRunAuthorityAllowedOperations, RunAuthorityOperationKind.ReadyForReview]
+        };
+        var widenedValidation = RunAuthorityProfileValidator.Validate(widenedProfile);
+
+        Assert.IsFalse(widenedValidation.IsValid);
+        AssertContains(widenedValidation.Issues, "BoundedRunAuthorityCannotAllowDangerousOperation:ReadyForReview");
     }
 
     [TestMethod]
@@ -383,6 +424,19 @@ public sealed class BlockB03AuthorityProfileVocabularyDriftTests
             ForbiddenOperations = ExpectedAskBeforeMutationForbiddenOperations,
             CanMutateDurableSource = true,
             CanApplyPatch = true
+        };
+
+    private static RunAuthorityProfile BoundedRunAuthorityProfile() =>
+        AskBeforeMutationProfile() with
+        {
+            ProfileId = "bounded-run-authority",
+            Kind = AuthorityProfileKind.BoundedRunAuthority,
+            AllowedOperations = ExpectedBoundedRunAuthorityAllowedOperations,
+            ForbiddenOperations = ExpectedBoundedRunAuthorityForbiddenOperations,
+            CanExecuteRollback = true,
+            CanCommit = true,
+            CanPush = true,
+            CanCreatePullRequest = true
         };
 
     private static Type PropertyType<T>(string propertyName) =>

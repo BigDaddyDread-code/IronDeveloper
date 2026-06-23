@@ -368,12 +368,20 @@ public sealed class BlockBUSourceApplyConsumesBoundedAuthorityTests
     }
 
     [TestMethod]
-    public void BlockBU_BRValidatorStillRejectsSourceApplyProposalStageGrant()
+    public void BlockBU_BRValidatorAllowsSourceApplyGrantButDecisionStillDoesNotExecute()
     {
         var validation = BoundedRunAuthorityGrantValidator.Validate(ValidGrant(), ObservedAtUtc);
+        var decision = SourceApplyAuthorityEvaluator.Evaluate(ValidRequest() with { AcceptedApplyRequest = null });
 
-        Assert.IsFalse(validation.IsValid);
-        AssertContains(validation.Issues, "BoundedRunAllowedOperationCannotCrossBoundary:SourceApply");
+        Assert.IsTrue(validation.IsValid, string.Join(", ", validation.Issues));
+        Assert.IsTrue(decision.IsEligibleForControlledSourceApply, Describe(decision));
+        Assert.AreEqual(SourceApplyAuthorityPath.BoundedRunAuthority, decision.AuthorityPath);
+        AssertContains(decision.ForbiddenActions, "do not apply source from authority decision alone");
+        AssertContains(decision.ForbiddenActions, "do not commit from source apply authority");
+        AssertContains(decision.ForbiddenActions, "do not push from source apply authority");
+        AssertContains(decision.ForbiddenActions, "do not create PR from source apply authority");
+        AssertContains(decision.ForbiddenActions, "do not continue workflow from source apply authority");
+        AssertContains(decision.RequiredIndependentChecks, "executor must independently re-check repo/branch/run/patch hash/file scope/expiry/worktree state");
     }
 
     [TestMethod]

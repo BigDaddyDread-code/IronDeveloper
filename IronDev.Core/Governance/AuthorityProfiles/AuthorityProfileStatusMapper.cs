@@ -87,6 +87,26 @@ public static class AuthorityProfileStatusMapper
                 ]);
         }
 
+        if (request.ProfileKind == AuthorityProfileKind.BoundedRunAuthority &&
+            RunAuthorityProfileValidator.BoundedRunAuthorityForbiddenOperations.Contains(request.OperationKind))
+        {
+            return BuildBlocked(
+                request,
+                [
+                    $"BoundedRunAuthorityOperationBlocked:{request.OperationKind}"
+                ],
+                [
+                    $"separate governed authority for {request.OperationKind}"
+                ],
+                [
+                    $"request governed authority outside BoundedRunAuthority for {request.OperationKind}"
+                ],
+                [
+                    $"do not perform {request.OperationKind} under BoundedRunAuthority",
+                    "do not treat bounded profile allowance as later-stage authority"
+                ]);
+        }
+
         if (request.ProfileKind == AuthorityProfileKind.AskBeforeMutation &&
             IsMutationOperation(request.OperationKind) &&
             !HasAcceptedApplyApproval(request.EvidenceRefs))

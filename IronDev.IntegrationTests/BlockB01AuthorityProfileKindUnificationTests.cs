@@ -159,19 +159,19 @@ public sealed class BlockB01AuthorityProfileKindUnificationTests
     }
 
     [TestMethod]
-    public void BlockB01_BoundedRunAuthorityRemainsUnsupportedForRunProfileValidation()
+    public void BlockB01_BoundedRunAuthorityUsesCanonicalAuthorityProfileKind()
     {
-        var profile = ProposalOnlyProfile() with { Kind = AuthorityProfileKind.BoundedRunAuthority };
+        var profile = BoundedRunAuthorityProfile();
         var validation = RunAuthorityProfileValidator.Validate(profile);
-        var decision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.PatchPackageWrite);
+        var commitDecision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.Commit);
+        var mergeDecision = RunAuthorityProfileEvaluator.Evaluate(profile, RunAuthorityOperationKind.Merge);
 
-        Assert.IsFalse(validation.IsValid);
-        AssertContains(validation.Issues, "AuthorityProfileKindUnsupported:BoundedRunAuthority");
-        Assert.IsFalse(decision.IsAllowedByProfile);
-        Assert.AreEqual(AuthorityProfileKind.BoundedRunAuthority, decision.ProfileKind);
-        AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid");
-        AssertContains(decision.BlockedReasons, "RunAuthorityProfileInvalid:AuthorityProfileKindUnsupported:BoundedRunAuthority");
-        AssertContains(decision.ForbiddenActions, "do not proceed from invalid run authority profile");
+        Assert.IsTrue(validation.IsValid, string.Join(", ", validation.Issues));
+        Assert.IsTrue(commitDecision.IsAllowedByProfile, string.Join(", ", commitDecision.BlockedReasons));
+        Assert.AreEqual(AuthorityProfileKind.BoundedRunAuthority, commitDecision.ProfileKind);
+        Assert.IsFalse(mergeDecision.IsAllowedByProfile);
+        Assert.AreEqual(AuthorityProfileKind.BoundedRunAuthority, mergeDecision.ProfileKind);
+        AssertContains(mergeDecision.BlockedReasons, "BoundedRunAuthority does not allow Merge.");
     }
 
     [TestMethod]
@@ -267,6 +267,21 @@ public sealed class BlockB01AuthorityProfileKindUnificationTests
             CanContinueWorkflow = false,
             CanExecuteProviderMutation = false,
             CanPublishPackage = false
+        };
+
+    private static RunAuthorityProfile BoundedRunAuthorityProfile() =>
+        ProposalOnlyProfile() with
+        {
+            ProfileId = "bounded-run-authority",
+            Kind = AuthorityProfileKind.BoundedRunAuthority,
+            AllowedOperations = RunAuthorityProfileValidator.BoundedRunAuthorityAllowedOperations,
+            ForbiddenOperations = RunAuthorityProfileValidator.BoundedRunAuthorityForbiddenOperations,
+            CanMutateDurableSource = true,
+            CanApplyPatch = true,
+            CanExecuteRollback = true,
+            CanCommit = true,
+            CanPush = true,
+            CanCreatePullRequest = true
         };
 
     private static void AssertInvalid(RunAuthorityProfile profile, string expectedIssue)

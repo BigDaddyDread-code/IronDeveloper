@@ -57,9 +57,15 @@ public static class BoundedRunAuthorityGrantValidator
 
         foreach (var operation in operations)
         {
+            var isKnownOperation = Enum.IsDefined(operation) && operation != RunAuthorityOperationKind.Unknown;
             ValidateOperation(operation, "BoundedRunAllowedOperationKindKnownRequired", issues);
-            if (RunAuthorityProfileValidator.ProposalOnlyForbiddenOperations.Contains(operation))
+            if (!isKnownOperation)
+                continue;
+
+            if (RunAuthorityProfileValidator.BoundedRunAuthorityForbiddenOperations.Contains(operation))
                 issues.Add($"BoundedRunAllowedOperationCannotCrossBoundary:{operation}");
+            else if (!RunAuthorityProfileValidator.BoundedRunAuthorityAllowedOperations.Contains(operation))
+                issues.Add($"BoundedRunAllowedOperationNotSupportedByBoundedProfile:{operation}");
         }
     }
 
