@@ -20,6 +20,7 @@ namespace IronDev.IntegrationTests.Api;
 [TestClass]
 public abstract class ApiTestBase
 {
+    private const string TestJwtKey = "irondev-test-only-jwt-key-not-from-committed-config-32chars";
     protected static WebApplicationFactory<Program> Factory { get; private set; } = default!;
     protected static HttpClient Client { get; private set; } = default!;
     protected static string ConnectionString { get; private set; } = string.Empty;
@@ -41,12 +42,13 @@ public abstract class ApiTestBase
     {
         try
         {
+            Environment.SetEnvironmentVariable("IRONDEV_JWT_KEY", TestJwtKey);
+
             Factory = new WebApplicationFactory<Program>()
                 .WithWebHostBuilder(builder =>
                 {
                     builder.UseEnvironment("Test");
-                    // Force test-only configuration values into the builder so Program.cs picks them up.
-                    builder.UseSetting("Jwt:Key", "irondev-test-only-jwt-key-not-from-committed-config-32chars");
+                    // Force non-secret configuration values into the builder so Program.cs picks them up.
                     builder.UseSetting("Jwt:Issuer", "irondev-api");
                     builder.UseSetting("Jwt:Audience", "irondev-client");
                     builder.UseSetting("ConnectionStrings:IronDeveloperDb", "Server=DESKTOP-KFA0H13;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;");
@@ -63,7 +65,7 @@ public abstract class ApiTestBase
 
                         cfg.AddInMemoryCollection(new Dictionary<string, string?>
                         {
-                            ["Jwt:Key"] = "irondev-test-only-jwt-key-not-from-committed-config-32chars"
+                            ["Jwt:Key"] = TestJwtKey
                         });
                     });
                 });
@@ -96,6 +98,7 @@ public abstract class ApiTestBase
     public static async Task ClassCleanup()
     {
         Client?.Dispose();
+        Environment.SetEnvironmentVariable("IRONDEV_JWT_KEY", null);
         if (Factory != null)
         {
             await Factory.DisposeAsync();
