@@ -80,8 +80,10 @@ Commands:
 - Governance/status corridor: 1960/1960 passed.
 - Restore: passed with existing NU1510 warnings.
 - Build: 0 errors / 4 warnings.
-- SQL integration lane: pending GitHub Actions SQL Server service.
-- GitHub Actions sql-integration-ci: pending live SQL service proof.
+- SQL integration lane: live GitHub Actions SQL Server service proof passed on PR head d8e7f1e50684117c678b4b19f37d7f447e254843.
+- GitHub Actions sql-integration-ci run 28005862147: passed on PR head d8e7f1e50684117c678b4b19f37d7f447e254843.
+- GitHub Actions governance-boundary-ci run 28005862141: passed on PR head d8e7f1e50684117c678b4b19f37d7f447e254843.
+- This receipt update records the live CI evidence after the initial local receipt was written; CI evidence remains evidence only.
 - `git diff --check`: passed.
 - `git diff --cached --check`: passed.
 
