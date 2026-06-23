@@ -1,11 +1,13 @@
 using IronDev.Core.Governance;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace IronDev.Api.Controllers;
 
 [ApiController]
 [Authorize]
+[EnableRateLimiting("SensitiveApiPolicy")]
 [Route("api/v1/projects/{projectId:guid}/release-readiness-decision-records")]
 public sealed class ReleaseReadinessDecisionRecordsController : ControllerBase
 {

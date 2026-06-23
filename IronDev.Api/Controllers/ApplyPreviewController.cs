@@ -1,11 +1,13 @@
 using IronDev.Core.Workflow;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace IronDev.Api.Controllers;
 
 [ApiController]
 [Authorize]
+[EnableRateLimiting("SensitiveApiPolicy")]
 [Route("api/workflow/apply-preview")]
 public sealed class ApplyPreviewController : ControllerBase
 {

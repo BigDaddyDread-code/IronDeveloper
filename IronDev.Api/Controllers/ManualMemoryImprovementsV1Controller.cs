@@ -6,11 +6,13 @@ using IronDev.Core.Agents.Audit;
 using IronDev.Core.Agents.Concrete;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace IronDev.Api.Controllers;
 
 [ApiController]
 [Authorize]
+[EnableRateLimiting("SensitiveApiPolicy")]
 [Route("api/v1/manual-memory-improvements")]
 public sealed class ManualMemoryImprovementsV1Controller : ControllerBase
 {
