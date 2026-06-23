@@ -2,6 +2,13 @@ namespace IronDev.Core.Governance;
 
 public static class AuthorityProfileStatusMapper
 {
+    private sealed record AuthorityProfileOperationBoundary
+    {
+        public required AuthorityProfileKind ProfileKind { get; init; }
+        public required IReadOnlyCollection<RunAuthorityOperationKind> AllowedOperations { get; init; }
+        public required IReadOnlyCollection<RunAuthorityOperationKind> ForbiddenOperations { get; init; }
+    }
+
     public static GovernedOperationStatus Map(AuthorityProfileStatusRequest? request)
     {
         if (request is null)
@@ -31,6 +38,16 @@ public static class AuthorityProfileStatusMapper
                 ["do not infer authority from unknown profile"]);
         }
 
+        if (!Enum.IsDefined(request.OperationKind) || request.OperationKind == RunAuthorityOperationKind.Unknown)
+        {
+            return BuildBlocked(
+                request,
+                [Reason(AuthorityProfileStatusReason.AuthorityProfileOperationKnownRequired)],
+                ["known-authority-profile-operation"],
+                ["request known governed operation selection"],
+                ["do not infer authority from unknown operation"]);
+        }
+
         if (IsExpired(request))
         {
             return BuildStatus(
@@ -42,69 +59,33 @@ public static class AuthorityProfileStatusMapper
                 ["do not use expired grant"]);
         }
 
-        if (request.ProfileKind == AuthorityProfileKind.ProposalOnly &&
-            RunAuthorityProfileValidator.ProposalOnlyForbiddenOperations.Contains(request.OperationKind))
+        if (!TryGetCanonicalBoundary(request.ProfileKind, out var boundary))
         {
             return BuildBlocked(
                 request,
                 [
-                    Reason(AuthorityProfileStatusReason.ProposalOnlyDoesNotAllowDurableMutation),
-                    $"ProposalOnlyOperationBlocked:{request.OperationKind}"
+                    Reason(AuthorityProfileStatusReason.AuthorityProfileKindUnsupported),
+                    $"AuthorityProfileKindUnsupported:{request.ProfileKind}"
                 ],
-                [
-                    "bounded-run-authority-grant",
-                    "accepted-source-apply-authority"
-                ],
-                [
-                    "review patch package",
-                    "request bounded mutation authority for this repo/branch/run/scope"
-                ],
-                [
-                    "do not apply source under ProposalOnly",
-                    "do not commit under ProposalOnly",
-                    "do not push under ProposalOnly",
-                    "do not continue workflow from ProposalOnly status"
-                ]);
+                ["canonical-authority-profile-boundary"],
+                ["request supported authority profile selection"],
+                ["do not infer authority from unsupported profile"]);
         }
 
-        if (request.ProfileKind == AuthorityProfileKind.AskBeforeMutation &&
-            RunAuthorityProfileValidator.AskBeforeMutationForbiddenOperations.Contains(request.OperationKind))
-        {
-            return BuildBlocked(
-                request,
-                [
-                    $"AskBeforeMutationOperationBlocked:{request.OperationKind}"
-                ],
-                [
-                    $"separate governed authority for {request.OperationKind}"
-                ],
-                [
-                    $"request governed authority outside AskBeforeMutation for {request.OperationKind}"
-                ],
-                [
-                    $"do not perform {request.OperationKind} under AskBeforeMutation",
-                    "do not treat accepted apply approval as authority for later mutation lanes"
-                ]);
-        }
+        if (boundary.ForbiddenOperations.Contains(request.OperationKind))
+            return BuildProfileForbidden(request, boundary);
 
-        if (request.ProfileKind == AuthorityProfileKind.BoundedRunAuthority &&
-            RunAuthorityProfileValidator.BoundedRunAuthorityForbiddenOperations.Contains(request.OperationKind))
+        if (!boundary.AllowedOperations.Contains(request.OperationKind))
         {
             return BuildBlocked(
                 request,
                 [
-                    $"BoundedRunAuthorityOperationBlocked:{request.OperationKind}"
+                    Reason(AuthorityProfileStatusReason.AuthorityProfileOperationNotInCanonicalProfile),
+                    $"AuthorityProfileOperationNotInCanonicalProfile:{request.ProfileKind}:{request.OperationKind}"
                 ],
-                [
-                    $"separate governed authority for {request.OperationKind}"
-                ],
-                [
-                    $"request governed authority outside BoundedRunAuthority for {request.OperationKind}"
-                ],
-                [
-                    $"do not perform {request.OperationKind} under BoundedRunAuthority",
-                    "do not treat bounded profile allowance as later-stage authority"
-                ]);
+                ["canonical-authority-profile-operation-boundary"],
+                ["update canonical authority profile operation boundary"],
+                ["do not infer authority from an unmodelled profile operation"]);
         }
 
         if (request.ProfileKind == AuthorityProfileKind.AskBeforeMutation &&
@@ -124,6 +105,18 @@ public static class AuthorityProfileStatusMapper
                     "do not treat validation passed as approval",
                     "do not treat patch package completed as source apply authority"
                 ]);
+        }
+
+        if (request.ProfileKind == AuthorityProfileKind.BoundedRunAuthority &&
+            IsBoundedRunAuthorityMutationLane(request.OperationKind) &&
+            !HasBoundedRunAuthorityEvidenceGate(request, out var boundedReasons, out var boundedMissing, out var boundedActions))
+        {
+            return BuildBlocked(
+                request,
+                boundedReasons,
+                boundedMissing,
+                ["inspect bounded run authority grant and operation eligibility decision evidence"],
+                boundedActions);
         }
 
         if (request.EligibilityDecision is null)
@@ -193,6 +186,87 @@ public static class AuthorityProfileStatusMapper
             ["request operation eligibility evaluation for this repo/branch/run/scope"],
             ["do not treat a non-eligible decision as executable"]);
     }
+
+    private static bool TryGetCanonicalBoundary(
+        AuthorityProfileKind profileKind,
+        out AuthorityProfileOperationBoundary boundary)
+    {
+        boundary = profileKind switch
+        {
+            AuthorityProfileKind.ProposalOnly => new AuthorityProfileOperationBoundary
+            {
+                ProfileKind = profileKind,
+                AllowedOperations = RunAuthorityProfileValidator.ProposalOnlyAllowedOperations,
+                ForbiddenOperations = RunAuthorityProfileValidator.ProposalOnlyForbiddenOperations
+            },
+            AuthorityProfileKind.AskBeforeMutation => new AuthorityProfileOperationBoundary
+            {
+                ProfileKind = profileKind,
+                AllowedOperations = RunAuthorityProfileValidator.AskBeforeMutationAllowedOperations,
+                ForbiddenOperations = RunAuthorityProfileValidator.AskBeforeMutationForbiddenOperations
+            },
+            AuthorityProfileKind.BoundedRunAuthority => new AuthorityProfileOperationBoundary
+            {
+                ProfileKind = profileKind,
+                AllowedOperations = RunAuthorityProfileValidator.BoundedRunAuthorityAllowedOperations,
+                ForbiddenOperations = RunAuthorityProfileValidator.BoundedRunAuthorityForbiddenOperations
+            },
+            _ => null!
+        };
+
+        return boundary is not null;
+    }
+
+    private static GovernedOperationStatus BuildProfileForbidden(
+        AuthorityProfileStatusRequest request,
+        AuthorityProfileOperationBoundary boundary) =>
+        boundary.ProfileKind switch
+        {
+            AuthorityProfileKind.ProposalOnly => BuildBlocked(
+                request,
+                [
+                    Reason(AuthorityProfileStatusReason.ProposalOnlyDoesNotAllowDurableMutation),
+                    $"ProposalOnlyOperationBlocked:{request.OperationKind}"
+                ],
+                [
+                    "bounded-run-authority-grant",
+                    "accepted-source-apply-authority"
+                ],
+                [
+                    "review patch package",
+                    "request bounded mutation authority for this repo/branch/run/scope"
+                ],
+                [
+                    "do not apply source under ProposalOnly",
+                    "do not commit under ProposalOnly",
+                    "do not push under ProposalOnly",
+                    "do not continue workflow from ProposalOnly status"
+                ]),
+            AuthorityProfileKind.AskBeforeMutation => BuildBlocked(
+                request,
+                [$"AskBeforeMutationOperationBlocked:{request.OperationKind}"],
+                [$"separate governed authority for {request.OperationKind}"],
+                [$"request governed authority outside AskBeforeMutation for {request.OperationKind}"],
+                [
+                    $"do not perform {request.OperationKind} under AskBeforeMutation",
+                    "do not treat accepted apply approval as authority for later mutation lanes"
+                ]),
+            AuthorityProfileKind.BoundedRunAuthority => BuildBlocked(
+                request,
+                [$"BoundedRunAuthorityOperationBlocked:{request.OperationKind}"],
+                [$"separate governed authority for {request.OperationKind}"],
+                [$"request governed authority outside BoundedRunAuthority for {request.OperationKind}"],
+                [
+                    $"do not perform {request.OperationKind} under BoundedRunAuthority",
+                    "do not treat bounded profile allowance as later-stage authority"
+                ]),
+            _ => BuildBlocked(
+                request,
+                [Reason(AuthorityProfileStatusReason.AuthorityProfileKindUnsupported)],
+                ["canonical-authority-profile-boundary"],
+                ["request supported authority profile selection"],
+                ["do not infer authority from unsupported profile"])
+        };
 
     private static GovernedOperationStatus BuildBlocked(
         AuthorityProfileStatusRequest request,
@@ -311,9 +385,51 @@ public static class AuthorityProfileStatusMapper
         RunAuthorityProfileValidator.ProposalOnlyForbiddenOperations.Contains(operationKind);
 
     private static bool HasAcceptedApplyApproval(IReadOnlyCollection<string>? evidenceRefs) =>
+        HasRefPrefix(evidenceRefs, "accepted-apply-approval:") ||
+        HasRefPrefix(evidenceRefs, "accepted-source-apply-request:");
+
+    private static bool IsBoundedRunAuthorityMutationLane(RunAuthorityOperationKind operationKind) =>
+        operationKind is
+            RunAuthorityOperationKind.SourceApply or
+            RunAuthorityOperationKind.DurableSourceMutation or
+            RunAuthorityOperationKind.Rollback or
+            RunAuthorityOperationKind.Commit or
+            RunAuthorityOperationKind.Push or
+            RunAuthorityOperationKind.DraftPullRequest;
+
+    private static bool HasBoundedRunAuthorityEvidenceGate(
+        AuthorityProfileStatusRequest request,
+        out IReadOnlyCollection<string> blockedReasons,
+        out IReadOnlyCollection<string> missingEvidence,
+        out IReadOnlyCollection<string> forbiddenActions)
+    {
+        var reasons = new List<string>();
+        var missing = new List<string>();
+        var actions = new List<string>();
+
+        if (!HasRefPrefix(request.EvidenceRefs, "bounded-run-authority-grant:"))
+        {
+            reasons.Add(Reason(AuthorityProfileStatusReason.BoundedRunAuthorityGrantEvidenceRequired));
+            missing.Add("bounded-run-authority-grant");
+            actions.Add("do not infer bounded authority from profile kind alone");
+        }
+
+        if (!HasRefPrefix(request.EvidenceRefs, "operation-eligibility-decision:"))
+        {
+            reasons.Add(Reason(AuthorityProfileStatusReason.OperationEligibilityDecisionEvidenceRequired));
+            missing.Add("operation-eligibility-decision");
+            actions.Add("do not infer bounded authority from eligibility text alone");
+        }
+
+        blockedReasons = Clean(reasons);
+        missingEvidence = Clean(missing);
+        forbiddenActions = Clean(actions);
+        return blockedReasons.Count == 0;
+    }
+
+    private static bool HasRefPrefix(IReadOnlyCollection<string>? evidenceRefs, string prefix) =>
         ValuesOrEmpty(evidenceRefs).Any(value =>
-            value?.StartsWith("accepted-apply-approval:", StringComparison.OrdinalIgnoreCase) == true ||
-            value?.StartsWith("accepted-source-apply-request:", StringComparison.OrdinalIgnoreCase) == true);
+            value?.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) == true);
 
     private static string Reason(AuthorityProfileStatusReason reason) => reason.ToString();
 
