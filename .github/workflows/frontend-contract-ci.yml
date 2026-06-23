@@ -32,3 +32,18 @@ jobs:
       - name: Frontend contract check
         shell: pwsh
         run: ./Scripts/ci/run-frontend-contract-ci.ps1
+
+      - name: Verify evidence artifacts are sanitized
+        if: always()
+        id: artifact-safety
+        shell: pwsh
+        run: ./Scripts/ci/test-ci-evidence-artifact-safety.ps1 -ArtifactDirectory artifacts/ci/frontend-contract
+
+      - name: Upload frontend contract evidence
+        if: ${{ always() && steps.artifact-safety.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-contract-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/frontend-contract
+          retention-days: 14
+          if-no-files-found: error

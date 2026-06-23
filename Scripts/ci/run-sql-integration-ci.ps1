@@ -10,6 +10,20 @@ function Write-Section {
     Write-Host "== $Name =="
 }
 
+function ConvertTo-SafeLaneName {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $safe = [Regex]::Replace($Name.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim("-")
+    if ([string]::IsNullOrWhiteSpace($safe)) {
+        return "ci-lane"
+    }
+
+    return $safe
+}
+
 function Invoke-TestLane {
     param(
         [Parameter(Mandatory = $true)]
@@ -20,11 +34,17 @@ function Invoke-TestLane {
     )
 
     Write-Section $Name
+    $safeLaneName = ConvertTo-SafeLaneName $Name
     dotnet test $script:Project `
         --no-restore `
         --no-build `
         --logger "console;verbosity=minimal" `
+        --logger "trx;LogFileName=$safeLaneName.trx" `
+        --results-directory $script:TestResultsRoot `
         --filter $Filter
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Name failed."
+    }
 }
 
 function Invoke-TestLaneWithRetry {
@@ -41,12 +61,15 @@ function Invoke-TestLaneWithRetry {
     )
 
     Write-Section "$Name readiness"
+    $safeLaneName = ConvertTo-SafeLaneName $Name
     for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
         Write-Host "Attempt $attempt of $Attempts"
         dotnet test $script:Project `
             --no-restore `
             --no-build `
             --logger "console;verbosity=minimal" `
+            --logger "trx;LogFileName=$safeLaneName.trx" `
+            --results-directory $script:TestResultsRoot `
             --filter $Filter
 
         if ($LASTEXITCODE -eq 0) {
@@ -86,7 +109,22 @@ function Set-TestOutputConnectionString {
         Set-Content -LiteralPath $resolvedPath -Encoding UTF8
 }
 
+$script:RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+$script:ArtifactRoot = Join-Path $script:RepoRoot "artifacts\ci\sql-integration"
+$script:TestResultsRoot = Join-Path $script:ArtifactRoot "test-results"
 $script:Project = "IronDev.IntegrationTests/IronDev.IntegrationTests.csproj"
+
+if (Test-Path -LiteralPath $script:ArtifactRoot) {
+    Remove-Item -LiteralPath $script:ArtifactRoot -Recurse -Force
+}
+
+New-Item -ItemType Directory -Path $script:TestResultsRoot -Force | Out-Null
+& (Join-Path $PSScriptRoot "write-ci-evidence-summary.ps1") `
+    -ArtifactDirectory $script:ArtifactRoot `
+    -WorkflowName "sql-integration-ci" `
+    -LaneName "sql-integration" `
+    -CommandCategory "dotnet test" `
+    -ResultStatus "Started"
 
 Write-Section "SQL integration CI"
 Write-Host "SQL CI reports evidence only."
@@ -125,3 +163,11 @@ Invoke-TestLane `
 
 Write-Section "SQL integration CI complete"
 Write-Host "A database-backed green check is evidence, not permission."
+& (Join-Path $PSScriptRoot "write-ci-evidence-summary.ps1") `
+    -ArtifactDirectory $script:ArtifactRoot `
+    -WorkflowName "sql-integration-ci" `
+    -LaneName "sql-integration" `
+    -CommandCategory "dotnet test" `
+    -ResultStatus "Passed"
+& (Join-Path $PSScriptRoot "test-ci-evidence-artifact-safety.ps1") `
+    -ArtifactDirectory $script:ArtifactRoot

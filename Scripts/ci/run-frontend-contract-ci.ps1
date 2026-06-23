@@ -10,10 +10,48 @@ function Write-Section {
     Write-Host "== $Name =="
 }
 
+function Invoke-LoggedNativeCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPath,
+
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Command
+    )
+
+    Write-Section $Name
+    Add-Content -LiteralPath $OutputPath -Value ""
+    Add-Content -LiteralPath $OutputPath -Value "== $Name =="
+    & $Command 2>&1 | Tee-Object -FilePath $OutputPath -Append
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Name failed."
+    }
+}
+
 $script:RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $script:FrontendRoot = Join-Path $script:RepoRoot "IronDev.TauriShell"
 $script:OpenApiSnapshot = Join-Path $script:FrontendRoot "openapi\irondev-api.openapi.json"
 $script:GeneratedClient = Join-Path $script:FrontendRoot "src\api\generated\ironDevApiTypes.ts"
+$script:ArtifactRoot = Join-Path $script:RepoRoot "artifacts\ci\frontend-contract"
+$script:FrontendOutput = Join-Path $script:ArtifactRoot "frontend-contract-output.txt"
+$script:OpenApiDriftSummary = Join-Path $script:ArtifactRoot "openapi-drift-summary.txt"
+
+if (Test-Path -LiteralPath $script:ArtifactRoot) {
+    Remove-Item -LiteralPath $script:ArtifactRoot -Recurse -Force
+}
+
+New-Item -ItemType Directory -Path $script:ArtifactRoot -Force | Out-Null
+& (Join-Path $PSScriptRoot "write-ci-evidence-summary.ps1") `
+    -ArtifactDirectory $script:ArtifactRoot `
+    -WorkflowName "frontend-contract-ci" `
+    -LaneName "frontend-contract" `
+    -CommandCategory "frontend type-check and OpenAPI drift" `
+    -ResultStatus "Started"
+Set-Content -LiteralPath $script:FrontendOutput -Value "Frontend contract output. Evidence only; not approval or permission." -Encoding UTF8
+Set-Content -LiteralPath $script:OpenApiDriftSummary -Value "OpenAPI drift summary. Evidence only; not approval or permission." -Encoding UTF8
 
 Write-Section "Frontend contract CI"
 Write-Host "Frontend contract CI reports evidence only."
@@ -41,22 +79,33 @@ $tempGeneratedClient = Join-Path $tempRoot "ironDevApiTypes.ts"
 try {
     Push-Location $script:FrontendRoot
 
-    Write-Section "Install frontend dependencies"
-    npm ci
+    Invoke-LoggedNativeCommand `
+        -Name "Install frontend dependencies" `
+        -OutputPath $script:FrontendOutput `
+        -Command { npm ci }
 
-    Write-Section "Tauri frontend type-check"
-    npx tsc --noEmit
+    Invoke-LoggedNativeCommand `
+        -Name "Tauri frontend type-check" `
+        -OutputPath $script:FrontendOutput `
+        -Command { npx tsc --noEmit }
 
-    Write-Section "OpenAPI generated client drift check"
-    New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
-    npx openapi-typescript openapi/irondev-api.openapi.json -o $tempGeneratedClient
+    Invoke-LoggedNativeCommand `
+        -Name "OpenAPI generated client drift check" `
+        -OutputPath $script:OpenApiDriftSummary `
+        -Command {
+            New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+            npx openapi-typescript openapi/irondev-api.openapi.json -o $tempGeneratedClient
+        }
 
     $committedClient = (Get-Content -LiteralPath $script:GeneratedClient -Raw) -replace "`r`n", "`n" -replace "`r", "`n"
     $generatedClient = (Get-Content -LiteralPath $tempGeneratedClient -Raw) -replace "`r`n", "`n" -replace "`r", "`n"
 
     if ($committedClient -ne $generatedClient) {
+        Add-Content -LiteralPath $script:OpenApiDriftSummary -Value "OpenAPI/client drift detected."
         throw "OpenAPI/client drift detected. This is evidence only. Update the API contract/client in a separate reviewed PR."
     }
+
+    Add-Content -LiteralPath $script:OpenApiDriftSummary -Value "Committed generated API client matches the OpenAPI snapshot."
 }
 finally {
     Pop-Location
@@ -68,3 +117,11 @@ finally {
 
 Write-Section "Frontend contract CI complete"
 Write-Host "A clean type-check and OpenAPI drift check is evidence, not permission."
+& (Join-Path $PSScriptRoot "write-ci-evidence-summary.ps1") `
+    -ArtifactDirectory $script:ArtifactRoot `
+    -WorkflowName "frontend-contract-ci" `
+    -LaneName "frontend-contract" `
+    -CommandCategory "frontend type-check and OpenAPI drift" `
+    -ResultStatus "Passed"
+& (Join-Path $PSScriptRoot "test-ci-evidence-artifact-safety.ps1") `
+    -ArtifactDirectory $script:ArtifactRoot
