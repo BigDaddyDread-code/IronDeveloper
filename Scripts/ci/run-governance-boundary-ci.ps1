@@ -93,7 +93,8 @@ $compatibilityBoundaryFilter = @(
 
 $securityBoundaryFilter = @(
     "FullyQualifiedName~BlockC11SecretScanningRegressionTests",
-    "FullyQualifiedName~BlockC12LocalTestSafetyRegressionTests"
+    "FullyQualifiedName~BlockC12LocalTestSafetyRegressionTests",
+    "FullyQualifiedName~BlockC13ProductionEnvironmentSafetyRegressionTests"
 ) -join "|"
 
 $apiBoundaryFilter = @(

@@ -68,6 +68,8 @@ builder.Host.UseDefaultServiceProvider(options =>
     options.ValidateOnBuild = true;
 });
 
+var allowedCorsOrigins = ResolveAllowedCorsOrigins(builder.Configuration, builder.Environment);
+StartupEnvironmentSafety.Current = CreateEnvironmentSafetyContext(builder);
 var environmentInfo = CreateEnvironmentInfo(builder);
 ValidateEnvironmentSafety(environmentInfo);
 Log.Information(
@@ -86,7 +88,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 
-var allowedCorsOrigins = ResolveAllowedCorsOrigins(builder.Configuration, builder.Environment);
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsPolicyName, policy =>
@@ -369,11 +370,36 @@ static string ResolveDatabaseName(string connectionString)
     }
 }
 
+static StartupEnvironmentSafetyContext CreateEnvironmentSafetyContext(WebApplicationBuilder builder)
+{
+    var connectionString = builder.Configuration.GetConnectionString("IronDeveloperDb") ?? string.Empty;
+    var parsed = TryParseConnectionString(connectionString);
+
+    return new StartupEnvironmentSafetyContext(
+        connectionString,
+        parsed.Database,
+        parsed.DataSource,
+        parsed.ContainsPassword,
+        builder.Configuration["LocalTest:WorkspaceRoot"] ?? string.Empty,
+        builder.Configuration["LocalTest:LogsRoot"] ?? string.Empty,
+        builder.Configuration["DisposableBuild:WorkspaceRoot"] ?? string.Empty,
+        builder.Configuration["DisposableBuild:EvidenceRoot"] ?? string.Empty);
+}
+
 static void ValidateEnvironmentSafety(EnvironmentInfoDto environmentInfo)
 {
-    if (!string.Equals(environmentInfo.Environment, "LocalTest", StringComparison.OrdinalIgnoreCase))
+    if (string.Equals(environmentInfo.Environment, "LocalTest", StringComparison.OrdinalIgnoreCase))
+    {
+        ValidateLocalTestEnvironmentSafety(environmentInfo);
         return;
+    }
 
+    if (IsProductionLikeEnvironment(environmentInfo.Environment))
+        ValidateProductionLikeEnvironmentSafety(environmentInfo, StartupEnvironmentSafety.Current);
+}
+
+static void ValidateLocalTestEnvironmentSafety(EnvironmentInfoDto environmentInfo)
+{
     if (!IsSafeLocalTestDatabaseName(environmentInfo.Database))
     {
         throw new InvalidOperationException("LocalTest must use an isolated test database with a clear test marker.");
@@ -391,6 +417,165 @@ static void ValidateEnvironmentSafety(EnvironmentInfoDto environmentInfo)
 
     if (environmentInfo.DangerRealRepoWritesEnabled)
         throw new InvalidOperationException("LocalTest cannot enable dangerous real repo writes.");
+}
+
+static void ValidateProductionLikeEnvironmentSafety(
+    EnvironmentInfoDto environmentInfo,
+    StartupEnvironmentSafetyContext? safetyContext)
+{
+    safetyContext ??= StartupEnvironmentSafetyContext.Empty;
+
+    if (string.IsNullOrWhiteSpace(safetyContext.ConnectionString))
+        throw new InvalidOperationException("Production-like environment must configure a database connection string.");
+
+    if (ContainsPlaceholderDatabaseConfiguration(safetyContext.ConnectionString))
+        throw new InvalidOperationException("Production-like environment must not use placeholder database server configuration.");
+
+    if (string.IsNullOrWhiteSpace(safetyContext.Database))
+        throw new InvalidOperationException("Production-like environment must configure a database name.");
+
+    if (HasUnsafeProductionLikeDatabaseMarker(safetyContext.Database))
+        throw new InvalidOperationException("Production-like environment must not use test-like database names.");
+
+    if (IsLocalDatabaseServer(safetyContext.DataSource))
+        throw new InvalidOperationException("Production-like environment must not use a local database server.");
+
+    if (safetyContext.ContainsPassword)
+        throw new InvalidOperationException("Production-like environment must not use password-bearing database configuration.");
+
+    if (environmentInfo.DangerRealRepoWritesEnabled)
+        throw new InvalidOperationException("Production-like environment must not enable dangerous real repo writes.");
+
+    if (IsUnsafeProductionLikeRoot(safetyContext.LocalTestWorkspaceRoot))
+        throw new InvalidOperationException("Production-like environment must not use local or test workspace roots.");
+
+    if (IsUnsafeProductionLikeRoot(safetyContext.LocalTestLogsRoot))
+        throw new InvalidOperationException("Production-like environment must not use local or test logs roots.");
+
+    if (IsUnsafeProductionLikeRoot(safetyContext.DisposableWorkspaceRoot))
+        throw new InvalidOperationException("Production-like environment must not use local or test disposable workspace roots.");
+
+    if (IsUnsafeProductionLikeRoot(safetyContext.DisposableEvidenceRoot))
+        throw new InvalidOperationException("Production-like environment must not use local or test disposable evidence roots.");
+}
+
+static bool IsProductionLikeEnvironment(string environmentName) =>
+    !string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase) &&
+    !string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase) &&
+    !string.Equals(environmentName, "LocalTest", StringComparison.OrdinalIgnoreCase);
+
+static (string Database, string DataSource, bool ContainsPassword) TryParseConnectionString(string connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+        return (string.Empty, string.Empty, false);
+
+    try
+    {
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        return (
+            builder.InitialCatalog ?? string.Empty,
+            builder.DataSource ?? string.Empty,
+            !string.IsNullOrWhiteSpace(builder.Password));
+    }
+    catch
+    {
+        return (string.Empty, string.Empty, ContainsPasswordKey(connectionString));
+    }
+}
+
+static bool ContainsPasswordKey(string connectionString) =>
+    connectionString
+        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Any(part =>
+            part.StartsWith("Password=", StringComparison.OrdinalIgnoreCase) ||
+            part.StartsWith("Pwd=", StringComparison.OrdinalIgnoreCase));
+
+static bool ContainsPlaceholderDatabaseConfiguration(string connectionString) =>
+    connectionString.Contains("YOUR_SERVER", StringComparison.OrdinalIgnoreCase);
+
+static bool HasUnsafeProductionLikeDatabaseMarker(string database)
+{
+    var segments = SplitLocalTestSafetySegments(database);
+    return segments.Any(segment =>
+        segment.Equals("Test", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("LocalTest", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Dev", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Development", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Local", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Scratch", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Temp", StringComparison.OrdinalIgnoreCase));
+}
+
+static bool IsLocalDatabaseServer(string dataSource)
+{
+    if (string.IsNullOrWhiteSpace(dataSource))
+        return true;
+
+    var normalized = dataSource.Trim();
+    var host = normalized;
+    if (host.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase))
+        host = host[4..];
+
+    var slashIndex = host.IndexOf('\\', StringComparison.Ordinal);
+    if (slashIndex >= 0)
+        host = host[..slashIndex];
+
+    var commaIndex = host.IndexOf(',', StringComparison.Ordinal);
+    if (commaIndex >= 0)
+        host = host[..commaIndex];
+
+    host = host.Trim();
+
+    return host.Equals(".", StringComparison.OrdinalIgnoreCase) ||
+        host.Equals("(local)", StringComparison.OrdinalIgnoreCase) ||
+        host.Equals("(localdb)", StringComparison.OrdinalIgnoreCase) ||
+        host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+        host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+        host.Equals("::1", StringComparison.OrdinalIgnoreCase) ||
+        host.StartsWith("DESKTOP-", StringComparison.OrdinalIgnoreCase) ||
+        normalized.Contains("(localdb)", StringComparison.OrdinalIgnoreCase) ||
+        normalized.Contains("SQLEXPRESS", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool IsUnsafeProductionLikeRoot(string root)
+{
+    if (string.IsNullOrWhiteSpace(root))
+        return false;
+
+    var normalized = root.Replace('\\', '/').Trim();
+    var lower = normalized.ToLowerInvariant();
+    var tempRoot = Path.GetTempPath().Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
+    var userRoot = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+        .Replace('\\', '/')
+        .TrimEnd('/')
+        .ToLowerInvariant();
+
+    if (!string.IsNullOrWhiteSpace(tempRoot) &&
+        (lower.Equals(tempRoot, StringComparison.Ordinal) || lower.StartsWith(tempRoot + "/", StringComparison.Ordinal)))
+    {
+        return true;
+    }
+
+    if (!string.IsNullOrWhiteSpace(userRoot) &&
+        (lower.Equals(userRoot, StringComparison.Ordinal) || lower.StartsWith(userRoot + "/", StringComparison.Ordinal)))
+    {
+        return true;
+    }
+
+    if (lower.Contains("/source/repos/", StringComparison.Ordinal))
+    {
+        return true;
+    }
+
+    var segments = SplitLocalTestSafetySegments(root);
+    return segments.Any(segment =>
+        segment.Equals("Test", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("LocalTest", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Dev", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Development", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Local", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Scratch", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Temp", StringComparison.OrdinalIgnoreCase));
 }
 
 static bool IsSafeLocalTestDatabaseName(string database)
@@ -521,3 +706,29 @@ static IRunReportService CreateRunReportService(IConfiguration configuration)
 
 // Expose Program for WebApplicationFactory in integration tests.
 public partial class Program { }
+
+internal sealed record StartupEnvironmentSafetyContext(
+    string ConnectionString,
+    string Database,
+    string DataSource,
+    bool ContainsPassword,
+    string LocalTestWorkspaceRoot,
+    string LocalTestLogsRoot,
+    string DisposableWorkspaceRoot,
+    string DisposableEvidenceRoot)
+{
+    public static StartupEnvironmentSafetyContext Empty { get; } = new(
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        false,
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        string.Empty);
+}
+
+internal static class StartupEnvironmentSafety
+{
+    public static StartupEnvironmentSafetyContext? Current { get; set; }
+}
