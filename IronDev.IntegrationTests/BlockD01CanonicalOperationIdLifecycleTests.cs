@@ -117,6 +117,26 @@ public sealed class BlockD01CanonicalOperationIdLifecycleTests
         AssertContains(result.Issues, "OperationIdentityLifecycleStateRequired");
     }
 
+    [DataTestMethod]
+    [DataRow(null, "project-d01", "OperationIdentityTenantIdRequired")]
+    [DataRow("", "project-d01", "OperationIdentityTenantIdRequired")]
+    [DataRow("tenant d01", "project-d01", "OperationIdentityTenantIdInvalid")]
+    [DataRow("tenant-approve-me", "project-d01", "OperationIdentityTenantIdInvalid")]
+    [DataRow("tenant-d01", null, "OperationIdentityProjectIdRequired")]
+    [DataRow("tenant-d01", "", "OperationIdentityProjectIdRequired")]
+    [DataRow("tenant-d01", "project d01", "OperationIdentityProjectIdInvalid")]
+    [DataRow("tenant-d01", "project-policy-satisfied", "OperationIdentityProjectIdInvalid")]
+    public void RecordValidation_FailsClosedForMissingOrUnsafeTenantProjectScope(
+        string? tenantId,
+        string? projectId,
+        string expectedIssue)
+    {
+        var result = OperationIdentityValidator.ValidateRecord(Record(tenantId: tenantId!, projectId: projectId!));
+
+        Assert.IsFalse(result.IsValid);
+        AssertContains(result.Issues, expectedIssue);
+    }
+
     [TestMethod]
     public void References_AttachWithoutChangingOperationId()
     {
@@ -417,12 +437,14 @@ public sealed class BlockD01CanonicalOperationIdLifecycleTests
 
     private static OperationIdentityRecord Record(
         OperationIdentityLifecycleState lifecycleState = OperationIdentityLifecycleState.Minted,
-        IReadOnlyList<OperationIdentityReference>? references = null) =>
+        IReadOnlyList<OperationIdentityReference>? references = null,
+        string tenantId = "tenant-d01",
+        string projectId = "project-d01") =>
         new()
         {
             OperationId = OperationId,
-            TenantId = "tenant-d01",
-            ProjectId = "project-d01",
+            TenantId = tenantId,
+            ProjectId = projectId,
             CreatedAtUtc = CreatedAtUtc,
             CreatedBy = "backend-operation-identity-service",
             LifecycleState = lifecycleState,

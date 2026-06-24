@@ -35,6 +35,9 @@ public static partial class OperationIdentityValidator
         var issues = new List<string>();
         AddOperationIdIssues(record.OperationId, issues);
 
+        AddScopeIdIssues(record.TenantId, "OperationIdentityTenantIdRequired", "OperationIdentityTenantIdInvalid", issues);
+        AddScopeIdIssues(record.ProjectId, "OperationIdentityProjectIdRequired", "OperationIdentityProjectIdInvalid", issues);
+
         if (record.CreatedAtUtc == default)
         {
             issues.Add("OperationIdentityCreatedAtRequired");
@@ -165,6 +168,28 @@ public static partial class OperationIdentityValidator
         }
 
         AddReferenceSubstitutionIssues(operationId, issues);
+    }
+
+    private static void AddScopeIdIssues(
+        string? scopeId,
+        string requiredIssue,
+        string invalidIssue,
+        ICollection<string> issues)
+    {
+        if (string.IsNullOrWhiteSpace(scopeId))
+        {
+            issues.Add(requiredIssue);
+            return;
+        }
+
+        if (ContainsUnsafeText(scopeId) ||
+            scopeId.Any(char.IsWhiteSpace) ||
+            scopeId.Contains("approve", StringComparison.OrdinalIgnoreCase) ||
+            scopeId.Contains("policy", StringComparison.OrdinalIgnoreCase) ||
+            scopeId.Contains("authority", StringComparison.OrdinalIgnoreCase))
+        {
+            issues.Add(invalidIssue);
+        }
     }
 
     private static void AddReferenceSubstitutionIssues(string operationId, ICollection<string> issues)

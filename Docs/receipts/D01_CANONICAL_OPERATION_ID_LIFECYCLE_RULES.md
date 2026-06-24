@@ -6,6 +6,8 @@ D01 defines the canonical lifecycle rules for `OperationId`.
 
 Every governed operation has one durable backend-minted root identifier. Related run IDs, patch IDs, apply IDs, commit IDs, push IDs, PR IDs, receipt IDs, evidence IDs, and correlation IDs are references only.
 
+Operation identity is scoped by tenant and project. Tenant and project scope are required identity fields, not optional read-model hints.
+
 ## Boundary
 
 Operation identity is a durable reference spine. It does not grant authority, approval, policy satisfaction, validation freshness, source apply, rollback, commit, push, PR creation, merge readiness, release readiness, deployment readiness, memory promotion, or workflow continuation.
@@ -22,6 +24,8 @@ A canonical `OperationId` is:
 - opaque
 - backend-minted
 - preserved once assigned
+- scoped to one tenant
+- scoped to one project
 - not derived from UI text
 - not derived from memory
 - not derived from model output
@@ -31,6 +35,8 @@ A canonical `OperationId` is:
 - not re-minted by status, timeline, or read-model layers
 
 D01 accepts backend-shaped IDs using the `op_` prefix followed by lowercase hex or a lowercase GUID without braces. Human prose, blank values, whitespace, control characters, run IDs, patch IDs, apply IDs, commit package IDs, commit SHAs, push IDs, PR IDs, receipt IDs, evidence IDs, and correlation IDs fail validation as canonical operation IDs.
+
+Tenant ID and project ID are required. Missing tenant or project scope fails validation so durable operation identity cannot become cross-tenant or cross-project ambiguous.
 
 ## Reference ID Rules
 
@@ -90,7 +96,7 @@ Frontend readiness sources remain read-only and must not mint operation IDs.
 
 ## Validation
 
-- Focused D01 tests: 46/46 passed.
+- Focused D01 tests: 54/54 passed.
 - A02 operation status read adapter tests and A05 operation timeline read adapter tests: 61/61 passed.
 - Frontend readiness/read-only practical corridor: 660/660 passed for A01-A07 and A10-A12.
 - Full A01-A12 frontend readiness corridor was attempted: 794/797 passed; three A08/A09 assertions now report `Expired` where the older fixture expected `Available` or `Current` on 2026-06-24. D01 does not modify those time-sensitive frontend-readiness fixtures.

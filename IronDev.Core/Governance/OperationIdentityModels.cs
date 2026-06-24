@@ -45,8 +45,8 @@ public sealed record OperationIdentityReference
 public sealed record OperationIdentityRecord
 {
     public required string OperationId { get; init; }
-    public string? TenantId { get; init; }
-    public string? ProjectId { get; init; }
+    public required string TenantId { get; init; }
+    public required string ProjectId { get; init; }
     public required DateTimeOffset CreatedAtUtc { get; init; }
     public required string CreatedBy { get; init; }
     public required OperationIdentityLifecycleState LifecycleState { get; init; }
