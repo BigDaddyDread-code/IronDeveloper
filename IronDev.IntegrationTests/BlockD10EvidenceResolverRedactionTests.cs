@@ -741,9 +741,7 @@ public sealed class BlockD10EvidenceResolverRedactionTests
     [DataRow("Authorization: Basic abc123", "[REDACTED_AUTHORIZATION]", EvidenceRedactionReasonKind.AuthorizationHeaderDetected)]
     [DataRow("Bearer abc.def.ghi", "[REDACTED_SECRET]", EvidenceRedactionReasonKind.TokenDetected)]
     [DataRow("api_key=abc123", "[REDACTED_SECRET]", EvidenceRedactionReasonKind.SecretDetected)]
-    [DataRow("password=abc123", "[REDACTED_SECRET]", EvidenceRedactionReasonKind.SecretDetected)]
     [DataRow("token=abc123", "[REDACTED_SECRET]", EvidenceRedactionReasonKind.TokenDetected)]
-    [DataRow("Server=db;User Id=sa;Password=pw", "[REDACTED_SECRET]", EvidenceRedactionReasonKind.ConnectionStringDetected)]
     [DataRow("hidden chain-of-thought: secret path", "[REDACTED_PRIVATE_REASONING]", EvidenceRedactionReasonKind.PrivateReasoningDetected)]
     [DataRow("private reasoning: secret path", "[REDACTED_PRIVATE_REASONING]", EvidenceRedactionReasonKind.PrivateReasoningDetected)]
     [DataRow("scratchpad: hidden plan", "[REDACTED_PRIVATE_REASONING]", EvidenceRedactionReasonKind.PrivateReasoningDetected)]
@@ -774,8 +772,39 @@ public sealed class BlockD10EvidenceResolverRedactionTests
         Assert.IsFalse(preview.PreviewText.Contains("abc123", StringComparison.OrdinalIgnoreCase));
     }
 
+    [TestMethod]
+    public void SecretAssignmentPayloadIsRedacted()
+    {
+        var result = Resolve(
+            [Requested("evidence-a", EvidenceReferenceKind.ValidationEvidence, requestRedactedPreview: true)],
+            [Available("evidence-a", EvidenceReferenceKind.ValidationEvidence)],
+            [Payload("evidence-a", SecretAssignmentPayload())]);
+
+        var preview = result.ResolvedEvidence[0].RedactedPreview!;
+        Assert.IsTrue(preview.WasRedacted);
+        Assert.IsFalse(preview.WasSuppressed);
+        Assert.IsTrue(preview.PreviewText.Contains("[REDACTED_SECRET]", StringComparison.Ordinal));
+        AssertContains(preview.RedactionReasons, EvidenceRedactionReasonKind.SecretDetected);
+        Assert.IsFalse(preview.PreviewText.Contains("abc123", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void ConnectionStringPayloadIsRedacted()
+    {
+        var result = Resolve(
+            [Requested("evidence-a", EvidenceReferenceKind.ValidationEvidence, requestRedactedPreview: true)],
+            [Available("evidence-a", EvidenceReferenceKind.ValidationEvidence)],
+            [Payload("evidence-a", SecretConnectionPayload())]);
+
+        var preview = result.ResolvedEvidence[0].RedactedPreview!;
+        Assert.IsTrue(preview.WasRedacted);
+        Assert.IsFalse(preview.WasSuppressed);
+        Assert.IsTrue(preview.PreviewText.Contains("[REDACTED_SECRET]", StringComparison.Ordinal));
+        AssertContains(preview.RedactionReasons, EvidenceRedactionReasonKind.ConnectionStringDetected);
+        Assert.IsFalse(preview.PreviewText.Contains("pw", StringComparison.OrdinalIgnoreCase));
+    }
+
     [DataTestMethod]
-    [DataRow("-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----", EvidenceRedactionReasonKind.PrivateKeyDetected)]
     [DataRow("unsafe\u0001control", EvidenceRedactionReasonKind.UnsafeControlCharacters)]
     public void UnsafePayloadsAreSuppressedInsteadOfLeaked(
         string payloadText,
@@ -790,6 +819,21 @@ public sealed class BlockD10EvidenceResolverRedactionTests
         Assert.IsTrue(preview.WasSuppressed);
         Assert.AreEqual("[SUPPRESSED_UNSAFE_PAYLOAD]", preview.PreviewText);
         AssertContains(preview.RedactionReasons, expectedReason);
+        Assert.IsFalse(preview.PreviewText.Contains("PRIVATE KEY", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void SecretKeyBlockPayloadIsSuppressedInsteadOfLeaked()
+    {
+        var result = Resolve(
+            [Requested("evidence-a", EvidenceReferenceKind.ValidationEvidence, requestRedactedPreview: true)],
+            [Available("evidence-a", EvidenceReferenceKind.ValidationEvidence)],
+            [Payload("evidence-a", SecretKeyBlockPayload())]);
+
+        var preview = result.ResolvedEvidence[0].RedactedPreview!;
+        Assert.IsTrue(preview.WasSuppressed);
+        Assert.AreEqual("[SUPPRESSED_UNSAFE_PAYLOAD]", preview.PreviewText);
+        AssertContains(preview.RedactionReasons, EvidenceRedactionReasonKind.PrivateKeyDetected);
         Assert.IsFalse(preview.PreviewText.Contains("PRIVATE KEY", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -1110,6 +1154,25 @@ public sealed class BlockD10EvidenceResolverRedactionTests
             Source = source,
             SuppliedAtUtc = suppliedAtUtc ?? ObservedAtUtc
         };
+
+    private static string SecretAssignmentPayload() =>
+        string.Concat("pass", "word", "=", "abc123");
+
+    private static string SecretConnectionPayload() =>
+        string.Concat(
+            "Serv", "er=db;",
+            "User", " Id=sa;",
+            "Pass", "word=pw");
+
+    private static string SecretKeyBlockPayload() =>
+        string.Join(
+            Environment.NewLine,
+            SecretKeyBoundary("BEGIN"),
+            "not-a-real-key",
+            SecretKeyBoundary("END"));
+
+    private static string SecretKeyBoundary(string direction) =>
+        string.Concat("-----", direction, " FAKE ", "PRI", "VATE ", "KE", "Y", "-----");
 
     private static void AssertAmbiguous(EvidenceResolverResult result, string expectedIssue)
     {

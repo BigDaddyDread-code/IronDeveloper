@@ -424,7 +424,7 @@ public static class OperationStatusPaginationValidator
         value.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
         value.Contains("raw payload", StringComparison.OrdinalIgnoreCase) ||
         value.Contains("diff --git", StringComparison.OrdinalIgnoreCase) ||
-        value.Contains("BEGIN PRIVATE KEY", StringComparison.OrdinalIgnoreCase) ||
+        value.Contains("private key", StringComparison.OrdinalIgnoreCase) ||
         value.Contains("connection string", StringComparison.OrdinalIgnoreCase) ||
         value.Contains("token=", StringComparison.OrdinalIgnoreCase) ||
         value.Contains("secret", StringComparison.OrdinalIgnoreCase);
