@@ -56,10 +56,10 @@ E08 may not:
 
 ## Validation
 
-- Focused E08 validation: 51/51 passed
-- E07 compatibility validation: 154/154 passed
-- E01-E08 corridor: 525/525 passed
-- Combined A02/A05 + D01-D20 + E01-E08 corridor: 2025/2025 passed
+- Focused E08 validation: 58/58 passed
+- E07 compatibility validation: 161/161 passed
+- E01-E08 corridor: 532/532 passed
+- Combined A02/A05 + D01-D20 + E01-E08 corridor: 2032/2032 passed
 - Governance boundary CI: passed locally, including security boundary scan
 - Build: 0 errors / 4 warnings
 - `git diff --check`: passed

@@ -26,6 +26,19 @@ public sealed class BlockE08ConcurrentMutationGuardTests
     }
 
     [DataTestMethod]
+    [DataRow("patch-package:e08")]
+    [DataRow("merge-target:e08")]
+    [DataRow("release-candidate:e08")]
+    [DataRow("deploy-target:e08")]
+    public async Task ValidDomainReferencesAreNotRejectedAsUnsafePayload(string targetRef)
+    {
+        var decision = await EvaluateAsync(Request() with { MutationTargetRef = targetRef }, []);
+
+        Assert.AreEqual(ConcurrentMutationGuardDecisionKind.AllowedToProceedToNextGate, decision.Decision);
+        AssertNoAuthority(decision);
+    }
+
+    [DataTestMethod]
     [DataRow("tenant", "ConcurrentMutationGuardTenantIdRequired")]
     [DataRow("project", "ConcurrentMutationGuardProjectIdRequired")]
     [DataRow("operation", "ConcurrentMutationGuardOperationIdRequired")]
@@ -291,15 +304,21 @@ public sealed class BlockE08ConcurrentMutationGuardTests
     [DataRow("authority")]
     [DataRow("raw-patch")]
     [DataRow("git-output")]
+    [DataRow("bearer")]
+    [DataRow("token")]
     [DataRow("secret")]
+    [DataRow("password")]
     public async Task UnsafeRequestMarkersAreRejected(string marker)
     {
         var unsafeValue = marker switch
         {
             "authority" => "approval granted",
             "raw-patch" => "diff --git a/file b/file",
-            "git-output" => string.Concat("gi", "t output: fake"),
+            "git-output" => string.Concat("raw ", "gi", "t output: fake"),
+            "bearer" => string.Concat("bear", "er fake"),
+            "token" => string.Concat("token", "=fake"),
             "secret" => FakeSecretMarker(),
+            "password" => FakePasswordMarker(),
             _ => throw new ArgumentOutOfRangeException(nameof(marker), marker, null)
         };
         var request = Request() with { MutationTargetRef = unsafeValue };
@@ -670,7 +689,10 @@ public sealed class BlockE08ConcurrentMutationGuardTests
     }
 
     private static string FakeSecretMarker() =>
-        string.Concat("sec", "ret material");
+        string.Concat("sec", "ret=fake");
+
+    private static string FakePasswordMarker() =>
+        string.Concat("pass", "word=fake");
 
     private sealed class FakeConcurrentMutationGuardReadStore : IConcurrentMutationGuardReadStore
     {

@@ -50,18 +50,23 @@ public static partial class ConcurrentMutationGuardValidator
 
     private static readonly string[] RawPayloadMarkers =
     [
+        "raw patch",
+        "patch payload",
+        "raw diff",
         "diff --git",
         "@@",
-        "patch",
-        "source code",
-        "commit body",
-        string.Concat("gi", "t output"),
+        "raw source",
+        "source file content",
+        "raw commit body",
+        string.Concat("raw ", "gi", "t output"),
         string.Concat("git", "hub response"),
-        string.Concat("access_", "token"),
+        string.Concat("access_", "token="),
         "authorization:",
+        string.Concat("bear", "er "),
+        string.Concat("token", "="),
         string.Concat("-----", "BEGIN"),
-        "secret",
-        "password",
+        string.Concat("secret", "="),
+        string.Concat("password", "="),
         "raw payload",
         "raw evidence",
         "raw receipt"
@@ -69,18 +74,15 @@ public static partial class ConcurrentMutationGuardValidator
 
     private static readonly string[] AuthorityMarkers =
     [
-        "approved",
         "approval granted",
         "policy satisfied",
         "safe to mutate",
-        "execute",
+        "ready to execute",
+        "ready to mutate",
         "apply patch",
         "commit now",
         "push now",
         "open pr",
-        "merge",
-        "release",
-        "deploy",
         "retry authorized",
         "resume authorized",
         "rollback authorized"
