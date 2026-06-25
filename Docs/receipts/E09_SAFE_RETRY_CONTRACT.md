@@ -68,12 +68,12 @@ Failure receipts, idempotency metadata, retry budgets, concurrent guard metadata
 
 ## Validation
 
-- Focused E09 validation: 88/88 passed
-- E08 compatibility validation: 146/146 passed
-- E01-E09 corridor: 620/620 passed
-- Combined A02/A05 + D01-D20 + E01-E09 corridor: 2120/2120 passed
+- Focused E09 validation: 92/92 passed
+- E08 compatibility validation: 150/150 passed
+- E01-E09 corridor: 624/624 passed
+- Combined A02/A05 + D01-D20 + E01-E09 corridor: 2124/2124 passed
 - Governance boundary CI: passed locally, including security boundary scan
-- Build: 0 errors / 2 warnings
+- Build: 0 errors / 4 warnings
 - `git diff --check`: passed
 - `git diff --cached --check`: passed with normal LF/CRLF warnings
 

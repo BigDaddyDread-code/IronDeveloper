@@ -142,6 +142,7 @@ public sealed record SafeRetryPriorAttemptMetadata
 public sealed record SafeRetryLineageReadResult
 {
     public required string RetryLineageRef { get; init; }
+    public required int ObservedPriorRetryCount { get; init; }
     public required IReadOnlyList<SafeRetryPriorAttemptMetadata> PriorAttempts { get; init; }
     public required bool WasTruncated { get; init; }
     public required string TruncationReason { get; init; }
@@ -150,6 +151,7 @@ public sealed record SafeRetryLineageReadResult
         new()
         {
             RetryLineageRef = retryLineageRef,
+            ObservedPriorRetryCount = 0,
             PriorAttempts = [],
             WasTruncated = false,
             TruncationReason = string.Empty

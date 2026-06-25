@@ -158,6 +158,11 @@ public static partial class SafeRetryContractValidator
             missingReceiptEvidence.Add("SafeRetryLineageRefMismatch");
         }
 
+        if (readResult.ObservedPriorRetryCount < 0)
+        {
+            issues.Add("SafeRetryObservedPriorRetryCountNonNegativeRequired");
+        }
+
         if (readResult.WasTruncated ||
             readResult.PriorAttempts.Count > MaxPriorAttempts)
         {

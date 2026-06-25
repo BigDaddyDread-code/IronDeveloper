@@ -89,13 +89,31 @@ public sealed class SafeRetryContractService
                 lineageValidation.MissingReceiptEvidence.First());
         }
 
-        if (request.PriorRetryCount >= request.MaxRetryCount)
+        if (lineage is null)
+        {
+            return Decision(
+                request,
+                SafeRetryAssessmentDecisionKind.BlockedByMissingReceiptEvidence,
+                SafeRetryAssessmentBlockKind.MissingReceiptEvidence,
+                "SafeRetryLineageReadResultRequired");
+        }
+
+        if (lineage.ObservedPriorRetryCount >= request.MaxRetryCount)
         {
             return Decision(
                 request,
                 SafeRetryAssessmentDecisionKind.BlockedByRetryBudget,
                 SafeRetryAssessmentBlockKind.RetryBudget,
-                "SafeRetryBudgetExceeded");
+                "SafeRetryBudgetExceededByObservedLineage");
+        }
+
+        if (request.PriorRetryCount != lineage.ObservedPriorRetryCount)
+        {
+            return Decision(
+                request,
+                SafeRetryAssessmentDecisionKind.BlockedByRetryBudget,
+                SafeRetryAssessmentBlockKind.RetryBudget,
+                "SafeRetryPriorRetryCountMismatch");
         }
 
         if (Same(request.PreviousIdempotencyKeyRef, request.ProposedRetryIdempotencyKeyRef) &&

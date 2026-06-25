@@ -272,6 +272,65 @@ public sealed class BlockE09SafeRetryContractTests
     }
 
     [TestMethod]
+    public async Task PriorRetryCountUnderReportsLineageBlocks()
+    {
+        var store = new FakeSafeRetryAttemptReadStore
+        {
+            Result = LineageWithObservedCount(1)
+        };
+
+        var decision = await EvaluateAsync(Request() with { PriorRetryCount = 0, MaxRetryCount = 3 }, store);
+
+        Assert.AreEqual(SafeRetryAssessmentDecisionKind.BlockedByRetryBudget, decision.Decision);
+        Assert.AreEqual("SafeRetryPriorRetryCountMismatch", decision.Reason);
+        AssertNoAuthority(decision);
+    }
+
+    [TestMethod]
+    public async Task PriorRetryCountOverReportsLineageBlocks()
+    {
+        var store = new FakeSafeRetryAttemptReadStore
+        {
+            Result = LineageWithObservedCount(1)
+        };
+
+        var decision = await EvaluateAsync(Request() with { PriorRetryCount = 2, MaxRetryCount = 3 }, store);
+
+        Assert.AreEqual(SafeRetryAssessmentDecisionKind.BlockedByRetryBudget, decision.Decision);
+        Assert.AreEqual("SafeRetryPriorRetryCountMismatch", decision.Reason);
+        AssertNoAuthority(decision);
+    }
+
+    [TestMethod]
+    public async Task RetryBudgetUsesObservedLineageCount()
+    {
+        var store = new FakeSafeRetryAttemptReadStore
+        {
+            Result = LineageWithObservedCount(2)
+        };
+
+        var decision = await EvaluateAsync(Request() with { PriorRetryCount = 2, MaxRetryCount = 3 }, store);
+
+        Assert.AreEqual(SafeRetryAssessmentDecisionKind.RetryRequestMayProceedToAuthorityGate, decision.Decision);
+        AssertNoAuthority(decision);
+    }
+
+    [TestMethod]
+    public async Task ObservedLineageCountAtMaxBlocksEvenWhenRequestUnderReports()
+    {
+        var store = new FakeSafeRetryAttemptReadStore
+        {
+            Result = LineageWithObservedCount(3)
+        };
+
+        var decision = await EvaluateAsync(Request() with { PriorRetryCount = 0, MaxRetryCount = 3 }, store);
+
+        Assert.AreEqual(SafeRetryAssessmentDecisionKind.BlockedByRetryBudget, decision.Decision);
+        Assert.AreEqual("SafeRetryBudgetExceededByObservedLineage", decision.Reason);
+        AssertNoAuthority(decision);
+    }
+
+    [TestMethod]
     public async Task RetryMaxOverHardCapRejected()
     {
         var store = new FakeSafeRetryAttemptReadStore();
@@ -613,6 +672,15 @@ public sealed class BlockE09SafeRetryContractTests
             Outcome = SafeRetryAttemptOutcome.Failed,
             FailureClass = SafeRetryFailureClass.PreMutationTimeout,
             ObservedAtUtc = observedAtUtc ?? AssessedAtUtc.AddMinutes(-5)
+        };
+
+    private static SafeRetryLineageReadResult LineageWithObservedCount(int observedPriorRetryCount) =>
+        SafeRetryLineageReadResult.Empty("retry-lineage:e09") with
+        {
+            ObservedPriorRetryCount = observedPriorRetryCount,
+            PriorAttempts = Enumerable.Range(0, observedPriorRetryCount)
+                .Select(index => PriorAttempt($"attempt:e09:previous-{index}", AssessedAtUtc.AddMinutes(-10 + index)))
+                .ToArray()
         };
 
     private static void AssertRequiresFreshGates(SafeRetryAssessmentDecision decision)
