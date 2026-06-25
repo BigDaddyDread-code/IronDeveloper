@@ -66,14 +66,15 @@ E14 does not grant:
 - Operator-observed validation requires operator observation evidence.
 - Expected validation target, validation fingerprint, source state, patch package, commit, head, and base refs must match observed refs when supplied.
 - Raw test output, raw build output, raw CI output, raw console output, raw failure logs, raw stack traces, raw command lines, raw Git output, raw provider responses, raw patch, raw diff, raw source, private reasoning, credentials, and authority-claim text are rejected.
+- Rejected unsafe payloads are not echoed through returned decision evidence fields.
 - Valid domain refs such as `patch-package:*`, `merge-target:*`, `release-candidate:*`, and `deploy-target:*` are not rejected merely because they name mutation domains.
 
 ## Validation
 
-- Focused E14 validation: 121/121 passed
-- E13/E14 compatibility validation: 238/238 passed
-- E01-E14 corridor: 1146/1146 passed
-- Combined A02/A05 + D01-D20 + E01-E14 corridor: 2646/2646 passed
+- Focused E14 validation: 127/127 passed
+- E13/E14 compatibility validation: 244/244 passed
+- E01-E14 corridor: 1152/1152 passed
+- Combined A02/A05 + D01-D20 + E01-E14 corridor: 2652/2652 passed
 - Governance boundary CI: passed
 - Build: 0 errors / 4 warnings
 - `git diff --check`: passed

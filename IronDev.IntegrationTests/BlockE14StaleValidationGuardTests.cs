@@ -398,6 +398,62 @@ public sealed class BlockE14StaleValidationGuardTests
         AssertNoAuthority(decision);
     }
 
+    [TestMethod]
+    public void NullRequestFailsClosedWithoutThrowing()
+    {
+        var decision = Evaluate(null);
+
+        Assert.AreEqual(StaleValidationGuardDecisionKind.Invalid, decision.Decision);
+        Assert.AreEqual(StaleValidationGuardBlockKind.InvalidRequest, decision.BlockKind);
+        Assert.AreEqual("StaleValidationGuardRequestRequired", decision.Reason);
+        AssertNoAuthority(decision);
+    }
+
+    [TestMethod]
+    public void UnsafePayloadDecisionDoesNotEchoValidationEvidenceRef()
+    {
+        var unsafeValue = UnsafeReference("raw-test-output");
+        var decision = Evaluate(Request() with { ValidationEvidenceRef = unsafeValue });
+
+        AssertNoUnsafeDecisionEcho(decision, unsafeValue);
+    }
+
+    [TestMethod]
+    public void UnsafePayloadDecisionDoesNotEchoCredentialMaterial()
+    {
+        var unsafeValue = UnsafeReference("credential");
+        var decision = Evaluate(Request() with { ValidationEvidenceRef = unsafeValue });
+
+        AssertNoUnsafeDecisionEcho(decision, unsafeValue);
+    }
+
+    [TestMethod]
+    public void UnsafePayloadDecisionDoesNotEchoRawDiff()
+    {
+        var unsafeValue = UnsafeReference("raw-diff");
+        var decision = Evaluate(Request() with { ValidationEvidenceRef = unsafeValue });
+
+        AssertNoUnsafeDecisionEcho(decision, unsafeValue);
+    }
+
+    [TestMethod]
+    public void UnsafePayloadDecisionDoesNotEchoRawPatch()
+    {
+        var unsafeValue = UnsafeReference("raw-patch");
+        var decision = Evaluate(Request() with { ValidationEvidenceRef = unsafeValue });
+
+        AssertNoUnsafeDecisionEcho(decision, unsafeValue);
+    }
+
+    [TestMethod]
+    public void UnsafePayloadDecisionDoesNotEchoRawProviderResponse()
+    {
+        var unsafeValue = UnsafeReference("raw-provider-response");
+        var decision = Evaluate(Request() with { ValidationEvidenceRef = unsafeValue });
+
+        AssertNoUnsafeDecisionEcho(decision, unsafeValue);
+    }
+
     [DataTestMethod]
     [DataRow("patch-package:e14")]
     [DataRow("merge-target:e14")]
@@ -596,7 +652,7 @@ public sealed class BlockE14StaleValidationGuardTests
         StringAssert.Contains(receipt, expected);
     }
 
-    private static StaleValidationGuardDecision Evaluate(StaleValidationGuardRequest request) =>
+    private static StaleValidationGuardDecision Evaluate(StaleValidationGuardRequest? request) =>
         new StaleValidationGuardService().Evaluate(request);
 
     private static StaleValidationGuardRequest Request() =>
@@ -785,6 +841,27 @@ public sealed class BlockE14StaleValidationGuardTests
         CollectionAssert.Contains(decision.ForbiddenAuthorityImplications.ToList(), "stale validation guard is not validation execution");
         CollectionAssert.Contains(decision.ForbiddenAuthorityImplications.ToList(), "stale validation guard is not source safety");
         CollectionAssert.Contains(decision.ForbiddenAuthorityImplications.ToList(), "stale validation guard is not workflow continuation");
+    }
+
+    private static void AssertNoUnsafeDecisionEcho(StaleValidationGuardDecision decision, string unsafeValue)
+    {
+        Assert.AreEqual(StaleValidationGuardDecisionKind.BlockedByUnsafePayload, decision.Decision);
+        Assert.AreEqual(StaleValidationGuardBlockKind.UnsafePayload, decision.BlockKind);
+        AssertNoAuthority(decision);
+
+        var stringValues = typeof(StaleValidationGuardDecision)
+            .GetProperties()
+            .Where(static property => property.PropertyType == typeof(string))
+            .Select(property => (Name: property.Name, Value: (string?)property.GetValue(decision) ?? string.Empty));
+
+        foreach (var (name, value) in stringValues)
+        {
+            Assert.IsFalse(
+                value.Contains(unsafeValue, StringComparison.Ordinal),
+                $"{name} echoed unsafe value.");
+        }
+
+        Assert.AreEqual("[unsafe-rejected]", decision.MatchedValidationEvidenceRef);
     }
 
     private static string E14CoreSource()

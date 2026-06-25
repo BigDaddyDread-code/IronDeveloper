@@ -2,9 +2,18 @@ namespace IronDev.Core.Governance;
 
 public sealed class StaleValidationGuardService
 {
-    public StaleValidationGuardDecision Evaluate(StaleValidationGuardRequest request)
+    public StaleValidationGuardDecision Evaluate(StaleValidationGuardRequest? request)
     {
         var validation = StaleValidationGuardValidator.ValidateRequest(request);
+        if (request is null)
+        {
+            return NullDecision(
+                StaleValidationGuardDecisionKind.Invalid,
+                StaleValidationGuardBlockKind.InvalidRequest,
+                validation,
+                validation.Issues.FirstOrDefault() ?? "StaleValidationGuardRequestRequired");
+        }
+
         if (validation.HasUnsafePayload)
         {
             return Decision(
@@ -412,6 +421,74 @@ public sealed class StaleValidationGuardService
     private static bool Same(string? left, string? right) =>
         string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
+    private static string SafeDecisionValue(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : StaleValidationGuardValidator.ContainsUnsafeText(value)
+                ? "[unsafe-rejected]"
+                : value;
+
+    private static StaleValidationGuardDecision NullDecision(
+        StaleValidationGuardDecisionKind decision,
+        StaleValidationGuardBlockKind blockKind,
+        StaleValidationGuardValidationResult validation,
+        string reason) =>
+        new()
+        {
+            Decision = decision,
+            Reason = reason,
+            BlockKind = blockKind,
+            TenantId = string.Empty,
+            ProjectId = string.Empty,
+            OperationId = string.Empty,
+            CorrelationId = string.Empty,
+            MutationSurface = MutationLeaseSurfaceKind.Unknown,
+            AttemptRef = string.Empty,
+            TargetRef = string.Empty,
+            GuardRef = string.Empty,
+            SubjectKind = StaleValidationSubjectKind.Unknown,
+            ValidationEvidenceKind = ValidationEvidenceKind.Unknown,
+            EvidenceTrustLevel = ValidationEvidenceTrustLevel.Unknown,
+            ObservationFreshness = ValidationObservationFreshness.Unknown,
+            ValidationOutcome = ValidationOutcomeState.Unknown,
+            ValidationScope = ValidationScopeKind.Unknown,
+            MatchedValidationEvidenceRef = string.Empty,
+            MatchedValidationReceiptRef = string.Empty,
+            MatchedBuildReceiptRef = string.Empty,
+            MatchedTestReceiptRef = string.Empty,
+            MatchedGovernanceReceiptRef = string.Empty,
+            MatchedProviderCiStateRef = string.Empty,
+            MatchedOperatorObservationRef = string.Empty,
+            MatchedPostStateObservationRef = string.Empty,
+            MatchedDirtyWorktreeGuardRef = string.Empty,
+            MatchedMovedBaseGuardRef = string.Empty,
+            MatchedConcurrentGuardDecisionRef = string.Empty,
+            MatchedExpectedValidationTargetRef = string.Empty,
+            MatchedObservedValidationTargetRef = string.Empty,
+            MatchedExpectedValidationFingerprint = string.Empty,
+            MatchedObservedValidationFingerprint = string.Empty,
+            MatchedExpectedSourceStateRef = string.Empty,
+            MatchedObservedSourceStateRef = string.Empty,
+            MatchedExpectedPatchPackageRef = string.Empty,
+            MatchedObservedPatchPackageRef = string.Empty,
+            MatchedExpectedCommitRef = string.Empty,
+            MatchedObservedCommitRef = string.Empty,
+            MatchedExpectedHeadRef = string.Empty,
+            MatchedObservedHeadRef = string.Empty,
+            MatchedExpectedBaseRef = string.Empty,
+            MatchedObservedBaseRef = string.Empty,
+            RequiresFreshAuthority = true,
+            RequiresFreshValidation = true,
+            RequiresFreshConcurrentGuard = true,
+            RequiresDirtyWorktreeGuard = true,
+            RequiresMovedBaseGuard = true,
+            RequiresFreshPostStateObservation = true,
+            RequiresHumanReview = true,
+            Warnings = validation.Warnings,
+            ForbiddenAuthorityImplications = validation.ForbiddenAuthorityImplications,
+            RecordFingerprint = "stale-validation-guard|null|Invalid|InvalidRequest"
+        };
+
     private static StaleValidationGuardDecision Decision(
         StaleValidationGuardRequest request,
         StaleValidationGuardDecisionKind decision,
@@ -423,45 +500,45 @@ public sealed class StaleValidationGuardService
             Decision = decision,
             Reason = reason,
             BlockKind = blockKind,
-            TenantId = request.TenantId,
-            ProjectId = request.ProjectId,
-            OperationId = request.OperationId,
-            CorrelationId = request.CorrelationId,
+            TenantId = SafeDecisionValue(request.TenantId),
+            ProjectId = SafeDecisionValue(request.ProjectId),
+            OperationId = SafeDecisionValue(request.OperationId),
+            CorrelationId = SafeDecisionValue(request.CorrelationId),
             MutationSurface = request.MutationSurface,
-            AttemptRef = request.AttemptRef,
-            TargetRef = request.TargetRef,
-            GuardRef = request.GuardRef,
+            AttemptRef = SafeDecisionValue(request.AttemptRef),
+            TargetRef = SafeDecisionValue(request.TargetRef),
+            GuardRef = SafeDecisionValue(request.GuardRef),
             SubjectKind = request.SubjectKind,
             ValidationEvidenceKind = request.ValidationEvidenceKind,
             EvidenceTrustLevel = request.EvidenceTrustLevel,
             ObservationFreshness = request.ObservationFreshness,
             ValidationOutcome = request.ValidationOutcome,
             ValidationScope = request.ValidationScope,
-            MatchedValidationEvidenceRef = request.ValidationEvidenceRef ?? string.Empty,
-            MatchedValidationReceiptRef = request.ValidationReceiptRef ?? string.Empty,
-            MatchedBuildReceiptRef = request.BuildReceiptRef ?? string.Empty,
-            MatchedTestReceiptRef = request.TestReceiptRef ?? string.Empty,
-            MatchedGovernanceReceiptRef = request.GovernanceReceiptRef ?? string.Empty,
-            MatchedProviderCiStateRef = request.ProviderCiStateRef ?? string.Empty,
-            MatchedOperatorObservationRef = request.OperatorObservationRef ?? string.Empty,
-            MatchedPostStateObservationRef = request.PostStateObservationRef ?? string.Empty,
-            MatchedDirtyWorktreeGuardRef = request.DirtyWorktreeGuardRef ?? string.Empty,
-            MatchedMovedBaseGuardRef = request.MovedBaseGuardRef ?? string.Empty,
-            MatchedConcurrentGuardDecisionRef = request.ConcurrentGuardDecisionRef ?? string.Empty,
-            MatchedExpectedValidationTargetRef = request.ExpectedValidationTargetRef ?? string.Empty,
-            MatchedObservedValidationTargetRef = request.ObservedValidationTargetRef ?? string.Empty,
-            MatchedExpectedValidationFingerprint = request.ExpectedValidationFingerprint ?? string.Empty,
-            MatchedObservedValidationFingerprint = request.ObservedValidationFingerprint ?? string.Empty,
-            MatchedExpectedSourceStateRef = request.ExpectedSourceStateRef ?? string.Empty,
-            MatchedObservedSourceStateRef = request.ObservedSourceStateRef ?? string.Empty,
-            MatchedExpectedPatchPackageRef = request.ExpectedPatchPackageRef ?? string.Empty,
-            MatchedObservedPatchPackageRef = request.ObservedPatchPackageRef ?? string.Empty,
-            MatchedExpectedCommitRef = request.ExpectedCommitRef ?? string.Empty,
-            MatchedObservedCommitRef = request.ObservedCommitRef ?? string.Empty,
-            MatchedExpectedHeadRef = request.ExpectedHeadRef ?? string.Empty,
-            MatchedObservedHeadRef = request.ObservedHeadRef ?? string.Empty,
-            MatchedExpectedBaseRef = request.ExpectedBaseRef ?? string.Empty,
-            MatchedObservedBaseRef = request.ObservedBaseRef ?? string.Empty,
+            MatchedValidationEvidenceRef = SafeDecisionValue(request.ValidationEvidenceRef),
+            MatchedValidationReceiptRef = SafeDecisionValue(request.ValidationReceiptRef),
+            MatchedBuildReceiptRef = SafeDecisionValue(request.BuildReceiptRef),
+            MatchedTestReceiptRef = SafeDecisionValue(request.TestReceiptRef),
+            MatchedGovernanceReceiptRef = SafeDecisionValue(request.GovernanceReceiptRef),
+            MatchedProviderCiStateRef = SafeDecisionValue(request.ProviderCiStateRef),
+            MatchedOperatorObservationRef = SafeDecisionValue(request.OperatorObservationRef),
+            MatchedPostStateObservationRef = SafeDecisionValue(request.PostStateObservationRef),
+            MatchedDirtyWorktreeGuardRef = SafeDecisionValue(request.DirtyWorktreeGuardRef),
+            MatchedMovedBaseGuardRef = SafeDecisionValue(request.MovedBaseGuardRef),
+            MatchedConcurrentGuardDecisionRef = SafeDecisionValue(request.ConcurrentGuardDecisionRef),
+            MatchedExpectedValidationTargetRef = SafeDecisionValue(request.ExpectedValidationTargetRef),
+            MatchedObservedValidationTargetRef = SafeDecisionValue(request.ObservedValidationTargetRef),
+            MatchedExpectedValidationFingerprint = SafeDecisionValue(request.ExpectedValidationFingerprint),
+            MatchedObservedValidationFingerprint = SafeDecisionValue(request.ObservedValidationFingerprint),
+            MatchedExpectedSourceStateRef = SafeDecisionValue(request.ExpectedSourceStateRef),
+            MatchedObservedSourceStateRef = SafeDecisionValue(request.ObservedSourceStateRef),
+            MatchedExpectedPatchPackageRef = SafeDecisionValue(request.ExpectedPatchPackageRef),
+            MatchedObservedPatchPackageRef = SafeDecisionValue(request.ObservedPatchPackageRef),
+            MatchedExpectedCommitRef = SafeDecisionValue(request.ExpectedCommitRef),
+            MatchedObservedCommitRef = SafeDecisionValue(request.ObservedCommitRef),
+            MatchedExpectedHeadRef = SafeDecisionValue(request.ExpectedHeadRef),
+            MatchedObservedHeadRef = SafeDecisionValue(request.ObservedHeadRef),
+            MatchedExpectedBaseRef = SafeDecisionValue(request.ExpectedBaseRef),
+            MatchedObservedBaseRef = SafeDecisionValue(request.ObservedBaseRef),
             RequiresFreshAuthority = true,
             RequiresFreshValidation = true,
             RequiresFreshConcurrentGuard = true,
