@@ -321,6 +321,12 @@ public sealed class BranchRemoteHeadVerificationService
             Require(request.BranchObservationRef, "BranchRemoteHeadBranchObservationRefRequired", missing);
             Require(request.RemoteObservationRef, "BranchRemoteHeadRemoteObservationRefRequired", missing);
             Require(request.HeadObservationRef, "BranchRemoteHeadHeadObservationRefRequired", missing);
+            Require(request.ObservedBranchRef, "BranchRemoteHeadObservedBranchRefRequired", missing);
+            Require(request.ObservedRemoteRef, "BranchRemoteHeadObservedRemoteRefRequired", missing);
+            Require(request.ObservedRemoteUrlFingerprint, "BranchRemoteHeadObservedRemoteUrlFingerprintRequired", missing);
+            Require(request.ObservedLocalHeadRef, "BranchRemoteHeadObservedLocalHeadRefRequired", missing);
+            Require(request.ObservedRemoteHeadRef, "BranchRemoteHeadObservedRemoteHeadRefRequired", missing);
+            Require(request.ObservedBaseRef, "BranchRemoteHeadObservedBaseRefRequired", missing);
             Require(request.DirtyWorktreeGuardRef, "BranchRemoteHeadDirtyWorktreeGuardRefRequired", missing);
             Require(request.MovedBaseGuardRef, "BranchRemoteHeadMovedBaseGuardRefRequired", missing);
             Require(request.StaleValidationGuardRef, "BranchRemoteHeadStaleValidationGuardRefRequired", missing);

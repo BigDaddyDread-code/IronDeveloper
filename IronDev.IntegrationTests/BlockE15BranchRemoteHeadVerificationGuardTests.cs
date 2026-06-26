@@ -210,6 +210,12 @@ public sealed class BlockE15BranchRemoteHeadVerificationGuardTests
     [DataRow("branch", "BranchRemoteHeadBranchObservationRefRequired")]
     [DataRow("remote", "BranchRemoteHeadRemoteObservationRefRequired")]
     [DataRow("head", "BranchRemoteHeadHeadObservationRefRequired")]
+    [DataRow("observed-branch", "BranchRemoteHeadObservedBranchRefRequired")]
+    [DataRow("observed-remote", "BranchRemoteHeadObservedRemoteRefRequired")]
+    [DataRow("observed-remote-url", "BranchRemoteHeadObservedRemoteUrlFingerprintRequired")]
+    [DataRow("observed-local-head", "BranchRemoteHeadObservedLocalHeadRefRequired")]
+    [DataRow("observed-remote-head", "BranchRemoteHeadObservedRemoteHeadRefRequired")]
+    [DataRow("observed-base", "BranchRemoteHeadObservedBaseRefRequired")]
     [DataRow("composite", "BranchRemoteHeadCompositeObservationRefRequired")]
     [DataRow("provider", "BranchRemoteHeadProviderBranchStateRefRequired")]
     [DataRow("operator", "BranchRemoteHeadOperatorObservationRefRequired")]
@@ -644,6 +650,12 @@ public sealed class BlockE15BranchRemoteHeadVerificationGuardTests
             "branch" => Request() with { BranchObservationRef = "" },
             "remote" => Request() with { RemoteObservationRef = "" },
             "head" => Request() with { HeadObservationRef = "" },
+            "observed-branch" => Request() with { ObservedBranchRef = "" },
+            "observed-remote" => Request() with { ObservedRemoteRef = "" },
+            "observed-remote-url" => Request() with { ObservedRemoteUrlFingerprint = "" },
+            "observed-local-head" => Request() with { ObservedLocalHeadRef = "" },
+            "observed-remote-head" => Request() with { ObservedRemoteHeadRef = "" },
+            "observed-base" => Request() with { ObservedBaseRef = "" },
             "composite" => Request() with { CompositeObservationRef = "" },
             "provider" => Request() with
             {

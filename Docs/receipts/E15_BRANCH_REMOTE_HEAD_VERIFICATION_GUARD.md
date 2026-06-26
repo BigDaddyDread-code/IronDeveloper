@@ -56,6 +56,7 @@ E15 does not grant:
 - Self-reported evidence requires corroboration and still cannot proceed.
 - Test-fixture branch evidence is valid only from test-labelled sources and cannot proceed.
 - Positive decisions require branch observation, remote observation, head observation, dirty worktree guard, moved-base guard, stale-validation guard, concurrent guard, and post-state observation refs.
+- Positive decisions require observed branch, observed remote, observed remote URL fingerprint, observed local head, observed remote head, and observed base refs.
 - Composite evidence requires composite observation refs.
 - Provider-backed evidence requires provider branch state refs.
 - Operator-observed evidence requires operator observation refs.
@@ -65,10 +66,10 @@ E15 does not grant:
 
 ## Validation
 
-- Focused E15 validation: 145/145 passed
-- E14/E15 compatibility validation: 272/272 passed
-- E01-E15 corridor: 1297/1297 passed
-- Combined A02/A05 + D01-D20 + E01-E15 corridor: 2797/2797 passed
+- Focused E15 validation: 151/151 passed
+- E14/E15 compatibility validation: 278/278 passed
+- E01-E15 corridor: 1303/1303 passed
+- Combined A02/A05 + D01-D20 + E01-E15 corridor: 2803/2803 passed
 - Governance boundary CI: passed
 - Build: 0 errors / 4 warnings
 - `git diff --check`: passed
