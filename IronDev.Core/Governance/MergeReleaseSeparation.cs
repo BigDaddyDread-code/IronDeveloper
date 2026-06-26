@@ -313,6 +313,7 @@ public static class ReleaseReadinessEvidencePackager
         if (!input.RecoveryEvidenceExists) gaps.Add("MissingRecoveryEvidence");
         if (input.PullRequestMerged && string.IsNullOrWhiteSpace(input.ReleaseCandidateRef)) gaps.Add("MissingReleaseCandidateRef");
         if (input.PullRequestMerged && IsPullRequestUrl(input.ReleaseCandidateRef)) gaps.Add("InvalidReleaseCandidateRef:PullRequestUrl");
+        if (input.PullRequestMerged && IsPullRequestHeadRef(input.ReleaseCandidateRef, input.Request.HeadBranch)) gaps.Add("InvalidReleaseCandidateRef:PullRequestHeadRef");
         if (input.ProductHardeningEvidenceExists && !input.ProductHardeningPassed) blockers.Add("ProductHardeningEvidenceBlocksReleaseDecision");
         if (input.ReleaseReadinessReportExists && IsNotReady(input.ReleaseReadinessReportOutcome)) blockers.Add($"ReleaseReadinessReportBlocksReleaseDecision:{input.ReleaseReadinessReportOutcome}");
         if (input.UnsafeMaterialFindings > 0) blockers.Add("UnsafeMaterialFindingsBlockReleaseDecision");
@@ -361,6 +362,11 @@ public static class ReleaseReadinessEvidencePackager
 
     private static bool IsPullRequestUrl(string? value) =>
         !string.IsNullOrWhiteSpace(value) && value.Contains("/pull/", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPullRequestHeadRef(string? value, string? headBranch) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        !string.IsNullOrWhiteSpace(headBranch) &&
+        string.Equals(value.Trim(), headBranch.Trim(), StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record MergeReleaseBoundaryMap
