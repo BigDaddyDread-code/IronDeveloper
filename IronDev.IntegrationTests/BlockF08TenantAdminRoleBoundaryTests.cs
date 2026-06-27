@@ -3,7 +3,7 @@ using IronDev.Core.Governance;
 namespace IronDev.IntegrationTests;
 
 [TestClass]
-public sealed class BlockF08aTenantAdminRoleCatalogContractTests
+public sealed class BlockF08TenantAdminRoleBoundaryTests
 {
     [TestMethod]
     public void DefaultCatalogContainsExactlyOneTenantAdminRole()
@@ -191,9 +191,89 @@ public sealed class BlockF08aTenantAdminRoleCatalogContractTests
     }
 
     [TestMethod]
-    public void StaticScanF08aAddsNoProductionAuthoritySurface()
+    public void TenantAdminRoleNameCannotBeUsedAsApprovalPolicySourceSafetyValidationOrWorkflowEvidence()
     {
-        var source = StripStringLiterals(F08aCoreSource());
+        var fixture = TenantAdminEvidenceFixture.Safe();
+        var finding = TenantAdminAuthorityMarkerDetector.Evaluate(fixture);
+
+        Assert.IsFalse(finding.GrantsApprovalAuthority);
+        Assert.IsFalse(finding.SatisfiesPolicy);
+        Assert.IsFalse(finding.RefreshesValidation);
+        Assert.IsFalse(finding.ProvesSourceSafety);
+        Assert.IsFalse(finding.GrantsWorkflowContinuation);
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "approval-evidence");
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "policy-satisfaction-evidence");
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "validation-freshness-evidence");
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "source-safety-evidence");
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "workflow-continuation-evidence");
+    }
+
+    [TestMethod]
+    public void TenantScopedEvidenceDoesNotBecomeGlobalPlatformOrCrossTenantAuthority()
+    {
+        var fixture = TenantAdminEvidenceFixture.Safe() with
+        {
+            TenantId = "tenant:f08",
+            RequestedTenantId = "tenant:other"
+        };
+        var finding = TenantAdminAuthorityMarkerDetector.Evaluate(fixture);
+
+        Assert.IsFalse(finding.GrantsTenantAuthority);
+        Assert.IsFalse(finding.GrantsPlatformAuthority);
+        Assert.IsFalse(finding.GrantsGlobalAdminAuthority);
+        Assert.IsFalse(finding.GrantsCrossTenantVisibility);
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "tenant-visibility-decision");
+    }
+
+    [TestMethod]
+    public void TenantAdminVisibilityDoesNotOverrideF04F05F06OrF07Boundaries()
+    {
+        var fixture = TenantAdminEvidenceFixture.Safe();
+        var finding = TenantAdminAuthorityMarkerDetector.Evaluate(fixture);
+
+        Assert.IsFalse(finding.GrantsAccess);
+        Assert.IsFalse(finding.GrantsApprovalAuthority);
+        Assert.IsFalse(finding.SatisfiesPolicy);
+        Assert.IsFalse(finding.GrantsDiagnosticExecutionAuthority);
+        Assert.IsFalse(finding.GrantsRetryAuthority);
+        Assert.IsFalse(finding.GrantsRollbackAuthority);
+        Assert.IsFalse(finding.GrantsRecoveryAuthority);
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "viewer-readonly-decision");
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "reviewer-visibility-decision");
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "approver-request-decision-visibility-decision");
+        CollectionAssert.Contains(finding.RequiredSeparateEvidence.ToList(), "operator-support-diagnostic-visibility-decision");
+    }
+
+    [DataTestMethod]
+    [DataRow("TenantAdminGranted = true")]
+    [DataRow("CanAccessAllTenants = true")]
+    [DataRow("tenant admin may operate globally")]
+    [DataRow("tenant admin may inspect all tenants")]
+    [DataRow("tenant admin may grant itself access")]
+    [DataRow("tenant admin may assign roles")]
+    [DataRow("tenant admin may manage permissions")]
+    [DataRow("tenant admin may approve policy")]
+    [DataRow("tenant admin may satisfy policy")]
+    [DataRow("tenant admin may continue workflow")]
+    [DataRow("tenant admin may bypass redaction")]
+    [DataRow("tenant admin may reveal secrets")]
+    public void HostileTenantAdminTextIsRejectedOrClassifiedHidden(string marker)
+    {
+        var result = RoleCatalogValidator.ValidateEntry(TenantAdmin() with
+        {
+            Description = marker
+        });
+        var finding = TenantAdminAuthorityMarkerDetector.Evaluate(TenantAdminEvidenceFixture.Hostile(marker));
+
+        Assert.IsFalse(result.IsValid);
+        Assert.IsTrue(finding.IsHidden);
+        Assert.IsTrue(finding.RejectedMarkers.Contains(marker, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void StaticScanF08AddsNoProductionAuthoritySurface()
+    {
+        var source = StripStringLiterals(F08CoreSource());
         var forbidden = new[]
         {
             "ClaimsPrincipal",
@@ -234,10 +314,11 @@ public sealed class BlockF08aTenantAdminRoleCatalogContractTests
     [TestMethod]
     public void ReceiptExistsAndStatesTenantAdminRoleNameIsNotAuthority()
     {
-        var receipt = File.ReadAllText(Path.Combine(RepoRoot(), "Docs", "receipts", "F08A_TENANT_ADMIN_ROLE_CATALOG_CONTRACT.md"));
+        var receipt = File.ReadAllText(Path.Combine(RepoRoot(), "Docs", "receipts", "F08_TENANT_ADMIN_ROLE_BOUNDARY_TESTS.md"));
 
+        StringAssert.Contains(receipt, "Tenant admin evidence is not platform authority.");
         StringAssert.Contains(receipt, "A tenant admin role name is not tenant admin authority.");
-        StringAssert.Contains(receipt, "Naming the admin is not granting the keys.");
+        StringAssert.Contains(receipt, "Admin of a tenant is not god of the system.");
         StringAssert.Contains(receipt, "does not implement tenant admin authority");
         StringAssert.Contains(receipt, "does not implement platform admin authority");
         StringAssert.Contains(receipt, "does not implement cross-tenant access");
@@ -259,7 +340,7 @@ public sealed class BlockF08aTenantAdminRoleCatalogContractTests
             MatrixService().BuildDefaultMatrix(Catalog()),
             TenantAdmin().RoleId);
 
-    private static string F08aCoreSource()
+    private static string F08CoreSource()
     {
         var root = RepoRoot();
         var files = new[]
@@ -360,6 +441,9 @@ public sealed class BlockF08aTenantAdminRoleCatalogContractTests
         public required bool DisclosesCredentials { get; init; }
         public required bool DisclosesRawPayload { get; init; }
         public required bool DisclosesPrivateReasoning { get; init; }
+        public required bool IsHidden { get; init; }
+        public required IReadOnlyList<string> RequiredSeparateEvidence { get; init; }
+        public required IReadOnlyList<string> RejectedMarkers { get; init; }
 
         public static TenantAdminBoundaryFinding FromSafeCatalogEntry(GovernanceRoleCatalogEntry entry)
         {
@@ -392,7 +476,79 @@ public sealed class BlockF08aTenantAdminRoleCatalogContractTests
                 DisclosesSecrets = false,
                 DisclosesCredentials = false,
                 DisclosesRawPayload = false,
-                DisclosesPrivateReasoning = false
+                DisclosesPrivateReasoning = false,
+                IsHidden = false,
+                RequiredSeparateEvidence =
+                [
+                    "role-assignment-evidence",
+                    "tenant-visibility-decision",
+                    "viewer-readonly-decision",
+                    "reviewer-visibility-decision",
+                    "approver-request-decision-visibility-decision",
+                    "operator-support-diagnostic-visibility-decision",
+                    "approval-evidence",
+                    "policy-satisfaction-evidence",
+                    "validation-freshness-evidence",
+                    "source-safety-evidence",
+                    "diagnostic-execution-authority",
+                    "retry-authority",
+                    "rollback-authority",
+                    "recovery-authority",
+                    "mutation-authority",
+                    "workflow-continuation-evidence",
+                    "merge-authority",
+                    "release-authority",
+                    "deployment-authority",
+                    "redaction-decision"
+                ],
+                RejectedMarkers = []
+            };
+        }
+    }
+
+    private sealed record TenantAdminEvidenceFixture
+    {
+        public required string RoleId { get; init; }
+        public required string TenantId { get; init; }
+        public required string RequestedTenantId { get; init; }
+        public required IReadOnlyList<string> EvidenceRefs { get; init; }
+        public required IReadOnlyList<string> TextMarkers { get; init; }
+
+        public static TenantAdminEvidenceFixture Safe() =>
+            new()
+            {
+                RoleId = "role:f01:tenant-administrator",
+                TenantId = "tenant:f08",
+                RequestedTenantId = "tenant:f08",
+                EvidenceRefs = ["role-catalog-entry:role:f01:tenant-administrator"],
+                TextMarkers = []
+            };
+
+        public static TenantAdminEvidenceFixture Hostile(string marker) =>
+            Safe() with
+            {
+                TextMarkers = [marker]
+            };
+    }
+
+    private static class TenantAdminAuthorityMarkerDetector
+    {
+        public static TenantAdminBoundaryFinding Evaluate(TenantAdminEvidenceFixture fixture)
+        {
+            var rejectedMarkers = fixture.TextMarkers
+                .Where(RoleCatalogValidator.ContainsUnsafeRoleText)
+                .ToArray();
+
+            return TenantAdminBoundaryFinding.FromSafeCatalogEntry(TenantAdmin()) with
+            {
+                IsHidden = rejectedMarkers.Length > 0,
+                RejectedMarkers = rejectedMarkers,
+                RequiredSeparateEvidence = TenantAdminBoundaryFinding.FromSafeCatalogEntry(TenantAdmin())
+                    .RequiredSeparateEvidence
+                    .Concat(string.Equals(fixture.TenantId, fixture.RequestedTenantId, StringComparison.OrdinalIgnoreCase)
+                        ? []
+                        : ["tenant-boundary-review"])
+                    .ToArray()
             };
         }
     }
