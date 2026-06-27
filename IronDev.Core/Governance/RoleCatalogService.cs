@@ -26,6 +26,7 @@ public sealed class RoleCatalogService
                 Entry(GovernanceRoleKind.RollbackReviewer, GovernanceRoleScopeKind.OperationScoped, "Rollback Reviewer", "Names a responsibility type for rollback review.", "May be referenced by future rollback review profiles.", GovernanceRoleSurface.Rollback),
                 Entry(GovernanceRoleKind.RecoveryReviewer, GovernanceRoleScopeKind.OperationScoped, "Recovery Reviewer", "Names a responsibility type for recovery review.", "May be referenced by future recovery review profiles.", GovernanceRoleSurface.Recovery, GovernanceRoleSurface.Retry),
                 Entry(GovernanceRoleKind.Auditor, GovernanceRoleScopeKind.TenantScoped, "Auditor", "Names a responsibility type for audit review.", "May be referenced by future audit read profiles.", GovernanceRoleSurface.Audit, GovernanceRoleSurface.StatusReadModel),
+                Entry(GovernanceRoleKind.TenantAdministrator, GovernanceRoleScopeKind.TenantScoped, "Tenant Administrator", "Tenant-scoped administrative responsibility marker for future governed visibility and boundary checks.", "May be referenced by future tenant-boundary profile contracts.", GovernanceRoleSurface.StatusReadModel, GovernanceRoleSurface.Audit, GovernanceRoleSurface.FrontendReadOnly),
                 Entry(GovernanceRoleKind.Observer, GovernanceRoleScopeKind.ProjectScoped, "Observer", "Names a read-oriented responsibility type.", "May be referenced by future read-only profile contracts.", GovernanceRoleSurface.StatusReadModel, GovernanceRoleSurface.FrontendReadOnly),
                 Entry(GovernanceRoleKind.AutomationAgent, GovernanceRoleScopeKind.WorkflowScoped, "Automation Agent", "Names a system participant responsibility type.", "May be referenced by future automation profile contracts and does not create autonomy.", GovernanceRoleSurface.WorkflowContinuation, GovernanceRoleSurface.StatusReadModel),
                 Entry(GovernanceRoleKind.SystemReadOnly, GovernanceRoleScopeKind.GlobalCatalog, "System Read Only", "Names a read-only system responsibility type.", "May be referenced by future read-only backend profile contracts.", GovernanceRoleSurface.StatusReadModel, GovernanceRoleSurface.FrontendReadOnly)
@@ -92,6 +93,7 @@ public sealed class RoleCatalogService
             GovernanceRoleKind.RollbackReviewer => "rollback-reviewer",
             GovernanceRoleKind.RecoveryReviewer => "recovery-reviewer",
             GovernanceRoleKind.Auditor => "auditor",
+            GovernanceRoleKind.TenantAdministrator => "tenant-administrator",
             GovernanceRoleKind.Observer => "observer",
             GovernanceRoleKind.AutomationAgent => "automation-agent",
             GovernanceRoleKind.SystemReadOnly => "system-read-only",
