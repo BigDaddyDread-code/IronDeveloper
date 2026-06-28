@@ -18,7 +18,8 @@ public enum GovernanceRoleKind
     Observer = 13,
     AutomationAgent = 14,
     SystemReadOnly = 15,
-    TenantAdministrator = 16
+    TenantAdministrator = 16,
+    SystemAccountabilityOwner = 17
 }
 
 public enum GovernanceRoleScopeKind
