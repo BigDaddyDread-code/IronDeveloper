@@ -96,6 +96,17 @@ public sealed class RoleVisibilityMatrixService
             Hint(RoleVisibilitySurface.FrontendReadOnly, RoleVisibilityMaterialKind.OperationStatusSummary, RoleVisibilityLevel.SummaryOnly),
             Hint(RoleVisibilitySurface.FrontendReadOnly, RoleVisibilityMaterialKind.ReceiptMetadata, RoleVisibilityLevel.MetadataOnly));
 
+        Add(entries, catalog, GovernanceRoleKind.ExternalViewer,
+            Hint(RoleVisibilitySurface.FrontendReadOnly, RoleVisibilityMaterialKind.OperationStatusSummary, RoleVisibilityLevel.MetadataOnly),
+            Hint(RoleVisibilitySurface.OperationStatus, RoleVisibilityMaterialKind.OperationStatusSummary, RoleVisibilityLevel.SummaryOnly),
+            Hint(RoleVisibilitySurface.ReceiptReadModel, RoleVisibilityMaterialKind.ReceiptMetadata, RoleVisibilityLevel.MetadataOnly),
+            Hint(RoleVisibilitySurface.ValidationReview, RoleVisibilityMaterialKind.ValidationSummary, RoleVisibilityLevel.SummaryOnly),
+            Hint(RoleVisibilitySurface.Proposal, RoleVisibilityMaterialKind.ProposalSummary, RoleVisibilityLevel.SummaryOnly),
+            Hint(RoleVisibilitySurface.ApprovalPackage, RoleVisibilityMaterialKind.ApprovalPackageSummary, RoleVisibilityLevel.SummaryOnly),
+            Hint(RoleVisibilitySurface.PolicyReview, RoleVisibilityMaterialKind.PolicyReviewSummary, RoleVisibilityLevel.SummaryOnly),
+            Hint(RoleVisibilitySurface.Audit, RoleVisibilityMaterialKind.AuditTrailSummary, RoleVisibilityLevel.SummaryOnly),
+            Hint(RoleVisibilitySurface.ReleaseReadiness, RoleVisibilityMaterialKind.ReleaseReadinessSummary, RoleVisibilityLevel.SummaryOnly));
+
         foreach (var role in catalog.Entries)
         {
             entries.Add(Hidden(role, RoleVisibilityMaterialKind.RawPayload, RoleVisibilitySensitivityKind.RawPayload));
