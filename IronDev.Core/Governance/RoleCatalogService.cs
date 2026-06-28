@@ -30,7 +30,8 @@ public sealed class RoleCatalogService
                 Entry(GovernanceRoleKind.Observer, GovernanceRoleScopeKind.ProjectScoped, "Observer", "Names a read-oriented responsibility type.", "May be referenced by future read-only profile contracts.", GovernanceRoleSurface.StatusReadModel, GovernanceRoleSurface.FrontendReadOnly),
                 Entry(GovernanceRoleKind.AutomationAgent, GovernanceRoleScopeKind.WorkflowScoped, "Automation Agent", "Names a system participant responsibility type.", "May be referenced by future automation profile contracts and does not create autonomy.", GovernanceRoleSurface.WorkflowContinuation, GovernanceRoleSurface.StatusReadModel),
                 Entry(GovernanceRoleKind.SystemReadOnly, GovernanceRoleScopeKind.GlobalCatalog, "System Read Only", "Names a read-only system responsibility type.", "May be referenced by future read-only backend profile contracts.", GovernanceRoleSurface.StatusReadModel, GovernanceRoleSurface.FrontendReadOnly),
-                Entry(GovernanceRoleKind.SystemAccountabilityOwner, GovernanceRoleScopeKind.GlobalCatalog, "System Accountability Owner", "Names a system accountability responsibility marker for future governed visibility and boundary checks.", "May be referenced by future system-owner boundary profile contracts and does not grant controls.", GovernanceRoleSurface.StatusReadModel, GovernanceRoleSurface.Audit, GovernanceRoleSurface.FrontendReadOnly)
+                Entry(GovernanceRoleKind.SystemAccountabilityOwner, GovernanceRoleScopeKind.GlobalCatalog, "System Accountability Owner", "Names a system accountability responsibility marker for future governed visibility and boundary checks.", "May be referenced by future system-owner boundary profile contracts and does not grant controls.", GovernanceRoleSurface.StatusReadModel, GovernanceRoleSurface.Audit, GovernanceRoleSurface.FrontendReadOnly),
+                Entry(GovernanceRoleKind.ExternalViewer, GovernanceRoleScopeKind.ProjectScoped, "External Viewer", "Names an external-facing read-only responsibility marker for future governed redaction and visibility checks.", "May be referenced by future external-viewer redaction profile contracts and remains evidence only.", GovernanceRoleSurface.StatusReadModel, GovernanceRoleSurface.FrontendReadOnly)
             ]
         };
 
@@ -99,6 +100,7 @@ public sealed class RoleCatalogService
             GovernanceRoleKind.AutomationAgent => "automation-agent",
             GovernanceRoleKind.SystemReadOnly => "system-read-only",
             GovernanceRoleKind.SystemAccountabilityOwner => "system-accountability-owner",
+            GovernanceRoleKind.ExternalViewer => "external-viewer",
             _ => "unknown"
         };
 }
