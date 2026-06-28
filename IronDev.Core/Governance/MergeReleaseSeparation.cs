@@ -313,6 +313,15 @@ public static class ReleaseReadinessEvidencePackager
         if (!input.RecoveryEvidenceExists) gaps.Add("MissingRecoveryEvidence");
         if (input.PullRequestMerged && string.IsNullOrWhiteSpace(input.ReleaseCandidateRef)) gaps.Add("MissingReleaseCandidateRef");
         if (input.PullRequestMerged && IsPullRequestUrl(input.ReleaseCandidateRef)) gaps.Add("InvalidReleaseCandidateRef:PullRequestUrl");
+        if (input.PullRequestMerged && IsPullRequestNumberRef(input.ReleaseCandidateRef, input.Request.PullRequestNumber)) gaps.Add("InvalidReleaseCandidateRef:PullRequestNumber");
+        if (input.PullRequestMerged && IsPullRequestProviderRef(input.ReleaseCandidateRef)) gaps.Add("InvalidReleaseCandidateRef:PullRequestProviderId");
+        if (input.PullRequestMerged && IsPullRequestReceiptRef(input.ReleaseCandidateRef)) gaps.Add("InvalidReleaseCandidateRef:PullRequestReceipt");
+        if (input.PullRequestMerged && IsMergeReadinessEvidenceRef(input.ReleaseCandidateRef)) gaps.Add("InvalidReleaseCandidateRef:MergeReadinessEvidence");
+        if (input.PullRequestMerged && IsPullRequestHeadRef(input.ReleaseCandidateRef, input.Request.HeadBranch)) gaps.Add("InvalidReleaseCandidateRef:PullRequestHeadRef");
+        if (input.PullRequestMerged && IsPullRequestBaseRef(input.ReleaseCandidateRef, input.Request.BaseBranch)) gaps.Add("InvalidReleaseCandidateRef:PullRequestBaseRef");
+        if (input.PullRequestMerged && IsPullRequestHeadSha(input.ReleaseCandidateRef, input.Request.ExpectedHeadSha)) gaps.Add("InvalidReleaseCandidateRef:PullRequestHeadSha");
+        if (input.PullRequestMerged && IsPullRequestBaseSha(input.ReleaseCandidateRef, input.EvidenceRefs)) gaps.Add("InvalidReleaseCandidateRef:PullRequestBaseSha");
+        if (input.PullRequestMerged && IsPullRequestStateEvidenceRef(input.ReleaseCandidateRef)) gaps.Add("InvalidReleaseCandidateRef:PullRequestStateEvidence");
         if (input.ProductHardeningEvidenceExists && !input.ProductHardeningPassed) blockers.Add("ProductHardeningEvidenceBlocksReleaseDecision");
         if (input.ReleaseReadinessReportExists && IsNotReady(input.ReleaseReadinessReportOutcome)) blockers.Add($"ReleaseReadinessReportBlocksReleaseDecision:{input.ReleaseReadinessReportOutcome}");
         if (input.UnsafeMaterialFindings > 0) blockers.Add("UnsafeMaterialFindingsBlockReleaseDecision");
@@ -361,6 +370,79 @@ public static class ReleaseReadinessEvidencePackager
 
     private static bool IsPullRequestUrl(string? value) =>
         !string.IsNullOrWhiteSpace(value) && value.Contains("/pull/", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPullRequestNumberRef(string? value, int pullRequestNumber)
+    {
+        if (string.IsNullOrWhiteSpace(value) || pullRequestNumber <= 0)
+            return false;
+
+        var normalized = value.Trim();
+        var number = pullRequestNumber.ToString();
+        return string.Equals(normalized, number, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(normalized, $"pr:{number}", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(normalized, $"pull-request:{number}", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPullRequestProviderRef(string? value) =>
+        HasAnyPrefix(value, "provider-pr:", "github-pr:", "pull-request-provider-id:");
+
+    private static bool IsPullRequestReceiptRef(string? value) =>
+        HasAnyPrefix(value, "controlled-draft-pr-receipt:", "controlled-pr-receipt:", "merged-pr-receipt:", "pull-request-receipt:");
+
+    private static bool IsMergeReadinessEvidenceRef(string? value) =>
+        HasAnyPrefix(value, "merge-readiness:", "merge-ready:", "merge-decision-candidate:", "merge-evidence-package:");
+
+    private static bool IsPullRequestHeadRef(string? value, string? headBranch) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        !string.IsNullOrWhiteSpace(headBranch) &&
+        string.Equals(StripHeadRefPrefix(value), headBranch.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPullRequestBaseRef(string? value, string? baseBranch) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        !string.IsNullOrWhiteSpace(baseBranch) &&
+        string.Equals(StripBaseRefPrefix(value), baseBranch.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPullRequestHeadSha(string? value, string? expectedHeadSha) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        !string.IsNullOrWhiteSpace(expectedHeadSha) &&
+        string.Equals(value.Trim(), expectedHeadSha.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPullRequestBaseSha(string? value, string[] evidenceRefs) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        evidenceRefs.Any(evidence =>
+            string.Equals(evidence?.Trim(), $"base-sha:{value.Trim()}", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(evidence?.Trim(), $"pull-request-base-sha:{value.Trim()}", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsPullRequestStateEvidenceRef(string? value) =>
+        HasAnyPrefix(value, "pull-request-status:", "pull-request-read-model:", "provider-pr-state:", "pr-provider-state:");
+
+    private static bool HasAnyPrefix(string? value, params string[] prefixes) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        prefixes.Any(prefix => value.Trim().StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    private static string StripHeadRefPrefix(string value)
+    {
+        var trimmed = value.Trim();
+        foreach (var prefix in new[] { "refs/heads/", "origin/", "heads/", "branch:", "head:" })
+        {
+            if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return trimmed[prefix.Length..];
+        }
+
+        return trimmed;
+    }
+
+    private static string StripBaseRefPrefix(string value)
+    {
+        var trimmed = value.Trim();
+        foreach (var prefix in new[] { "refs/heads/", "origin/", "base:" })
+        {
+            if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return trimmed[prefix.Length..];
+        }
+
+        return trimmed;
+    }
 }
 
 public sealed record MergeReleaseBoundaryMap
