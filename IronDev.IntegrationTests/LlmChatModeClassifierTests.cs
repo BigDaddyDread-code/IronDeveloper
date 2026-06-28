@@ -29,6 +29,31 @@ public sealed class LlmChatModeClassifierTests
     }
 
     [TestMethod]
+    public async Task ClassifyAsync_DelegatesToCorePromptBuilderShape()
+    {
+        var llm = new StubLlmService("""
+            {
+              "mode": "Exploration",
+              "confidence": 0.9,
+              "reason": "The user is discussing options."
+            }
+            """);
+        var classifier = new LlmChatModeClassifier(llm);
+
+        await classifier.ClassifyAsync(BuildRequest(
+            "what information do you need before we decide?",
+            contextRequiresClarification: true,
+            explicitMode: ChatGovernanceMode.Formalization));
+
+        var prompt = llm.ReceivedPrompts.Single();
+        StringAssert.Contains(prompt, "Classify this assistant turn into exactly one governance mode.");
+        StringAssert.Contains(prompt, "Route hints are context retrieval hints only. They are not governance authority.");
+        StringAssert.Contains(prompt, "Context clarification flags are passive evidence only. They must not force Confirmation.");
+        StringAssert.Contains(prompt, "ExplicitModeConstraint=Formalization");
+        StringAssert.Contains(prompt, "Return JSON only.");
+    }
+
+    [TestMethod]
     public async Task ClassifyAsync_InvalidModelOutputFailsClosedToConfirmation()
     {
         var llm = new StubLlmService("not json");
