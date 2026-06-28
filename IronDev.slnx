@@ -2,6 +2,7 @@
   <Project Path="IronDev.Core/IronDev.Core.csproj" />
   <Project Path="IronDev.Client/IronDev.Client.csproj" />
   <Project Path="IronDev.Infrastructure/IronDev.Infrastructure.csproj" />
+  <Project Path="IronDev.UnitTests/IronDev.UnitTests.csproj" />
   <Project Path="IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj" />
   <Project Path="IronDev.IntegrationTests/IronDev.IntegrationTests.csproj" />
   <Project Path="IronDev.Api/IronDev.Api.csproj" />
