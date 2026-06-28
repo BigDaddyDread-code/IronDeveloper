@@ -209,8 +209,7 @@ Local validation on this branch:
 - C11 secret scan: 9/9
 - `dotnet build IronDev.slnx --no-restore`: 0 errors / 4 warnings
 - `git diff --check`: passed
-
-`git diff --cached --check` must be run after staging the exact F15 files.
+- `git diff --cached --check`: passed
 
 GitHub CI must not be claimed unless it runs and passes on the current head.
 
