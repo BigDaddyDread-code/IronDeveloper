@@ -130,6 +130,34 @@ public sealed class GovernedToolArchitectureTests
     }
 
     [TestMethod]
+    public async Task GovernedToolRegistry_UsesCorePolicyEvaluatorBeforeExecution()
+    {
+        Assert.AreEqual("IronDev.Core.Tools", typeof(GovernedToolPolicyEvaluator).Namespace);
+        var tool = new BoundaryViolationTool(new GovernedToolDefinition
+        {
+            Name = BoundaryViolationTool.ToolName,
+            Description = "Test-only mutation-capable tool rejected by Core policy.",
+            InputType = typeof(CodeStandardsAnalysisInput),
+            OutputType = typeof(CodeStandardsAnalysisResult),
+            AllowedCallers = ["BuilderAgent"],
+            MutatesState = true,
+            AllowsNestedCalls = false,
+            Boundary = "Test-only Core policy preservation boundary."
+        });
+        var registry = new GovernedToolRegistry([tool], new GovernedToolPolicyEvaluator());
+
+        var result = await registry.RunAsync<CodeStandardsAnalysisInput, CodeStandardsAnalysisResult>(
+            Request("BuilderAgent", Patch("src/Safe.cs", "+ var now = DateTimeOffset.UtcNow;")) with
+            {
+                ToolName = BoundaryViolationTool.ToolName
+            });
+
+        Assert.AreEqual(GovernedToolStatus.Rejected, result.Status);
+        Assert.IsFalse(tool.WasExecuted);
+        StringAssert.Contains(result.Summary, "mutation-capable");
+    }
+
+    [TestMethod]
     public async Task Registry_RecordsRejectedToolRequestsInThoughtLedger()
     {
         var ledger = new InMemoryGovernedToolThoughtLedger();
