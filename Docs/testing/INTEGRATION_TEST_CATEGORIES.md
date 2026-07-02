@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 603
-- Test classes found: 597
-- Test methods found: 9602
-- Category names found: 221
+- Source files scanned: 604
+- Test classes found: 598
+- Test methods found: 9613
+- Category names found: 224
 
 ## G13 Category Changes
 
@@ -92,6 +92,14 @@ A label does not make a slow test safe.
 - H13 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Docker compose behavior, change Weaviate auth/prod config, implement raw payload redaction, implement artifact retention, implement source-apply/rollback/workflow/release/deploy behavior, or add migration runner/DbUp work.
 - Weaviate rebuild restores recall. It does not restore authority.
 
+## H14 Weaviate Auth / Production Config Tests
+
+- Added focused `Auth`, `ProductionConfig`, `SecretSafety`, and `Weaviate` metadata to the H14 auth/prod config boundary test.
+- Added broad `Governance`, `Contract`, and `Boundary` metadata to the H14 auth/prod config boundary test.
+- H14 does not add `RequiresRealDatabase` or `LongRunning`; the test reads contract, receipt, category, config, environment endpoint, auth validator, and rebuild guard metadata only.
+- H14 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Docker compose behavior, change deployment config, change Weaviate rebuild behavior, require live Weaviate, require Docker, implement raw payload redaction, implement artifact retention, implement source-apply/rollback/workflow/release/deploy behavior, or add migration runner/DbUp work.
+- Weaviate auth protects the index. It does not make index content authoritative.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -113,6 +121,7 @@ A label does not make a slow test safe.
 | `ApplyDryRunStore` | 3 | 15 | 0 | 3 |
 | `ApplyPreview` | 2 | 13 | 0 | 2 |
 | `ArtifactRetention` | 1 | 8 | 0 | 1 |
+| `Auth` | 1 | 11 | 0 | 1 |
 | `Backup` | 1 | 9 | 0 | 1 |
 | `ApprovalAuthorityBoundary` | 2 | 20 | 0 | 2 |
 | `ApprovalAuthorityStaticBoundary` | 1 | 2 | 0 | 1 |
@@ -129,9 +138,9 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 12 | 95 | 0 | 12 |
+| `Boundary` | 13 | 106 | 0 | 13 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 13 | 102 | 0 | 13 |
+| `Contract` | 14 | 113 | 0 | 14 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -152,7 +161,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 15 | 114 | 0 | 15 |
+| `Governance` | 16 | 125 | 0 | 16 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -199,6 +208,7 @@ A label does not make a slow test safe.
 | `PolicySatisfactionRecordContract` | 1 | 19 | 0 | 1 |
 | `PolicySatisfactionSqlStore` | 1 | 15 | 0 | 1 |
 | `ProjectionRebuild` | 2 | 18 | 0 | 2 |
+| `ProductionConfig` | 1 | 11 | 0 | 1 |
 | `PR204` | 2 | 10 | 0 | 2 |
 | `PR205` | 1 | 18 | 0 | 1 |
 | `PR206` | 1 | 14 | 0 | 1 |
@@ -268,6 +278,7 @@ A label does not make a slow test safe.
 | `RollbackRegression` | 2 | 19 | 0 | 2 |
 | `RollbackSupportReceiptReadApi` | 1 | 5 | 0 | 1 |
 | `RollbackSupportReceiptStore` | 1 | 23 | 0 | 1 |
+| `SecretSafety` | 1 | 11 | 0 | 1 |
 | `SemanticMemory` | 1 | 9 | 0 | 1 |
 | `SourceApplyDryRunExecutor` | 1 | 17 | 0 | 1 |
 | `SourceApplyDryRunReceiptStore` | 1 | 11 | 0 | 1 |
@@ -316,7 +327,7 @@ A label does not make a slow test safe.
 | `WorkflowStepThoughtLedger` | 1 | 9 | 0 | 1 |
 | `WorkflowTransitionRecord` | 1 | 25 | 0 | 1 |
 | `WorkflowTransitionRecordStore` | 1 | 24 | 0 | 1 |
-| `Weaviate` | 1 | 9 | 0 | 1 |
+| `Weaviate` | 2 | 20 | 0 | 2 |
 
 ## CI-Facing Category Counts
 
