@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 599
-- Test classes found: 593
-- Test methods found: 9568
-- Category names found: 210
+- Source files scanned: 600
+- Test classes found: 594
+- Test methods found: 9576
+- Category names found: 214
 
 ## G13 Category Changes
 
@@ -60,6 +60,14 @@ A label does not make a slow test safe.
 - H09 does not add a SQL migration, alter tables, alter timestamp columns, rename timestamp columns, add default constraints, alter default constraints, add check constraints, alter check constraints, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Weaviate behavior, or change workflow/source-apply/rollback/release/deployment authority.
 - UTC timestamps make time comparable only.
 
+## H10 Raw Payload Redaction and Retention Policy
+
+- Added focused `PayloadSafety`, `Redaction`, `Retention`, and `Policy` metadata to the H10 policy contract test.
+- Added broad `Governance`, `Contract`, and `Boundary` metadata to the H10 policy contract test.
+- H10 does not add `RequiresRealDatabase` or `LongRunning`; the test reads policy, receipt, category, and static repository path metadata only.
+- H10 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Weaviate behavior, change workflow/source-apply/rollback/release/deployment authority, implement redaction, implement retention deletion, implement artifact deletion, run replay, run backfill, or rebuild projections.
+- Redaction policy limits exposure. It does not make retained payloads safe.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -95,9 +103,9 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 8 | 61 | 0 | 8 |
+| `Boundary` | 9 | 69 | 0 | 9 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 9 | 68 | 0 | 9 |
+| `Contract` | 10 | 76 | 0 | 10 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -117,7 +125,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 11 | 80 | 0 | 11 |
+| `Governance` | 12 | 88 | 0 | 12 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -157,6 +165,8 @@ A label does not make a slow test safe.
 | `PatchArtifactRegression` | 1 | 10 | 0 | 1 |
 | `PatchArtifactStore` | 1 | 22 | 0 | 1 |
 | `PatchBaseHashValidation` | 1 | 27 | 0 | 1 |
+| `PayloadSafety` | 1 | 8 | 0 | 1 |
+| `Policy` | 1 | 8 | 0 | 1 |
 | `PolicyRequirementSatisfactionEvaluator` | 1 | 22 | 0 | 1 |
 | `PolicySatisfactionReceiptRegression` | 1 | 24 | 0 | 1 |
 | `PolicySatisfactionRecordContract` | 1 | 19 | 0 | 1 |
@@ -207,6 +217,7 @@ A label does not make a slow test safe.
 | `RealDatabaseWorkflowRunSmoke` | 2 | 14 | 0 | 2 |
 | `RealDatabaseWorkflowStepSmoke` | 1 | 8 | 0 | 1 |
 | `RealDatabaseWorkflowTransitionRecordStoreSmoke` | 1 | 24 | 0 | 1 |
+| `Redaction` | 1 | 8 | 0 | 1 |
 | `Receipt` | 20 | 407 | 0 | 20 |
 | `ReleaseGateNegativeCampaign` | 1 | 30 | 0 | 1 |
 | `ReleaseReadinessApiRegression` | 1 | 6 | 0 | 1 |
@@ -217,6 +228,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
 | `RequiresRealDatabase` | 39 | 410 | 0 | 39 |
+| `Retention` | 1 | 8 | 0 | 1 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |
 | `RollbackExecutionReceiptStore` | 3 | 27 | 0 | 3 |
