@@ -123,6 +123,7 @@ public sealed class GovernanceEventValidator
     public const string ActorTypeRequired = "GOVERNANCE_EVENT_ACTOR_TYPE_REQUIRED";
     public const string ActorIdRequired = "GOVERNANCE_EVENT_ACTOR_ID_REQUIRED";
     public const string PayloadVersionInvalid = "GOVERNANCE_EVENT_PAYLOAD_VERSION_INVALID";
+    public const string PayloadVersionUnsupported = "GOVERNANCE_EVENT_PAYLOAD_VERSION_UNSUPPORTED";
     public const string PayloadJsonRequired = "GOVERNANCE_EVENT_PAYLOAD_JSON_REQUIRED";
     public const string PayloadJsonInvalid = "GOVERNANCE_EVENT_PAYLOAD_JSON_INVALID";
     public const string PayloadTextUnsafe = "GOVERNANCE_EVENT_PAYLOAD_TEXT_UNSAFE";
@@ -150,8 +151,17 @@ public sealed class GovernanceEventValidator
         Require(request.ActorType, ActorTypeRequired, nameof(request.ActorType), "Actor type is required.", issues);
         Require(request.ActorId, ActorIdRequired, nameof(request.ActorId), "Actor ID is required.", issues);
 
-        if (request.PayloadVersion <= 0)
-            issues.Add(Issue(PayloadVersionInvalid, "Payload version must be positive.", nameof(request.PayloadVersion)));
+        if (request.PayloadVersion <= GovernanceEventSchemaVersions.LegacyUnversioned)
+        {
+            var versionDecision = GovernanceEventSchemaVersioning.ForNewEvent(request.PayloadVersion);
+            issues.Add(Issue(PayloadVersionInvalid, versionDecision.Reason, nameof(request.PayloadVersion)));
+        }
+        else
+        {
+            var versionDecision = GovernanceEventSchemaVersioning.ForNewEvent(request.PayloadVersion);
+            if (!versionDecision.CanWrite)
+                issues.Add(Issue(PayloadVersionUnsupported, versionDecision.Reason, nameof(request.PayloadVersion)));
+        }
 
         ValidatePayloadJson(request.PayloadJson, issues);
         return issues;
