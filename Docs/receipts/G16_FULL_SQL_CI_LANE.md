@@ -2,7 +2,7 @@
 
 ## Purpose
 
-G16 adds an explicit full SQL-backed CI lane that executes the real database / SQL-backed integration coverage made visible by G14.
+G16 adds an explicit SQL-backed CI lane for bounded real-database evidence and explicit broad-category selection gaps made visible by G14.
 
 Full CI is not release approval.
 
@@ -33,7 +33,9 @@ G16 adds a separate workflow:
 - Script: `Scripts/ci/run-full-sql-integration-ci.ps1`
 - Artifact root: `artifacts/ci/full-sql-integration`
 
-The new workflow restores and builds the solution, lists the G14 SQL/slow categories, executes SQL readiness, executes the old SQL-backed store lane, executes `TestCategory=RequiresRealDatabase`, executes G13/G14 category contracts, executes C11 secret scan compatibility, scans artifacts, and uploads bounded evidence.
+The new workflow restores and builds the solution, lists the G14 SQL/slow categories, executes SQL readiness, executes the old SQL-backed store lane, executes a bounded real-database smoke expansion, executes G13/G14 category contracts, executes C11 secret scan compatibility, scans artifacts, and uploads bounded evidence.
+
+The broad `RequiresRealDatabase` / `LongRunning` category sets are selection-only in G16. They are not called execution-proven until a later split runs bounded subsets without timeout.
 
 ## Workflow trigger changes
 
@@ -45,6 +47,8 @@ The new workflow runs on:
 - `workflow_dispatch`
 
 The workflow uses `permissions: contents: read` and cancels superseded runs for the same ref.
+
+The workflow uses `timeout-minutes: 30`; timeout is treated as failed CI evidence, not as a reason to call the lane green.
 
 ## SQL environment
 
@@ -64,16 +68,17 @@ The workflow uses `permissions: contents: read` and cancels superseded runs for 
 6. Store category selection proof.
 7. SQL Server connectivity smoke with readiness retry.
 8. SQL-backed governance stores.
-9. RequiresRealDatabase execution.
+9. Real database smoke expansion.
 10. Category safety contracts: G13 and G14.
 11. C11 secret scan compatibility.
 
-The lane intentionally executes `TestCategory=RequiresRealDatabase` once and records whether it also covers the `LongRunning` selection by overlap count. It does not duplicate the same 380-test class set unless a later split proves that duplication is useful.
+The lane intentionally does not execute the full `TestCategory=RequiresRealDatabase` or `TestCategory=LongRunning` sets. The first all-in-one GitHub attempt was cancelled after exceeding useful CI duration, so G16 now records those broad selections as split-required execution gaps.
 
 ## Filters used
 
 - `FullyQualifiedName~BlockC02SqlServerConnectivitySmokeTests`
 - Existing SQL store filter: `AcceptedApprovalSqlStoreTests`, `PolicySatisfactionSqlStoreTests`, `ApplyDryRunStoreTests`, `DryRunReceiptStoreTests`, `PatchArtifactStoreTests`, `WorkflowTransitionRecordStoreTests`, `ToolRequestStoreTests`
+- Real database smoke expansion: `RealDatabaseApprovalDecisionSmokeTests`, `RealDatabaseDogfoodReceiptSmokeTests`, `RealDatabasePolicyDecisionSmokeTests`, `RealDatabaseThoughtLedgerGovernanceReferenceSmokeTests`, `RealDatabaseToolGateDecisionSmokeTests`, `RealDatabaseToolRequestSmokeTests`, `RealDatabaseWorkflowRunSmokeTests`
 - `TestCategory=RequiresRealDatabase`
 - `TestCategory=LongRunning`
 - `TestCategory~RealDatabase`
@@ -108,13 +113,13 @@ The difference between source-counted methods and `dotnet --list-tests` discover
 
 ## Executed counts
 
-Pending current-head GitHub run.
+Pending revised current-head GitHub run.
 
 The new lane must record executed counts in `artifacts/ci/full-sql-integration/sql-lane-summary.md` and `test-count-summary.json`.
 
 ## Duration per lane
 
-Pending current-head GitHub run.
+Pending revised current-head GitHub run.
 
 The script writes `artifacts/ci/full-sql-integration/timing-summary.md`.
 
@@ -141,7 +146,7 @@ Expected files:
 
 ## Artifact safety scan result
 
-Pending current-head GitHub run.
+Pending revised current-head GitHub run.
 
 The workflow runs `Scripts/ci/test-ci-evidence-artifact-safety.ps1` before upload.
 
@@ -167,7 +172,7 @@ Local full SQL execution was not run because this workspace does not have the Gi
 
 ## GitHub SQL evidence
 
-Pending current-head GitHub run:
+Pending revised current-head GitHub run:
 
 - GitHub SQL run ID
 - GitHub SQL job ID
@@ -180,19 +185,34 @@ Pending current-head GitHub run:
 
 ## Execution gaps
 
-Pending current-head GitHub run.
+The first current-head GitHub run attempted broad `RequiresRealDatabase` execution and was cancelled after the main SQL step ran for about 32 minutes:
+
+- Run: `28570760199`
+- Job: `84707776970`
+- Head: `704d7a89019041629771f3611ee2d7355e1d63a0`
+- Conclusion: cancelled
+
+That cancellation is treated as useful evidence: broad DB category execution needs a later split instead of one huge first-pass gate.
+
+Known G16 execution gaps:
+
+- Full `TestCategory=RequiresRealDatabase` execution: deferred / split-required.
+- Full `TestCategory=LongRunning` execution: deferred / split-required.
+- `ManualLocal`: existing ignored manual-local debt; not executed by G16.
 
 ManualLocal remains existing ignored manual-local debt and is not executed by G16.
 
 ## Selection-only gaps
 
-Pending current-head GitHub run.
+Pending revised current-head GitHub run.
 
 Any selection-only rows must remain explicitly recorded. No selected lane is called passed unless it executed.
 
 ## What full SQL CI proves
 
 Full SQL CI proves only that the configured SQL-backed CI lanes ran against the configured SQL Server environment and passed on this head.
+
+It does not prove the full broad `RequiresRealDatabase` / `LongRunning` selections until those selections are split and executed.
 
 ## What full SQL CI does not prove
 

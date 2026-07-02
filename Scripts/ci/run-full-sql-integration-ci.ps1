@@ -290,13 +290,9 @@ function Write-ExecutionGapSummary {
     $requiresRealDatabase = @($script:SelectionNames["RequiresRealDatabase"])
     $longRunning = @($script:SelectionNames["LongRunning"])
     $overlap = @($requiresRealDatabase | Where-Object { $longRunning -contains $_ })
-    $requiresExecuted = $script:LaneRecords |
-        Where-Object { $_["Lane"] -eq "RequiresRealDatabase execution" } |
+    $realDatabaseSmokeExecuted = $script:LaneRecords |
+        Where-Object { $_["Lane"] -eq "Real database smoke expansion" } |
         Select-Object -First 1
-
-    $coveredBySingleCommand = $requiresExecuted -and
-        $requiresRealDatabase.Count -eq $longRunning.Count -and
-        $overlap.Count -eq $longRunning.Count
 
     $lines = @(
         "# Full SQL Execution Gap Summary",
@@ -312,8 +308,13 @@ function Write-ExecutionGapSummary {
         "| RequiresRealDatabase selected count | $($requiresRealDatabase.Count) |",
         "| LongRunning selected count | $($longRunning.Count) |",
         "| RequiresRealDatabase / LongRunning overlap count | $($overlap.Count) |",
-        "| RequiresRealDatabase executed count | $(if ($requiresExecuted) { $requiresExecuted["Executed"] } else { "not-executed" }) |",
-        "| LongRunning execution covered by same command | $coveredBySingleCommand |",
+        "| Real database smoke expansion executed count | $(if ($realDatabaseSmokeExecuted) { $realDatabaseSmokeExecuted["Executed"] } else { "not-executed" }) |",
+        "| Broad RequiresRealDatabase execution status | deferred/split-required |",
+        "| Broad LongRunning execution status | deferred/split-required |",
+        "",
+        "The broad RequiresRealDatabase / LongRunning category sets remain selection-only in this lane.",
+        "",
+        "They require a later split into bounded executable groups before their full selection can be called execution-proven.",
         "",
         "ManualLocal remains existing ignored manual-local debt and is not executed by this lane.",
         "",
@@ -394,7 +395,18 @@ try {
     ) -join "|"
 
     Invoke-TestLane -Name "SQL-backed governance stores" -Filter $sqlStoreFilter
-    Invoke-TestLane -Name "RequiresRealDatabase execution" -Filter "TestCategory=RequiresRealDatabase"
+
+    $realDatabaseSmokeFilter = @(
+        "FullyQualifiedName~RealDatabaseApprovalDecisionSmokeTests",
+        "FullyQualifiedName~RealDatabaseDogfoodReceiptSmokeTests",
+        "FullyQualifiedName~RealDatabasePolicyDecisionSmokeTests",
+        "FullyQualifiedName~RealDatabaseThoughtLedgerGovernanceReferenceSmokeTests",
+        "FullyQualifiedName~RealDatabaseToolGateDecisionSmokeTests",
+        "FullyQualifiedName~RealDatabaseToolRequestSmokeTests",
+        "FullyQualifiedName~RealDatabaseWorkflowRunSmokeTests"
+    ) -join "|"
+
+    Invoke-TestLane -Name "Real database smoke expansion" -Filter $realDatabaseSmokeFilter
 
     $categoryContractFilter = @(
         "FullyQualifiedName~IntegrationTestCategoryContractTests",

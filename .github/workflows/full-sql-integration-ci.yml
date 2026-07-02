@@ -28,7 +28,7 @@ jobs:
   full-sql-integration-ci:
     name: Full SQL-backed integration lane
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     services:
       sqlserver:
