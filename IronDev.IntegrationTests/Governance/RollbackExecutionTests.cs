@@ -671,6 +671,8 @@ public sealed class ControlledRollbackExecutorTests
     }
 }
 
+[TestCategory("RequiresRealDatabase")]
+[TestCategory("LongRunning")]
 [TestClass]
 [TestCategory("RollbackExecutionReceiptStore")]
 [TestCategory("PR206")]

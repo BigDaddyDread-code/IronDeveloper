@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 589
-- Test classes found: 583
-- Test methods found: 9495
-- Category names found: 196
+- Source files scanned: 590
+- Test classes found: 584
+- Test methods found: 9505
+- Category names found: 199
 
 ## G13 Category Changes
 
@@ -27,6 +27,22 @@ A label does not make a slow test safe.
 - Added broad `Governance`, `Contract`, and `Boundary` metadata to the G13 category contract test.
 - No categories were renamed.
 - No categories were removed.
+
+## G14 Slow / Quarantine Split
+
+- new categories added: `RequiresRealDatabase`, `LongRunning`, `ManualLocal`.
+- categories not added: `Slow`, `Quarantined`, `RequiresExternalDependency`, `RequiresLocalTooling`.
+- counts by category:
+  - `RequiresRealDatabase`: 35 test classes, 380 test methods, 35 files.
+  - `LongRunning`: 35 test classes, 380 test methods, 35 files.
+  - `ManualLocal`: 1 test class, 1 test method, 1 file.
+- test classes affected: 35 store/real-database-shaped integration classes plus 1 manual local legacy class.
+- test methods affected if source-countable: 380 `RequiresRealDatabase`/`LongRunning` methods and 1 `ManualLocal` method.
+- tests moved into explicit slow/quarantine visibility: store and real-database-shaped classes are now explicitly visible through `RequiresRealDatabase` and `LongRunning`; the existing manual local ignored task is visible through `ManualLocal`.
+- tests remain in default lanes: no CI filters were changed, no tests were deleted, and no default lane exclusion was added.
+- selection-only pending execution proof: most `RequiresRealDatabase`/`LongRunning` rows remain `SelectionOnlyPendingExecution` until a slow/SQL lane executes them.
+- real execution proof: none was added by G14; existing SQL CI class membership remains documented, but this PR does not claim fresh SQL execution.
+- Selection proof is not execution proof.
 
 ## Inventory
 
@@ -63,9 +79,9 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 1 | 7 | 0 | 1 |
+| `Boundary` | 2 | 17 | 0 | 2 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 1 | 7 | 0 | 1 |
+| `Contract` | 2 | 17 | 0 | 2 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -81,7 +97,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 1 | 7 | 0 | 1 |
+| `Governance` | 2 | 17 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
 | `GovernanceSubstrateContract` | 1 | 10 | 0 | 1 |
@@ -99,6 +115,8 @@ A label does not make a slow test safe.
 | `L4FailureModeReport` | 1 | 8 | 0 | 1 |
 | `L4InvariantRegression` | 1 | 14 | 0 | 1 |
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
+| `LongRunning` | 35 | 380 | 0 | 35 |
+| `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
 | `MemoryPromotionRequestPackage` | 1 | 7 | 0 | 1 |
 | `MemoryProposalConflictDetection` | 1 | 14 | 0 | 1 |
@@ -175,6 +193,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessGateEvaluator` | 1 | 30 | 0 | 1 |
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
+| `RequiresRealDatabase` | 35 | 380 | 0 | 35 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |
 | `RollbackExecutionReceiptStore` | 3 | 27 | 0 | 3 |

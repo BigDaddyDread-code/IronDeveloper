@@ -2,6 +2,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Database;
 
+[TestCategory("RequiresRealDatabase")]
+[TestCategory("LongRunning")]
 [TestClass]
 [TestCategory("RealDatabaseWorkflowRunSmoke")]
 public sealed class RealDatabaseWorkflowRunSmokeTests
