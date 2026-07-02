@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 595
-- Test classes found: 589
-- Test methods found: 9538
-- Category names found: 204
+- Source files scanned: 596
+- Test classes found: 590
+- Test methods found: 9546
+- Category names found: 205
 
 ## G13 Category Changes
 
@@ -33,11 +33,11 @@ A label does not make a slow test safe.
 - new categories added: `RequiresRealDatabase`, `LongRunning`, `ManualLocal`.
 - categories not added: `Slow`, `Quarantined`, `RequiresExternalDependency`, `RequiresLocalTooling`.
 - counts by category:
-  - `RequiresRealDatabase`: 37 test classes, 394 test methods, 37 files.
-  - `LongRunning`: 37 test classes, 394 test methods, 37 files.
+  - `RequiresRealDatabase`: 38 test classes, 402 test methods, 38 files.
+  - `LongRunning`: 38 test classes, 402 test methods, 38 files.
   - `ManualLocal`: 1 test class, 1 test method, 1 file.
-- test classes affected: 37 store/real-database-shaped integration classes plus 1 manual local legacy class.
-- test methods affected if source-countable: 394 `RequiresRealDatabase`/`LongRunning` methods and 1 `ManualLocal` method.
+- test classes affected: 38 store/real-database-shaped integration classes plus 1 manual local legacy class.
+- test methods affected if source-countable: 402 `RequiresRealDatabase`/`LongRunning` methods and 1 `ManualLocal` method.
 - tests moved into explicit slow/quarantine visibility: store and real-database-shaped classes are now explicitly visible through `RequiresRealDatabase` and `LongRunning`; the existing manual local ignored task is visible through `ManualLocal`.
 - tests remain in default lanes: no CI filters were changed, no tests were deleted, and no default lane exclusion was added.
 - selection-only pending execution proof: most `RequiresRealDatabase`/`LongRunning` rows remain `SelectionOnlyPendingExecution` until a slow/SQL lane executes them.
@@ -79,9 +79,9 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 4 | 31 | 0 | 4 |
+| `Boundary` | 5 | 39 | 0 | 5 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 5 | 38 | 0 | 5 |
+| `Contract` | 6 | 46 | 0 | 6 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -96,10 +96,11 @@ A label does not make a slow test safe.
 | `DryRunReceiptStore` | 1 | 21 | 0 | 1 |
 | `DryRunReceiptWriteIntegration` | 1 | 20 | 0 | 1 |
 | `EndToEndGovernedDogfoodCampaign` | 1 | 10 | 0 | 1 |
+| `Evidence` | 1 | 8 | 0 | 1 |
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 7 | 50 | 0 | 7 |
+| `Governance` | 8 | 58 | 0 | 8 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -118,7 +119,7 @@ A label does not make a slow test safe.
 | `L4FailureModeReport` | 1 | 8 | 0 | 1 |
 | `L4InvariantRegression` | 1 | 14 | 0 | 1 |
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
-| `LongRunning` | 37 | 394 | 0 | 37 |
+| `LongRunning` | 38 | 402 | 0 | 38 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
 | `MemoryPromotionRequestPackage` | 1 | 7 | 0 | 1 |
@@ -196,7 +197,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessGateEvaluator` | 1 | 30 | 0 | 1 |
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
-| `RequiresRealDatabase` | 37 | 394 | 0 | 37 |
+| `RequiresRealDatabase` | 38 | 402 | 0 | 38 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |
 | `RollbackExecutionReceiptStore` | 3 | 27 | 0 | 3 |
@@ -221,8 +222,8 @@ A label does not make a slow test safe.
 | `Spike` | 1 | 6 | 0 | 1 |
 | `StaleAuthorityDetection` | 1 | 31 | 0 | 1 |
 | `StaticBoundary` | 39 | 294 | 0 | 39 |
-| `StorageReview` | 1 | 7 | 0 | 1 |
-| `Store` | 11 | 122 | 0 | 11 |
+| `StorageReview` | 2 | 15 | 0 | 2 |
+| `Store` | 12 | 130 | 0 | 12 |
 | `ThoughtLedgerGovernanceReference` | 2 | 14 | 0 | 2 |
 | `ThoughtLedgerHandoffEntry` | 1 | 18 | 0 | 1 |
 | `ToolRequestStore` | 1 | 11 | 0 | 1 |
