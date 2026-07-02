@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 598
-- Test classes found: 592
-- Test methods found: 9560
-- Category names found: 208
+- Source files scanned: 599
+- Test classes found: 593
+- Test methods found: 9568
+- Category names found: 210
 
 ## G13 Category Changes
 
@@ -33,11 +33,11 @@ A label does not make a slow test safe.
 - new categories added: `RequiresRealDatabase`, `LongRunning`, `ManualLocal`.
 - categories not added: `Slow`, `Quarantined`, `RequiresExternalDependency`, `RequiresLocalTooling`.
 - counts by category:
-  - `RequiresRealDatabase`: 38 test classes, 402 test methods, 38 files.
-  - `LongRunning`: 38 test classes, 402 test methods, 38 files.
+  - `RequiresRealDatabase`: 39 test classes, 410 test methods, 39 files.
+  - `LongRunning`: 39 test classes, 410 test methods, 39 files.
   - `ManualLocal`: 1 test class, 1 test method, 1 file.
-- test classes affected: 38 store/real-database-shaped integration classes plus 1 manual local legacy class.
-- test methods affected if source-countable: 402 `RequiresRealDatabase`/`LongRunning` methods and 1 `ManualLocal` method.
+- test classes affected: 39 store/real-database-shaped integration classes plus 1 manual local legacy class.
+- test methods affected if source-countable: 410 `RequiresRealDatabase`/`LongRunning` methods and 1 `ManualLocal` method.
 - tests moved into explicit slow/quarantine visibility: store and real-database-shaped classes are now explicitly visible through `RequiresRealDatabase` and `LongRunning`; the existing manual local ignored task is visible through `ManualLocal`.
 - tests remain in default lanes: no CI filters were changed, no tests were deleted, and no default lane exclusion was added.
 - selection-only pending execution proof: most `RequiresRealDatabase`/`LongRunning` rows remain `SelectionOnlyPendingExecution` until a slow/SQL lane executes them.
@@ -51,6 +51,14 @@ A label does not make a slow test safe.
 - H08 does not add `RequiresRealDatabase` or `LongRunning`; the tested surfaces are in-memory/read-adapter contracts.
 - H08 adds no SQL migration, schema, table, column, index, stored procedure, trigger, permission, API, CLI, UI, Weaviate, workflow, source-apply, rollback, release, deployment, replay, rebuild, or backfill behavior.
 - Tenant filters protect read scope only.
+
+## H09 UTC Timestamp DB Constraint Review
+
+- Added focused `Database` and `UtcTimestamp` metadata to the H09 SQL metadata review test.
+- Added broad `Governance`, `StorageReview`, `RequiresRealDatabase`, `LongRunning`, `Contract`, and `Boundary` metadata to the H09 timestamp review test.
+- H09 uses existing migration setup and SQL metadata reads only after integration setup.
+- H09 does not add a SQL migration, alter tables, alter timestamp columns, rename timestamp columns, add default constraints, alter default constraints, add check constraints, alter check constraints, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Weaviate behavior, or change workflow/source-apply/rollback/release/deployment authority.
+- UTC timestamps make time comparable only.
 
 ## Inventory
 
@@ -87,12 +95,13 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 7 | 53 | 0 | 7 |
+| `Boundary` | 8 | 61 | 0 | 8 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 8 | 60 | 0 | 8 |
+| `Contract` | 9 | 68 | 0 | 9 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
+| `Database` | 1 | 8 | 0 | 1 |
 | `DatabaseMigrationReceipt` | 1 | 7 | 0 | 1 |
 | `DatabaseMigration` | 2 | 12 | 0 | 2 |
 | `Decision` | 2 | 12 | 0 | 2 |
@@ -108,7 +117,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 10 | 72 | 0 | 10 |
+| `Governance` | 11 | 80 | 0 | 11 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -127,7 +136,7 @@ A label does not make a slow test safe.
 | `L4FailureModeReport` | 1 | 8 | 0 | 1 |
 | `L4InvariantRegression` | 1 | 14 | 0 | 1 |
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
-| `LongRunning` | 38 | 402 | 0 | 38 |
+| `LongRunning` | 39 | 410 | 0 | 39 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
 | `MemoryPromotionRequestPackage` | 1 | 7 | 0 | 1 |
@@ -207,7 +216,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessGateEvaluator` | 1 | 30 | 0 | 1 |
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
-| `RequiresRealDatabase` | 38 | 402 | 0 | 38 |
+| `RequiresRealDatabase` | 39 | 410 | 0 | 39 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |
 | `RollbackExecutionReceiptStore` | 3 | 27 | 0 | 3 |
@@ -232,13 +241,14 @@ A label does not make a slow test safe.
 | `Spike` | 1 | 6 | 0 | 1 |
 | `StaleAuthorityDetection` | 1 | 31 | 0 | 1 |
 | `StaticBoundary` | 39 | 294 | 0 | 39 |
-| `StorageReview` | 3 | 20 | 0 | 3 |
+| `StorageReview` | 4 | 28 | 0 | 4 |
 | `Store` | 12 | 130 | 0 | 12 |
 | `TenantIsolation` | 1 | 9 | 0 | 1 |
 | `ThoughtLedgerGovernanceReference` | 2 | 14 | 0 | 2 |
 | `ThoughtLedgerHandoffEntry` | 1 | 18 | 0 | 1 |
 | `ToolRequestStore` | 1 | 11 | 0 | 1 |
 | `UiCannotOwnBackendAuthority` | 1 | 8 | 0 | 1 |
+| `UtcTimestamp` | 1 | 8 | 0 | 1 |
 | `WorkflowA2aHandoff` | 2 | 31 | 0 | 2 |
 | `WorkflowApprovalHalt` | 3 | 14 | 0 | 3 |
 | `WorkflowAuthoritySubstitution` | 1 | 8 | 0 | 1 |
