@@ -1,0 +1,68 @@
+name: full-sql-integration-ci
+
+on:
+  pull_request:
+    branches:
+      - main
+      - governance/block-f-rollup-to-main
+      - ci/fast-unit-lane-under-five-minutes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-sql-integration-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  IRONDEV_CI_SQL_SERVER: localhost
+  IRONDEV_CI_SQL_PORT: 1433
+  IRONDEV_CI_SQL_DATABASE: IronDev_CI_${{ github.run_id }}_${{ github.run_attempt }}
+  IRONDEV_CI_SQL_USER: sa
+  IRONDEV_CI_SQL_PASSWORD: ${{ format('IronDev_CI_Strong_{0}_{1}_Passw0rd_123!', github.run_id, github.run_attempt) }}
+
+jobs:
+  full-sql-integration-ci:
+    name: Full SQL-backed integration lane
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: ${{ format('IronDev_CI_Strong_{0}_{1}_Passw0rd_123!', github.run_id, github.run_attempt) }}
+        ports:
+          - 1433:1433
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Full SQL-backed integration lane
+        shell: pwsh
+        run: ./Scripts/ci/run-full-sql-integration-ci.ps1
+
+      - name: Verify full SQL evidence artifacts are sanitized
+        if: always()
+        id: artifact-safety
+        shell: pwsh
+        run: ./Scripts/ci/test-ci-evidence-artifact-safety.ps1 -ArtifactDirectory artifacts/ci/full-sql-integration
+
+      - name: Upload full SQL integration evidence
+        if: ${{ always() && steps.artifact-safety.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-sql-integration-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/full-sql-integration
+          retention-days: 14
+          if-no-files-found: error
