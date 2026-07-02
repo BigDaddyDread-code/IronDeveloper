@@ -105,8 +105,8 @@ public sealed partial class SlowQuarantineCategoryContractTests
             StringAssert.Contains(inventory, $"| `{category}` |");
         }
 
-        StringAssert.Contains(inventory, "`RequiresRealDatabase`: 38 test classes, 402 test methods, 38 files.");
-        StringAssert.Contains(inventory, "`LongRunning`: 38 test classes, 402 test methods, 38 files.");
+        StringAssert.Contains(inventory, "`RequiresRealDatabase`: 39 test classes, 410 test methods, 39 files.");
+        StringAssert.Contains(inventory, "`LongRunning`: 39 test classes, 410 test methods, 39 files.");
         StringAssert.Contains(inventory, "`ManualLocal`: 1 test class, 1 test method, 1 file.");
     }
 
