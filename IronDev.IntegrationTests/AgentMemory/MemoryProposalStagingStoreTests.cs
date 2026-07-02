@@ -9,6 +9,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.AgentMemory;
 
+[TestCategory("RequiresRealDatabase")]
+[TestCategory("LongRunning")]
 [TestClass]
 [TestCategory("MemoryProposalStagingStore")]
 [TestCategory("RealDatabaseMemoryProposalStagingSmoke")]

@@ -11,6 +11,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Agents;
 
+[TestCategory("Store")]
+[TestCategory("RequiresRealDatabase")]
+[TestCategory("LongRunning")]
 [TestClass]
 public sealed class ToolExecutionAuditStoreTests : IntegrationTestBase
 {

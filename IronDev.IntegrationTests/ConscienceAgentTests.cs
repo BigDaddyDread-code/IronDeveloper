@@ -124,4 +124,57 @@ public sealed class ConscienceAgentTests
         }
         Assert.IsTrue(blockingFactors.Exists(f => f.Contains("bypassing a governance gate")));
     }
+
+    [TestMethod]
+    public async Task ConscienceAgent_DelegatesPolicyDecisionShape()
+    {
+        var definition = new AgentDefinition
+        {
+            Name = "ConscienceAgent",
+            Purpose = "Test safety rules.",
+            DefaultModelProfile = "cheap-runner"
+        };
+        var resolver = new AgentModelResolver();
+        var agent = new ConscienceAgent(definition, resolver);
+
+        var result = await agent.RunAsync(CreateRequest(
+            "disposable workspace apply patch",
+            "apply",
+            "disposable workspace|outside real repo|before hash|after hash"));
+
+        Assert.AreEqual(AgentRunStatus.Succeeded, result.Status);
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.IsNotNull(result.OutputJson);
+
+        using var doc = JsonDocument.Parse(result.OutputJson);
+        var root = doc.RootElement;
+
+        CollectionAssert.AreEquivalent(
+            new[]
+            {
+                "decision",
+                "confidence",
+                "reasons",
+                "allowingFactors",
+                "blockingFactors",
+                "missingEvidence",
+                "violatedBoundaries",
+                "requiredNextSteps",
+                "observedProject",
+                "affectedProject",
+                "authoritySources",
+                "requestedTools",
+                "boundary"
+            },
+            root.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.AreEqual("Allow", root.GetProperty("decision").GetString());
+        Assert.AreEqual("TestProject", root.GetProperty("observedProject").GetString());
+        Assert.AreEqual("TestProject", root.GetProperty("affectedProject").GetString());
+        Assert.AreEqual("ConscienceAgent reviews only. It does not patch, create tickets, mutate memory, or approve itself.", root.GetProperty("boundary").GetString());
+
+        var allowingFactors = root.GetProperty("allowingFactors").EnumerateArray()
+            .Select(item => item.GetString())
+            .ToArray();
+        CollectionAssert.Contains(allowingFactors, "Disposable workspace boundary is explicit.");
+    }
 }

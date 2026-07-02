@@ -2,6 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("StaticBoundary")]
 [TestClass]
 [TestCategory("ReadOnlyDogfoodReceiptViewerUi")]
 public sealed class ReadOnlyDogfoodReceiptViewerUiStaticBoundaryTests

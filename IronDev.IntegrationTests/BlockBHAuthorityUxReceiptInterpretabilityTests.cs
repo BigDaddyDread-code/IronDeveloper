@@ -5,6 +5,7 @@ using IronDev.Core.Governance;
 
 namespace IronDev.IntegrationTests;
 
+[TestCategory("Receipt")]
 [TestClass]
 public sealed class BlockBHAuthorityUxReceiptInterpretabilityTests
 {

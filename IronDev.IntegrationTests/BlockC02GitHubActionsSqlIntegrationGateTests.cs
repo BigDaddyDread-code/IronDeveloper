@@ -296,6 +296,8 @@ public sealed class BlockC02GitHubActionsSqlIntegrationGateTests
     }
 }
 
+[TestCategory("RequiresRealDatabase")]
+[TestCategory("LongRunning")]
 [TestClass]
 public sealed class BlockC02SqlServerConnectivitySmokeTests
 {
