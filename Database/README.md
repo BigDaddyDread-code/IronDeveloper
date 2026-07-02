@@ -46,6 +46,10 @@ The script:
 
 The verifier checks the governance schema, governance event table/procedures/trigger, tool request, tool gate decision, approval decision, policy decision event, dogfood receipt, and ThoughtLedger governance reference tables/procedures/triggers/foreign keys plus key JSON/version constraints.
 
+## Migration state decision
+
+`Docs/decisions/ADR-017-migration-state-tracking.md` defines the migration-state tracking contract before any durable migration-state table exists. Migration state is evidence, not database authority. A recorded migration is not a safe database, and migration state does not replace `verify-migrations.ps1`.
+
 ## Runtime DDL boundary
 
 Runtime services may call stored procedures. They must not create the governance schema or governance/tool-request/tool-gate-decision/approval-decision/policy-decision-event/dogfood-receipt/thoughtledger-governance-reference tables on startup.
