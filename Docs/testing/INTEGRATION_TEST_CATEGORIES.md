@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 600
-- Test classes found: 594
-- Test methods found: 9576
-- Category names found: 214
+- Source files scanned: 601
+- Test classes found: 595
+- Test methods found: 9584
+- Category names found: 216
 
 ## G13 Category Changes
 
@@ -68,6 +68,14 @@ A label does not make a slow test safe.
 - H10 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Weaviate behavior, change workflow/source-apply/rollback/release/deployment authority, implement redaction, implement retention deletion, implement artifact deletion, run replay, run backfill, or rebuild projections.
 - Redaction policy limits exposure. It does not make retained payloads safe.
 
+## H11 Evidence Artifact Retention Policy
+
+- Added focused `ArtifactRetention` and `EvidenceArtifact` metadata to the H11 policy contract test.
+- Added broad `Governance`, `Retention`, `Policy`, `Contract`, and `Boundary` metadata to the H11 policy contract test.
+- H11 does not add `RequiresRealDatabase` or `LongRunning`; the test reads policy, receipt, category, and static repository path metadata only.
+- H11 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Weaviate behavior, change workflow/source-apply/rollback/release/deployment authority, implement artifact deletion, implement artifact expiry, implement retention deletion, implement cleanup commands, run replay, run backfill, or rebuild projections.
+- Artifact retention policy controls lifecycle. It does not make artifacts safe.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -88,6 +96,7 @@ A label does not make a slow test safe.
 | `ApplyDryRunStaticBoundary` | 1 | 4 | 0 | 1 |
 | `ApplyDryRunStore` | 3 | 15 | 0 | 3 |
 | `ApplyPreview` | 2 | 13 | 0 | 2 |
+| `ArtifactRetention` | 1 | 8 | 0 | 1 |
 | `ApprovalAuthorityBoundary` | 2 | 20 | 0 | 2 |
 | `ApprovalAuthorityStaticBoundary` | 1 | 2 | 0 | 1 |
 | `ApprovalAuthorityWording` | 0 | 1 | 1 | 1 |
@@ -103,9 +112,9 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 9 | 69 | 0 | 9 |
+| `Boundary` | 10 | 77 | 0 | 10 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 10 | 76 | 0 | 10 |
+| `Contract` | 11 | 84 | 0 | 11 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -122,10 +131,11 @@ A label does not make a slow test safe.
 | `DryRunReceiptWriteIntegration` | 1 | 20 | 0 | 1 |
 | `EndToEndGovernedDogfoodCampaign` | 1 | 10 | 0 | 1 |
 | `Evidence` | 1 | 8 | 0 | 1 |
+| `EvidenceArtifact` | 1 | 8 | 0 | 1 |
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 12 | 88 | 0 | 12 |
+| `Governance` | 13 | 96 | 0 | 13 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -166,7 +176,7 @@ A label does not make a slow test safe.
 | `PatchArtifactStore` | 1 | 22 | 0 | 1 |
 | `PatchBaseHashValidation` | 1 | 27 | 0 | 1 |
 | `PayloadSafety` | 1 | 8 | 0 | 1 |
-| `Policy` | 1 | 8 | 0 | 1 |
+| `Policy` | 2 | 16 | 0 | 2 |
 | `PolicyRequirementSatisfactionEvaluator` | 1 | 22 | 0 | 1 |
 | `PolicySatisfactionReceiptRegression` | 1 | 24 | 0 | 1 |
 | `PolicySatisfactionRecordContract` | 1 | 19 | 0 | 1 |
@@ -228,7 +238,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
 | `RequiresRealDatabase` | 39 | 410 | 0 | 39 |
-| `Retention` | 1 | 8 | 0 | 1 |
+| `Retention` | 2 | 16 | 0 | 2 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |
 | `RollbackExecutionReceiptStore` | 3 | 27 | 0 | 3 |
