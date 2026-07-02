@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 590
-- Test classes found: 584
-- Test methods found: 9505
-- Category names found: 199
+- Source files scanned: 591
+- Test classes found: 585
+- Test methods found: 9511
+- Category names found: 201
 
 ## G13 Category Changes
 
@@ -86,6 +86,8 @@ A label does not make a slow test safe.
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
 | `DatabaseMigrationReceipt` | 1 | 7 | 0 | 1 |
+| `DatabaseMigration` | 1 | 6 | 0 | 1 |
+| `Decision` | 1 | 6 | 0 | 1 |
 | `DisposableWorkspaceDryRunBoundaryReceipt` | 1 | 20 | 0 | 1 |
 | `DisposableWorkspaceDryRunExecutor` | 1 | 20 | 0 | 1 |
 | `DogfoodReceiptStore` | 1 | 8 | 0 | 1 |
@@ -97,7 +99,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 2 | 17 | 0 | 2 |
+| `Governance` | 3 | 23 | 0 | 3 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
 | `GovernanceSubstrateContract` | 1 | 10 | 0 | 1 |
@@ -216,7 +218,7 @@ A label does not make a slow test safe.
 | `SourceApplyThreatBoundary` | 1 | 11 | 0 | 1 |
 | `SqlInventory` | 1 | 8 | 0 | 1 |
 | `StaleAuthorityDetection` | 1 | 31 | 0 | 1 |
-| `StaticBoundary` | 36 | 275 | 0 | 36 |
+| `StaticBoundary` | 37 | 281 | 0 | 37 |
 | `Store` | 9 | 108 | 0 | 9 |
 | `ThoughtLedgerGovernanceReference` | 2 | 14 | 0 | 2 |
 | `ThoughtLedgerHandoffEntry` | 1 | 18 | 0 | 1 |
