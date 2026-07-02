@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 601
-- Test classes found: 595
-- Test methods found: 9584
-- Category names found: 216
+- Source files scanned: 602
+- Test classes found: 596
+- Test methods found: 9593
+- Category names found: 219
 
 ## G13 Category Changes
 
@@ -76,6 +76,14 @@ A label does not make a slow test safe.
 - H11 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Weaviate behavior, change workflow/source-apply/rollback/release/deployment authority, implement artifact deletion, implement artifact expiry, implement retention deletion, implement cleanup commands, run replay, run backfill, or rebuild projections.
 - Artifact retention policy controls lifecycle. It does not make artifacts safe.
 
+## H12 Read Projection Backup and Rebuild Story
+
+- Added focused `ReadProjection`, `ProjectionRebuild`, and `Backup` metadata to the H12 story contract test.
+- Added broad `Governance`, `Policy`, `Contract`, and `Boundary` metadata to the H12 story contract test.
+- H12 does not add `RequiresRealDatabase` or `LongRunning`; the test reads architecture, receipt, category, and static repository path metadata only.
+- H12 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Weaviate behavior, change workflow/source-apply/rollback/release/deployment authority, implement backup jobs, implement rebuild commands, run replay, run backfill, or rebuild projections.
+- Projection rebuild plans restore read models. They do not recreate authority records.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -97,6 +105,7 @@ A label does not make a slow test safe.
 | `ApplyDryRunStore` | 3 | 15 | 0 | 3 |
 | `ApplyPreview` | 2 | 13 | 0 | 2 |
 | `ArtifactRetention` | 1 | 8 | 0 | 1 |
+| `Backup` | 1 | 9 | 0 | 1 |
 | `ApprovalAuthorityBoundary` | 2 | 20 | 0 | 2 |
 | `ApprovalAuthorityStaticBoundary` | 1 | 2 | 0 | 1 |
 | `ApprovalAuthorityWording` | 0 | 1 | 1 | 1 |
@@ -112,9 +121,9 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 10 | 77 | 0 | 10 |
+| `Boundary` | 11 | 86 | 0 | 11 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 11 | 84 | 0 | 11 |
+| `Contract` | 12 | 93 | 0 | 12 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -135,7 +144,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 13 | 96 | 0 | 13 |
+| `Governance` | 14 | 105 | 0 | 14 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -176,11 +185,12 @@ A label does not make a slow test safe.
 | `PatchArtifactStore` | 1 | 22 | 0 | 1 |
 | `PatchBaseHashValidation` | 1 | 27 | 0 | 1 |
 | `PayloadSafety` | 1 | 8 | 0 | 1 |
-| `Policy` | 2 | 16 | 0 | 2 |
+| `Policy` | 3 | 25 | 0 | 3 |
 | `PolicyRequirementSatisfactionEvaluator` | 1 | 22 | 0 | 1 |
 | `PolicySatisfactionReceiptRegression` | 1 | 24 | 0 | 1 |
 | `PolicySatisfactionRecordContract` | 1 | 19 | 0 | 1 |
 | `PolicySatisfactionSqlStore` | 1 | 15 | 0 | 1 |
+| `ProjectionRebuild` | 1 | 9 | 0 | 1 |
 | `PR204` | 2 | 10 | 0 | 2 |
 | `PR205` | 1 | 18 | 0 | 1 |
 | `PR206` | 1 | 14 | 0 | 1 |
@@ -210,6 +220,7 @@ A label does not make a slow test safe.
 | `ReadOnlyMemoryProposalReviewUi` | 1 | 13 | 0 | 1 |
 | `ReadOnlyToolGateDecisionUi` | 1 | 12 | 0 | 1 |
 | `ReadOnlyWorkflowRunStepViewerUi` | 1 | 12 | 0 | 1 |
+| `ReadProjection` | 1 | 9 | 0 | 1 |
 | `ReadModel` | 1 | 9 | 0 | 1 |
 | `RealDatabaseAgentHandoffSmoke` | 1 | 8 | 0 | 1 |
 | `RealDatabaseApplyDryRunStoreSmoke` | 1 | 7 | 0 | 1 |
