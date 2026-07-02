@@ -18,6 +18,7 @@ jobs:
   fast-unit-ci:
     name: Fast unit tests
     runs-on: windows-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -28,11 +29,21 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore
-        run: dotnet restore IronDev.slnx
+      - name: Fast unit lane
+        shell: pwsh
+        run: ./Scripts/ci/run-fast-unit-ci.ps1
 
-      - name: Build
-        run: dotnet build IronDev.slnx --no-restore
+      - name: Verify fast unit evidence artifacts are sanitized
+        if: always()
+        id: artifact-safety
+        shell: pwsh
+        run: ./Scripts/ci/test-ci-evidence-artifact-safety.ps1 -ArtifactDirectory artifacts/ci/fast-unit
 
-      - name: Fast unit tests
-        run: dotnet test IronDev.UnitTests/IronDev.UnitTests.csproj --no-build
+      - name: Upload fast unit evidence
+        if: ${{ always() && steps.artifact-safety.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fast-unit-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/fast-unit
+          retention-days: 14
+          if-no-files-found: error
