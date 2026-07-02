@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace IronDev.IntegrationTests;
 
 [TestCategory("Store")]
+[TestCategory("RequiresRealDatabase")]
+[TestCategory("LongRunning")]
 [TestClass]
 public sealed class SqlAgentLocalMemoryStoreAgentMemoryTests : IntegrationTestBase
 {

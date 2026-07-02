@@ -9,6 +9,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace IronDev.IntegrationTests;
 
 [TestCategory("Store")]
+[TestCategory("RequiresRealDatabase")]
+[TestCategory("LongRunning")]
 [TestClass]
 public sealed class SqlRunEventStoreTests : IntegrationTestBase
 {

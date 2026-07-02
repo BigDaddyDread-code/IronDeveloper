@@ -12,6 +12,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("RequiresRealDatabase")]
+[TestCategory("LongRunning")]
 [TestClass]
 [TestCategory("RollbackSupportReceiptStore")]
 [TestCategory("RealDatabaseRollbackSupportReceiptStoreSmoke")]

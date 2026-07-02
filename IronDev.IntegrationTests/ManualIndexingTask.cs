@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace IronDev.IntegrationTests;
 
+[TestCategory("ManualLocal")]
 [TestClass]
 public class ManualIndexingTask
 {
