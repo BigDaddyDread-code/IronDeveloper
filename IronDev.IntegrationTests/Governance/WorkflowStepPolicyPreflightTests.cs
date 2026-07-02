@@ -522,6 +522,7 @@ public sealed class WorkflowRunnerSkeletonPolicyPreflightTests
 
 [TestClass]
 [TestCategory("WorkflowStepPolicyPreflight")]
+[TestCategory("StaticBoundary")]
 public sealed class WorkflowStepPolicyPreflightStaticBoundaryTests
 {
     [TestMethod]

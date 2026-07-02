@@ -2,6 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("Receipt")]
 [TestClass]
 public sealed class BlockML4CandidateReceiptTests
 {

@@ -2,6 +2,7 @@
 
 namespace IronDev.IntegrationTests.AgentMemory;
 
+[TestCategory("Receipt")]
 [TestClass]
 public sealed class MemoryPromotionRequestBoundaryReceiptTests
 {

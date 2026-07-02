@@ -2,6 +2,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("StaticBoundary")]
+[TestCategory("Receipt")]
 [TestClass]
 public sealed class BlockML4CandidateReceiptStaticBoundaryTests
 {

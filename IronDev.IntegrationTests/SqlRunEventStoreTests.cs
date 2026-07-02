@@ -8,6 +8,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
 
+[TestCategory("Store")]
 [TestClass]
 public sealed class SqlRunEventStoreTests : IntegrationTestBase
 {

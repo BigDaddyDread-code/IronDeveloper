@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace IronDev.IntegrationTests.Agents;
 
+[TestCategory("Store")]
 [TestClass]
 public sealed class GovernedManualAgentExecutionStoreTests : IntegrationTestBase
 {
