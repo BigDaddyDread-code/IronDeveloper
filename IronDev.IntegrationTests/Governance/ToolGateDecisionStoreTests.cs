@@ -9,6 +9,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("Store")]
 [TestClass]
 public sealed class ToolGateDecisionStoreTests : IntegrationTestBase
 {

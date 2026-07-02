@@ -2,6 +2,7 @@
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("Receipt")]
 [TestClass]
 public sealed class BlockLGovernedRunnerReceiptTests
 {

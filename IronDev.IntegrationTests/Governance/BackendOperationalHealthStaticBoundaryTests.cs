@@ -4,6 +4,7 @@ using IronDev.Core.Operations;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("StaticBoundary")]
 [TestClass]
 public sealed class BackendOperationalHealthStaticBoundaryTests
 {

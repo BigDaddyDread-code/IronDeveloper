@@ -4,6 +4,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("StaticBoundary")]
 [TestClass]
 [TestCategory("WorkflowCannotGrantAuthority")]
 public sealed class WorkflowCannotGrantAuthorityStaticBoundaryTests

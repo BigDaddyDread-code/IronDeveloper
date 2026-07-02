@@ -3,6 +3,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("StaticBoundary")]
 [TestClass]
 [TestCategory("WorkflowApprovalHalt")]
 public sealed class WorkflowApprovalHaltStaticBoundaryTests

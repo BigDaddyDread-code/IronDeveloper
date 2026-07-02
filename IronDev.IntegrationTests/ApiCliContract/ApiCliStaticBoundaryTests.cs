@@ -2,6 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.ApiCliContract;
 
+[TestCategory("StaticBoundary")]
 [TestClass]
 [TestCategory("ApiCliContract")]
 public sealed class ApiCliStaticBoundaryTests

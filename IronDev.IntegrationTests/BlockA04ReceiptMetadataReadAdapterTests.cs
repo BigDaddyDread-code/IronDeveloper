@@ -4,6 +4,7 @@ using IronDev.Infrastructure.Governance;
 
 namespace IronDev.IntegrationTests;
 
+[TestCategory("Receipt")]
 [TestClass]
 public sealed class BlockA04ReceiptMetadataReadAdapterTests
 {
