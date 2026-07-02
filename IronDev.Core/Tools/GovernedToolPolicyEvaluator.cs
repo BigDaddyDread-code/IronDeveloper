@@ -1,6 +1,4 @@
-using IronDev.Core.Tools;
-
-namespace IronDev.Infrastructure.Tools;
+namespace IronDev.Core.Tools;
 
 public sealed class GovernedToolPolicyEvaluator
 {

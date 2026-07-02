@@ -5,6 +5,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("StaticBoundary")]
 [TestClass]
 [TestCategory("BlockNControlledApplyPreparation")]
 public sealed class BlockNControlledApplyPreparationStaticBoundaryTests

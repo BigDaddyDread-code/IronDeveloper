@@ -5,6 +5,7 @@ using IronDev.Core.Validation;
 
 namespace IronDev.IntegrationTests;
 
+[TestCategory("Receipt")]
 [TestClass]
 public sealed class BlockBK0ValidationReceiptTests
 {

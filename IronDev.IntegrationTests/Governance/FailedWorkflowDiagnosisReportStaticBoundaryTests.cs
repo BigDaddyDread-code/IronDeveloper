@@ -6,6 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Governance;
 
+[TestCategory("StaticBoundary")]
 [TestClass]
 [TestCategory("FailedWorkflowDiagnosisReport")]
 public sealed class FailedWorkflowDiagnosisReportStaticBoundaryTests

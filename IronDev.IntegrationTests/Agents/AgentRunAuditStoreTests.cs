@@ -11,6 +11,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace IronDev.IntegrationTests.Agents;
 
+[TestCategory("Store")]
+[TestCategory("RequiresRealDatabase")]
+[TestCategory("LongRunning")]
 [TestClass]
 public sealed class AgentRunAuditStoreTests : IntegrationTestBase
 {

@@ -1,0 +1,49 @@
+name: fast-unit-ci
+
+on:
+  pull_request:
+    branches:
+      - main
+      - governance/block-f-rollup-to-main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fast-unit-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-unit-ci:
+    name: Fast unit tests
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Fast unit lane
+        shell: pwsh
+        run: ./Scripts/ci/run-fast-unit-ci.ps1
+
+      - name: Verify fast unit evidence artifacts are sanitized
+        if: always()
+        id: artifact-safety
+        shell: pwsh
+        run: ./Scripts/ci/test-ci-evidence-artifact-safety.ps1 -ArtifactDirectory artifacts/ci/fast-unit
+
+      - name: Upload fast unit evidence
+        if: ${{ always() && steps.artifact-safety.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fast-unit-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/fast-unit
+          retention-days: 14
+          if-no-files-found: error

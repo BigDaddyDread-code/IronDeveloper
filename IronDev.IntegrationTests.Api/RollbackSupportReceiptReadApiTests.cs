@@ -11,6 +11,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Api;
 
+[TestCategory("Receipt")]
 [TestClass]
 public sealed class RollbackSupportReceiptReadApiTests : ApiTestBase
 {
