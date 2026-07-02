@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 596
-- Test classes found: 590
-- Test methods found: 9546
-- Category names found: 205
+- Source files scanned: 597
+- Test classes found: 591
+- Test methods found: 9551
+- Category names found: 206
 
 ## G13 Category Changes
 
@@ -79,9 +79,9 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 5 | 39 | 0 | 5 |
+| `Boundary` | 6 | 44 | 0 | 6 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 6 | 46 | 0 | 6 |
+| `Contract` | 7 | 51 | 0 | 7 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -100,7 +100,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 8 | 58 | 0 | 8 |
+| `Governance` | 9 | 63 | 0 | 9 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -133,6 +133,7 @@ A label does not make a slow test safe.
 | `MissingPolicyWording` | 0 | 5 | 5 | 1 |
 | `NoAuthorityTransferValidator` | 1 | 13 | 0 | 1 |
 | `OverallMemorySystemDiscussion` | 1 | 10 | 0 | 1 |
+| `OperationStatus` | 1 | 5 | 0 | 1 |
 | `PatchArtifactApiRegression` | 1 | 4 | 0 | 1 |
 | `PatchArtifactContract` | 1 | 25 | 0 | 1 |
 | `PatchArtifactCreation` | 1 | 21 | 0 | 1 |
@@ -222,7 +223,7 @@ A label does not make a slow test safe.
 | `Spike` | 1 | 6 | 0 | 1 |
 | `StaleAuthorityDetection` | 1 | 31 | 0 | 1 |
 | `StaticBoundary` | 39 | 294 | 0 | 39 |
-| `StorageReview` | 2 | 15 | 0 | 2 |
+| `StorageReview` | 3 | 20 | 0 | 3 |
 | `Store` | 12 | 130 | 0 | 12 |
 | `ThoughtLedgerGovernanceReference` | 2 | 14 | 0 | 2 |
 | `ThoughtLedgerHandoffEntry` | 1 | 18 | 0 | 1 |
