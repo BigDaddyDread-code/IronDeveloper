@@ -31,6 +31,46 @@ public interface ISemanticMemoryService
         int projectId,
         IProgress<SemanticIndexRebuildProgress>? progress = null,
         CancellationToken ct = default);
+    async Task<SemanticIndexRebuildResult> RebuildIndexAsync(
+        SemanticIndexRebuildRequest request,
+        IProgress<SemanticIndexRebuildProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var startedAtUtc = DateTime.UtcNow;
+        var plan = SemanticIndexRebuildGuard.BuildPlan(request, "unknown", weaviateEnabled: true);
+
+        if (plan.BlockReasons.Count > 0)
+            return SemanticIndexRebuildGuard.Blocked(plan, startedAtUtc);
+
+        if (request.DryRun || request.Mode == SemanticIndexRebuildMode.DryRunProjectOnly)
+            return SemanticIndexRebuildGuard.Planned(plan, startedAtUtc);
+
+        try
+        {
+            await RebuildIndexAsync(request.ProjectId, progress, ct);
+            return SemanticIndexRebuildGuard.Completed(plan, startedAtUtc, runId: string.Empty, processedDocuments: 0);
+        }
+        catch (OperationCanceledException)
+        {
+            return SemanticIndexRebuildGuard.Failed(
+                plan,
+                startedAtUtc,
+                runId: string.Empty,
+                processedDocuments: 0,
+                SemanticIndexRebuildBlockReason.Cancelled,
+                "Rebuild was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            return SemanticIndexRebuildGuard.Failed(
+                plan,
+                startedAtUtc,
+                runId: string.Empty,
+                processedDocuments: 0,
+                SemanticIndexRebuildBlockReason.Unknown,
+                ex.Message);
+        }
+    }
     Task RebuildProjectAsync(int projectId, CancellationToken ct = default);
     Task MarkStaleAsync(SemanticStaleRequest request, CancellationToken ct = default);
     Task DeleteEmbeddingAsync(Guid artefactId, CancellationToken ct = default);

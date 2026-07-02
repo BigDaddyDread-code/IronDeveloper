@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 602
-- Test classes found: 596
-- Test methods found: 9593
-- Category names found: 219
+- Source files scanned: 603
+- Test classes found: 597
+- Test methods found: 9602
+- Category names found: 221
 
 ## G13 Category Changes
 
@@ -84,6 +84,14 @@ A label does not make a slow test safe.
 - H12 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Weaviate behavior, change workflow/source-apply/rollback/release/deployment authority, implement backup jobs, implement rebuild commands, run replay, run backfill, or rebuild projections.
 - Projection rebuild plans restore read models. They do not recreate authority records.
 
+## H13 Weaviate Rebuild Command Hardening
+
+- Added focused `Weaviate`, `SemanticMemory`, and `ProjectionRebuild` metadata to the H13 rebuild hardening contract test.
+- Added broad `Governance`, `Contract`, and `Boundary` metadata to the H13 rebuild hardening contract test.
+- H13 does not add `RequiresRealDatabase` or `LongRunning`; the test reads contract, receipt, category, and static repository path metadata only.
+- H13 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Docker compose behavior, change Weaviate auth/prod config, implement raw payload redaction, implement artifact retention, implement source-apply/rollback/workflow/release/deploy behavior, or add migration runner/DbUp work.
+- Weaviate rebuild restores recall. It does not restore authority.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -121,9 +129,9 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 11 | 86 | 0 | 11 |
+| `Boundary` | 12 | 95 | 0 | 12 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 12 | 93 | 0 | 12 |
+| `Contract` | 13 | 102 | 0 | 13 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -144,7 +152,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 14 | 105 | 0 | 14 |
+| `Governance` | 15 | 114 | 0 | 15 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -190,7 +198,7 @@ A label does not make a slow test safe.
 | `PolicySatisfactionReceiptRegression` | 1 | 24 | 0 | 1 |
 | `PolicySatisfactionRecordContract` | 1 | 19 | 0 | 1 |
 | `PolicySatisfactionSqlStore` | 1 | 15 | 0 | 1 |
-| `ProjectionRebuild` | 1 | 9 | 0 | 1 |
+| `ProjectionRebuild` | 2 | 18 | 0 | 2 |
 | `PR204` | 2 | 10 | 0 | 2 |
 | `PR205` | 1 | 18 | 0 | 1 |
 | `PR206` | 1 | 14 | 0 | 1 |
@@ -260,6 +268,7 @@ A label does not make a slow test safe.
 | `RollbackRegression` | 2 | 19 | 0 | 2 |
 | `RollbackSupportReceiptReadApi` | 1 | 5 | 0 | 1 |
 | `RollbackSupportReceiptStore` | 1 | 23 | 0 | 1 |
+| `SemanticMemory` | 1 | 9 | 0 | 1 |
 | `SourceApplyDryRunExecutor` | 1 | 17 | 0 | 1 |
 | `SourceApplyDryRunReceiptStore` | 1 | 11 | 0 | 1 |
 | `SourceApplyDryRunReceiptValidation` | 1 | 11 | 0 | 1 |
@@ -307,6 +316,7 @@ A label does not make a slow test safe.
 | `WorkflowStepThoughtLedger` | 1 | 9 | 0 | 1 |
 | `WorkflowTransitionRecord` | 1 | 25 | 0 | 1 |
 | `WorkflowTransitionRecordStore` | 1 | 24 | 0 | 1 |
+| `Weaviate` | 1 | 9 | 0 | 1 |
 
 ## CI-Facing Category Counts
 

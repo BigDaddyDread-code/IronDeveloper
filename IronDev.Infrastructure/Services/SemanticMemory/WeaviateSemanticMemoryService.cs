@@ -329,32 +329,66 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
         IProgress<SemanticIndexRebuildProgress>? progress = null,
         CancellationToken ct = default)
     {
-        await EnsureInitializedAsync();
-        await EnsureMetadataSchemaAsync(ct);
+        var result = await RebuildIndexAsync(new SemanticIndexRebuildRequest
+        {
+            ProjectId = projectId,
+            RequestedBy = "compatibility-wrapper",
+            Reason = "Legacy project rebuild request"
+        }, progress, ct);
+
+        if (result.Status is SemanticIndexRebuildStatus.Blocked or SemanticIndexRebuildStatus.Failed or SemanticIndexRebuildStatus.Partial)
+            throw new InvalidOperationException(result.ErrorMessage.Length == 0
+                ? result.FailureReason?.ToString() ?? "Semantic index rebuild failed."
+                : result.ErrorMessage);
+    }
+
+    public async Task<SemanticIndexRebuildResult> RebuildIndexAsync(
+        SemanticIndexRebuildRequest request,
+        IProgress<SemanticIndexRebuildProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var startedAtUtc = DateTime.UtcNow;
         string collectionName = _options.CollectionPrefix;
-        var runId = await StartIndexRunAsync(projectId, ct);
+        var plan = SemanticIndexRebuildGuard.BuildPlan(
+            request,
+            collectionName,
+            _options.Enabled);
+
+        if (plan.BlockReasons.Count > 0)
+            return SemanticIndexRebuildGuard.Blocked(plan, startedAtUtc);
+
+        int? runId = null;
         int total = 0;
         int processed = 0;
 
         try
         {
-            try
-            {
-                await _chunkRepository.MarkProjectStaleAsync(projectId, ct);
-                await _client!.Collections.Delete(collectionName);
-            }
-            catch
-            {
-                // Ignore if missing
-            }
+            await EnsureInitializedAsync();
+            await EnsureMetadataSchemaAsync(ct);
 
             var documents = await _projectMemoryService.GetContextDocumentsAsync(
-                projectId: projectId,
+                projectId: request.ProjectId,
                 status: "Active",
                 take: 1000,
                 cancellationToken: ct);
 
             total = documents.Count;
+            plan = SemanticIndexRebuildGuard.BuildPlan(
+                request,
+                collectionName,
+                _options.Enabled,
+                sourceDocumentCount: total,
+                estimatedChunkCount: total);
+
+            if (plan.BlockReasons.Count > 0)
+                return SemanticIndexRebuildGuard.Blocked(plan, startedAtUtc);
+
+            if (request.DryRun || request.Mode == SemanticIndexRebuildMode.DryRunProjectOnly)
+                return SemanticIndexRebuildGuard.Planned(plan, startedAtUtc);
+
+            runId = await StartIndexRunAsync(request.ProjectId, ct);
+            await _chunkRepository.MarkProjectStaleAsync(request.ProjectId, ct);
+            await EnsureCollectionAsync(collectionName, ct);
 
             foreach (var doc in documents)
             {
@@ -373,7 +407,7 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
                 processed++;
             }
 
-            await CompleteIndexRunAsync(runId, "Completed", total, processed, null, ct);
+            await CompleteIndexRunAsync(runId.Value, "Completed", total, processed, null, ct);
             progress?.Report(new SemanticIndexRebuildProgress
             {
                 TotalDocuments = total,
@@ -381,19 +415,61 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
                 CurrentDocumentTitle = string.Empty,
                 IsCompleted = true
             });
+
+            return SemanticIndexRebuildGuard.Completed(
+                plan,
+                startedAtUtc,
+                runId.Value.ToString(),
+                processedDocuments: processed);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
         {
-            await CompleteIndexRunAsync(runId, "Failed", total, processed, ex.Message, CancellationToken.None);
+            if (runId.HasValue)
+                await CompleteIndexRunAsync(runId.Value, "Failed", total, processed, "Rebuild was cancelled.", CancellationToken.None);
+
             progress?.Report(new SemanticIndexRebuildProgress
             {
                 TotalDocuments = total,
                 ProcessedDocuments = processed,
                 CurrentDocumentTitle = string.Empty,
                 IsCompleted = true,
-                ErrorMessage = ex.Message
+                ErrorMessage = "Rebuild was cancelled."
             });
-            throw;
+
+            return SemanticIndexRebuildGuard.Failed(
+                plan,
+                startedAtUtc,
+                runId?.ToString() ?? string.Empty,
+                processed,
+                SemanticIndexRebuildBlockReason.Cancelled,
+                "Rebuild was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            var failureReason = ex is InvalidOperationException
+                ? SemanticIndexRebuildBlockReason.WeaviateUnavailable
+                : SemanticIndexRebuildBlockReason.Unknown;
+            var errorMessage = SemanticIndexRebuildGuard.SanitizeErrorMessage(ex.Message);
+
+            if (runId.HasValue)
+                await CompleteIndexRunAsync(runId.Value, "Failed", total, processed, errorMessage, CancellationToken.None);
+
+            progress?.Report(new SemanticIndexRebuildProgress
+            {
+                TotalDocuments = total,
+                ProcessedDocuments = processed,
+                CurrentDocumentTitle = string.Empty,
+                IsCompleted = true,
+                ErrorMessage = errorMessage
+            });
+
+            return SemanticIndexRebuildGuard.Failed(
+                plan,
+                startedAtUtc,
+                runId?.ToString() ?? string.Empty,
+                processed,
+                failureReason,
+                errorMessage);
         }
     }
 

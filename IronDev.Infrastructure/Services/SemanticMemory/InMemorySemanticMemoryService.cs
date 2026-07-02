@@ -156,21 +156,57 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
         IProgress<SemanticIndexRebuildProgress>? progress = null,
         CancellationToken ct = default)
     {
+        var result = await RebuildIndexAsync(new SemanticIndexRebuildRequest
+        {
+            ProjectId = projectId,
+            RequestedBy = "compatibility-wrapper",
+            Reason = "Legacy project rebuild request"
+        }, progress, ct);
+
+        if (result.Status is SemanticIndexRebuildStatus.Blocked or SemanticIndexRebuildStatus.Failed or SemanticIndexRebuildStatus.Partial)
+            throw new InvalidOperationException(result.ErrorMessage.Length == 0
+                ? result.FailureReason?.ToString() ?? "Semantic index rebuild failed."
+                : result.ErrorMessage);
+    }
+
+    public async Task<SemanticIndexRebuildResult> RebuildIndexAsync(
+        SemanticIndexRebuildRequest request,
+        IProgress<SemanticIndexRebuildProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var startedAtUtc = DateTime.UtcNow;
+        var plan = SemanticIndexRebuildGuard.BuildPlan(
+            request,
+            collectionName: "InMemorySemanticIndex",
+            weaviateEnabled: true);
+
+        if (plan.BlockReasons.Count > 0)
+            return SemanticIndexRebuildGuard.Blocked(plan, startedAtUtc);
+
+        var documents = await _projectMemoryService.GetContextDocumentsAsync(
+            projectId: request.ProjectId,
+            status: "Active",
+            take: 1000,
+            cancellationToken: ct);
+
+        plan = SemanticIndexRebuildGuard.BuildPlan(
+            request,
+            collectionName: "InMemorySemanticIndex",
+            weaviateEnabled: true,
+            sourceDocumentCount: documents.Count,
+            estimatedChunkCount: documents.Count);
+
+        if (request.DryRun || request.Mode == SemanticIndexRebuildMode.DryRunProjectOnly)
+            return SemanticIndexRebuildGuard.Planned(plan, startedAtUtc);
+
         foreach (var staleKey in _store
-            .Where(x => x.Value.Embedding.ProjectId == projectId)
+            .Where(x => x.Value.Embedding.ProjectId == request.ProjectId)
             .Select(x => x.Key)
             .ToList())
         {
             _store.TryRemove(staleKey, out _);
         }
 
-        var documents = await _projectMemoryService.GetContextDocumentsAsync(
-            projectId: projectId,
-            status: "Active",
-            take: 1000,
-            cancellationToken: ct);
-
-        int total = documents.Count;
         int processed = 0;
 
         foreach (var doc in documents)
@@ -180,7 +216,7 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
 
             progress?.Report(new SemanticIndexRebuildProgress
             {
-                TotalDocuments = total,
+                TotalDocuments = documents.Count,
                 ProcessedDocuments = processed,
                 CurrentDocumentTitle = doc.Title,
                 IsCompleted = false
@@ -192,11 +228,17 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
 
         progress?.Report(new SemanticIndexRebuildProgress
         {
-            TotalDocuments = total,
+            TotalDocuments = documents.Count,
             ProcessedDocuments = processed,
             CurrentDocumentTitle = string.Empty,
             IsCompleted = true
         });
+
+        return SemanticIndexRebuildGuard.Completed(
+            plan,
+            startedAtUtc,
+            runId: "in-memory",
+            processedDocuments: processed);
     }
 
     public Task RebuildProjectAsync(int projectId, CancellationToken ct = default)
