@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 597
-- Test classes found: 591
-- Test methods found: 9551
-- Category names found: 206
+- Source files scanned: 598
+- Test classes found: 592
+- Test methods found: 9560
+- Category names found: 208
 
 ## G13 Category Changes
 
@@ -43,6 +43,14 @@ A label does not make a slow test safe.
 - selection-only pending execution proof: most `RequiresRealDatabase`/`LongRunning` rows remain `SelectionOnlyPendingExecution` until a slow/SQL lane executes them.
 - real execution proof: none was added by G14; existing SQL CI class membership remains documented, but this PR does not claim fresh SQL execution.
 - Selection proof is not execution proof.
+
+## H08 Tenant Enforcement Read Model Tests
+
+- Added focused `TenantIsolation` and `ReadModel` metadata to the H08 cross-surface tenant enforcement contract test.
+- Added broad `Governance`, `Contract`, and `Boundary` metadata to the H08 tenant enforcement contract test.
+- H08 does not add `RequiresRealDatabase` or `LongRunning`; the tested surfaces are in-memory/read-adapter contracts.
+- H08 adds no SQL migration, schema, table, column, index, stored procedure, trigger, permission, API, CLI, UI, Weaviate, workflow, source-apply, rollback, release, deployment, replay, rebuild, or backfill behavior.
+- Tenant filters protect read scope only.
 
 ## Inventory
 
@@ -79,9 +87,9 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 6 | 44 | 0 | 6 |
+| `Boundary` | 7 | 53 | 0 | 7 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
-| `Contract` | 7 | 51 | 0 | 7 |
+| `Contract` | 8 | 60 | 0 | 8 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -100,7 +108,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 9 | 63 | 0 | 9 |
+| `Governance` | 10 | 72 | 0 | 10 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -173,6 +181,7 @@ A label does not make a slow test safe.
 | `ReadOnlyMemoryProposalReviewUi` | 1 | 13 | 0 | 1 |
 | `ReadOnlyToolGateDecisionUi` | 1 | 12 | 0 | 1 |
 | `ReadOnlyWorkflowRunStepViewerUi` | 1 | 12 | 0 | 1 |
+| `ReadModel` | 1 | 9 | 0 | 1 |
 | `RealDatabaseAgentHandoffSmoke` | 1 | 8 | 0 | 1 |
 | `RealDatabaseApplyDryRunStoreSmoke` | 1 | 7 | 0 | 1 |
 | `RealDatabaseDogfoodReceiptSmoke` | 1 | 4 | 0 | 1 |
@@ -225,6 +234,7 @@ A label does not make a slow test safe.
 | `StaticBoundary` | 39 | 294 | 0 | 39 |
 | `StorageReview` | 3 | 20 | 0 | 3 |
 | `Store` | 12 | 130 | 0 | 12 |
+| `TenantIsolation` | 1 | 9 | 0 | 1 |
 | `ThoughtLedgerGovernanceReference` | 2 | 14 | 0 | 2 |
 | `ThoughtLedgerHandoffEntry` | 1 | 18 | 0 | 1 |
 | `ToolRequestStore` | 1 | 11 | 0 | 1 |
