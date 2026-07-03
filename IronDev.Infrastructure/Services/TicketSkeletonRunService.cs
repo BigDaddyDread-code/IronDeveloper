@@ -222,19 +222,24 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // P0-2: prepare the critic's review package at full fidelity. The package is
         // review material only — the run does not create, request, or simulate the
         // review itself; that belongs to the critic through its own governed surface.
-        var packagePath = await PersistCriticPackageAsync(
+        var (packagePath, criterionCount, uncoveredCriterionCount) = await PersistCriticPackageAsync(
             run.RunId, evidenceRoot, proposalId, ticket, proposal, authoredTests, workspaceResult, cancellationToken).ConfigureAwait(false);
 
         var packageHash = ComputeSha256(await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false));
 
         await PublishAsync(run.RunId, "CriticReviewPackageReady",
-            "Critic review package prepared. A package is review material, not a review: the independent critic reviews it through its own governed surface, and nothing here is approval.",
+            "Critic review package prepared. A package is review material, not a review: the independent critic reviews it through its own governed surface, and nothing here is approval." +
+            (uncoveredCriterionCount > 0
+                ? $" {uncoveredCriterionCount} of {criterionCount} acceptance criteria have NO covering test — the coverage hole is explicit in the package."
+                : string.Empty),
             projectId, ticketId, new Dictionary<string, string>
             {
                 ["packageId"] = $"critic-pkg-{run.RunId}",
                 ["packagePath"] = packagePath,
                 ["packageSha256"] = packageHash,
                 ["proposalId"] = proposalId,
+                ["criterionCount"] = criterionCount.ToString(),
+                ["uncoveredCriterionCount"] = uncoveredCriterionCount.ToString(),
                 ["currentNode"] = "SkeletonRun"
             }, cancellationToken).ConfigureAwait(false);
 
@@ -252,7 +257,10 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             }, cancellationToken).ConfigureAwait(false);
 
             await PublishAsync(run.RunId, "ApprovalRequiredHalt",
-                "Halted for approval. Halt is not approval: record an accepted approval matching this requirement, then request continuation.",
+                "Halted for approval. Halt is not approval: record an accepted approval matching this requirement, then request continuation." +
+                (uncoveredCriterionCount > 0
+                    ? $" NOTE: {uncoveredCriterionCount} of {criterionCount} acceptance criteria have no covering test — approving this run includes consciously owning that coverage hole."
+                    : string.Empty),
                 projectId, ticketId, new Dictionary<string, string>
                 {
                     ["approvalProjectId"] = ApprovalProjectGuid(projectId).ToString("D"),
@@ -260,6 +268,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                     ["approvalTargetId"] = run.RunId,
                     ["approvalTargetHash"] = packageHash,
                     ["capabilityCode"] = ContinueCapabilityCode,
+                    ["criterionCount"] = criterionCount.ToString(),
+                    ["uncoveredCriterionCount"] = uncoveredCriterionCount.ToString(),
                     ["currentNode"] = "SkeletonRun"
                 }, cancellationToken).ConfigureAwait(false);
         }
@@ -708,7 +718,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 ExistsOnDisk = existsOnDisk,
                 AnnouncedSha256 = announcedHash,
                 Sha256OnDisk = hashOnDisk,
-                HashVerified = hashVerified
+                HashVerified = hashVerified,
+                CriterionCount = int.TryParse(Payload(packageEvent, "criterionCount"), out var criterionCount) ? criterionCount : 0,
+                UncoveredCriterionCount = int.TryParse(Payload(packageEvent, "uncoveredCriterionCount"), out var uncoveredCount) ? uncoveredCount : 0
             };
 
             if (!existsOnDisk)
@@ -953,7 +965,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private static string CriticPackagePath(string evidenceRoot, string runId) =>
         Path.Combine(evidenceRoot, runId, "evidence", "critic-package.json");
 
-    private static async Task<string> PersistCriticPackageAsync(
+    private static async Task<(string PackagePath, int CriterionCount, int UncoveredCriterionCount)> PersistCriticPackageAsync(
         string runId,
         string evidenceRoot,
         string proposalId,
@@ -997,7 +1009,10 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         var packagePath = CriticPackagePath(evidenceRoot, runId);
         Directory.CreateDirectory(Path.GetDirectoryName(packagePath)!);
         await File.WriteAllTextAsync(packagePath, JsonSerializer.Serialize(package, JsonOptions), cancellationToken).ConfigureAwait(false);
-        return packagePath;
+        return (
+            packagePath,
+            package.CriterionCoverage.Count,
+            package.CriterionCoverage.Count(coverage => !coverage.Covered));
     }
 
     private static async Task<string> PersistProposalEvidenceAsync(

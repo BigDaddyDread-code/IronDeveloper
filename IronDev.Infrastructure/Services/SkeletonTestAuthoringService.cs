@@ -63,6 +63,8 @@ public sealed class SkeletonTestAuthoringService : ISkeletonTestAuthoringService
         Rules:
         - MSTest (C#), one test class per criterion where practical.
         - Every test file must map to exactly one criterion.
+        - coversCriterion must QUOTE the criterion line exactly as given above —
+          it is matched against the criteria to build the coverage record.
         - Relative paths only, under a "tests/" folder.
         - Respond with ONLY a JSON array, no prose, no code fences:
           [{"relativePath":"tests/...Tests.cs","content":"...","coversCriterion":"..."}]

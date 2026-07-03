@@ -29,6 +29,7 @@ public sealed class SkeletonCriticGroundTruthVerifier : ISkeletonCriticGroundTru
     public const string PackageHashCheck = "package-hash-matches-halt-announcement";
     public const string InternalConsistencyCheck = "package-internally-consistent";
     public const string CommandEvidenceCheck = "claimed-command-evidence-on-disk";
+    public const string CriterionCoverageCheck = "criterion-coverage-record-honest";
     public const string ReExecutionCheck = "claims-reproduce-on-independent-re-execution";
 
     private readonly IRunEventStore _events;
@@ -59,7 +60,8 @@ public sealed class SkeletonCriticGroundTruthVerifier : ISkeletonCriticGroundTru
         {
             await CheckPackageHashAsync(runId, packageSha256, cancellationToken).ConfigureAwait(false),
             CheckInternalConsistency(package),
-            CheckCommandEvidence(package)
+            CheckCommandEvidence(package),
+            CheckCriterionCoverageRecord(package)
         };
         checks.Add(await ReExecuteAsync(runId, package, cancellationToken).ConfigureAwait(false));
 
@@ -136,6 +138,39 @@ public sealed class SkeletonCriticGroundTruthVerifier : ISkeletonCriticGroundTru
                 ? "The package's claims are consistent with its own recorded command results and change contents."
                 : "The package contradicts itself.",
             BlocksMerge = contradictions.Count > 0
+        };
+    }
+
+    /// <summary>
+    /// P1-4: the coverage record must be what the calculator yields from the
+    /// package's own criteria and tests. Coverage HOLES are honest review material
+    /// for the human; a coverage record that DISAGREES with recomputation is a
+    /// forgery — someone edited the matrix instead of writing the tests.
+    /// </summary>
+    private static SkeletonGroundTruthCheck CheckCriterionCoverageRecord(SkeletonCriticPackage package)
+    {
+        var recomputed = SkeletonCriterionCoverageCalculator.Compute(package.AcceptanceCriteria, package.AuthoredTests);
+        var recorded = package.CriterionCoverage;
+
+        static string Fingerprint(IReadOnlyList<SkeletonCriterionCoverage> coverage) =>
+            string.Join(" | ", coverage
+                .OrderBy(row => row.Criterion, StringComparer.OrdinalIgnoreCase)
+                .Select(row => $"{row.Criterion}=>{row.Covered}:[{string.Join(",", row.CoveringTests.OrderBy(test => test, StringComparer.OrdinalIgnoreCase))}]"));
+
+        var expected = Fingerprint(recomputed);
+        var actual = Fingerprint(recorded);
+        var honest = string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase);
+
+        return new SkeletonGroundTruthCheck
+        {
+            CheckName = CriterionCoverageCheck,
+            Passed = honest,
+            Expected = expected,
+            Actual = actual,
+            Detail = honest
+                ? "The recorded criterion-coverage matrix matches independent recomputation from the package's own criteria and tests."
+                : "The recorded criterion-coverage matrix does NOT match recomputation — the matrix was edited instead of the tests being written.",
+            BlocksMerge = !honest
         };
     }
 

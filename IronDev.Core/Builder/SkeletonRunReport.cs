@@ -93,6 +93,10 @@ public sealed record SkeletonRunCriticPackageTrace
     public string Sha256OnDisk { get; init; } = string.Empty;
 
     public bool HashVerified { get; init; }
+
+    /// <summary>P1-4: the coverage state announced with the package — uncovered criteria are part of what approval owns.</summary>
+    public int CriterionCount { get; init; }
+    public int UncoveredCriterionCount { get; init; }
 }
 
 public sealed record SkeletonRunApprovalTrace

@@ -377,6 +377,66 @@ public sealed class SkeletonCriticReviewTests
     }
 
     [TestMethod]
+    public async Task Verifier_HonestCoverageRecord_Passes_EvenWithAnUncoveredCriterion()
+    {
+        // A coverage HOLE is honest review material for the human gate;
+        // only a record that disagrees with recomputation is a forgery.
+        var verifier = BuildVerifier(new RecordingEventStore());
+        var holed = MinimalPackage() with
+        {
+            AcceptanceCriteria = "- Catalog sorts by title\n- Catalog paging keeps sort order",
+            AuthoredTests = [new SkeletonAuthoredTest { RelativePath = "tests/S.cs", Content = "class S {}", CoversCriterion = "Catalog sorts by title" }]
+        };
+        holed = holed with { CriterionCoverage = SkeletonCriterionCoverageCalculator.Compute(holed.AcceptanceCriteria, holed.AuthoredTests) };
+
+        var verification = await verifier.VerifyAsync(RunId, holed, "pkg.json", "h");
+
+        var coverage = verification.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.CriterionCoverageCheck);
+        Assert.IsTrue(coverage.Passed, coverage.Actual);
+    }
+
+    [TestMethod]
+    public async Task Verifier_ForgedCoverageRecord_IsABlockingMismatch()
+    {
+        // The matrix says "covered"; the package's own tests say otherwise.
+        // Someone edited the matrix instead of writing the tests.
+        var verifier = BuildVerifier(new RecordingEventStore());
+        var forged = MinimalPackage() with
+        {
+            AcceptanceCriteria = "Catalog paging keeps sort order",
+            AuthoredTests = [],
+            CriterionCoverage =
+            [
+                new SkeletonCriterionCoverage
+                {
+                    Criterion = "Catalog paging keeps sort order",
+                    Covered = true,
+                    CoveringTests = ["tests/Phantom.cs"]
+                }
+            ]
+        };
+
+        var verification = await verifier.VerifyAsync(RunId, forged, "pkg.json", "h");
+
+        var coverage = verification.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.CriterionCoverageCheck);
+        Assert.IsFalse(coverage.Passed);
+        Assert.IsTrue(coverage.BlocksMerge, "A forged coverage record is tampering, not a judgment call.");
+        StringAssert.Contains(coverage.Detail, "edited instead of the tests being written");
+    }
+
+    [TestMethod]
+    public async Task ReviewAsync_ThePromptShowsUncoveredCriteria_Explicitly()
+    {
+        using var harness = CriticHarness.Create(packageCriteria: "- Catalog sorts by title ascending\n- Catalog paging keeps sort order");
+
+        await harness.Service.ReviewAsync(Request());
+
+        StringAssert.Contains(harness.Llm.LastPrompt, "UNCOVERED: Catalog paging keeps sort order",
+            "The critic reviews the coverage hole by name — absence is evidence.");
+        StringAssert.Contains(harness.Llm.LastPrompt, "COVERED: Catalog sorts by title ascending");
+    }
+
+    [TestMethod]
     public async Task Verifier_ReExecution_CatchesAClaimThatDoesNotReproduce()
     {
         // The decisive check, against a real sandbox: the package CLAIMS the
@@ -631,7 +691,8 @@ public sealed class SkeletonCriticReviewTests
         public static CriticHarness Create(
             Func<string>? llmResponse = null,
             bool writePackage = true,
-            Func<SkeletonGroundTruthVerification>? groundTruth = null)
+            Func<SkeletonGroundTruthVerification>? groundTruth = null,
+            string packageCriteria = "Catalog sorts by title ascending")
         {
             var evidenceRoot = Path.Combine(Path.GetTempPath(), $"irondev-critic-{Guid.NewGuid():N}");
             var packageHash = string.Empty;
@@ -646,7 +707,7 @@ public sealed class SkeletonCriticReviewTests
                     TicketId = TicketId,
                     ProjectId = ProjectId,
                     TicketTitle = "Add book sorting",
-                    AcceptanceCriteria = "Catalog sorts by title ascending",
+                    AcceptanceCriteria = packageCriteria,
                     ProposalSummary = "Adds a sort option.",
                     Changes =
                     [
@@ -668,6 +729,10 @@ public sealed class SkeletonCriticReviewTests
                         }
                     ],
                     WorkspaceRunSucceeded = true
+                };
+                package = package with
+                {
+                    CriterionCoverage = SkeletonCriterionCoverageCalculator.Compute(package.AcceptanceCriteria, package.AuthoredTests)
                 };
 
                 var packageDir = Path.Combine(evidenceRoot, "runs", RunId, "evidence");

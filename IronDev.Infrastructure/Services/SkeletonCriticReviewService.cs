@@ -295,16 +295,25 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
         }
 
         lines.Add(string.Empty);
-        lines.Add("Tests authored from the acceptance criteria (blind to the diff):");
-        if (package.AuthoredTests.Count == 0)
+        lines.Add("Criterion-to-test coverage matrix (P1-4: uncovered criteria are explicit, never silent):");
+        if (package.CriterionCoverage.Count == 0)
         {
-            lines.Add("NONE — the criterion-to-test matrix has no cells. Treat missing coverage as review material.");
+            lines.Add("NO CRITERIA PARSED — a work package without checkable acceptance criteria is itself review material.");
         }
         else
         {
-            foreach (var test in package.AuthoredTests)
-                lines.Add($"- {test.RelativePath} covers: {test.CoversCriterion}");
+            foreach (var coverage in package.CriterionCoverage)
+                lines.Add(coverage.Covered
+                    ? $"- COVERED: {coverage.Criterion} — by {string.Join(", ", coverage.CoveringTests)}"
+                    : $"- UNCOVERED: {coverage.Criterion} — no authored test checks this criterion.");
         }
+
+        var orphanTests = package.AuthoredTests
+            .Where(test => !package.CriterionCoverage.Any(coverage => coverage.CoveringTests.Contains(test.RelativePath, StringComparer.OrdinalIgnoreCase)))
+            .Select(test => test.RelativePath)
+            .ToList();
+        if (orphanTests.Count > 0)
+            lines.Add($"Tests covering no known criterion: {string.Join(", ", orphanTests)} — weigh whether they test anything that was asked for.");
 
         lines.Add(string.Empty);
         lines.Add("Build/test command results:");
