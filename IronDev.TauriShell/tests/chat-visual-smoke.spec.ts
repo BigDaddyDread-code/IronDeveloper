@@ -19,7 +19,7 @@ test('captures login hierarchy for LocalTest review', async ({ page }) => {
   await capture(page, 'login-localtest.png');
 });
 
-test('captures Chat hierarchy with visible composer and collapsible context', async ({ page }) => {
+test('captures Board and Shape hierarchy for LocalTest review', async ({ page }) => {
   await mockSelectedProject(page);
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
     await route.fulfill({
@@ -27,43 +27,33 @@ test('captures Chat hierarchy with visible composer and collapsible context', as
       contentType: 'application/json',
       body: JSON.stringify({
         response: [
-          '## Project state',
+          '## Suggested criteria',
           '',
-          '- Tickets are ready for review.',
-          '- Build readiness should be checked before sandbox work.',
-          '',
-          '```ts',
-          'const nextAction = "Review build readiness";',
-          '```'
+          '- Catalog sorts by title, author, and price.',
+          '- Default sort is title, ascending.'
         ].join('\n'),
-        contextSummary: 'Project exploration lane using project context.',
-        linkedFilePaths: 'IronDev.TauriShell/src/features/chatToBuild/ChatWorkspace.tsx',
-        linkedSymbols: 'ChatWorkspace',
+        contextSummary: 'Shaping lane using project context.',
+        linkedFilePaths: 'src/Catalog/CatalogService.cs',
         traceId: 42
       })
     });
   });
 
   await page.goto('/');
-  await page.getByTestId('shell.nav.chat').click();
+  await expect(page.getByTestId('flow.shell')).toBeVisible();
+  await expect(page.getByTestId('flow.board.columns')).toBeVisible();
+  await capture(page, 'board-pipeline.png');
 
-  await expect(page.getByTestId('chat.workspace')).toBeVisible();
-  await expect(page.getByTestId('chat.sessions')).toHaveCount(0);
-  await expect(page.getByTestId('chat.composer')).toBeVisible();
-  await expect(page.getByTestId('chat.contextPanel')).toBeVisible();
-  await capture(page, 'chat-empty-with-context.png');
+  await page.getByTestId('flow.board.new').click();
+  await expect(page.getByTestId('flow.stagerail')).toBeVisible();
+  await expect(page.getByTestId('flow.contract')).toBeVisible();
+  await capture(page, 'shape-empty-contract.png');
 
-  await page.getByTestId('chat.composer.input').fill('Where should I start?');
-  await page.getByTestId('chat.command.send').click();
-  await expect(page.getByTestId('chat.thread').getByRole('heading', { name: 'Project state' })).toBeVisible();
-  await expect(page.getByTestId('chat.composer')).toBeVisible();
-  await capture(page, 'chat-response-with-context.png');
-
-  await page.getByTestId('chat.contextPanel.toggle').click();
-  await expect(page.getByTestId('chat.contextPanel')).toHaveCount(0);
-  await expect(page.getByTestId('chat.contextPanel.show')).toBeVisible();
-  await expect(page.getByTestId('chat.composer')).toBeVisible();
-  await capture(page, 'chat-response-context-hidden.png');
+  await page.getByTestId('flow.shape.prompt').fill('Users need to sort the catalog.');
+  await page.getByTestId('flow.shape.prompt').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Suggested criteria' })).toBeVisible();
+  await expect(page.getByTestId('flow.shape.gate')).toContainText('blocked');
+  await capture(page, 'shape-discussion-response.png');
 });
 
 async function capture(page: import('@playwright/test').Page, name: string) {
@@ -129,6 +119,19 @@ async function mockSelectedProject(page: import('@playwright/test').Page) {
   });
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
+  });
+  await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { id: 42, tenantId: 3, projectId: 7, title: 'Add book sorting to catalog', status: 'Draft', acceptanceCriteria: null }
+      ])
+    });
   });
   await page.route('**/irondev-api/api/projects/7/chat/sessions', async (route) => {
     if (route.request().method() === 'GET') {
