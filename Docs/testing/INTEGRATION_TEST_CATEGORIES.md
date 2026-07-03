@@ -295,6 +295,7 @@ A label does not make a slow test safe.
 | `Spike` | 1 | 6 | 0 | 1 |
 | `StaleAuthorityDetection` | 1 | 31 | 0 | 1 |
 | `StaticBoundary` | 39 | 294 | 0 | 39 |
+| `SkeletonRun` | 1 | 9 | 0 | 1 |
 | `StorageReview` | 4 | 28 | 0 | 4 |
 | `Store` | 12 | 130 | 0 | 12 |
 | `TenantIsolation` | 1 | 9 | 0 | 1 |

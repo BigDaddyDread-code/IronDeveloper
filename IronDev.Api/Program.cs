@@ -192,6 +192,7 @@ builder.Services.AddScoped<IBuilderReadinessService, BuilderReadinessService>();
 builder.Services.AddScoped<ITicketEvidenceSummaryService, TicketEvidenceSummaryService>();
 builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
+builder.Services.AddScoped<ITicketSkeletonRunService, TicketSkeletonRunService>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();
 builder.Services.AddSingleton<DiscussionCodeScenarioCatalog>();
 builder.Services.AddSingleton<IBuildScenarioCatalog>(sp => sp.GetRequiredService<DiscussionCodeScenarioCatalog>());

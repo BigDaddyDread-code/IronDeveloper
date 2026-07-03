@@ -306,49 +306,11 @@ public sealed class TicketBuildRunService : ITicketBuildRunService
             ticket.TechnicalNotes
         }.Where(part => !string.IsNullOrWhiteSpace(part)));
 
-    private IReadOnlyList<DisposableWorkspaceCommand> BuildBackendOwnedCommandProfile(string projectPath)
-    {
-        var target = FindDotNetTarget(projectPath);
-        var args = string.IsNullOrWhiteSpace(target)
-            ? Array.Empty<string>()
-            : new[] { target };
-
-        return
-        [
-            new DisposableWorkspaceCommand
-            {
-                FileName = "dotnet",
-                Arguments = args.Prepend("build").Append("--nologo").ToArray(),
-                DisplayName = "dotnet build",
-                Timeout = TimeSpan.FromSeconds(ReadTimeoutSeconds("BuildTimeoutSeconds", 120))
-            },
-            new DisposableWorkspaceCommand
-            {
-                FileName = "dotnet",
-                Arguments = args.Prepend("test").Append("--nologo").ToArray(),
-                DisplayName = "dotnet test",
-                Timeout = TimeSpan.FromSeconds(ReadTimeoutSeconds("TestTimeoutSeconds", 120))
-            }
-        ];
-    }
-
-    private static string? FindDotNetTarget(string projectPath)
-    {
-        var solution = Directory.EnumerateFiles(projectPath, "*.sln", SearchOption.TopDirectoryOnly)
-            .Concat(Directory.EnumerateFiles(projectPath, "*.slnx", SearchOption.TopDirectoryOnly))
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(solution))
-            return Path.GetFileName(solution);
-
-        var project = Directory.EnumerateFiles(projectPath, "*.*proj", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) &&
-                           !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
-
-        return project is null ? null : Path.GetRelativePath(projectPath, project);
-    }
+    private IReadOnlyList<DisposableWorkspaceCommand> BuildBackendOwnedCommandProfile(string projectPath) =>
+        Workspaces.DotNetCommandProfile.BuildAndTest(
+            projectPath,
+            ReadTimeoutSeconds("BuildTimeoutSeconds", 120),
+            ReadTimeoutSeconds("TestTimeoutSeconds", 120));
 
     private int ReadTimeoutSeconds(string key, int fallback)
     {

@@ -88,6 +88,9 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
                 ["usedGitWorktree"] = usedGitWorktree.ToString().ToLowerInvariant()
             }, cancellationToken).ConfigureAwait(false);
 
+            if (request.FileWrites.Count > 0)
+                await ApplyFileWritesAsync(request.RunId, workspacePath, evidencePath, request.FileWrites, cancellationToken).ConfigureAwait(false);
+
             for (var index = 0; index < request.Commands.Count; index++)
             {
                 var command = request.Commands[index];
@@ -330,6 +333,65 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
         }, cancellationToken).ConfigureAwait(false);
 
         return result;
+    }
+
+    /// <summary>
+    /// Applies declarative file writes inside the workspace only. Every path is resolved
+    /// and proven to stay under the workspace before anything is touched; the applied
+    /// manifest is written as run evidence. Workspace mutation is not source mutation.
+    /// </summary>
+    private async Task ApplyFileWritesAsync(
+        string runId,
+        string workspacePath,
+        string evidencePath,
+        IReadOnlyList<Core.Workspaces.DisposableWorkspaceFileWrite> fileWrites,
+        CancellationToken cancellationToken)
+    {
+        var applied = new List<Dictionary<string, string>>();
+
+        foreach (var write in fileWrites)
+        {
+            if (string.IsNullOrWhiteSpace(write.RelativePath) || Path.IsPathRooted(write.RelativePath))
+                throw new InvalidOperationException($"Workspace file write path must be relative: '{write.RelativePath}'.");
+
+            var targetPath = Path.GetFullPath(Path.Combine(workspacePath, write.RelativePath));
+            if (!IsSameOrUnder(workspacePath, targetPath) || string.Equals(workspacePath, targetPath, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Workspace file write must stay inside the workspace: '{write.RelativePath}'.");
+
+            if (write.IsDeletion)
+            {
+                if (File.Exists(targetPath))
+                    File.Delete(targetPath);
+                applied.Add(new Dictionary<string, string>
+                {
+                    ["relativePath"] = write.RelativePath,
+                    ["action"] = "deleted"
+                });
+                continue;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+            await File.WriteAllTextAsync(targetPath, write.Content ?? string.Empty, cancellationToken).ConfigureAwait(false);
+            applied.Add(new Dictionary<string, string>
+            {
+                ["relativePath"] = write.RelativePath,
+                ["action"] = "written",
+                ["contentLength"] = (write.Content ?? string.Empty).Length.ToString()
+            });
+        }
+
+        var manifestPath = Path.Combine(evidencePath, "file-writes.json");
+        await File.WriteAllTextAsync(manifestPath, System.Text.Json.JsonSerializer.Serialize(applied, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true
+        }), cancellationToken).ConfigureAwait(false);
+
+        await PublishAsync(runId, "WorkspaceFileWritesApplied", $"Applied {applied.Count} file write(s) inside the disposable workspace.", new Dictionary<string, string>
+        {
+            ["fileWriteCount"] = applied.Count.ToString(),
+            ["manifestPath"] = manifestPath,
+            ["boundary"] = "Workspace mutation is not source mutation."
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private static void ValidateAllowedCommand(DisposableWorkspaceCommand command)

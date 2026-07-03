@@ -19,6 +19,7 @@ public sealed class TicketsController : ControllerBase
     private readonly ICodebaseTicketGeneratorService _generator;
     private readonly ITicketBuildOrchestrator _orchestrator;
     private readonly ITicketBuildRunService _buildRuns;
+    private readonly ITicketSkeletonRunService _skeletonRuns;
     private readonly IBuilderReadinessService _readiness;
     private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly ITicketRunReviewService _runReview;
@@ -30,6 +31,7 @@ public sealed class TicketsController : ControllerBase
         ICodebaseTicketGeneratorService generator,
         ITicketBuildOrchestrator orchestrator,
         ITicketBuildRunService buildRuns,
+        ITicketSkeletonRunService skeletonRuns,
         IBuilderReadinessService readiness,
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
@@ -40,6 +42,7 @@ public sealed class TicketsController : ControllerBase
         _generator = generator;
         _orchestrator = orchestrator;
         _buildRuns = buildRuns;
+        _skeletonRuns = skeletonRuns;
         _readiness = readiness;
         _evidenceSummary = evidenceSummary;
         _runReview = runReview;
@@ -199,6 +202,22 @@ public sealed class TicketsController : ControllerBase
         CancellationToken ct)
     {
         var result = await _buildRuns.StartDisposableAsync(projectId, ticketId, request, ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
+    /// POST skeleton-runs — the P0-1 walking skeleton: readiness → proposal (persisted
+    /// as evidence) → disposable workspace → apply-in-workspace → build/test → evidence
+    /// packaged. No new authority: blocked states are explicit and terminal, and the run
+    /// cannot request, consume, or simulate approval.
+    /// </summary>
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs")]
+    public async Task<ActionResult<TicketBuildRunDto>> StartSkeletonRun(
+        int projectId,
+        long ticketId,
+        CancellationToken ct)
+    {
+        var result = await _skeletonRuns.StartAsync(projectId, ticketId, ct);
         return result is null ? NotFound() : Ok(result);
     }
 
