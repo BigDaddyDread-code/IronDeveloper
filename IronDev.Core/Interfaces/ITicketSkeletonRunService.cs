@@ -47,4 +47,13 @@ public interface ITicketSkeletonRunService
     /// remain separate governed steps this service does not have.
     /// </summary>
     Task<TicketBuildRunDto?> ApplyAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reconstructs the whole governed loop for a run from durable evidence: events,
+    /// critic package (hash recomputed from disk), the approval requirement and the
+    /// continuation that consumed it, and the apply spine's receipts. Read-only and
+    /// verifying: unverifiable links are named as gaps, never patched over. A report
+    /// grants nothing and cannot alter the run.
+    /// </summary>
+    Task<SkeletonRunReport?> GetRunReportAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default);
 }
