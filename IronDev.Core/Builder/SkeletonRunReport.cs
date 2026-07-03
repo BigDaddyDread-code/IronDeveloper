@@ -24,6 +24,14 @@ public sealed record SkeletonRunReport
     public SkeletonRunTestAuthoringTrace? TestAuthoring { get; init; }
     public SkeletonRunCriticPackageTrace? CriticPackage { get; init; }
     public SkeletonRunApprovalTrace? Approval { get; init; }
+
+    /// <summary>
+    /// P1-1: independent critic reviews recorded against this run, by reference.
+    /// The durable review lives in the agent-run audit store; the report links,
+    /// it does not embed. Reviews are advisory — their presence grants nothing.
+    /// </summary>
+    public IReadOnlyList<SkeletonRunCriticReviewTrace> CriticReviews { get; init; } = [];
+
     public SkeletonRunApplyTrace? Apply { get; init; }
 
     /// <summary>Every loop link the report could not verify, by name. Empty means every observed link verified.</summary>
@@ -102,6 +110,19 @@ public sealed record SkeletonRunApplyTrace
 
     /// <summary>The spine's evidence-chain files, each checked on disk. The chain is the receipt.</summary>
     public IReadOnlyList<SkeletonRunReceiptRef> Receipts { get; init; } = [];
+}
+
+/// <summary>An independent critic review linked to the run, by reference. Advisory only.</summary>
+public sealed record SkeletonRunCriticReviewTrace
+{
+    public string CriticAgentRunId { get; init; } = string.Empty;
+    public string ReviewId { get; init; } = string.Empty;
+    public string Verdict { get; init; } = string.Empty;
+    public int FindingCount { get; init; }
+    public int BlockingFindingCount { get; init; }
+
+    /// <summary>The package hash the critic reviewed — comparable against the approval's target hash.</summary>
+    public string PackageSha256 { get; init; } = string.Empty;
 }
 
 public sealed record SkeletonRunApplyStageTrace

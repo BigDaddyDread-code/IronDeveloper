@@ -20,6 +20,7 @@ public sealed class TicketsController : ControllerBase
     private readonly ITicketBuildOrchestrator _orchestrator;
     private readonly ITicketBuildRunService _buildRuns;
     private readonly ITicketSkeletonRunService _skeletonRuns;
+    private readonly ISkeletonCriticReviewService _criticReviews;
     private readonly IBuilderReadinessService _readiness;
     private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly ITicketRunReviewService _runReview;
@@ -32,6 +33,7 @@ public sealed class TicketsController : ControllerBase
         ITicketBuildOrchestrator orchestrator,
         ITicketBuildRunService buildRuns,
         ITicketSkeletonRunService skeletonRuns,
+        ISkeletonCriticReviewService criticReviews,
         IBuilderReadinessService readiness,
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
@@ -43,6 +45,7 @@ public sealed class TicketsController : ControllerBase
         _orchestrator = orchestrator;
         _buildRuns = buildRuns;
         _skeletonRuns = skeletonRuns;
+        _criticReviews = criticReviews;
         _readiness = readiness;
         _evidenceSummary = evidenceSummary;
         _runReview = runReview;
@@ -267,6 +270,32 @@ public sealed class TicketsController : ControllerBase
     {
         var package = await _skeletonRuns.GetCriticPackageAsync(projectId, ticketId, runId, ct);
         return package is null ? NotFound() : Ok(package);
+    }
+
+    /// <summary>
+    /// POST skeleton-runs/{runId}/critic-review — requests an independent critic
+    /// review of the run's prepared work package. The critic pulls the package from
+    /// durable evidence itself and reviews it with no team memory. Findings are
+    /// advisory: a finding is not a veto, review is not approval, and the human
+    /// gate remains a separate governed step.
+    /// </summary>
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/critic-review")]
+    public async Task<ActionResult<SkeletonCriticReviewOutcome>> RequestSkeletonCriticReview(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken ct)
+    {
+        var outcome = await _criticReviews.ReviewAsync(new SkeletonCriticReviewRequest
+        {
+            ProjectId = projectId,
+            TicketId = ticketId,
+            RunId = runId,
+            RequestedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value
+                ?? "unknown-user"
+        }, ct);
+        return outcome is null ? NotFound() : Ok(outcome);
     }
 
     /// <summary>

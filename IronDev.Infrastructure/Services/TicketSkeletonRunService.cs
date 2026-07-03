@@ -710,6 +710,21 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 gaps.Add("Continuation was unblocked but the consumed accepted-approval id was not recorded.");
         }
 
+        // Critic review links (P1-1): recorded reviews enter the report by
+        // reference. Advisory only — their presence or absence grants nothing.
+        var criticReviews = events
+            .Where(runEvent => runEvent.EventType == "SkeletonCriticReviewRecorded")
+            .Select(runEvent => new SkeletonRunCriticReviewTrace
+            {
+                CriticAgentRunId = Payload(runEvent, "criticAgentRunId"),
+                ReviewId = Payload(runEvent, "reviewId"),
+                Verdict = Payload(runEvent, "verdict"),
+                FindingCount = int.TryParse(Payload(runEvent, "findingCount"), out var findingCount) ? findingCount : 0,
+                BlockingFindingCount = int.TryParse(Payload(runEvent, "blockingFindingCount"), out var blockingCount) ? blockingCount : 0,
+                PackageSha256 = Payload(runEvent, "packageSha256")
+            })
+            .ToList();
+
         // Apply link (P0-4): stages from durable events, receipts checked on disk.
         SkeletonRunApplyTrace? applyTrace = null;
         var appliedEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "SkeletonApplied");
@@ -790,6 +805,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             TestAuthoring = testAuthoringTrace,
             CriticPackage = packageTrace,
             Approval = approvalTrace,
+            CriticReviews = criticReviews,
             Apply = applyTrace,
             Gaps = gaps,
             LoopComplete = loopComplete

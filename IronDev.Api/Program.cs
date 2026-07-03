@@ -195,6 +195,7 @@ builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
 builder.Services.AddScoped<ITicketSkeletonRunService, TicketSkeletonRunService>();
 builder.Services.AddScoped<ISkeletonTestAuthoringService, SkeletonTestAuthoringService>();
+builder.Services.AddScoped<ISkeletonCriticReviewService, SkeletonCriticReviewService>();
 builder.Services.AddSingleton<IApprovalSatisfactionEvaluator, ApprovalSatisfactionEvaluator>();
 builder.Services.AddSingleton<IWorkflowApprovalHaltEvaluator, WorkflowApprovalHaltEvaluator>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();
@@ -228,7 +229,6 @@ builder.Services.AddScoped<IControlledWorktreeApplyService, ControlledWorktreeAp
 builder.Services.AddScoped<IAgentRunAuditEnvelopeStore, SqlAgentRunAuditEnvelopeStore>();
 builder.Services.AddScoped<IAgentRunAuditEnvelopeReadRepository, SqlAgentRunAuditEnvelopeReadRepository>();
 builder.Services.AddScoped<IAgentRunAuditQueryService, AgentRunAuditQueryService>();
-builder.Services.AddScoped<IManualIndependentCriticAgentService, ManualIndependentCriticAgentService>();
 builder.Services.AddScoped<IManualMemoryImprovementAgentService, ManualMemoryImprovementAgentService>();
 builder.Services.AddScoped<ManualAgentExecutionStoreValidator>();
 builder.Services.AddScoped<IStoredManualIndependentCriticAgentService, StoredManualIndependentCriticAgentService>();
