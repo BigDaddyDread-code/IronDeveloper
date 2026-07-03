@@ -123,6 +123,10 @@ public sealed record SkeletonRunCriticReviewTrace
 
     /// <summary>The package hash the critic reviewed — comparable against the approval's target hash.</summary>
     public string PackageSha256 { get; init; } = string.Empty;
+
+    /// <summary>P1-2: how many ground-truth checks ran and how many found claim/evidence mismatches.</summary>
+    public int GroundTruthCheckCount { get; init; }
+    public int GroundTruthMismatchCount { get; init; }
 }
 
 public sealed record SkeletonRunApplyStageTrace

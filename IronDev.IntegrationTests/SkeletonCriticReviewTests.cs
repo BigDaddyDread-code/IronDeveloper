@@ -7,6 +7,7 @@ using IronDev.Core.RunReports;
 using IronDev.Core.Runs;
 using IronDev.Data.Models;
 using IronDev.Infrastructure.Services;
+using IronDev.Infrastructure.Services.Workspaces;
 using IronDev.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -88,6 +89,37 @@ public sealed class SkeletonCriticReviewTests
         StringAssert.Contains(source, "not approval");
         StringAssert.Contains(source, "not a veto");
         StringAssert.Contains(source, "pulls its subject from durable evidence");
+    }
+
+    [TestMethod]
+    public void GroundTruthVerifier_IsHarnessNotAgent_AndHoldsNoApprovalSurface()
+    {
+        var source = File.ReadAllText(RepositoryFile("IronDev.Infrastructure", "Services", "SkeletonCriticGroundTruthVerifier.cs"));
+
+        // P1-2: the verifier re-executes evidence, so it may use the disposable
+        // workspace service — but it must never touch approvals, executors, or
+        // memory, and it must state that it is the harness around the critic,
+        // not the boxed review-only agent.
+        foreach (var forbidden in new[]
+        {
+            "AcceptedApproval",
+            "SatisfyPolicy",
+            "ApprovalGranted",
+            "ControlledSourceApply",
+            "ControlledCommitExecutor",
+            "ControlledPushExecutor",
+            "IAgentMemory",
+            "CollectiveMemory",
+            "MemoryPack"
+        })
+        {
+            Assert.IsFalse(source.Contains(forbidden, StringComparison.OrdinalIgnoreCase),
+                $"The verifier establishes ground truth; it cannot approve, execute controlled mutations, or remember: {forbidden}");
+        }
+
+        StringAssert.Contains(source, "not the critic agent");
+        StringAssert.Contains(source, "grants nothing");
+        StringAssert.Contains(source, "trust but verify");
     }
 
     // ── The critic reviews and the link is durable ────────────────────────────
@@ -197,6 +229,231 @@ public sealed class SkeletonCriticReviewTests
         Assert.IsNull(await harness.Service.ReviewAsync(Request() with { RunId = "no-such-run" }));
     }
 
+    // ── P1-2: trust but verify — mismatches are findings by construction ─────
+
+    [TestMethod]
+    public async Task ReviewAsync_BlockingGroundTruthMismatch_OverridesAnAgreeableModel()
+    {
+        // The model waves the work through; the evidence says the package was
+        // tampered with. Evidence wins: the mismatch is a blocking finding and
+        // the verdict floor is RecommendBlock, regardless of the model's mood.
+        using var harness = CriticHarness.Create(
+            llmResponse: () => "{\"verdict\":\"NoObjection\",\"findings\":[]}",
+            groundTruth: () => new SkeletonGroundTruthVerification
+            {
+                Checks =
+                [
+                    new SkeletonGroundTruthCheck
+                    {
+                        CheckName = SkeletonCriticGroundTruthVerifier.PackageHashCheck,
+                        Passed = false,
+                        Expected = "aaaa",
+                        Actual = "bbbb",
+                        Detail = "The package on disk is NOT the package the run announced at halt — it changed after the fact.",
+                        BlocksMerge = true
+                    }
+                ]
+            });
+
+        var outcome = await harness.Service.ReviewAsync(Request());
+
+        Assert.IsTrue(outcome!.Succeeded, outcome.FailureReason);
+        Assert.AreEqual("RecommendBlock", outcome.Verdict,
+            "A blocking ground-truth mismatch sets the verdict floor — an agreeable model cannot wave through tampered evidence.");
+        Assert.IsTrue(outcome.Findings.Any(finding =>
+                finding.Title.Contains("Ground truth mismatch", StringComparison.Ordinal) && finding.BlocksMerge),
+            "The mismatch becomes a blocking finding by construction, not by judgment.");
+
+        var recorded = harness.Events.Single("SkeletonCriticReviewRecorded");
+        Assert.AreEqual("1", recorded.Payload["groundTruthMismatchCount"]);
+    }
+
+    [TestMethod]
+    public async Task ReviewAsync_NonBlockingMismatch_ForbidsACleanVerdict()
+    {
+        using var harness = CriticHarness.Create(
+            llmResponse: () => "{\"verdict\":\"NoObjection\",\"findings\":[]}",
+            groundTruth: () => new SkeletonGroundTruthVerification
+            {
+                Checks =
+                [
+                    new SkeletonGroundTruthCheck
+                    {
+                        CheckName = SkeletonCriticGroundTruthVerifier.ReExecutionCheck,
+                        Passed = false,
+                        Expected = "an independent re-execution",
+                        Actual = "re-execution unavailable: the project's local path is missing",
+                        Detail = "The package's claims could not be independently reproduced.",
+                        BlocksMerge = false
+                    }
+                ]
+            });
+
+        var outcome = await harness.Service.ReviewAsync(Request());
+
+        Assert.AreEqual("RequestChanges", outcome!.Verdict,
+            "Unverifiable claims are weaker evidence: the review cannot come back clean.");
+        Assert.IsTrue(outcome.Findings.Any(finding => !finding.BlocksMerge &&
+            finding.Problem.Contains("could not be independently reproduced", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task ReviewAsync_AllChecksPass_TheModelVerdictStands_AndThePromptCarriesTheGroundTruth()
+    {
+        using var harness = CriticHarness.Create(llmResponse: () => "{\"verdict\":\"NoObjection\",\"findings\":[]}");
+
+        var outcome = await harness.Service.ReviewAsync(Request());
+
+        Assert.AreEqual("NoObjection", outcome!.Verdict, "Verified claims leave the model's judgment untouched.");
+        Assert.AreEqual(4, outcome.GroundTruth!.Checks.Count);
+        Assert.AreEqual(0, outcome.GroundTruth.Mismatches.Count);
+        Assert.AreEqual("0", harness.Events.Single("SkeletonCriticReviewRecorded").Payload["groundTruthMismatchCount"]);
+        StringAssert.Contains(harness.Llm.LastPrompt, "INDEPENDENT GROUND-TRUTH VERIFICATION",
+            "The critic model consumes the ground truth as evidence — it reviews with the hood open.");
+    }
+
+    // ── P1-2: the verifier itself, against real evidence ─────────────────────
+
+    [TestMethod]
+    public async Task Verifier_PackageHash_ComparedToTheHaltAnnouncement()
+    {
+        var events = new RecordingEventStore();
+        await events.PublishAsync(new RunEventDto
+        {
+            RunId = RunId,
+            EventType = "CriticReviewPackageReady",
+            Payload = new Dictionary<string, string> { ["packageSha256"] = "aaaa" }
+        });
+        var verifier = BuildVerifier(events);
+
+        var match = await verifier.VerifyAsync(RunId, MinimalPackage(), "pkg.json", "aaaa");
+        Assert.IsTrue(match.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.PackageHashCheck).Passed);
+
+        var tampered = await verifier.VerifyAsync(RunId, MinimalPackage(), "pkg.json", "bbbb");
+        var hashCheck = tampered.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.PackageHashCheck);
+        Assert.IsFalse(hashCheck.Passed);
+        Assert.IsTrue(hashCheck.BlocksMerge, "A package changed after halt is not the package that halted.");
+    }
+
+    [TestMethod]
+    public async Task Verifier_InternalContradictions_AreMismatches()
+    {
+        var verifier = BuildVerifier(new RecordingEventStore());
+
+        // Claims success while its own recorded command failed.
+        var contradictory = MinimalPackage() with
+        {
+            WorkspaceRunSucceeded = true,
+            CommandResults = [new SkeletonCriticPackageCommandResult { DisplayName = "dotnet test", ExitCode = 1 }]
+        };
+        var verification = await verifier.VerifyAsync(RunId, contradictory, "pkg.json", "h");
+        var consistency = verification.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.InternalConsistencyCheck);
+        Assert.IsFalse(consistency.Passed);
+        Assert.IsTrue(consistency.BlocksMerge, "A package that contradicts itself needs no external evidence to be wrong.");
+        StringAssert.Contains(consistency.Actual, "dotnet test");
+    }
+
+    [TestMethod]
+    public async Task Verifier_MissingClaimedCommandEvidence_IsAMismatch()
+    {
+        var verifier = BuildVerifier(new RecordingEventStore());
+        var package = MinimalPackage() with
+        {
+            CommandResults =
+            [
+                new SkeletonCriticPackageCommandResult
+                {
+                    DisplayName = "dotnet build",
+                    ExitCode = 0,
+                    StandardOutputRef = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.txt")
+                }
+            ]
+        };
+
+        var verification = await verifier.VerifyAsync(RunId, package, "pkg.json", "h");
+
+        var evidence = verification.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.CommandEvidenceCheck);
+        Assert.IsFalse(evidence.Passed, "A claim whose receipt is missing is a claim, not evidence.");
+    }
+
+    [TestMethod]
+    public async Task Verifier_ReExecution_CatchesAClaimThatDoesNotReproduce()
+    {
+        // The decisive check, against a real sandbox: the package CLAIMS the
+        // workspace run succeeded, but its own contents do not compile. The
+        // independent re-execution catches the lie.
+        using var repo = TempSandboxRepo.Create();
+        var verifier = BuildVerifier(new RecordingEventStore(), repo.Path);
+        var lyingPackage = MinimalPackage() with
+        {
+            WorkspaceRunSucceeded = true,
+            Changes =
+            [
+                new SkeletonCriticPackageChange
+                {
+                    FilePath = "src/Broken.cs",
+                    IsNewFile = true,
+                    Diff = "+public enum Broken {",
+                    FullContentAfter = "public enum Broken {"
+                }
+            ]
+        };
+
+        var verification = await verifier.VerifyAsync(RunId, lyingPackage, "pkg.json", "h");
+
+        var reExecution = verification.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.ReExecutionCheck);
+        Assert.IsFalse(reExecution.Passed, "The claim must not survive contact with a fresh workspace.");
+        Assert.IsTrue(reExecution.BlocksMerge);
+        StringAssert.Contains(reExecution.Detail, "does NOT reproduce");
+    }
+
+    [TestMethod]
+    public async Task Verifier_ReExecution_ConfirmsAnHonestClaim()
+    {
+        using var repo = TempSandboxRepo.Create();
+        var verifier = BuildVerifier(new RecordingEventStore(), repo.Path);
+        var honestPackage = MinimalPackage() with
+        {
+            WorkspaceRunSucceeded = true,
+            Changes =
+            [
+                new SkeletonCriticPackageChange
+                {
+                    FilePath = "src/SortOptions.cs",
+                    IsNewFile = true,
+                    Diff = "+public enum SortOptions { Title }",
+                    FullContentAfter = "public enum SortOptions { Title }"
+                }
+            ],
+            AuthoredTests =
+            [
+                new SkeletonAuthoredTest
+                {
+                    RelativePath = "tests/skeleton/SortTests.cs",
+                    Content = "public class SortTests { }",
+                    CoversCriterion = "Catalog sorts by title"
+                }
+            ]
+        };
+
+        var verification = await verifier.VerifyAsync(RunId, honestPackage, "pkg.json", "h");
+
+        var reExecution = verification.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.ReExecutionCheck);
+        Assert.IsTrue(reExecution.Passed, $"An honest claim reproduces: {reExecution.Actual}");
+    }
+
+    [TestMethod]
+    public async Task Verifier_ReExecutionUnavailable_IsANamedNonBlockingMismatch_NeverASilentPass()
+    {
+        var verifier = BuildVerifier(new RecordingEventStore(), localPath: null);
+
+        var verification = await verifier.VerifyAsync(RunId, MinimalPackage(), "pkg.json", "h");
+
+        var reExecution = verification.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.ReExecutionCheck);
+        Assert.IsFalse(reExecution.Passed, "What cannot be verified is not treated as verified.");
+        Assert.IsFalse(reExecution.BlocksMerge, "Degraded verifiability informs the human; it does not manufacture a block.");
+    }
+
     // ── Parser ────────────────────────────────────────────────────────────────
 
     [TestMethod]
@@ -217,6 +474,34 @@ public sealed class SkeletonCriticReviewTests
 
     // ── Harness ───────────────────────────────────────────────────────────────
 
+    private static SkeletonCriticGroundTruthVerifier BuildVerifier(RecordingEventStore events, string? localPath = null)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DisposableBuild:WorkspaceRoot"] = Path.Combine(Path.GetTempPath(), $"irondev-critic-verify-ws-{Guid.NewGuid():N}"),
+                ["DisposableBuild:EvidenceRoot"] = Path.Combine(Path.GetTempPath(), $"irondev-critic-verify-ev-{Guid.NewGuid():N}")
+            })
+            .Build();
+
+        return new SkeletonCriticGroundTruthVerifier(
+            events,
+            new StubProjectService(new Project { Id = ProjectId, LocalPath = localPath }),
+            new DisposableWorkspaceExecutionService(new LiteRunStore(), new RecordingEventStore()),
+            configuration);
+    }
+
+    private static SkeletonCriticPackage MinimalPackage() => new()
+    {
+        PackageId = $"critic-pkg-{RunId}",
+        RunId = RunId,
+        ProposalId = $"prop-{RunId}",
+        TicketId = TicketId,
+        ProjectId = ProjectId,
+        TicketTitle = "Add book sorting",
+        WorkspaceRunSucceeded = true
+    };
+
     private static SkeletonCriticReviewRequest Request() => new()
     {
         ProjectId = ProjectId,
@@ -225,15 +510,30 @@ public sealed class SkeletonCriticReviewTests
         RequestedByUserId = "user-9"
     };
 
+    private static SkeletonGroundTruthVerification AllChecksPass() => new()
+    {
+        Checks =
+        [
+            new SkeletonGroundTruthCheck { CheckName = SkeletonCriticGroundTruthVerifier.PackageHashCheck, Passed = true, Detail = "The package on disk is byte-identical to the one announced at halt." },
+            new SkeletonGroundTruthCheck { CheckName = SkeletonCriticGroundTruthVerifier.InternalConsistencyCheck, Passed = true, Detail = "No contradictions." },
+            new SkeletonGroundTruthCheck { CheckName = SkeletonCriticGroundTruthVerifier.CommandEvidenceCheck, Passed = true, Detail = "All present." },
+            new SkeletonGroundTruthCheck { CheckName = SkeletonCriticGroundTruthVerifier.ReExecutionCheck, Passed = true, Detail = "Claims reproduce." }
+        ]
+    };
+
     private sealed class CriticHarness : IDisposable
     {
         public required SkeletonCriticReviewService Service { get; init; }
         public required RecordingEventStore Events { get; init; }
         public required StubStoredCriticService StoredCritic { get; init; }
+        public required StubLlm Llm { get; init; }
         public required string PackageSha256 { get; init; }
         public required string EvidenceRoot { get; init; }
 
-        public static CriticHarness Create(Func<string>? llmResponse = null, bool writePackage = true)
+        public static CriticHarness Create(
+            Func<string>? llmResponse = null,
+            bool writePackage = true,
+            Func<SkeletonGroundTruthVerification>? groundTruth = null)
         {
             var evidenceRoot = Path.Combine(Path.GetTempPath(), $"irondev-critic-{Guid.NewGuid():N}");
             var packageHash = string.Empty;
@@ -293,12 +593,14 @@ public sealed class SkeletonCriticReviewTests
 
             var events = new RecordingEventStore();
             var storedCritic = new StubStoredCriticService();
+            var llm = new StubLlm(llmResponse ?? (() => "{\"verdict\":\"NoObjection\",\"findings\":[]}"));
             var service = new SkeletonCriticReviewService(
                 new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ProjectId, TenantId = 3, Title = "Add book sorting" }),
                 new StubRunStore(new RunRecord { RunId = RunId, ProjectId = ProjectId, TicketId = TicketId, State = RunLifecycleState.PausedForApproval }),
                 events,
-                new StubLlm(llmResponse ?? (() => "{\"verdict\":\"NoObjection\",\"findings\":[]}")),
+                llm,
                 storedCritic,
+                new StubGroundTruthVerifier(groundTruth ?? AllChecksPass),
                 configuration);
 
             return new CriticHarness
@@ -306,6 +608,7 @@ public sealed class SkeletonCriticReviewTests
                 Service = service,
                 Events = events,
                 StoredCritic = storedCritic,
+                Llm = llm,
                 PackageSha256 = packageHash,
                 EvidenceRoot = evidenceRoot
             };
@@ -371,8 +674,23 @@ public sealed class SkeletonCriticReviewTests
 
     private sealed class StubLlm(Func<string> behavior) : ILLMService
     {
-        public Task<string> GetResponseAsync(string prompt, CancellationToken ct = default) =>
-            Task.FromResult(behavior());
+        public string? LastPrompt { get; private set; }
+
+        public Task<string> GetResponseAsync(string prompt, CancellationToken ct = default)
+        {
+            LastPrompt = prompt;
+            return Task.FromResult(behavior());
+        }
+    }
+
+    private sealed class StubGroundTruthVerifier(Func<SkeletonGroundTruthVerification> behavior) : ISkeletonCriticGroundTruthVerifier
+    {
+        public Task<SkeletonGroundTruthVerification> VerifyAsync(
+            string runId,
+            SkeletonCriticPackage package,
+            string packagePath,
+            string packageSha256,
+            CancellationToken ct = default) => Task.FromResult(behavior());
     }
 
     private sealed class StubTicketService(ProjectTicket ticket) : ITicketService
@@ -431,6 +749,119 @@ public sealed class SkeletonCriticReviewTests
 
         public IReadOnlyList<RunEventDto> All(string eventType) =>
             _events.Where(runEvent => string.Equals(runEvent.EventType, eventType, StringComparison.Ordinal)).ToList();
+    }
+
+    private sealed class StubProjectService(Project project) : IProjectService
+    {
+        public Task<int> CreateProjectAsync(Project toCreate, CancellationToken ct = default) => Task.FromResult(toCreate.Id);
+        public Task<IReadOnlyList<Project>> GetProjectsAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Project>>([project]);
+        public Task<Project?> GetByIdAsync(int projectId, CancellationToken ct = default) =>
+            Task.FromResult<Project?>(projectId == project.Id ? project : null);
+        public Task<Project?> UpdateProjectAsync(int projectId, Project toUpdate, CancellationToken ct = default) =>
+            Task.FromResult<Project?>(project);
+        public Task UpdateLocalPathAsync(int projectId, string localPath, CancellationToken ct = default) => Task.CompletedTask;
+        public Task MarkIndexStaleAsync(int projectId, string reason, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class LiteRunStore : IRunStore
+    {
+        private readonly Dictionary<string, RunRecord> _runs = [];
+
+        public Task<RunRecord> CreateAsync(CreateRunRequest request, CancellationToken ct = default)
+        {
+            var run = new RunRecord
+            {
+                RunId = request.RunId ?? Guid.NewGuid().ToString("N"),
+                ProjectId = request.ProjectId,
+                TicketId = request.TicketId,
+                State = RunLifecycleState.Created,
+                IsDisposable = request.IsDisposable,
+                Summary = request.Summary
+            };
+            _runs[run.RunId] = run;
+            return Task.FromResult(run);
+        }
+
+        public Task<RunRecord?> GetAsync(string runId, CancellationToken ct = default) =>
+            Task.FromResult(_runs.TryGetValue(runId, out var run) ? run : null);
+
+        public Task<IReadOnlyList<RunRecord>> GetRecentAsync(int limit = 50, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<RunRecord>>(_runs.Values.Take(limit).ToList());
+
+        public Task<RunRecord?> TransitionAsync(RunStateTransition transition, CancellationToken ct = default)
+        {
+            if (!_runs.TryGetValue(transition.RunId, out var run))
+                return Task.FromResult<RunRecord?>(null);
+            var updated = run with { State = transition.State, Summary = transition.Summary, FailureReason = transition.FailureReason };
+            _runs[transition.RunId] = updated;
+            return Task.FromResult<RunRecord?>(updated);
+        }
+    }
+
+    private sealed class TempSandboxRepo : IDisposable
+    {
+        public required string Path { get; init; }
+
+        public static TempSandboxRepo Create()
+        {
+            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "irondev-critic-repo-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(path);
+            RunTool(path, "git", "init");
+            RunTool(path, "git", "config user.email critic@irondev.local");
+            RunTool(path, "git", "config user.name Critic");
+            File.WriteAllText(System.IO.Path.Combine(path, "Directory.Build.props"), """
+                <Project>
+                  <PropertyGroup>
+                    <MSBuildProjectExtensionsPath>.assets/</MSBuildProjectExtensionsPath>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(System.IO.Path.Combine(path, "Sandbox.csproj"), """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                </Project>
+                """);
+            Directory.CreateDirectory(System.IO.Path.Combine(path, "src"));
+            File.WriteAllText(System.IO.Path.Combine(path, "src", "Existing.cs"), "namespace Sandbox; public static class Existing { }");
+            RunTool(path, "dotnet", "restore");
+            RunTool(path, "git", "add .");
+            RunTool(path, "git", "commit -m initial");
+            return new TempSandboxRepo { Path = path };
+        }
+
+        private static void RunTool(string workingDirectory, string fileName, string arguments)
+        {
+            var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fileName, arguments)
+            {
+                WorkingDirectory = workingDirectory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            })!;
+            process.WaitForExit();
+            Assert.AreEqual(0, process.ExitCode, $"{fileName} {arguments} failed: {process.StandardError.ReadToEnd()}{process.StandardOutput.ReadToEnd()}");
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                if (Directory.Exists(Path))
+                {
+                    foreach (var file in Directory.EnumerateFiles(Path, "*", SearchOption.AllDirectories))
+                        File.SetAttributes(file, FileAttributes.Normal);
+                    Directory.Delete(Path, recursive: true);
+                }
+            }
+            catch
+            {
+                // best-effort cleanup of temp repos
+            }
+        }
     }
 
     private static string RepositoryFile(params string[] parts)
