@@ -26,11 +26,11 @@ namespace IronDev.Infrastructure.Services;
 /// </summary>
 public sealed class SkeletonCriticGroundTruthVerifier : ISkeletonCriticGroundTruthVerifier
 {
-    public const string PackageHashCheck = "package-hash-matches-halt-announcement";
-    public const string InternalConsistencyCheck = "package-internally-consistent";
-    public const string CommandEvidenceCheck = "claimed-command-evidence-on-disk";
-    public const string CriterionCoverageCheck = "criterion-coverage-record-honest";
-    public const string ReExecutionCheck = "claims-reproduce-on-independent-re-execution";
+    public const string PackageHashCheck = SkeletonGroundTruthCheckNames.PackageHash;
+    public const string InternalConsistencyCheck = SkeletonGroundTruthCheckNames.InternalConsistency;
+    public const string CommandEvidenceCheck = SkeletonGroundTruthCheckNames.CommandEvidence;
+    public const string CriterionCoverageCheck = SkeletonGroundTruthCheckNames.CriterionCoverage;
+    public const string ReExecutionCheck = SkeletonGroundTruthCheckNames.ReExecution;
 
     private readonly IRunEventStore _events;
     private readonly IProjectService _projects;

@@ -198,6 +198,7 @@ builder.Services.AddScoped<ISkeletonTestAuthoringService, SkeletonTestAuthoringS
 builder.Services.AddScoped<ISkeletonCriticReviewService, SkeletonCriticReviewService>();
 builder.Services.AddScoped<ISkeletonCriticGroundTruthVerifier, SkeletonCriticGroundTruthVerifier>();
 builder.Services.AddScoped<ISkeletonFindingDispositionService, SkeletonFindingDispositionService>();
+builder.Services.AddScoped<ISkeletonCriticCanaryRunner, SkeletonCriticCanaryRunner>();
 builder.Services.AddSingleton<IApprovalSatisfactionEvaluator, ApprovalSatisfactionEvaluator>();
 builder.Services.AddSingleton<IWorkflowApprovalHaltEvaluator, WorkflowApprovalHaltEvaluator>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();

@@ -70,6 +70,16 @@ public interface ISkeletonCriticReviewService
 
 // ── P1-2: trust but verify — the auditor pulls ground truth ─────────────────
 
+/// <summary>The canonical ground-truth check names — shared by the verifier that runs them and the canary corpus that expects them.</summary>
+public static class SkeletonGroundTruthCheckNames
+{
+    public const string PackageHash = "package-hash-matches-halt-announcement";
+    public const string InternalConsistency = "package-internally-consistent";
+    public const string CommandEvidence = "claimed-command-evidence-on-disk";
+    public const string CriterionCoverage = "criterion-coverage-record-honest";
+    public const string ReExecution = "claims-reproduce-on-independent-re-execution";
+}
+
 /// <summary>One ground-truth check: what the package claims versus what the evidence shows.</summary>
 public sealed record SkeletonGroundTruthCheck
 {
