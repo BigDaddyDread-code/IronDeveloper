@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import type { BuildReadinessResult, ProjectTicket } from '../../api/types';
+import { MarkdownRenderer } from '../../components/MarkdownRenderer';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { ContractRail } from '../components/ContractRail';
@@ -220,7 +221,7 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
               ) : (
                 discussion.map((entry) => (
                   <div key={entry.id} className={entry.role === 'user' ? 'fl-msg fl-user' : 'fl-msg fl-sys'}>
-                    {entry.text}
+                    {entry.role === 'assistant' ? <MarkdownRenderer markdown={entry.text} /> : entry.text}
                   </div>
                 ))
               )}
