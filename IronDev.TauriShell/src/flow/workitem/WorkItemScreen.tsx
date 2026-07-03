@@ -1,11 +1,21 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import type { BuildReadinessResult, ProjectTicket } from '../../api/types';
+import type {
+  AcceptedApprovalApiError,
+  BuildReadinessResult,
+  ProjectTicket,
+  SkeletonCriticPackage,
+  SkeletonRunReport,
+  TicketBuildRunDto
+} from '../../api/types';
+import { IronDevApiError } from '../../api/ironDevApi';
 import { MarkdownRenderer } from '../../components/MarkdownRenderer';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { ContractRail } from '../components/ContractRail';
 import { StageRail } from '../components/StageRail';
 import { GateInfo, ShapeDraft, WorkItemStage, emptyShapeDraft } from '../flowTypes';
+import { BuildStage, statusTone } from './BuildStage';
+import { ReviewStage } from './ReviewStage';
 
 interface WorkItemScreenProps {
   ticket: ProjectTicket | null;
@@ -60,6 +70,12 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
   const [isPromoting, setIsPromoting] = useState(false);
   const [readiness, setReadiness] = useState<BuildReadinessResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [run, setRun] = useState<TicketBuildRunDto | null>(null);
+  const [report, setReport] = useState<SkeletonRunReport | null>(null);
+  const [criticPackage, setCriticPackage] = useState<SkeletonCriticPackage | null>(null);
+  const [isStartingRun, setIsStartingRun] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [gateNotice, setGateNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ticket || project.selectedProjectId === null || ticket.id === undefined) {
@@ -107,9 +123,13 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
     return [
       { afterStage: 'shape', label: 'ready', state: 'open' },
       { afterStage: 'ticket', label: 'readiness', state: readiness?.isReady ? 'open' : 'locked' },
-      { afterStage: 'review', label: 'human gate', state: 'locked' }
+      {
+        afterStage: 'review',
+        label: 'human gate',
+        state: report?.approval?.continuationUnblocked === true ? 'open' : 'locked'
+      }
     ];
-  }, [stage, shapeBlockers.length, readiness?.isReady]);
+  }, [stage, shapeBlockers.length, readiness?.isReady, report?.approval?.continuationUnblocked]);
 
   const sendPrompt = useCallback(
     async (event: FormEvent) => {
@@ -191,6 +211,126 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
 
   const [criterionInput, setCriterionInput] = useState('');
 
+  // ── P0-7: Build and Review consume the walking-skeleton loop. Every action is
+  // a request to a governed endpoint; the backend verifies and refuses. ──
+
+  const describeApiError = (error: unknown, fallback: string): string => {
+    if (error instanceof IronDevApiError) {
+      const body = error.body as { errors?: AcceptedApprovalApiError[] } | undefined;
+      const detail = body?.errors?.map((issue) => issue.message).join(' ');
+      return detail && detail.length > 0 ? detail : error.message;
+    }
+    return error instanceof Error ? error.message : fallback;
+  };
+
+  const refreshRunEvidence = useCallback(
+    async (activeRun: TicketBuildRunDto) => {
+      if (project.selectedProjectId === null || ticket?.id === undefined) {
+        return;
+      }
+      try {
+        const nextReport = await session.client.getSkeletonRunReport(project.selectedProjectId, ticket.id, activeRun.runId);
+        setReport(nextReport);
+      } catch {
+        setReport(null);
+      }
+      try {
+        const nextPackage = await session.client.getSkeletonCriticPackage(project.selectedProjectId, ticket.id, activeRun.runId);
+        setCriticPackage(nextPackage);
+      } catch {
+        setCriticPackage(null);
+      }
+    },
+    [session.client, project.selectedProjectId, ticket]
+  );
+
+  const startBuildRun = useCallback(async () => {
+    if (project.selectedProjectId === null || ticket?.id === undefined || isStartingRun) {
+      return;
+    }
+    setIsStartingRun(true);
+    setErrorMessage(null);
+    setGateNotice(null);
+    try {
+      const started = await session.client.startSkeletonRun(project.selectedProjectId, ticket.id);
+      setRun(started);
+      setStage('build');
+      await refreshRunEvidence(started);
+    } catch (error: unknown) {
+      setErrorMessage(describeApiError(error, 'Could not start the build run.'));
+    } finally {
+      setIsStartingRun(false);
+    }
+  }, [project.selectedProjectId, ticket, isStartingRun, session.client, refreshRunEvidence]);
+
+  const recordApproval = useCallback(async () => {
+    const requirement = report?.approval;
+    if (project.selectedProjectId === null || run === null || !requirement || busyAction !== null) {
+      return;
+    }
+    setBusyAction('record');
+    setErrorMessage(null);
+    try {
+      const envelope = await session.client.recordAcceptedApproval(project.selectedProjectId, {
+        approvalTargetKind: requirement.targetKind,
+        approvalTargetId: run.runId,
+        approvalTargetHash: requirement.targetHash,
+        capabilityCode: requirement.capabilityCode,
+        approvalPurpose: 'workflow-continuation-input',
+        correlationId: run.runId,
+        causationId: `critic-pkg-${run.runId}`,
+        evidenceReferences: [`critic-package-sha256:${requirement.targetHash}`],
+        boundaryMaxims: ['Approval binds to the reviewed critic package hash.', 'Halt is not approval.']
+      });
+      setGateNotice(
+        `Approval ${envelope.acceptedApprovalId ?? ''} recorded. Recording is not continuation — request continuation for the backend to verify it live.`
+      );
+    } catch (error: unknown) {
+      setErrorMessage(describeApiError(error, 'The approval record was refused.'));
+    } finally {
+      setBusyAction(null);
+    }
+  }, [report, project.selectedProjectId, run, busyAction, session.client]);
+
+  const requestContinuation = useCallback(async () => {
+    if (project.selectedProjectId === null || ticket?.id === undefined || run === null || busyAction !== null) {
+      return;
+    }
+    setBusyAction('continue');
+    setErrorMessage(null);
+    try {
+      const result = await session.client.requestSkeletonRunContinuation(project.selectedProjectId, ticket.id, run.runId);
+      setRun(result);
+      setGateNotice(result.message ?? null);
+      await refreshRunEvidence(result);
+    } catch (error: unknown) {
+      setErrorMessage(describeApiError(error, 'The continuation request failed.'));
+    } finally {
+      setBusyAction(null);
+    }
+  }, [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence]);
+
+  const requestApply = useCallback(async () => {
+    if (project.selectedProjectId === null || ticket?.id === undefined || run === null || busyAction !== null) {
+      return;
+    }
+    setBusyAction('apply');
+    setErrorMessage(null);
+    try {
+      const result = await session.client.requestSkeletonRunApply(project.selectedProjectId, ticket.id, run.runId);
+      setRun(result);
+      setGateNotice(result.message ?? null);
+      await refreshRunEvidence(result);
+      if (result.status === 'Applied') {
+        setStage('done');
+      }
+    } catch (error: unknown) {
+      setErrorMessage(describeApiError(error, 'The apply request failed.'));
+    } finally {
+      setBusyAction(null);
+    }
+  }, [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence]);
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
@@ -198,7 +338,15 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
           <h1 className="fl-h1">{draft.title.trim().length > 0 ? draft.title : 'New work item'}</h1>
           <p className="fl-sub">
             {ticket && ticket.id !== undefined ? `WI-${ticket.id} · ` : ''}
-            {stage === 'shape' ? 'Shaping — discussion produces the contract.' : 'Ticket — the contract is the gate input.'}
+            {stage === 'shape'
+              ? 'Shaping — discussion produces the contract.'
+              : stage === 'ticket'
+                ? 'Ticket — the contract is the gate input.'
+                : stage === 'build'
+                  ? 'Build — the run reports; it grants nothing.'
+                  : stage === 'review'
+                    ? 'Review — the critic package and the human gate.'
+                    : 'Done — the loop record, verified end to end.'}
           </p>
         </div>
         <button className="fl-btn" onClick={onBackToBoard}>
@@ -212,6 +360,58 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
 
       <div className="fl-cols">
         <div className="fl-panel-box">
+          {stage === 'build' && run !== null ? (
+            <BuildStage run={run} report={report} onRefreshReport={() => run && void refreshRunEvidence(run)} />
+          ) : stage === 'review' ? (
+            <ReviewStage
+              criticPackage={criticPackage}
+              report={report}
+              busyAction={busyAction}
+              onRecordApproval={() => void recordApproval()}
+              onRequestContinuation={() => void requestContinuation()}
+              onRequestApply={() => void requestApply()}
+            />
+          ) : stage === 'done' ? (
+            <>
+              <p className="fl-plabel">Loop record</p>
+              {report === null ? (
+                <p className="fl-empty">Report not loaded.</p>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13.5, marginTop: 0 }} data-testid="flow.done.loop">
+                    <span style={{ color: statusTone(report.status), fontWeight: 600 }}>{report.status}</span>
+                    {' · '}
+                    {report.loopComplete
+                      ? 'Loop complete: every link verified — package hash, consumed approval, and receipts on disk.'
+                      : `Loop not fully verified — ${report.gaps.length} gap(s) named in the report.`}
+                  </p>
+                  {report.gaps.map((gap) => (
+                    <div className="fl-qbox" key={gap}>
+                      <span>{gap}</span>
+                    </div>
+                  ))}
+                  {report.apply ? (
+                    <>
+                      <p className="fl-plabel" style={{ marginTop: 14 }}>
+                        Receipts — the evidence chain
+                      </p>
+                      {report.apply.receipts.map((receipt) => (
+                        <div className="fl-qbox" key={receipt.name}>
+                          <span>
+                            {receipt.name} · {receipt.existsOnDisk ? 'on disk' : 'MISSING'}
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  ) : null}
+                  <p style={{ fontSize: 12, color: 'var(--fl-ink2)' }}>
+                    Copy-only: commit, push, and release remain separate governed steps this loop does not have.
+                  </p>
+                </>
+              )}
+            </>
+          ) : (
+            <>
           <p className="fl-plabel">{stage === 'shape' ? 'Shaping discussion' : 'Ticket detail'}</p>
 
           {stage === 'shape' ? (
@@ -278,6 +478,8 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
               )}
             </>
           )}
+            </>
+          )}
         </div>
 
         <ContractRail
@@ -324,17 +526,57 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
               {isPromoting ? 'Promoting…' : 'Promote to ticket'}
             </button>
           </>
-        ) : (
+        ) : stage === 'ticket' ? (
           <>
             <span className={readiness?.isReady ? 'fl-gatemsg fl-okmsg' : 'fl-gatemsg'}>
               {readiness?.isReady
-                ? 'Readiness gate: satisfied. Build and Review stages arrive with the walking-skeleton loop.'
+                ? 'Readiness gate: satisfied. Starting a run builds and tests in a disposable workspace — it approves nothing.'
                 : 'Readiness gate: blocked. The backend explains the block above — the UI never invents one.'}
             </span>
-            <button className="fl-btn" disabled title="The Build stage lands with the walking-skeleton loop.">
-              Queue for build
+            <button
+              className="fl-btn fl-pri"
+              disabled={!readiness?.isReady || isStartingRun}
+              onClick={() => void startBuildRun()}
+              data-testid="flow.ticket.startRun"
+            >
+              {isStartingRun ? 'Running…' : 'Start build run'}
             </button>
           </>
+        ) : stage === 'build' ? (
+          <>
+            <span
+              className={run?.status === 'PausedForApproval' ? 'fl-gatemsg fl-okmsg' : 'fl-gatemsg'}
+              data-testid="flow.build.gate"
+            >
+              {run?.status === 'PausedForApproval'
+                ? 'Halted for approval. Halt is not approval — the review stage is where a human decides.'
+                : run?.status === 'Failed'
+                  ? 'The run blocked. The report above names the reason and the next safe action.'
+                  : 'The run reports its own state; the UI never invents one.'}
+            </span>
+            <button
+              className="fl-btn fl-pri"
+              disabled={run === null || run.status === 'Failed'}
+              onClick={() => setStage('review')}
+              data-testid="flow.build.toReview"
+            >
+              Proceed to review
+            </button>
+          </>
+        ) : stage === 'review' ? (
+          <span
+            className={report?.approval?.continuationUnblocked ? 'fl-gatemsg fl-okmsg' : 'fl-gatemsg'}
+            data-testid="flow.review.gate"
+          >
+            {gateNotice ??
+              (report?.approval?.continuationUnblocked
+                ? 'Continuation unblocked by a verified approval. Approval is not apply permission — apply is verified live.'
+                : 'Human gate: locked. Only a recorded approval, verified live by the backend, unblocks continuation.')}
+          </span>
+        ) : (
+          <span className="fl-gatemsg fl-okmsg">
+            The loop record above is reconstruction from durable evidence — it grants nothing.
+          </span>
         )}
       </div>
     </div>

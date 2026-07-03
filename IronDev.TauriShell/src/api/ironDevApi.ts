@@ -1,7 +1,12 @@
 import type {
+  AcceptedApprovalEnvelope,
+  AcceptedApprovalReadModelUi,
   ApiConnectionStatus,
   ApiStatus,
   BuildReadinessResult,
+  CreateAcceptedApprovalUiRequest,
+  SkeletonCriticPackage,
+  SkeletonRunReport,
   ChatCompletionRequest,
   ChatCompletionResponse,
   ChatMessage,
@@ -746,6 +751,80 @@ class IronDevApiClient {
     );
   }
 
+  // ── P0-7: skeleton run — every action below is a REQUEST to a governed
+  // endpoint that enforces its own gate. The UI records and requests; the
+  // backend verifies and refuses. UI visibility is not backend authority.
+
+  async startSkeletonRun(projectId: number, ticketId: number, signal?: AbortSignal): Promise<TicketBuildRunDto> {
+    return this.request<TicketBuildRunDto>(`/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs`, {
+      method: 'POST',
+      signal
+    });
+  }
+
+  async requestSkeletonRunContinuation(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<TicketBuildRunDto> {
+    return this.request<TicketBuildRunDto>(
+      `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/continue`,
+      { method: 'POST', signal }
+    );
+  }
+
+  async requestSkeletonRunApply(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<TicketBuildRunDto> {
+    return this.request<TicketBuildRunDto>(
+      `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/apply`,
+      { method: 'POST', signal }
+    );
+  }
+
+  async getSkeletonCriticPackage(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<SkeletonCriticPackage> {
+    return this.request<SkeletonCriticPackage>(
+      `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/critic-package`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getSkeletonRunReport(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<SkeletonRunReport> {
+    return this.request<SkeletonRunReport>(
+      `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/report`,
+      { method: 'GET', signal }
+    );
+  }
+
+  // The human gate's governed surface. The server owns identity, timestamps,
+  // and every derived authority field; recording is not policy satisfaction,
+  // not continuation, not apply. approvalProjectGuidFor maps the int project id
+  // into the governance scope the accepted-approvals surface is keyed by.
+  async recordAcceptedApproval(
+    projectId: number,
+    request: CreateAcceptedApprovalUiRequest,
+    signal?: AbortSignal
+  ): Promise<AcceptedApprovalEnvelope<AcceptedApprovalReadModelUi>> {
+    return this.request<AcceptedApprovalEnvelope<AcceptedApprovalReadModelUi>>(
+      `/api/v1/projects/${approvalProjectGuidFor(projectId)}/accepted-approvals`,
+      { method: 'POST', body: request, signal }
+    );
+  }
+
   private async request<T>(path: string, options: RequestOptions): Promise<T> {
     const headers = new Headers({ Accept: 'application/json' });
 
@@ -781,6 +860,11 @@ interface RequestOptions {
   body?: unknown;
   signal?: AbortSignal;
   skipAuth?: boolean;
+}
+
+/** Deterministic governance-scope Guid for an int project id — mirrors TicketSkeletonRunService.ApprovalProjectGuid. */
+export function approvalProjectGuidFor(projectId: number): string {
+  return `${String(projectId).padStart(8, '0')}-0000-0000-0000-000000000000`;
 }
 
 function parseOptionalInt(value: string | null) {

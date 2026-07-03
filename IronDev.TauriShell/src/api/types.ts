@@ -1040,3 +1040,165 @@ export interface ControlledActionRequestCreateResponse {
   sourceMutated: boolean;
   workflowContinued: boolean;
 }
+
+// ── P0-7: skeleton run — the walking-skeleton loop the work-item spine consumes ──
+
+export interface SkeletonCriticPackageChange {
+  filePath: string;
+  description: string;
+  isNewFile: boolean;
+  isDeletion: boolean;
+  diff: string;
+  fullContentAfter?: string | null;
+}
+
+export interface SkeletonAuthoredTest {
+  relativePath: string;
+  content: string;
+  coversCriterion: string;
+}
+
+export interface SkeletonCriticPackageCommandResult {
+  displayName: string;
+  exitCode: number;
+  timedOut: boolean;
+  durationMs: number;
+  standardOutputRef?: string | null;
+  standardErrorRef?: string | null;
+}
+
+export interface SkeletonCriticPackage {
+  packageId: string;
+  runId: string;
+  proposalId: string;
+  ticketId: number;
+  projectId: number;
+  ticketTitle: string;
+  acceptanceCriteria: string;
+  proposalSummary: string;
+  proposalRationale: string;
+  changes: SkeletonCriticPackageChange[];
+  authoredTests: SkeletonAuthoredTest[];
+  commandResults: SkeletonCriticPackageCommandResult[];
+  evidenceRefs: string[];
+  workspaceRunSucceeded: boolean;
+  boundary: string;
+}
+
+export interface SkeletonRunTimelineEntry {
+  timestampUtc: string;
+  eventType: string;
+  message: string;
+}
+
+export interface SkeletonRunProposalTrace {
+  proposalId: string;
+  fileChangeCount: number;
+  evidenceRef: string;
+  evidenceExistsOnDisk: boolean;
+}
+
+export interface SkeletonRunTestAuthoringTrace {
+  authored: boolean;
+  authoredTestCount: number;
+  skippedReason: string;
+}
+
+export interface SkeletonRunCriticPackageTrace {
+  packageId: string;
+  packagePath: string;
+  existsOnDisk: boolean;
+  announcedSha256: string;
+  sha256OnDisk: string;
+  hashVerified: boolean;
+}
+
+export interface SkeletonRunApprovalTrace {
+  targetKind: string;
+  targetId: string;
+  targetHash: string;
+  capabilityCode: string;
+  haltObserved: boolean;
+  continuationUnblocked: boolean;
+  acceptedApprovalId: string;
+}
+
+export interface SkeletonRunApplyStageTrace {
+  stage: string;
+  succeeded: boolean;
+  errors: string;
+}
+
+export interface SkeletonRunReceiptRef {
+  name: string;
+  path: string;
+  existsOnDisk: boolean;
+}
+
+export interface SkeletonRunApplyTrace {
+  applied: boolean;
+  workspacePath: string;
+  refusedReason: string;
+  stages: SkeletonRunApplyStageTrace[];
+  receipts: SkeletonRunReceiptRef[];
+}
+
+export interface SkeletonRunReport {
+  runId: string;
+  projectId: number;
+  ticketId: number;
+  status: string;
+  summary: string;
+  timeline: SkeletonRunTimelineEntry[];
+  proposal?: SkeletonRunProposalTrace | null;
+  testAuthoring?: SkeletonRunTestAuthoringTrace | null;
+  criticPackage?: SkeletonRunCriticPackageTrace | null;
+  approval?: SkeletonRunApprovalTrace | null;
+  apply?: SkeletonRunApplyTrace | null;
+  gaps: string[];
+  loopComplete: boolean;
+  boundary: string;
+}
+
+// The human gate's own governed surface: recording an accepted approval. The
+// backend owns identity, timestamps, and every derived authority field — the
+// client may only describe WHAT is being approved.
+export interface CreateAcceptedApprovalUiRequest {
+  approvalTargetKind: string;
+  approvalTargetId: string;
+  approvalTargetHash: string;
+  capabilityCode: string;
+  approvalPurpose: string;
+  correlationId: string;
+  causationId: string;
+  evidenceReferences: string[];
+  boundaryMaxims: string[];
+  clientRequestId?: string | null;
+}
+
+export interface AcceptedApprovalApiError {
+  category: string;
+  code: string;
+  field: string;
+  message: string;
+}
+
+export interface AcceptedApprovalEnvelope<TData> {
+  status: string;
+  data?: TData | null;
+  acceptedApprovalId?: string | null;
+  warnings: string[];
+  errors: AcceptedApprovalApiError[];
+}
+
+export interface AcceptedApprovalReadModelUi {
+  acceptedApprovalId: string;
+  approvalTargetKind: string;
+  approvalTargetId: string;
+  approvalTargetHash?: string | null;
+  capabilityCode?: string | null;
+  approvalPurpose?: string | null;
+  approvedByActorDisplayName?: string | null;
+  acceptedAtUtc?: string | null;
+  expiresAtUtc?: string | null;
+}
