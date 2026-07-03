@@ -419,6 +419,75 @@ public sealed class SkeletonRunTests
         Assert.IsFalse(rooted.Succeeded, "Rooted paths are not usable test files.");
     }
 
+    // ── P1-4: criterion → test coverage — holes are explicit at the gate ─────
+
+    [TestMethod]
+    public async Task StartAsync_UncoveredCriteria_AreExplicitInThePackageAndTheHalt()
+    {
+        var harness = SkeletonHarness.Create(
+            acceptanceCriteria: "- Catalog sorts by title ascending\n- Catalog paging keeps sort order",
+            testAuthoringBehavior: () => new SkeletonTestAuthoringResult
+            {
+                Succeeded = true,
+                Tests =
+                [
+                    new SkeletonAuthoredTest
+                    {
+                        RelativePath = "tests/skeleton/SortTests.cs",
+                        Content = "public class SortTests { }",
+                        CoversCriterion = "Catalog sorts by title ascending"
+                    }
+                ]
+            });
+
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        var packageReady = harness.Events.Single("CriticReviewPackageReady");
+        Assert.AreEqual("2", packageReady.Payload["criterionCount"]);
+        Assert.AreEqual("1", packageReady.Payload["uncoveredCriterionCount"],
+            "One criterion has no covering test — the hole is counted, never silent.");
+
+        var halt = harness.Events.Single("ApprovalRequiredHalt");
+        Assert.AreEqual("1", halt.Payload["uncoveredCriterionCount"]);
+        StringAssert.Contains(halt.Message, "consciously owning that coverage hole",
+            "Approving a run with uncovered criteria is a deliberate act, and the halt says so.");
+
+        var package = await harness.Service.GetCriticPackageAsync(ProjectId, TicketId, run!.RunId);
+        Assert.AreEqual(2, package!.CriterionCoverage.Count);
+        var uncovered = package.CriterionCoverage.Single(coverage => !coverage.Covered);
+        StringAssert.Contains(uncovered.Criterion, "paging",
+            "The package names WHICH criterion is uncovered — the human approves a specific hole, not a number.");
+
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run.RunId);
+        Assert.AreEqual(1, report!.CriticPackage!.UncoveredCriterionCount);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_FullCoverage_TheHaltCarriesNoWarning()
+    {
+        var harness = SkeletonHarness.Create(
+            acceptanceCriteria: "Catalog sorts by title ascending",
+            testAuthoringBehavior: () => new SkeletonTestAuthoringResult
+            {
+                Succeeded = true,
+                Tests =
+                [
+                    new SkeletonAuthoredTest
+                    {
+                        RelativePath = "tests/skeleton/SortTests.cs",
+                        Content = "public class SortTests { }",
+                        CoversCriterion = "Catalog sorts by title ascending"
+                    }
+                ]
+            });
+
+        await harness.Service.StartAsync(ProjectId, TicketId);
+
+        var halt = harness.Events.Single("ApprovalRequiredHalt");
+        Assert.AreEqual("0", halt.Payload["uncoveredCriterionCount"]);
+        Assert.IsFalse(halt.Message.Contains("coverage hole", StringComparison.Ordinal));
+    }
+
     // ── P1-3: finding → disposition, enforced at the gate ─────────────────────
 
     private static Task PublishCriticReview(SkeletonHarness harness, string runId, string findingIds) =>
@@ -873,7 +942,8 @@ public sealed class SkeletonRunTests
             string? localPath = "__temp__",
             Func<BuilderProposal>? proposalBehavior = null,
             bool applyEnabled = false,
-            Func<SkeletonTestAuthoringResult>? testAuthoringBehavior = null)
+            Func<SkeletonTestAuthoringResult>? testAuthoringBehavior = null,
+            string? acceptanceCriteria = null)
         {
             var sourceDir = Path.Combine(Path.GetTempPath(), "irondev-skel-src-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(sourceDir);
@@ -891,7 +961,7 @@ public sealed class SkeletonRunTests
 
             var approvals = new InMemoryAcceptedApprovalStore();
             var service = new TicketSkeletonRunService(
-                new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ticketProjectId ?? ProjectId, Title = "Add book sorting" }),
+                new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ticketProjectId ?? ProjectId, Title = "Add book sorting", AcceptanceCriteria = acceptanceCriteria }),
                 new StubProjectService(new Project { Id = ProjectId, TenantId = 1, Name = "BookSeller", LocalPath = resolvedPath }),
                 new StubProposalService(proposalBehavior ?? (() => new BuilderProposal
                 {

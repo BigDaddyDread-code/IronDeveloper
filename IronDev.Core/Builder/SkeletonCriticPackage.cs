@@ -30,6 +30,17 @@ public sealed record SkeletonCriticPackage
     /// material only: they are never applied to the source repository.
     /// </summary>
     public IReadOnlyList<SkeletonAuthoredTest> AuthoredTests { get; init; } = [];
+
+    /// <summary>
+    /// P1-4 — the criterion→test coverage invariant. One row per acceptance
+    /// criterion, computed deterministically from the criteria and the authored
+    /// tests: covered by named tests, or explicitly UNCOVERED. A silent coverage
+    /// hole is impossible by construction; a visible one is something the human
+    /// consciously approves at the gate. The ground-truth verifier recomputes
+    /// this record — a forged one is tampering.
+    /// </summary>
+    public IReadOnlyList<SkeletonCriterionCoverage> CriterionCoverage { get; init; } = [];
+
     public IReadOnlyList<SkeletonCriticPackageCommandResult> CommandResults { get; init; } = [];
     public IReadOnlyList<string> EvidenceRefs { get; init; } = [];
     public bool WorkspaceRunSucceeded { get; init; }
@@ -103,6 +114,7 @@ public static class SkeletonCriticPackageBuilder
                 })
                 .ToList(),
             AuthoredTests = authoredTests,
+            CriterionCoverage = SkeletonCriterionCoverageCalculator.Compute(acceptanceCriteria, authoredTests),
             CommandResults = commandResults,
             EvidenceRefs = evidenceRefs,
             WorkspaceRunSucceeded = workspaceRunSucceeded
