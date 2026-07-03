@@ -64,7 +64,13 @@ Ordered, one PR each, every step usable the day it lands:
   `POST .../tickets/{id}/skeleton-runs` that chains what already works: readiness
   check → generate proposal (persist it with an id) → materialize disposable
   workspace → apply proposal files in-workspace → `dotnet build` + `dotnet test` →
-  persist run events. No new capability — composition only.
+  persist run events. No new authority — composition only. This does add
+  orchestration reach (a new coordinated execution path), so every existing gate
+  must remain enforced at the step where it already belongs: readiness before
+  proposal, SafeWriteRoot on every write, workspace-only mutation, and explicit
+  blocked states with no approval shortcut. Orchestrator glue is where systems like
+  this accidentally become autonomous; the skeleton coordinates existing services —
+  it must not become authority.
 - **P0-2 — Package → critic.** On skeleton-run completion, assemble the review
   package (ticket + diff + build/test results + evidence refs) and create the critic
   review via the existing manual-critic service. Persist the link run ↔ review.
