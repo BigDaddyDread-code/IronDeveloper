@@ -34,8 +34,8 @@ export type PatchArtifactEvidence = {
   incomplete?: boolean;
   unsafeMaterialDetected?: boolean;
   authorityClaimsDetected?: boolean;
-  rawPatchPayloadPresent?: boolean;
-  rawPatchPayloadRendered: false;
+  rawPatchBodyPresent?: boolean;
+  rawPatchBodyRendered: false;
   displayState: PatchArtifactDisplayState;
 };
 

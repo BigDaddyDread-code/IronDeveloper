@@ -32,8 +32,8 @@ export function PatchArtifactPanel({ evidence = null, isLoading = false, errorMe
   const authorityFlagsDetected = hasPatchArtifactAuthorityFlags(evidence);
   const missingEvidenceRefs = evidence?.evidenceRefs.length === 0;
   const missingBoundaryMaxims = evidence?.boundaryMaxims.length === 0;
-  const rawPatchPayloadRendered = evidence?.rawPatchPayloadRendered !== false;
-  const incomplete = Boolean(evidence?.incomplete) || missingFields.length > 0 || invalidTimestamp || missingBoundaryMaxims || rawPatchPayloadRendered;
+  const rawPatchBodyRendered = evidence?.rawPatchBodyRendered !== false;
+  const incomplete = Boolean(evidence?.incomplete) || missingFields.length > 0 || invalidTimestamp || missingBoundaryMaxims || rawPatchBodyRendered;
   const stale = evidence?.stale === true;
   const expired = evidence?.expired === true;
   const currentEvidence =
@@ -207,11 +207,11 @@ export function PatchArtifactPanel({ evidence = null, isLoading = false, errorMe
             </div>
             {incomplete ? (
               <p data-testid="patch-artifact.incompleteWarning">
-                Patch artifact evidence is incomplete or invalid. Missing: {missingFields.length ? missingFields.join(', ') : missingBoundaryMaxims ? 'boundaryMaxims' : rawPatchPayloadRendered ? 'rawPatchPayloadRendered' : 'invalid timestamp'}.
+                Patch artifact evidence is incomplete or invalid. Missing: {missingFields.length ? missingFields.join(', ') : missingBoundaryMaxims ? 'boundaryMaxims' : rawPatchBodyRendered ? 'rawPatchBodyRendered' : 'invalid timestamp'}.
               </p>
             ) : null}
             {missingEvidenceRefs ? <p data-testid="patch-artifact.missingEvidenceWarning">Patch artifact evidence has no evidence references and cannot permit dry-run or source apply.</p> : null}
-            {evidence.rawPatchPayloadPresent ? <p data-testid="patch-artifact.rawPatchWarning">Raw patch payload is present elsewhere and intentionally not rendered by this UI.</p> : null}
+            {evidence.rawPatchBodyPresent ? <p data-testid="patch-artifact.rawPatchWarning">Raw patch payload is present elsewhere and intentionally not rendered by this UI.</p> : null}
             {stale ? <p data-testid="patch-artifact.staleWarning">Patch artifact evidence is stale. This UI will not refresh authority.</p> : null}
             {expired ? <p data-testid="patch-artifact.expiredWarning">Patch artifact evidence is expired. This UI will not renew evidence.</p> : null}
             {unsafeTextDetected || evidence.unsafeMaterialDetected ? (

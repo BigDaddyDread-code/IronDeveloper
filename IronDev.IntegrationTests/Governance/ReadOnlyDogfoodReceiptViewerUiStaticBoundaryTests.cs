@@ -174,7 +174,7 @@ public sealed class ReadOnlyDogfoodReceiptViewerUiStaticBoundaryTests
     [TestMethod]
     public void DogfoodReceiptViewerUi_IsRoutedFromGovernancePathOnly()
     {
-        var shell = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.TauriShell", "src", "shell", "IronDevShell.tsx"));
+        var shell = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.TauriShell", "src", "flow", "library", "governanceRoutes.ts"));
         StringAssert.Contains(shell, "/governance/dogfood-receipts");
         StringAssert.Contains(shell, "DogfoodReceiptViewerRoute");
     }
@@ -221,7 +221,9 @@ public sealed class ReadOnlyDogfoodReceiptViewerUiStaticBoundaryTests
         [
             Path.Combine(root, "IronDev.TauriShell", "src", "features", "governance", "DogfoodReceiptViewerRoute.tsx"),
             Path.Combine(root, "IronDev.TauriShell", "src", "features", "governance", "DogfoodReceiptViewerTypes.ts"),
-            Path.Combine(root, "IronDev.TauriShell", "src", "shell", "IronDevShell.tsx"),
+            Path.Combine(root, "IronDev.TauriShell", "src", "flow", "FlowShell.tsx"),
+            Path.Combine(root, "IronDev.TauriShell", "src", "flow", "library", "governanceRoutes.ts"),
+            Path.Combine(root, "IronDev.TauriShell", "src", "flow", "library", "GovernanceHost.tsx"),
             Path.Combine(root, "IronDev.TauriShell", "src", "api", "ironDevApi.ts")
         ];
     }

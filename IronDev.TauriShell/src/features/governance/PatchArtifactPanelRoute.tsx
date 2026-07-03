@@ -78,8 +78,8 @@ function fixtureEvidence(fixture: string): PatchArtifactEvidence {
     warnings: ['Patch artifact display does not apply the patch.'],
     evidenceRefs: ['implementation-proposal-232', 'source-apply-request-232', 'patch-artifact-store-232'],
     boundaryMaxims: patchArtifactBoundaryRules,
-    rawPatchPayloadPresent: false,
-    rawPatchPayloadRendered: false,
+    rawPatchBodyPresent: false,
+    rawPatchBodyRendered: false,
     displayState: {
       ...patchArtifactDefaultDisplayState,
       evidencePresent: true,
@@ -132,7 +132,7 @@ function fixtureEvidence(fixture: string): PatchArtifactEvidence {
   if (fixture === 'raw-patch') {
     return {
       ...current,
-      rawPatchPayloadPresent: true,
+      rawPatchBodyPresent: true,
       warnings: ['raw patch payload withheld by this viewer']
     };
   }
