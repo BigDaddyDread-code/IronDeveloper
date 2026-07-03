@@ -59,6 +59,9 @@ internal sealed class StubCodeIndexService : ICodeIndexService
     public Task<IReadOnlyList<ProjectFile>> SearchFilesAsync(int projectId, string query, int take = 5, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<ProjectFile>>([]);
 
+    public Task<IReadOnlyList<ProjectFileSummary>> ListFilesAsync(int projectId, int skip = 0, int take = 500, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<ProjectFileSummary>>([]);
+
     public Task<ProjectFile?> GetByPathAsync(int projectId, string filePath, CancellationToken ct = default)
     {
         if (Files.TryGetValue(filePath, out var content))
