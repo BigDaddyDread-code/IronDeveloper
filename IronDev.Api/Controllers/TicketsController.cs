@@ -238,6 +238,22 @@ public sealed class TicketsController : ControllerBase
     }
 
     /// <summary>
+    /// POST skeleton-runs/{runId}/apply — applies an approved, continued run through
+    /// the governed workspace spine. Copy-only, evidence-chained, sandbox-only
+    /// (SkeletonApply:Enabled, off by default); the approval is re-verified live.
+    /// </summary>
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/apply")]
+    public async Task<ActionResult<TicketBuildRunDto>> ApplySkeletonRun(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken ct)
+    {
+        var result = await _skeletonRuns.ApplyAsync(projectId, ticketId, runId, ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
     /// GET skeleton-runs/{runId}/critic-package — the full-fidelity review package a
     /// completed skeleton run prepared for the independent critic. Read-only review
     /// material: serving it grants, requests, and simulates nothing.
@@ -301,12 +317,18 @@ public sealed class TicketsController : ControllerBase
     public Task<BuilderProposal> GenerateProposalFromRequest(int projectId, [FromBody] ProposalRequest request, CancellationToken ct) =>
         _proposals.GenerateProposalFromRequestAsync(projectId, request.Request, ct);
 
+    /// <summary>
+    /// Retired by P0-4: direct proposal apply mutated source without the governed
+    /// evidence chain. Source changes travel through skeleton runs — critic package →
+    /// accepted approval → continuation → evidence-chained copy-only apply.
+    /// </summary>
     [HttpPost("api/projects/{projectId:int}/proposal/apply")]
-    public async Task<IActionResult> ApplyProposal(BuilderProposal proposal, CancellationToken ct)
-    {
-        await _proposals.ApplyProposalAsync(proposal, ct);
-        return Ok();
-    }
+    public IActionResult ApplyProposal(BuilderProposal proposal) =>
+        StatusCode(StatusCodes.Status410Gone, new
+        {
+            error = "Direct proposal apply is retired.",
+            useInstead = "POST api/projects/{projectId}/tickets/{ticketId}/skeleton-runs, then continue and apply through the governed spine."
+        });
 
     [HttpPost("api/tickets/{ticketId:long}/apply-and-build")]
     public Task<TicketBuildResult> ApplyAndBuild(TicketBuildApproval approval, CancellationToken ct) =>
