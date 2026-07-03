@@ -8,6 +8,7 @@ import type {
   ChatTurnAuditResponse,
   ControlledActionRequestCreateRequest,
   ControlledActionRequestCreateResponse,
+  CreateTenantUserRequest,
   CreateTicketFromDocumentRequest,
   CreateTicketFromDocumentResponse,
   CreateProjectTicketRequest,
@@ -47,6 +48,7 @@ import type {
   StartDisposableCodeRunResponse,
   StartTicketBuildRunRequest,
   TenantSummary,
+  TenantUser,
   TicketBuildRunDto,
   TicketEvidenceSummary,
   TicketLoadResult,
@@ -199,6 +201,33 @@ class IronDevApiClient {
     return this.request<LoginResponse>('/api/tenants/select', {
       method: 'POST',
       body: { tenantId },
+      signal
+    });
+  }
+
+  async getTenantUsers(tenantId: number, signal?: AbortSignal): Promise<TenantUser[]> {
+    return this.request<TenantUser[]>(`/api/tenants/${tenantId}/users`, { method: 'GET', signal });
+  }
+
+  async createTenantUser(tenantId: number, request: CreateTenantUserRequest, signal?: AbortSignal): Promise<TenantUser> {
+    return this.request<TenantUser>(`/api/tenants/${tenantId}/users`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+  }
+
+  async setTenantUserRole(tenantId: number, userId: number, role: string, signal?: AbortSignal): Promise<void> {
+    await this.request<unknown>(`/api/tenants/${tenantId}/users/${userId}/role`, {
+      method: 'PUT',
+      body: { role },
+      signal
+    });
+  }
+
+  async removeTenantUser(tenantId: number, userId: number, signal?: AbortSignal): Promise<void> {
+    await this.request<unknown>(`/api/tenants/${tenantId}/users/${userId}`, {
+      method: 'DELETE',
       signal
     });
   }
