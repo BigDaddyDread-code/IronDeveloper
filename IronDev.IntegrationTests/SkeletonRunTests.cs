@@ -1,9 +1,11 @@
 using System.Runtime.CompilerServices;
 using IronDev.Core.Builder;
+using IronDev.Core.Governance;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Core.Runs;
+using IronDev.Core.Workflow;
 using IronDev.Core.Workspaces;
 using IronDev.Data.Models;
 using IronDev.Infrastructure.Services;
@@ -129,7 +131,15 @@ public sealed class SkeletonRunTests
         var result = await harness.Service.StartAsync(ProjectId, TicketId);
 
         Assert.IsNotNull(result);
-        Assert.IsFalse(result!.RequiresHumanApproval, "The skeleton must not request or simulate approval.");
+        // P0-3 conscious update: a successful run now halts FOR approval — honestly
+        // reporting that a human decision is required. It still cannot grant one.
+        Assert.IsTrue(result!.RequiresHumanApproval, "A successful skeleton run halts for approval.");
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result.Status);
+
+        var halt = harness.Events.Single("ApprovalRequiredHalt");
+        StringAssert.Contains(halt.Message, "Halt is not approval");
+        Assert.AreEqual(TicketSkeletonRunService.ApprovalTargetKind, halt.Payload["approvalTargetKind"]);
+        Assert.IsTrue(halt.Payload["approvalTargetHash"].Length == 64, "The approval requirement binds to the critic-package hash.");
 
         var request = harness.Workspaces.Requests.Single();
         Assert.AreEqual(2, request.FileWrites.Count, "Only valid changes become workspace file writes.");
@@ -225,30 +235,116 @@ public sealed class SkeletonRunTests
         }
     }
 
+    // ── P0-3: approval consumption ────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task ContinueAsync_WithoutApproval_StaysHaltedExplicitly()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run!.RunId);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status);
+        Assert.IsTrue(result.RequiresHumanApproval);
+        var refusals = harness.Events.All("ApprovalRequiredHalt");
+        Assert.IsTrue(refusals.Any(e => e.Payload.TryGetValue("refusedReason", out var reason) && reason == "MissingOrUnsatisfiedApproval"),
+            "Refusal must be explicit and name its reason.");
+    }
+
+    [TestMethod]
+    public async Task ContinueAsync_WithMatchingLiveApproval_Unblocks()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual(RunLifecycleState.Completed.ToString(), result!.Status);
+        Assert.IsFalse(result.RequiresHumanApproval);
+        var unblocked = harness.Events.Single("SkeletonContinuationUnblocked");
+        StringAssert.Contains(unblocked.Message, "not apply permission");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(unblocked.Payload["acceptedApprovalId"]), "The consumed approval must be named.");
+        Assert.AreEqual(0, harness.Approvals.SaveCallCount, "The skeleton can never create an approval.");
+    }
+
+    [TestMethod]
+    public async Task ContinueAsync_WithExpiredApproval_StaysHalted()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash, expiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(-5)));
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status);
+        Assert.IsTrue(result.RequiresHumanApproval, "An expired approval is not approval.");
+    }
+
+    [TestMethod]
+    public async Task ContinueAsync_WithHashMismatch_StaysHalted_ApprovalBindsToWhatWasReviewed()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, targetHash: new string('a', 64)));
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status);
+        Assert.IsTrue(result.RequiresHumanApproval,
+            "An approval bound to a different package hash approves something else — it must not unblock this run.");
+    }
+
+    [TestMethod]
+    public async Task ContinueAsync_OnRunNotAwaitingApproval_RefusesExplicitly()
+    {
+        var harness = SkeletonHarness.Create(proposalBehavior: () =>
+            throw new BuildReadinessBlockedException("Build blocked: index is stale.", ["index is stale"]));
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run!.RunId);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual(RunLifecycleState.Failed.ToString(), result!.Status);
+        var refused = harness.Events.Single("ContinuationRefused");
+        Assert.AreEqual("NotAwaitingApproval", refused.Payload["refusedReason"]);
+    }
+
     // ── No approval surface, statically ───────────────────────────────────────
 
     [TestMethod]
-    public void SkeletonRunService_SourceHasNoApprovalOrExecutorSurface()
+    public void SkeletonRunService_ConsumesApprovalsButCannotCreateThemOrTouchExecutors()
     {
         var source = File.ReadAllText(RepositoryFile("IronDev.Infrastructure", "Services", "TicketSkeletonRunService.cs"));
 
+        // History: P0-1 forbade any approval reference ("no approval surface at all").
+        // P0-3 consciously permits CONSUMPTION — querying and verifying live accepted
+        // approvals, and halting PausedForApproval. Creation and the executor tier
+        // remain forbidden.
         foreach (var forbidden in new[]
         {
-            "IAcceptedApprovalStore",
+            "SaveAsync",
+            "AcceptedApprovalCreateService",
             "ControlledSourceApply",
             "ControlledCommitExecutor",
             "ControlledPushExecutor",
             "SatisfyPolicy",
-            "PausedForApproval",
             "ApprovalGranted"
         })
         {
             Assert.IsFalse(source.Contains(forbidden, StringComparison.OrdinalIgnoreCase),
-                $"The skeleton orchestrator must not touch the approval or executor tier: {forbidden}");
+                $"The skeleton may consume approval evidence but never create it or touch the executor tier: {forbidden}");
         }
 
         StringAssert.Contains(source, "grants nothing");
         StringAssert.Contains(source, "no new authority");
+        StringAssert.Contains(source, "Halt is not approval");
+        StringAssert.Contains(source, "never create");
     }
 
     [TestMethod]
@@ -259,12 +355,12 @@ public sealed class SkeletonRunTests
             .Select(method => method.Name)
             .ToArray();
 
-        // History: P0-1 pinned the contract to StartAsync only. P0-2 adds exactly one
-        // read: serving the prepared critic package. Reading review material grants,
-        // requests, and simulates nothing — the contract still has no approve, apply,
-        // promote, review-create, or continue surface.
-        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync" }, methods,
-            "The skeleton contract is start + read-package only: no approve, apply, promote, review-create, or continue surface.");
+        // History: P0-1 pinned StartAsync only; P0-2 added the package read; P0-3 adds
+        // ContinueAsync — continuation gated on live approval evidence. The contract
+        // still has no approve, apply, promote, or review-create surface: ContinueAsync
+        // consumes approvals recorded elsewhere, it cannot mint them.
+        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync", "ContinueAsync" }, methods,
+            "The skeleton contract is start + read-package + approval-gated continue: no approve, apply, promote, or review-create surface.");
     }
 
     // ── Workspace containment: file writes cannot escape ──────────────────────
@@ -330,6 +426,7 @@ public sealed class SkeletonRunTests
         public required TicketSkeletonRunService Service { get; init; }
         public required RecordingWorkspaceService Workspaces { get; init; }
         public required InMemoryRunEventStore Events { get; init; }
+        public required InMemoryAcceptedApprovalStore Approvals { get; init; }
         public required string EvidenceRoot { get; init; }
 
         public static SkeletonHarness Create(
@@ -350,6 +447,7 @@ public sealed class SkeletonRunTests
                 ["DisposableBuild:WorkspaceRoot"] = Path.Combine(Path.GetTempPath(), "irondev-skel-ws-" + Guid.NewGuid().ToString("N"))
             }).Build();
 
+            var approvals = new InMemoryAcceptedApprovalStore();
             var service = new TicketSkeletonRunService(
                 new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ticketProjectId ?? ProjectId, Title = "Add book sorting" }),
                 new StubProjectService(new Project { Id = ProjectId, TenantId = 1, Name = "BookSeller", LocalPath = resolvedPath }),
@@ -362,6 +460,9 @@ public sealed class SkeletonRunTests
                 workspaces,
                 new InMemoryRunStore(),
                 events,
+                approvals,
+                new ApprovalSatisfactionEvaluator(),
+                new WorkflowApprovalHaltEvaluator(),
                 configuration);
 
             return new SkeletonHarness
@@ -369,6 +470,7 @@ public sealed class SkeletonRunTests
                 Service = service,
                 Workspaces = workspaces,
                 Events = events,
+                Approvals = approvals,
                 EvidenceRoot = evidenceRoot
             };
         }
@@ -406,6 +508,57 @@ public sealed class SkeletonRunTests
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotImplementedException();
     }
+
+    private sealed class InMemoryAcceptedApprovalStore : IAcceptedApprovalStore
+    {
+        private readonly List<AcceptedApprovalRecord> _records = [];
+
+        public int SaveCallCount { get; private set; }
+
+        public void Seed(AcceptedApprovalRecord record) => _records.Add(record);
+
+        public Task SaveAsync(AcceptedApprovalRecord record, CancellationToken ct = default)
+        {
+            SaveCallCount++;
+            _records.Add(record);
+            return Task.CompletedTask;
+        }
+
+        public Task<AcceptedApprovalRecord?> GetAsync(Guid projectId, Guid acceptedApprovalId, CancellationToken ct = default) =>
+            Task.FromResult(_records.FirstOrDefault(r => r.ProjectId == projectId && r.AcceptedApprovalId == acceptedApprovalId));
+
+        public Task<IReadOnlyList<AcceptedApprovalRecord>> ListByTargetAsync(Guid projectId, string approvalTargetKind, string approvalTargetId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>(_records
+                .Where(r => r.ProjectId == projectId &&
+                            string.Equals(r.ApprovalTargetKind, approvalTargetKind, StringComparison.Ordinal) &&
+                            string.Equals(r.ApprovalTargetId, approvalTargetId, StringComparison.Ordinal))
+                .ToList());
+
+        public Task<IReadOnlyList<AcceptedApprovalRecord>> ListByCorrelationAsync(string correlationId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>([]);
+
+        public Task<IReadOnlyList<AcceptedApprovalRecord>> ListByProjectAndCorrelationAsync(Guid projectId, string correlationId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>([]);
+    }
+
+    private static AcceptedApprovalRecord ApprovalFor(string runId, string targetHash, DateTimeOffset? expiresAtUtc = null, string? capabilityCode = null) =>
+        new()
+        {
+            AcceptedApprovalId = Guid.NewGuid(),
+            ProjectId = TicketSkeletonRunService.ApprovalProjectGuid(ProjectId),
+            ApprovalTargetKind = TicketSkeletonRunService.ApprovalTargetKind,
+            ApprovalTargetId = runId,
+            ApprovalTargetHash = targetHash,
+            CapabilityCode = capabilityCode ?? TicketSkeletonRunService.ContinueCapabilityCode,
+            ApprovalPurpose = AcceptedApprovalPurposes.WorkflowContinuationInput,
+            ApprovedByActorId = "human-gate-user-1",
+            AcceptedAtUtc = DateTimeOffset.UtcNow,
+            ExpiresAtUtc = expiresAtUtc,
+            CorrelationId = $"corr-{runId}",
+            CausationId = $"cause-{runId}",
+            EvidenceReferences = [$"critic-pkg-{runId}"],
+            BoundaryMaxims = ["Approval evidence is not apply permission."]
+        };
 
     private sealed class RecordingWorkspaceService : IDisposableWorkspaceExecutionService
     {
@@ -496,10 +649,13 @@ public sealed class SkeletonRunTests
 
         public RunEventDto Single(string eventType)
         {
-            var matches = _events.Where(e => string.Equals(e.EventType, eventType, StringComparison.Ordinal)).ToList();
+            var matches = All(eventType);
             Assert.AreEqual(1, matches.Count, $"Expected exactly one '{eventType}' event, found {matches.Count}.");
             return matches[0];
         }
+
+        public IReadOnlyList<RunEventDto> All(string eventType) =>
+            _events.Where(e => string.Equals(e.EventType, eventType, StringComparison.Ordinal)).ToList();
     }
 
     private sealed class TempDirs : IDisposable

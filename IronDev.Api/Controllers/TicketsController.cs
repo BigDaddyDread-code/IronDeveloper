@@ -222,6 +222,22 @@ public sealed class TicketsController : ControllerBase
     }
 
     /// <summary>
+    /// POST skeleton-runs/{runId}/continue — requests continuation of a run halted for
+    /// approval. The only unblock is a live accepted approval matching the run's
+    /// requirement exactly; this endpoint can never create, grant, or simulate one.
+    /// </summary>
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/continue")]
+    public async Task<ActionResult<TicketBuildRunDto>> ContinueSkeletonRun(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken ct)
+    {
+        var result = await _skeletonRuns.ContinueAsync(projectId, ticketId, runId, ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
     /// GET skeleton-runs/{runId}/critic-package — the full-fidelity review package a
     /// completed skeleton run prepared for the independent critic. Read-only review
     /// material: serving it grants, requests, and simulates nothing.
