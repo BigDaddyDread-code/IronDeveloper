@@ -44,6 +44,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private readonly IAcceptedApprovalStore _approvals;
     private readonly IApprovalSatisfactionEvaluator _approvalSatisfaction;
     private readonly IWorkflowApprovalHaltEvaluator _approvalHalt;
+    private readonly ISkeletonTestAuthoringService _testAuthoring;
     private readonly IConfiguration _configuration;
 
     public TicketSkeletonRunService(
@@ -56,6 +57,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         IAcceptedApprovalStore approvals,
         IApprovalSatisfactionEvaluator approvalSatisfaction,
         IWorkflowApprovalHaltEvaluator approvalHalt,
+        ISkeletonTestAuthoringService testAuthoring,
         IConfiguration configuration)
     {
         _tickets = tickets;
@@ -67,6 +69,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _approvals = approvals;
         _approvalSatisfaction = approvalSatisfaction;
         _approvalHalt = approvalHalt;
+        _testAuthoring = testAuthoring;
         _configuration = configuration;
     }
 
@@ -149,6 +152,49 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             ["currentNode"] = "SkeletonRun"
         }, cancellationToken).ConfigureAwait(false);
 
+        // P0-5: the Tester authors test files from the acceptance criteria. Its input
+        // contract carries no field for the proposal or diff — independence by
+        // contract: authored tests check what was asked for, not what was built.
+        // Authoring failure degrades explicitly; it is never a silent skip.
+        var authoring = await _testAuthoring.AuthorTestsAsync(new SkeletonTestAuthoringRequest
+        {
+            TicketId = ticketId,
+            ProjectId = projectId,
+            TicketTitle = ticket.Title ?? string.Empty,
+            AcceptanceCriteria = ticket.AcceptanceCriteria ?? string.Empty,
+            Problem = ticket.Problem ?? string.Empty
+        }, cancellationToken).ConfigureAwait(false);
+
+        var authoredTests = authoring.Succeeded ? SandboxTestPaths(authoring.Tests) : [];
+        if (authoring.Succeeded)
+        {
+            await PublishAsync(run.RunId, "TestsAuthored",
+                $"{authoredTests.Count} test file(s) authored from acceptance criteria, blind to the builder's diff.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["authoredTestCount"] = authoredTests.Count.ToString(),
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await PublishAsync(run.RunId, "TestAuthoringSkipped",
+                $"Test authoring skipped: {authoring.FailureReason} The run continues without authored tests — the criterion-to-test matrix has no cells and the critic package says so.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["skippedReason"] = authoring.FailureReason,
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+        }
+
+        var allWrites = fileWrites
+            .Concat(authoredTests.Select(test => new DisposableWorkspaceFileWrite
+            {
+                RelativePath = test.RelativePath,
+                Content = test.Content
+            }))
+            .ToList();
+
         var workspaceResult = await _workspaces.RunAsync(new DisposableWorkspaceRunRequest
         {
             RunId = run.RunId,
@@ -158,7 +204,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             CleanWorkspaceOnSuccess = true,
             PreserveWorkspaceOnFailure = true,
             PreserveWorkspaceOnCancellation = true,
-            FileWrites = fileWrites,
+            FileWrites = allWrites,
             Commands = DotNetCommandProfile.BuildAndTest(project.LocalPath, ReadTimeout("BuildTimeoutSeconds"), ReadTimeout("TestTimeoutSeconds"))
         }, cancellationToken).ConfigureAwait(false);
 
@@ -177,7 +223,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // review material only — the run does not create, request, or simulate the
         // review itself; that belongs to the critic through its own governed surface.
         var packagePath = await PersistCriticPackageAsync(
-            run.RunId, evidenceRoot, proposalId, ticket, proposal, workspaceResult, cancellationToken).ConfigureAwait(false);
+            run.RunId, evidenceRoot, proposalId, ticket, proposal, authoredTests, workspaceResult, cancellationToken).ConfigureAwait(false);
 
         var packageHash = ComputeSha256(await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false));
 
@@ -560,6 +606,22 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         return ToDto(updated ?? new RunRecord { RunId = runId, State = RunLifecycleState.Failed, FailureReason = summary }, projectId, ticketId);
     }
 
+    /// <summary>
+    /// Confines authored tests to the tests/ folder: paths outside it are re-rooted
+    /// under tests/skeleton/ so authored tests can never collide with, or overwrite,
+    /// the builder's proposed changes.
+    /// </summary>
+    private static IReadOnlyList<SkeletonAuthoredTest> SandboxTestPaths(IReadOnlyList<SkeletonAuthoredTest> tests) =>
+        tests
+            .Select(test =>
+            {
+                var normalized = test.RelativePath.Replace('\\', '/').TrimStart('/');
+                return normalized.StartsWith("tests/", StringComparison.OrdinalIgnoreCase) && !normalized.Contains("..", StringComparison.Ordinal)
+                    ? test with { RelativePath = normalized }
+                    : test with { RelativePath = $"tests/skeleton/{Path.GetFileName(normalized)}" };
+            })
+            .ToList();
+
     private static IReadOnlyList<DisposableWorkspaceFileWrite> MapFileWrites(BuilderProposal proposal) =>
         (proposal.Changes ?? [])
             .Where(change => change.IsValid && !string.IsNullOrWhiteSpace(change.FilePath))
@@ -588,6 +650,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         string proposalId,
         IronDev.Data.Models.ProjectTicket ticket,
         BuilderProposal proposal,
+        IReadOnlyList<SkeletonAuthoredTest> authoredTests,
         DisposableWorkspaceRunResult workspaceResult,
         CancellationToken cancellationToken)
     {
@@ -617,6 +680,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             ticket.Title ?? string.Empty,
             ticket.AcceptanceCriteria,
             proposal,
+            authoredTests,
             commandResults,
             evidenceRefs,
             workspaceResult.Succeeded);

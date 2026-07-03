@@ -5,6 +5,7 @@ using IronDev.Api.Controllers;
 using IronDev.AI;
 using IronDev.Api.Auth;
 using IronDev.Api.Middleware;
+using IronDev.Core.Builder;
 using IronDev.Core.Chat;
 using IronDev.Core;
 using IronDev.Core.Agents;
@@ -193,6 +194,7 @@ builder.Services.AddScoped<ITicketEvidenceSummaryService, TicketEvidenceSummaryS
 builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
 builder.Services.AddScoped<ITicketSkeletonRunService, TicketSkeletonRunService>();
+builder.Services.AddScoped<ISkeletonTestAuthoringService, SkeletonTestAuthoringService>();
 builder.Services.AddSingleton<IApprovalSatisfactionEvaluator, ApprovalSatisfactionEvaluator>();
 builder.Services.AddSingleton<IWorkflowApprovalHaltEvaluator, WorkflowApprovalHaltEvaluator>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();

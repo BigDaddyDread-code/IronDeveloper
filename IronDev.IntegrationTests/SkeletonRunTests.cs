@@ -315,6 +315,110 @@ public sealed class SkeletonRunTests
         Assert.AreEqual("NotAwaitingApproval", refused.Payload["refusedReason"]);
     }
 
+    // ── P0-5: the Tester — blind by contract, degrades explicitly ─────────────
+
+    [TestMethod]
+    public void TestAuthoringContract_HasNoChannelForTheBuildersDiff()
+    {
+        var propertyNames = typeof(SkeletonTestAuthoringRequest)
+            .GetProperties()
+            .Select(property => property.Name)
+            .ToArray();
+
+        // Same discipline as the critic's memory-blindness: independence is enforced
+        // by the contract, not by convention. A new field that could carry the
+        // proposal must trip this and force a conscious decision.
+        CollectionAssert.AreEquivalent(
+            new[] { "TicketId", "ProjectId", "TicketTitle", "AcceptanceCriteria", "Problem" },
+            propertyNames,
+            "The Tester's input is the requirement surface only.");
+
+        foreach (var forbidden in new[] { "Proposal", "Diff", "Change", "Content", "File", "Patch" })
+        {
+            Assert.IsFalse(
+                propertyNames.Any(name => name.Contains(forbidden, StringComparison.OrdinalIgnoreCase)),
+                $"The Tester must never see what was built: {forbidden}");
+        }
+    }
+
+    [TestMethod]
+    public async Task StartAsync_AuthoredTests_LandInWorkspaceAndCriticPackage()
+    {
+        var harness = SkeletonHarness.Create(testAuthoringBehavior: () => new SkeletonTestAuthoringResult
+        {
+            Succeeded = true,
+            Tests =
+            [
+                new SkeletonAuthoredTest
+                {
+                    RelativePath = "tests/skeleton/SortByTitleTests.cs",
+                    Content = "public class SortByTitleTests { }",
+                    CoversCriterion = "Catalog sorts by title"
+                },
+                new SkeletonAuthoredTest
+                {
+                    RelativePath = "src/Sneaky.cs",
+                    Content = "public class Sneaky { }",
+                    CoversCriterion = "escape attempt"
+                }
+            ]
+        });
+
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        Assert.IsNotNull(run);
+        harness.Events.Single("TestsAuthored");
+
+        var request = harness.Workspaces.Requests.Single();
+        var testWrites = request.FileWrites.Where(write => write.RelativePath.StartsWith("tests/", StringComparison.Ordinal)).ToList();
+        Assert.AreEqual(2, testWrites.Count, "Authored tests are confined to tests/ — a path outside it is re-rooted, never honored.");
+        Assert.IsTrue(testWrites.Any(write => write.RelativePath == "tests/skeleton/Sneaky.cs"),
+            "A test aimed outside tests/ must be re-rooted under tests/skeleton/.");
+
+        var package = await harness.Service.GetCriticPackageAsync(ProjectId, TicketId, run!.RunId);
+        Assert.IsNotNull(package);
+        Assert.AreEqual(2, package!.AuthoredTests.Count, "The critic sees the authored tests at full fidelity.");
+        Assert.AreEqual("Catalog sorts by title", package.AuthoredTests[0].CoversCriterion,
+            "Each authored test names the criterion it covers — the matrix cells.");
+    }
+
+    [TestMethod]
+    public async Task StartAsync_TestAuthoringFailure_DegradesExplicitly_NeverSilently()
+    {
+        var harness = SkeletonHarness.Create(testAuthoringBehavior: () => new SkeletonTestAuthoringResult
+        {
+            Succeeded = false,
+            FailureReason = "Test authoring model call failed: provider offline."
+        });
+
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        Assert.IsNotNull(run);
+        var skipped = harness.Events.Single("TestAuthoringSkipped");
+        StringAssert.Contains(skipped.Payload["skippedReason"], "provider offline");
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), run!.Status,
+            "Authoring failure degrades the run's coverage, not the run — and the events say so.");
+
+        var package = await harness.Service.GetCriticPackageAsync(ProjectId, TicketId, run.RunId);
+        Assert.AreEqual(0, package!.AuthoredTests.Count, "An empty matrix is visible to the critic, not hidden.");
+    }
+
+    [TestMethod]
+    public void TestAuthoringParser_RejectsGarbageExplicitly_AndToleratesCodeFences()
+    {
+        var fenced = SkeletonTestAuthoringService.TryParse(
+            "```json\n[{\"relativePath\":\"tests/T.cs\",\"content\":\"class T {}\",\"coversCriterion\":\"c1\"}]\n```");
+        Assert.IsTrue(fenced.Succeeded);
+        Assert.AreEqual("tests/T.cs", fenced.Tests[0].RelativePath);
+
+        var garbage = SkeletonTestAuthoringService.TryParse("Sure! Here are some tests you could write...");
+        Assert.IsFalse(garbage.Succeeded);
+        StringAssert.Contains(garbage.FailureReason, "not valid JSON");
+
+        var rooted = SkeletonTestAuthoringService.TryParse("[{\"relativePath\":\"C:/evil.cs\",\"content\":\"x\"}]");
+        Assert.IsFalse(rooted.Succeeded, "Rooted paths are not usable test files.");
+    }
+
     // ── P0-4: controlled apply through the governed workspace spine ───────────
 
     [TestMethod]
@@ -533,7 +637,8 @@ public sealed class SkeletonRunTests
             int? ticketProjectId = null,
             string? localPath = "__temp__",
             Func<BuilderProposal>? proposalBehavior = null,
-            bool applyEnabled = false)
+            bool applyEnabled = false,
+            Func<SkeletonTestAuthoringResult>? testAuthoringBehavior = null)
         {
             var sourceDir = Path.Combine(Path.GetTempPath(), "irondev-skel-src-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(sourceDir);
@@ -565,6 +670,7 @@ public sealed class SkeletonRunTests
                 approvals,
                 new ApprovalSatisfactionEvaluator(),
                 new WorkflowApprovalHaltEvaluator(),
+                new StubTestAuthoringService(testAuthoringBehavior ?? (() => new SkeletonTestAuthoringResult { Succeeded = true, Tests = [] })),
                 configuration);
 
             return new SkeletonHarness
@@ -609,6 +715,17 @@ public sealed class SkeletonRunTests
             throw new NotImplementedException();
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotImplementedException();
+    }
+
+    private sealed class StubTestAuthoringService(Func<SkeletonTestAuthoringResult> behavior) : ISkeletonTestAuthoringService
+    {
+        public SkeletonTestAuthoringRequest? LastRequest { get; private set; }
+
+        public Task<SkeletonTestAuthoringResult> AuthorTestsAsync(SkeletonTestAuthoringRequest request, CancellationToken ct = default)
+        {
+            LastRequest = request;
+            return Task.FromResult(behavior());
+        }
     }
 
     private sealed class InMemoryAcceptedApprovalStore : IAcceptedApprovalStore

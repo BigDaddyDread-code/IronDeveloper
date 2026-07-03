@@ -23,6 +23,13 @@ public sealed record SkeletonCriticPackage
     public string ProposalSummary { get; init; } = string.Empty;
     public string ProposalRationale { get; init; } = string.Empty;
     public IReadOnlyList<SkeletonCriticPackageChange> Changes { get; init; } = [];
+
+    /// <summary>
+    /// Tests authored from the acceptance criteria, blind by contract to the builder's
+    /// diff — the criterion→test matrix at full fidelity. Authored tests are workspace
+    /// material only: they are never applied to the source repository.
+    /// </summary>
+    public IReadOnlyList<SkeletonAuthoredTest> AuthoredTests { get; init; } = [];
     public IReadOnlyList<SkeletonCriticPackageCommandResult> CommandResults { get; init; } = [];
     public IReadOnlyList<string> EvidenceRefs { get; init; } = [];
     public bool WorkspaceRunSucceeded { get; init; }
@@ -68,6 +75,7 @@ public static class SkeletonCriticPackageBuilder
         string ticketTitle,
         string? acceptanceCriteria,
         BuilderProposal proposal,
+        IReadOnlyList<SkeletonAuthoredTest> authoredTests,
         IReadOnlyList<SkeletonCriticPackageCommandResult> commandResults,
         IReadOnlyList<string> evidenceRefs,
         bool workspaceRunSucceeded) =>
@@ -94,6 +102,7 @@ public static class SkeletonCriticPackageBuilder
                     FullContentAfter = change.FullContentAfter
                 })
                 .ToList(),
+            AuthoredTests = authoredTests,
             CommandResults = commandResults,
             EvidenceRefs = evidenceRefs,
             WorkspaceRunSucceeded = workspaceRunSucceeded
