@@ -339,6 +339,164 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         return ToDto(updated, projectId, ticketId, requiresHumanApproval: false);
     }
 
+    public async Task<TicketBuildRunDto?> ApplyAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default)
+    {
+        var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
+        if (ticket is null || ticket.ProjectId != projectId)
+            return null;
+
+        var project = await _projects.GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+        if (project is null)
+            return null;
+
+        var run = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (run is null || run.ProjectId != projectId || run.TicketId != ticketId)
+            return null;
+
+        // Explicit sandbox opt-in: applying to a source repository is off by default.
+        if (!string.Equals(_configuration["SkeletonApply:Enabled"], "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                "ApplyDisabled",
+                "Skeleton apply is disabled. Set SkeletonApply:Enabled=true for sandbox projects only — the spine is copy-only and must never point at a repository you cannot discard.",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        // Continuation must have been unblocked, proven from durable events —
+        // never from the request or a cached flag.
+        var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (run.State != RunLifecycleState.Completed ||
+            !events.Any(runEvent => string.Equals(runEvent.EventType, "SkeletonContinuationUnblocked", StringComparison.Ordinal)))
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                "ContinuationNotUnblocked",
+                "Apply requires a continuation unblocked by an accepted approval. Request continuation first.",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        // The approval is re-verified LIVE at the mutation step — an approval that
+        // expired or no longer matches the package hash refuses the apply.
+        var evidenceRoot = ResolveEvidenceRoot();
+        var packagePath = CriticPackagePath(evidenceRoot, runId);
+        if (!File.Exists(packagePath))
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                "CriticPackageEvidenceMissing",
+                "The critic package evidence is missing, so the approval cannot be re-verified.",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var packageBytes = await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false);
+        var packageHash = ComputeSha256(packageBytes);
+        var requirement = new ApprovalRequirement
+        {
+            ProjectId = ApprovalProjectGuid(projectId),
+            ApprovalTargetKind = ApprovalTargetKind,
+            ApprovalTargetId = runId,
+            ApprovalTargetHash = packageHash,
+            CapabilityCode = ContinueCapabilityCode,
+            ApprovalPurpose = AcceptedApprovalPurposes.WorkflowContinuationInput,
+            EvaluatedAtUtc = DateTimeOffset.UtcNow
+        };
+        var candidates = await _approvals.ListByTargetAsync(requirement.ProjectId, ApprovalTargetKind, runId, cancellationToken).ConfigureAwait(false);
+        var satisfied = candidates
+            .Select(candidate => _approvalSatisfaction.Evaluate(requirement, candidate))
+            .FirstOrDefault(evaluation => evaluation.IsSatisfied);
+        if (satisfied is null)
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                "ApprovalNoLongerSatisfied",
+                "No live accepted approval satisfies this run's requirement at apply time. Record a fresh approval, then request continuation again.",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var approvedByActorId = candidates.First(candidate => candidate.AcceptedApprovalId == satisfied.AcceptedApprovalId).ApprovedByActorId;
+        var package = JsonSerializer.Deserialize<SkeletonCriticPackage>(System.Text.Encoding.UTF8.GetString(packageBytes), JsonOptions)!;
+
+        await PublishAsync(runId, "SkeletonApplyStarted",
+            "Governed apply spine started: copy-only, evidence-chained, into and out of a prepared workspace. No commit, no push, no release.",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
+                ["approvalTargetHash"] = packageHash,
+                ["currentNode"] = "SkeletonApply"
+            }, cancellationToken).ConfigureAwait(false);
+
+        var spineWorkspaceRoot = ResolveWorkspaceRoot();
+        Directory.CreateDirectory(spineWorkspaceRoot);
+
+        var spineResult = await new SkeletonApplySpine().RunAsync(
+            applyRunId: $"{runId}-apply",
+            sourceRepo: project.LocalPath!,
+            workspaceRoot: spineWorkspaceRoot,
+            approvedPackage: package,
+            approvedByActorId: approvedByActorId,
+            approvalReason: $"Mirrors AcceptedApprovalRecord {satisfied.AcceptedApprovalId:D} bound to package hash {packageHash}. This stage records the decision; it did not make it.",
+            cancellationToken).ConfigureAwait(false);
+
+        foreach (var stage in spineResult.Stages)
+        {
+            await PublishAsync(runId, "SkeletonApplyStage",
+                $"{stage.Stage}: {(stage.Succeeded ? "completed" : "blocked")} — {stage.Summary}",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["stage"] = stage.Stage,
+                    ["succeeded"] = stage.Succeeded.ToString().ToLowerInvariant(),
+                    ["errors"] = string.Join(" | ", stage.Errors),
+                    ["currentNode"] = "SkeletonApply"
+                }, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!spineResult.Succeeded)
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                $"SpineBlocked:{spineResult.FailedStage}",
+                $"The governed apply spine blocked at '{spineResult.FailedStage}'. The workspace evidence chain records why; nothing was silently applied.",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        await _runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = runId,
+            State = RunLifecycleState.Applied,
+            Summary = $"Applied through the governed workspace spine under accepted approval {satisfied.AcceptedApprovalId:D}. Copy-only: commit, push, and release remain separate governed steps.",
+            WorkspacePath = spineResult.WorkspacePath
+        }, cancellationToken).ConfigureAwait(false);
+
+        await PublishAsync(runId, "SkeletonApplied",
+            "Applied through the governed workspace spine. The workspace evidence chain is the receipt. Copy-only: commit, push, and release remain separate governed steps.",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
+                ["workspacePath"] = spineResult.WorkspacePath,
+                ["evidenceChain"] = string.Join(",", spineResult.Stages.Select(stage => stage.Stage)),
+                ["currentNode"] = "SkeletonApply"
+            }, cancellationToken).ConfigureAwait(false);
+
+        var updated = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
+        return ToDto(updated, projectId, ticketId, requiresHumanApproval: false);
+    }
+
+    private async Task<TicketBuildRunDto> RefuseApplyAsync(
+        RunRecord run,
+        int projectId,
+        long ticketId,
+        string refusedReason,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        await PublishAsync(run.RunId, "SkeletonApplyRefused",
+            $"Apply refused: {message}",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["refusedReason"] = refusedReason,
+                ["currentNode"] = "SkeletonApply"
+            }, cancellationToken).ConfigureAwait(false);
+
+        var current = await _runs.GetAsync(run.RunId, cancellationToken).ConfigureAwait(false) ?? run;
+        return ToDto(current, projectId, ticketId, requiresHumanApproval: current.State == RunLifecycleState.PausedForApproval);
+    }
+
     /// <summary>
     /// Deterministic governance-scope Guid for an int project id, so approvals recorded
     /// through the Guid-scoped accepted-approvals surface can address skeleton runs.

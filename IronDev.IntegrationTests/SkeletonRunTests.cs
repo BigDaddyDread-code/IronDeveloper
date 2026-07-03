@@ -315,6 +315,103 @@ public sealed class SkeletonRunTests
         Assert.AreEqual("NotAwaitingApproval", refused.Payload["refusedReason"]);
     }
 
+    // ── P0-4: controlled apply through the governed workspace spine ───────────
+
+    [TestMethod]
+    public async Task ApplyAsync_DisabledByDefault_RefusesExplicitly()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        var result = await harness.Service.ApplyAsync(ProjectId, TicketId, run!.RunId);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual("ApplyDisabled", harness.Events.Single("SkeletonApplyRefused").Payload["refusedReason"]);
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status, "A refused apply changes nothing.");
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_WithoutUnblockedContinuation_Refuses()
+    {
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        var result = await harness.Service.ApplyAsync(ProjectId, TicketId, run!.RunId);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual("ContinuationNotUnblocked", harness.Events.Single("SkeletonApplyRefused").Payload["refusedReason"]);
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_ApprovalRevokedAfterContinuation_RefusesAtTheMutationStep()
+    {
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+        harness.Approvals.Clear();
+
+        var result = await harness.Service.ApplyAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual("ApprovalNoLongerSatisfied", harness.Events.Single("SkeletonApplyRefused").Payload["refusedReason"]);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), result!.Status,
+            "The approval is re-verified live at the mutation step; a revoked approval must not apply.");
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_FullLoop_AppliesThroughTheGovernedSpine_IntoARealRepo()
+    {
+        using var repo = TempGitRepo.Create();
+        var harness = SkeletonHarness.Create(
+            localPath: repo.Path,
+            applyEnabled: true,
+            proposalBehavior: () => new BuilderProposal
+            {
+                TicketId = TicketId,
+                ProjectId = ProjectId,
+                Summary = "Add book sorting.",
+                Changes =
+                [
+                    new ProposedFileChange
+                    {
+                        FilePath = "src/SortOptions.cs",
+                        IsValid = true,
+                        IsNewFile = true,
+                        Diff = "+public enum SortOptions { Title }",
+                        FullContentAfter = "public enum SortOptions { Title }"
+                    }
+                ]
+            });
+
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        var result = await harness.Service.ApplyAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.IsNotNull(result);
+        foreach (var stageEvent in harness.Events.All("SkeletonApplyStage").Concat(harness.Events.All("SkeletonApplyRefused")))
+            Console.WriteLine($"[apply] {stageEvent.Message} :: {(stageEvent.Payload.TryGetValue("errors", out var stageErrors) ? stageErrors : "")}");
+        var applied = harness.Events.Single("SkeletonApplied");
+        Assert.AreEqual(RunLifecycleState.Applied.ToString(), result!.Status);
+        StringAssert.Contains(applied.Message, "commit, push, and release remain separate governed steps");
+
+        var landedPath = Path.Combine(repo.Path, "src", "SortOptions.cs");
+        Assert.IsTrue(File.Exists(landedPath), "The approved change must land in the source repository.");
+        Assert.AreEqual("public enum SortOptions { Title }", await File.ReadAllTextAsync(landedPath));
+        Assert.IsFalse(Directory.Exists(Path.Combine(repo.Path, ".irondev")), "Workspace evidence must stay out of the source repository.");
+
+        var workspacePath = applied.Payload["workspacePath"];
+        var evidenceDir = Path.Combine(workspacePath, ".irondev", "runs", $"{run.RunId}-apply");
+        foreach (var evidence in new[] { "promotion-package.json", "promotion-approval.json", "apply-preflight.json", "apply-dry-run.json", "apply-copy.json" })
+        {
+            Assert.IsTrue(File.Exists(Path.Combine(evidenceDir, evidence)), $"The evidence chain is the receipt: missing {evidence}.");
+        }
+    }
+
     // ── No approval surface, statically ───────────────────────────────────────
 
     [TestMethod]
@@ -359,8 +456,11 @@ public sealed class SkeletonRunTests
         // ContinueAsync — continuation gated on live approval evidence. The contract
         // still has no approve, apply, promote, or review-create surface: ContinueAsync
         // consumes approvals recorded elsewhere, it cannot mint them.
-        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync", "ContinueAsync" }, methods,
-            "The skeleton contract is start + read-package + approval-gated continue: no approve, apply, promote, or review-create surface.");
+        // P0-4 adds ApplyAsync: apply gated on live approval re-verification, driving
+        // the governed workspace spine copy-only. Still no approve, promote, commit,
+        // push, release, or review-create surface.
+        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ApplyAsync" }, methods,
+            "The skeleton contract is start + read-package + approval-gated continue + governed apply: no approve, promote, commit, push, release, or review-create surface.");
     }
 
     // ── Workspace containment: file writes cannot escape ──────────────────────
@@ -432,7 +532,8 @@ public sealed class SkeletonRunTests
         public static SkeletonHarness Create(
             int? ticketProjectId = null,
             string? localPath = "__temp__",
-            Func<BuilderProposal>? proposalBehavior = null)
+            Func<BuilderProposal>? proposalBehavior = null,
+            bool applyEnabled = false)
         {
             var sourceDir = Path.Combine(Path.GetTempPath(), "irondev-skel-src-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(sourceDir);
@@ -444,7 +545,8 @@ public sealed class SkeletonRunTests
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["DisposableBuild:EvidenceRoot"] = evidenceRoot,
-                ["DisposableBuild:WorkspaceRoot"] = Path.Combine(Path.GetTempPath(), "irondev-skel-ws-" + Guid.NewGuid().ToString("N"))
+                ["DisposableBuild:WorkspaceRoot"] = Path.Combine(Path.GetTempPath(), "irondev-skel-ws-" + Guid.NewGuid().ToString("N")),
+                ["SkeletonApply:Enabled"] = applyEnabled ? "true" : null
             }).Build();
 
             var approvals = new InMemoryAcceptedApprovalStore();
@@ -516,6 +618,8 @@ public sealed class SkeletonRunTests
         public int SaveCallCount { get; private set; }
 
         public void Seed(AcceptedApprovalRecord record) => _records.Add(record);
+
+        public void Clear() => _records.Clear();
 
         public Task SaveAsync(AcceptedApprovalRecord record, CancellationToken ct = default)
         {
@@ -656,6 +760,80 @@ public sealed class SkeletonRunTests
 
         public IReadOnlyList<RunEventDto> All(string eventType) =>
             _events.Where(e => string.Equals(e.EventType, eventType, StringComparison.Ordinal)).ToList();
+    }
+
+    private sealed class TempGitRepo : IDisposable
+    {
+        public required string Path { get; init; }
+
+        public static TempGitRepo Create()
+        {
+            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "irondev-skel-repo-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(path);
+            RunGit(path, "init");
+            RunGit(path, "config user.email skeleton@irondev.local");
+            RunGit(path, "config user.name Skeleton");
+            File.WriteAllText(System.IO.Path.Combine(path, "README.md"), "# disposable skeleton apply target");
+            // Restore artifacts live in .assets/ (not obj/) so they survive the
+            // workspace prepare copy, which excludes bin/obj — same pattern as the
+            // proven workspace apply spine E2E test.
+            File.WriteAllText(System.IO.Path.Combine(path, "Directory.Build.props"), """
+                <Project>
+                  <PropertyGroup>
+                    <MSBuildProjectExtensionsPath>.assets/</MSBuildProjectExtensionsPath>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(System.IO.Path.Combine(path, "Sandbox.csproj"), """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                </Project>
+                """);
+            Directory.CreateDirectory(System.IO.Path.Combine(path, "src"));
+            File.WriteAllText(System.IO.Path.Combine(path, "src", "Existing.cs"), "namespace Sandbox; public static class Existing { }");
+            // The spine's validate stage runs `dotnet build --no-restore`, so the
+            // sandbox commits its restore artifacts and is buildable as-checked-out.
+            RunTool(path, "dotnet", "restore");
+            RunGit(path, "add .");
+            RunGit(path, "commit -m initial");
+            return new TempGitRepo { Path = path };
+        }
+
+        private static void RunGit(string workingDirectory, string arguments) =>
+            RunTool(workingDirectory, "git", arguments);
+
+        private static void RunTool(string workingDirectory, string fileName, string arguments)
+        {
+            var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(fileName, arguments)
+            {
+                WorkingDirectory = workingDirectory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            })!;
+            process.WaitForExit();
+            Assert.AreEqual(0, process.ExitCode, $"{fileName} {arguments} failed: {process.StandardError.ReadToEnd()}{process.StandardOutput.ReadToEnd()}");
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                if (Directory.Exists(Path))
+                {
+                    foreach (var file in Directory.EnumerateFiles(Path, "*", SearchOption.AllDirectories))
+                        File.SetAttributes(file, FileAttributes.Normal);
+                    Directory.Delete(Path, recursive: true);
+                }
+            }
+            catch
+            {
+                // best-effort cleanup of temp git repos
+            }
+        }
     }
 
     private sealed class TempDirs : IDisposable
