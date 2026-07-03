@@ -269,6 +269,23 @@ public sealed class TicketsController : ControllerBase
         return package is null ? NotFound() : Ok(package);
     }
 
+    /// <summary>
+    /// GET skeleton-runs/{runId}/report — reconstructs the whole governed loop from
+    /// durable evidence: events, critic package (hash recomputed from disk), the
+    /// approval consumed, and the apply spine's receipts. Read-only and verifying:
+    /// unverifiable links are named as gaps, never patched over.
+    /// </summary>
+    [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/report")]
+    public async Task<ActionResult<SkeletonRunReport>> GetSkeletonRunReport(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken ct)
+    {
+        var report = await _skeletonRuns.GetRunReportAsync(projectId, ticketId, runId, ct);
+        return report is null ? NotFound() : Ok(report);
+    }
+
     [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/build-runs")]
     public async Task<ActionResult<IReadOnlyList<TicketBuildRunSummaryDto>>> GetBuildRuns(
         int projectId,

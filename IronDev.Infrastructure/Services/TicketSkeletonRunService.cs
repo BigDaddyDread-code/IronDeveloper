@@ -575,6 +575,230 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         return JsonSerializer.Deserialize<SkeletonCriticPackage>(json, JsonOptions);
     }
 
+    // The apply spine's evidence chain, in stage order. apply-copy refuses to run
+    // unless the upstream chain exists — so for an Applied run, every one of these
+    // receipts must be present on disk, and the report checks each of them.
+    private static readonly string[] ApplyReceiptChain =
+    [
+        "promotion-package.json",
+        "promotion-approval.json",
+        "apply-preflight.json",
+        "apply-dry-run.json",
+        "apply-copy.json"
+    ];
+
+    /// <summary>
+    /// P0-6 — trace completeness. Reconstructs the whole loop from durable evidence
+    /// only: the run record, published events, and files on disk. Read-only: this
+    /// method publishes no events, transitions no state, and queries no approval
+    /// store — what it reports is what the run durably recorded, re-verified where
+    /// verification is possible (package hash recomputed, receipts checked on disk).
+    /// </summary>
+    public async Task<SkeletonRunReport?> GetRunReportAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken cancellationToken = default)
+    {
+        var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
+        if (ticket is null || ticket.ProjectId != projectId)
+            return null;
+
+        var run = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (run is null || run.ProjectId != projectId || run.TicketId != ticketId)
+            return null;
+
+        var events = (await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false))
+            .OrderBy(runEvent => runEvent.TimestampUtc)
+            .ToList();
+
+        var gaps = new List<string>();
+        var evidenceRoot = ResolveEvidenceRoot();
+
+        // Proposal link.
+        SkeletonRunProposalTrace? proposalTrace = null;
+        var proposalEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "ProposalGenerated");
+        if (proposalEvent is not null)
+        {
+            var proposalPath = Path.Combine(evidenceRoot, runId, "evidence", "proposal.json");
+            var proposalOnDisk = File.Exists(proposalPath);
+            proposalTrace = new SkeletonRunProposalTrace
+            {
+                ProposalId = Payload(proposalEvent, "proposalId"),
+                FileChangeCount = int.TryParse(Payload(proposalEvent, "fileChangeCount"), out var count) ? count : 0,
+                EvidenceRef = proposalPath,
+                EvidenceExistsOnDisk = proposalOnDisk
+            };
+            if (!proposalOnDisk)
+                gaps.Add("Proposal evidence file is missing from disk.");
+        }
+
+        // Test authoring link (P0-5) — an explicit skip is a recorded outcome, not a gap.
+        SkeletonRunTestAuthoringTrace? testAuthoringTrace = null;
+        var authoredEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "TestsAuthored");
+        var authoringSkippedEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "TestAuthoringSkipped");
+        if (authoredEvent is not null)
+        {
+            testAuthoringTrace = new SkeletonRunTestAuthoringTrace
+            {
+                Authored = true,
+                AuthoredTestCount = int.TryParse(Payload(authoredEvent, "authoredTestCount"), out var testCount) ? testCount : 0
+            };
+        }
+        else if (authoringSkippedEvent is not null)
+        {
+            testAuthoringTrace = new SkeletonRunTestAuthoringTrace
+            {
+                Authored = false,
+                SkippedReason = Payload(authoringSkippedEvent, "skippedReason")
+            };
+        }
+
+        // Critic package link — the hash is recomputed from disk, never just recited.
+        SkeletonRunCriticPackageTrace? packageTrace = null;
+        var packageEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "CriticReviewPackageReady");
+        if (packageEvent is not null)
+        {
+            var packagePath = CriticPackagePath(evidenceRoot, runId);
+            var announcedHash = Payload(packageEvent, "packageSha256");
+            var existsOnDisk = File.Exists(packagePath);
+            var hashOnDisk = existsOnDisk
+                ? ComputeSha256(await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false))
+                : string.Empty;
+
+            var hashVerified = existsOnDisk && !string.IsNullOrEmpty(announcedHash) &&
+                string.Equals(announcedHash, hashOnDisk, StringComparison.Ordinal);
+
+            packageTrace = new SkeletonRunCriticPackageTrace
+            {
+                PackageId = Payload(packageEvent, "packageId"),
+                PackagePath = packagePath,
+                ExistsOnDisk = existsOnDisk,
+                AnnouncedSha256 = announcedHash,
+                Sha256OnDisk = hashOnDisk,
+                HashVerified = hashVerified
+            };
+
+            if (!existsOnDisk)
+                gaps.Add("Critic package evidence is missing from disk.");
+            else if (!hashVerified)
+                gaps.Add("Critic package on disk no longer matches the hash announced at halt — the file changed after any approval bound to it.");
+        }
+
+        // Approval link: the requirement the run halted on, and the continuation that
+        // consumed a verified accepted approval.
+        SkeletonRunApprovalTrace? approvalTrace = null;
+        var haltEvent = events.FirstOrDefault(runEvent =>
+            runEvent.EventType == "ApprovalRequiredHalt" && !string.IsNullOrEmpty(Payload(runEvent, "approvalTargetKind")));
+        var unblockedEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "SkeletonContinuationUnblocked");
+        if (haltEvent is not null || unblockedEvent is not null)
+        {
+            approvalTrace = new SkeletonRunApprovalTrace
+            {
+                TargetKind = haltEvent is null ? string.Empty : Payload(haltEvent, "approvalTargetKind"),
+                TargetId = haltEvent is null ? string.Empty : Payload(haltEvent, "approvalTargetId"),
+                TargetHash = haltEvent is null ? string.Empty : Payload(haltEvent, "approvalTargetHash"),
+                CapabilityCode = haltEvent is null ? string.Empty : Payload(haltEvent, "capabilityCode"),
+                HaltObserved = haltEvent is not null,
+                ContinuationUnblocked = unblockedEvent is not null,
+                AcceptedApprovalId = unblockedEvent is null ? string.Empty : Payload(unblockedEvent, "acceptedApprovalId")
+            };
+
+            if (unblockedEvent is not null && haltEvent is null)
+                gaps.Add("Continuation was unblocked but no approval halt was recorded first.");
+            if (unblockedEvent is not null && string.IsNullOrEmpty(Payload(unblockedEvent, "acceptedApprovalId")))
+                gaps.Add("Continuation was unblocked but the consumed accepted-approval id was not recorded.");
+        }
+
+        // Apply link (P0-4): stages from durable events, receipts checked on disk.
+        SkeletonRunApplyTrace? applyTrace = null;
+        var appliedEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "SkeletonApplied");
+        var refusedEvent = events.LastOrDefault(runEvent => runEvent.EventType == "SkeletonApplyRefused");
+        var stageEvents = events.Where(runEvent => runEvent.EventType == "SkeletonApplyStage").ToList();
+        if (appliedEvent is not null || refusedEvent is not null || stageEvents.Count > 0)
+        {
+            var workspacePath = appliedEvent is null
+                ? run.WorkspacePath ?? string.Empty
+                : Payload(appliedEvent, "workspacePath");
+
+            var receipts = new List<SkeletonRunReceiptRef>();
+            if (appliedEvent is not null && !string.IsNullOrEmpty(workspacePath))
+            {
+                var receiptDir = Path.Combine(workspacePath, ".irondev", "runs", $"{runId}-apply");
+                foreach (var receiptName in ApplyReceiptChain)
+                {
+                    var receiptPath = Path.Combine(receiptDir, receiptName);
+                    var receiptExists = File.Exists(receiptPath);
+                    receipts.Add(new SkeletonRunReceiptRef
+                    {
+                        Name = receiptName,
+                        Path = receiptPath,
+                        ExistsOnDisk = receiptExists
+                    });
+                    if (!receiptExists)
+                        gaps.Add($"Apply receipt '{receiptName}' is missing from the workspace evidence chain.");
+                }
+            }
+
+            applyTrace = new SkeletonRunApplyTrace
+            {
+                Applied = appliedEvent is not null,
+                WorkspacePath = workspacePath,
+                RefusedReason = appliedEvent is null && refusedEvent is not null ? Payload(refusedEvent, "refusedReason") : string.Empty,
+                Stages = stageEvents
+                    .Select(stageEvent => new SkeletonRunApplyStageTrace
+                    {
+                        Stage = Payload(stageEvent, "stage"),
+                        Succeeded = string.Equals(Payload(stageEvent, "succeeded"), "true", StringComparison.OrdinalIgnoreCase),
+                        Errors = Payload(stageEvent, "errors")
+                    })
+                    .ToList(),
+                Receipts = receipts
+            };
+        }
+
+        if (run.State == RunLifecycleState.Applied)
+        {
+            if (approvalTrace is not { ContinuationUnblocked: true })
+                gaps.Add("The run is Applied but no continuation-unblocked event was recorded.");
+            if (applyTrace is not { Applied: true })
+                gaps.Add("The run is Applied but no applied event was recorded.");
+        }
+
+        var loopComplete = run.State == RunLifecycleState.Applied &&
+            gaps.Count == 0 &&
+            packageTrace is { HashVerified: true } &&
+            approvalTrace is { HaltObserved: true, ContinuationUnblocked: true } &&
+            applyTrace is { Applied: true } && applyTrace.Receipts.Count > 0;
+
+        return new SkeletonRunReport
+        {
+            RunId = runId,
+            ProjectId = projectId,
+            TicketId = ticketId,
+            Status = run.State.ToString(),
+            Summary = run.FailureReason ?? run.Summary,
+            Timeline = events
+                .Select(runEvent => new SkeletonRunTimelineEntry
+                {
+                    TimestampUtc = runEvent.TimestampUtc,
+                    EventType = runEvent.EventType,
+                    Message = runEvent.Message
+                })
+                .ToList(),
+            Proposal = proposalTrace,
+            TestAuthoring = testAuthoringTrace,
+            CriticPackage = packageTrace,
+            Approval = approvalTrace,
+            Apply = applyTrace,
+            Gaps = gaps,
+            LoopComplete = loopComplete
+        };
+    }
+
+    private static string Payload(RunEventDto runEvent, string key) =>
+        runEvent.Payload.TryGetValue(key, out var value) ? value : string.Empty;
+
     private async Task<TicketBuildRunDto> BlockAsync(
         string runId,
         int projectId,

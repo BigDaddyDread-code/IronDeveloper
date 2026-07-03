@@ -514,6 +514,100 @@ public sealed class SkeletonRunTests
         {
             Assert.IsTrue(File.Exists(Path.Combine(evidenceDir, evidence)), $"The evidence chain is the receipt: missing {evidence}.");
         }
+
+        // P0-6: the report reconstructs this whole loop from durable evidence alone.
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run.RunId);
+        Assert.IsNotNull(report);
+        Assert.IsTrue(report!.LoopComplete,
+            $"An applied run with every link verified is a complete loop. Gaps: {string.Join(" | ", report.Gaps)}");
+        Assert.AreEqual(0, report.Gaps.Count);
+        Assert.IsTrue(report.CriticPackage!.HashVerified);
+        Assert.IsTrue(report.Approval!.ContinuationUnblocked);
+        Assert.AreNotEqual(string.Empty, report.Approval.AcceptedApprovalId,
+            "The report names the accepted approval the continuation consumed.");
+        Assert.IsTrue(report.Apply!.Applied);
+        Assert.IsTrue(report.Apply.Receipts.Count >= 5 && report.Apply.Receipts.All(receipt => receipt.ExistsOnDisk),
+            "Every receipt in the apply chain is checked on disk, not assumed.");
+        Assert.AreEqual("SkeletonApplied", report.Timeline.Last().EventType);
+    }
+
+    // ── P0-6: trace completeness — the report reconstructs the whole loop ─────
+
+    [TestMethod]
+    public async Task GetRunReport_HaltedRun_ReconstructsTheLoopSoFar_AndVerifiesThePackageHash()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run!.RunId);
+
+        Assert.IsNotNull(report);
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), report!.Status);
+
+        Assert.IsNotNull(report.Proposal);
+        Assert.AreEqual($"prop-{run.RunId}", report.Proposal!.ProposalId);
+        Assert.IsTrue(report.Proposal.EvidenceExistsOnDisk, "The proposal evidence file is part of the reconstruction.");
+
+        Assert.IsNotNull(report.CriticPackage);
+        Assert.IsTrue(report.CriticPackage!.HashVerified,
+            "The report recomputes the package hash from disk — verification, not recitation.");
+        Assert.AreEqual(report.CriticPackage.AnnouncedSha256, report.CriticPackage.Sha256OnDisk);
+
+        Assert.IsNotNull(report.Approval);
+        Assert.IsTrue(report.Approval!.HaltObserved);
+        Assert.IsFalse(report.Approval.ContinuationUnblocked);
+        Assert.AreEqual(TicketSkeletonRunService.ApprovalTargetKind, report.Approval.TargetKind);
+        Assert.AreEqual(TicketSkeletonRunService.ContinueCapabilityCode, report.Approval.CapabilityCode);
+        Assert.AreEqual(report.CriticPackage.AnnouncedSha256, report.Approval.TargetHash,
+            "The requirement the report reconstructs is the hash any approval must bind to.");
+
+        Assert.IsNull(report.Apply, "No apply happened, so the report shows none — it never invents links.");
+        Assert.IsFalse(report.LoopComplete, "A halted run's loop is not complete.");
+        Assert.AreEqual(0, report.Gaps.Count, "A cleanly halted run has no unverifiable links — incomplete is not broken.");
+        Assert.AreEqual("RunStarted", report.Timeline.First().EventType);
+    }
+
+    [TestMethod]
+    public async Task GetRunReport_IsReadOnly_PublishesNothingAndAltersNothing()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var eventCountBefore = (await harness.Events.GetEventsAsync(run!.RunId)).Count;
+
+        await harness.Service.GetRunReportAsync(ProjectId, TicketId, run.RunId);
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run.RunId);
+
+        var eventCountAfter = (await harness.Events.GetEventsAsync(run.RunId)).Count;
+        Assert.AreEqual(eventCountBefore, eventCountAfter, "A report is reconstruction: reading it publishes nothing.");
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), report!.Status, "Reading a report transitions nothing.");
+    }
+
+    [TestMethod]
+    public async Task GetRunReport_TamperedCriticPackage_NamesTheGap()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        var packagePath = harness.Events.Single("CriticReviewPackageReady").Payload["packagePath"];
+        await File.AppendAllTextAsync(packagePath, " ");
+
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run!.RunId);
+
+        Assert.IsFalse(report!.CriticPackage!.HashVerified);
+        Assert.IsTrue(report.Gaps.Any(gap => gap.Contains("no longer matches", StringComparison.Ordinal)),
+            "A tampered package is a NAMED gap, never patched over.");
+        Assert.IsFalse(report.LoopComplete);
+    }
+
+    [TestMethod]
+    public async Task GetRunReport_UnknownRunOrWrongTicket_ReturnsNull()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        Assert.IsNull(await harness.Service.GetRunReportAsync(ProjectId, TicketId, "no-such-run"));
+        Assert.IsNull(await harness.Service.GetRunReportAsync(ProjectId, TicketId + 1, run!.RunId),
+            "A report is scoped to its ticket: identity mismatches reconstruct nothing.");
     }
 
     // ── No approval surface, statically ───────────────────────────────────────
@@ -563,8 +657,10 @@ public sealed class SkeletonRunTests
         // P0-4 adds ApplyAsync: apply gated on live approval re-verification, driving
         // the governed workspace spine copy-only. Still no approve, promote, commit,
         // push, release, or review-create surface.
-        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ApplyAsync" }, methods,
-            "The skeleton contract is start + read-package + approval-gated continue + governed apply: no approve, promote, commit, push, release, or review-create surface.");
+        // P0-6 adds GetRunReportAsync: read-only reconstruction of the whole loop from
+        // durable evidence — a report grants nothing and cannot alter the run.
+        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ApplyAsync", "GetRunReportAsync" }, methods,
+            "The skeleton contract is start + read-package + approval-gated continue + governed apply + read-report: no approve, promote, commit, push, release, or review-create surface.");
     }
 
     // ── Workspace containment: file writes cannot escape ──────────────────────
