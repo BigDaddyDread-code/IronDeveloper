@@ -1,48 +1,109 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
+import type { TenantUser } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
+import { useSessionContext } from '../../state/useSessionContext';
 import {
   ApprovalPolicyDraft,
   autonomyProfiles,
   loadApprovalPolicy,
   saveApprovalPolicy
 } from './approvalPolicy';
-import { DraftUser, FlowRole, flowRoles, loadDraftUsers, newDraftUser, saveDraftUsers } from './usersDraft';
+import { FlowRole, flowRoles } from './usersDraft';
+
+const apiRoles = ['Owner', 'TenantAdmin', 'Approver', 'Reviewer', 'Operator', 'Viewer', 'Member'];
 
 export function SettingsScreen() {
+  const session = useSessionContext();
   const project = useProjectContext();
 
-  const [users, setUsers] = useState<DraftUser[]>(() => loadDraftUsers());
+  const [users, setUsers] = useState<TenantUser[]>([]);
+  const [usersState, setUsersState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [isMutating, setIsMutating] = useState(false);
+
   const [policy, setPolicy] = useState<ApprovalPolicyDraft>(() => loadApprovalPolicy());
   const [policySaved, setPolicySaved] = useState(false);
 
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState<FlowRole>('viewer');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState('Viewer');
 
-  const updateUsers = (next: DraftUser[]) => {
-    setUsers(next);
-    saveDraftUsers(next);
-  };
+  const tenantId = project.selectedTenantId;
+
+  const refreshUsers = useCallback(async () => {
+    if (tenantId === null) {
+      setUsers([]);
+      setUsersState('ready');
+      return;
+    }
+    setUsersState('loading');
+    setUsersError(null);
+    try {
+      setUsers(await session.client.getTenantUsers(tenantId));
+      setUsersState('ready');
+    } catch (error: unknown) {
+      setUsersError(error instanceof Error ? error.message : 'Could not load tenant users.');
+      setUsersState('error');
+    }
+  }, [session.client, tenantId]);
+
+  useEffect(() => {
+    void refreshUsers();
+  }, [refreshUsers]);
+
+  const runMutation = useCallback(
+    async (mutation: () => Promise<void>) => {
+      setIsMutating(true);
+      setUsersError(null);
+      try {
+        await mutation();
+        await refreshUsers();
+      } catch (error: unknown) {
+        setUsersError(error instanceof Error ? error.message : 'The change was not applied.');
+      } finally {
+        setIsMutating(false);
+      }
+    },
+    [refreshUsers]
+  );
 
   const addUser = (event: FormEvent) => {
     event.preventDefault();
-    const email = newEmail.trim();
-    const name = newName.trim();
-    if (email.length === 0 || name.length === 0) {
+    if (tenantId === null) {
       return;
     }
-    updateUsers([...users, newDraftUser(email, name, newRole)]);
-    setNewEmail('');
-    setNewName('');
-    setNewRole('viewer');
+    const email = newEmail.trim();
+    const displayName = newName.trim();
+    if (email.length === 0 || displayName.length === 0) {
+      return;
+    }
+    void runMutation(async () => {
+      await session.client.createTenantUser(tenantId, {
+        email,
+        displayName,
+        password: newPassword.length > 0 ? newPassword : null,
+        role: newRole
+      });
+      setNewEmail('');
+      setNewName('');
+      setNewPassword('');
+      setNewRole('Viewer');
+    });
   };
 
-  const setUserRole = (id: string, role: FlowRole) => {
-    updateUsers(users.map((user) => (user.id === id ? { ...user, role } : user)));
+  const setUserRole = (userId: number, role: string) => {
+    if (tenantId === null) {
+      return;
+    }
+    void runMutation(() => session.client.setTenantUserRole(tenantId, userId, role));
   };
 
-  const removeUser = (id: string) => {
-    updateUsers(users.filter((user) => user.id !== id));
+  const removeUser = (userId: number) => {
+    if (tenantId === null) {
+      return;
+    }
+    void runMutation(() => session.client.removeTenantUser(tenantId, userId));
   };
 
   const updatePolicy = (next: ApprovalPolicyDraft) => {
@@ -55,76 +116,86 @@ export function SettingsScreen() {
     setPolicySaved(true);
   };
 
-  const currentTenant = project.tenants.find((tenant) => tenant.id === project.selectedTenantId);
+  const currentTenant = project.tenants.find((tenant) => tenant.id === tenantId);
+  const currentUserId = project.userProfile?.userId;
 
   return (
     <div>
       <h1 className="fl-h1">Settings</h1>
-      <p className="fl-sub">Users, roles, and how much of the pipeline waits for a human.</p>
+      <p className="fl-sub">
+        Users, roles, and how much of the pipeline waits for a human
+        {currentTenant ? ` — ${currentTenant.name}` : ''}.
+      </p>
 
       <div className="fl-banner" data-testid="flow.settings.banner">
-        Settings request policy — they do not grant it. Role assignment decides visibility, never mutation authority.
-        User and approval records below are a local draft until the backend role and policy endpoints land (Block F);
-        the backend's authority gates remain the only authority either way.
+        Role assignment decides visibility, never mutation authority — the backend's authority gates remain the only
+        authority. User management is live against the tenant user API and security-audited. The approval policy below
+        is still a local draft until the backend policy endpoints land.
       </div>
 
       <div className="fl-settings-grid">
         <div className="fl-panel-box">
           <p className="fl-plabel">Users and roles</p>
 
-          <table className="fl-table">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Role</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>
-                  <strong>{project.userProfile?.displayName ?? 'Current user'}</strong>
-                  <div style={{ fontSize: 12, color: 'var(--fl-muted)' }}>
-                    {project.userProfile?.email ?? '—'} · {currentTenant?.name ?? 'no tenant'} · signed in
-                  </div>
-                </td>
-                <td>
-                  <span className="fl-chip fl-ok">tenant admin</span>
-                </td>
-                <td />
-              </tr>
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td>
-                    <strong>{user.displayName}</strong>
-                    <div style={{ fontSize: 12, color: 'var(--fl-muted)' }}>{user.email} · draft</div>
-                  </td>
-                  <td>
-                    <select
-                      className="fl-select"
-                      value={user.role}
-                      onChange={(event) => setUserRole(user.id, event.target.value as FlowRole)}
-                    >
-                      {flowRoles.map((option) => (
-                        <option key={option.role} value={option.role}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button className="fl-btn fl-mini" onClick={() => removeUser(user.id)}>
-                      Remove
-                    </button>
-                  </td>
+          {tenantId === null ? (
+            <p className="fl-empty">Select a tenant to manage its users.</p>
+          ) : usersState === 'loading' ? (
+            <p className="fl-empty">Loading users…</p>
+          ) : (
+            <table className="fl-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th aria-label="Actions" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.id}>
+                    <td>
+                      <strong>{user.displayName}</strong>
+                      <div style={{ fontSize: 12, color: 'var(--fl-muted)' }}>
+                        {user.email}
+                        {user.id === currentUserId ? ' · you' : ''}
+                        {user.isActive ? '' : ' · inactive'}
+                      </div>
+                    </td>
+                    <td>
+                      <select
+                        className="fl-select"
+                        value={user.role}
+                        disabled={isMutating}
+                        onChange={(event) => setUserRole(user.id, event.target.value)}
+                      >
+                        {apiRoles.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        className="fl-btn fl-mini"
+                        disabled={isMutating || user.id === currentUserId}
+                        title={user.id === currentUserId ? 'You cannot remove yourself.' : 'Remove tenant membership'}
+                        onClick={() => removeUser(user.id)}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {usersError ? <div className="fl-error">{usersError}</div> : null}
 
           <form onSubmit={addUser} style={{ display: 'grid', gap: 8, marginTop: 14 }} data-testid="flow.settings.addUser">
             <p className="fl-plabel" style={{ margin: 0 }}>
-              Add a user (draft)
+              Add a user
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input
@@ -141,23 +212,35 @@ export function SettingsScreen() {
                 value={newName}
                 onChange={(event) => setNewName(event.target.value)}
               />
-              <select className="fl-select" value={newRole} onChange={(event) => setNewRole(event.target.value as FlowRole)}>
-                {flowRoles.map((option) => (
-                  <option key={option.role} value={option.role}>
-                    {option.label}
+              <input
+                className="fl-select"
+                type="password"
+                style={{ flex: 2, minWidth: 140 }}
+                placeholder="Password (new accounts)"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+              />
+              <select className="fl-select" value={newRole} onChange={(event) => setNewRole(event.target.value)}>
+                {apiRoles.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
                   </option>
                 ))}
               </select>
-              <button className="fl-btn" type="submit">
+              <button className="fl-btn" type="submit" disabled={isMutating || tenantId === null}>
                 Add user
               </button>
             </div>
+            <p style={{ fontSize: 12, color: 'var(--fl-muted)', margin: 0 }}>
+              An existing account is added by email without touching its password. The last owner cannot be demoted or
+              removed.
+            </p>
           </form>
 
           <p className="fl-plabel" style={{ marginTop: 18 }}>
             What each role sees
           </p>
-          {flowRoles.map((option) => (
+          {flowRoles.map((option: { role: FlowRole; label: string; description: string }) => (
             <div key={option.role} style={{ fontSize: 12.5, color: 'var(--fl-ink2)', padding: '3px 0' }}>
               <strong style={{ color: 'var(--fl-ink)' }}>{option.label}</strong> — {option.description}
             </div>

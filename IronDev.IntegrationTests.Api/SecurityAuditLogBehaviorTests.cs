@@ -359,6 +359,28 @@ public sealed class SecurityAuditLogBehaviorTests
         public Task<bool> IsMemberOfTenantAsync(int userId, int tenantId, CancellationToken ct = default) =>
             Task.FromResult(tenantId == AssignedTenantId);
 
+        public Task<string?> GetTenantRoleAsync(int userId, int tenantId, CancellationToken ct = default) =>
+            Task.FromResult<string?>(tenantId == AssignedTenantId ? TenantUserRoles.Owner : null);
+
+        public Task<IReadOnlyList<TenantUserRecord>> GetTenantUsersAsync(int tenantId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<TenantUserRecord>>([]);
+
+        public Task<CreateTenantUserResult> CreateTenantUserAsync(int tenantId, string email, string displayName, string? password, string role, CancellationToken ct = default) =>
+            Task.FromResult(new CreateTenantUserResult(TenantUserMutationStatus.Succeeded, new TenantUserRecord
+            {
+                Id = 99,
+                Email = email,
+                DisplayName = displayName,
+                IsActive = true,
+                Role = role
+            }));
+
+        public Task<TenantUserMutationResult> SetTenantUserRoleAsync(int tenantId, int userId, string role, CancellationToken ct = default) =>
+            Task.FromResult(TenantUserMutationResult.Succeeded);
+
+        public Task<TenantUserMutationResult> RemoveTenantUserAsync(int tenantId, int userId, CancellationToken ct = default) =>
+            Task.FromResult(TenantUserMutationResult.Succeeded);
+
         private static User CreateUser(int userId = 1) =>
             new()
             {

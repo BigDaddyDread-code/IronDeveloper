@@ -56,6 +56,11 @@ public abstract class ApiTestBase
                     builder.UseSetting("LocalTest:LogsRoot", Path.Combine(Path.GetTempPath(), "IronDevTestLogs"));
                     builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:1420");
                     builder.UseSetting("Cors:AllowedOrigins:1", "http://127.0.0.1:1420");
+                    // The suite performs many rapid logins from one in-process client; production-shaped
+                    // rate limits would fail unrelated tests. Rate limiting itself is covered by
+                    // SensitiveApiRateLimitTests with its own dedicated factory and tight limits.
+                    builder.UseSetting("RateLimiting:AuthLogin:PermitLimit", "1000");
+                    builder.UseSetting("RateLimiting:SensitiveApi:PermitLimit", "1000");
 
                     builder.ConfigureAppConfiguration((context, cfg) =>
                     {
@@ -363,6 +368,31 @@ public abstract class ApiTestBase
         IF OBJECT_ID(N'governance.ListGovernanceEventsCausedBy', N'P') IS NOT NULL DROP PROCEDURE governance.ListGovernanceEventsCausedBy;
         IF OBJECT_ID(N'governance.TR_GovernanceEvent_BlockUpdateDelete', N'TR') IS NOT NULL DROP TRIGGER governance.TR_GovernanceEvent_BlockUpdateDelete;
         IF OBJECT_ID(N'governance.GovernanceEvent', N'U') IS NOT NULL DROP TABLE governance.GovernanceEvent;
+
+        -- The explicit list above drifts as new governance objects appear. Sweep whatever remains
+        -- in the schema dynamically so the drop never fails on an object the list has not learned about.
+        IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'governance')
+        BEGIN
+            DECLARE @sweep NVARCHAR(MAX) = N'';
+            SELECT @sweep = @sweep + N'DROP TRIGGER governance.' + QUOTENAME(t.name) + N';'
+            FROM sys.triggers t
+            INNER JOIN sys.objects o ON o.object_id = t.parent_id
+            WHERE o.schema_id = SCHEMA_ID(N'governance');
+            SELECT @sweep = @sweep + N'DROP PROCEDURE governance.' + QUOTENAME(p.name) + N';'
+            FROM sys.procedures p
+            WHERE p.schema_id = SCHEMA_ID(N'governance');
+            SELECT @sweep = @sweep + N'DROP VIEW governance.' + QUOTENAME(v.name) + N';'
+            FROM sys.views v
+            WHERE v.schema_id = SCHEMA_ID(N'governance');
+            SELECT @sweep = @sweep + N'DROP TABLE governance.' + QUOTENAME(tb.name) + N';'
+            FROM sys.tables tb
+            WHERE tb.schema_id = SCHEMA_ID(N'governance');
+            SELECT @sweep = @sweep + N'DROP FUNCTION governance.' + QUOTENAME(f.name) + N';'
+            FROM sys.objects f
+            WHERE f.schema_id = SCHEMA_ID(N'governance') AND f.type IN ('FN', 'IF', 'TF');
+            IF LEN(@sweep) > 0 EXEC sp_executesql @sweep;
+        END
+
         IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'governance') DROP SCHEMA governance;
         """;
 

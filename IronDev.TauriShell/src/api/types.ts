@@ -709,6 +709,21 @@ export interface TenantSummary {
   slug: string;
 }
 
+export interface TenantUser {
+  id: number;
+  email: string;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+}
+
+export interface CreateTenantUserRequest {
+  email: string;
+  displayName: string;
+  password: string | null;
+  role: string;
+}
+
 export interface TicketLoadResult {
   tickets: ProjectTicket[];
   status: ApiConnectionStatus;
