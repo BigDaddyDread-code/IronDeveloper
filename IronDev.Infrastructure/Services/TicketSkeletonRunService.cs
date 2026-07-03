@@ -721,7 +721,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 Verdict = Payload(runEvent, "verdict"),
                 FindingCount = int.TryParse(Payload(runEvent, "findingCount"), out var findingCount) ? findingCount : 0,
                 BlockingFindingCount = int.TryParse(Payload(runEvent, "blockingFindingCount"), out var blockingCount) ? blockingCount : 0,
-                PackageSha256 = Payload(runEvent, "packageSha256")
+                PackageSha256 = Payload(runEvent, "packageSha256"),
+                GroundTruthCheckCount = int.TryParse(Payload(runEvent, "groundTruthCheckCount"), out var checkCount) ? checkCount : 0,
+                GroundTruthMismatchCount = int.TryParse(Payload(runEvent, "groundTruthMismatchCount"), out var mismatchCount) ? mismatchCount : 0
             })
             .ToList();
 

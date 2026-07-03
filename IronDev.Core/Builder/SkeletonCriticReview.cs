@@ -44,6 +44,10 @@ public sealed record SkeletonCriticReviewOutcome
     public string ReviewId { get; init; } = string.Empty;
     public string Verdict { get; init; } = string.Empty;
     public IReadOnlyList<SkeletonCriticReviewFindingDto> Findings { get; init; } = [];
+
+    /// <summary>P1-2: the ground truth the auditor established independently — every check, passed or failed.</summary>
+    public SkeletonGroundTruthVerification? GroundTruth { get; init; }
+
     public string Boundary { get; init; } = BoundaryText;
 
     public const string BoundaryText =
@@ -62,4 +66,55 @@ public interface ISkeletonCriticReviewService
 {
     /// <summary>Returns null when the run does not belong to the ticket/project; an explicit failure outcome otherwise.</summary>
     Task<SkeletonCriticReviewOutcome?> ReviewAsync(SkeletonCriticReviewRequest request, CancellationToken cancellationToken = default);
+}
+
+// ── P1-2: trust but verify — the auditor pulls ground truth ─────────────────
+
+/// <summary>One ground-truth check: what the package claims versus what the evidence shows.</summary>
+public sealed record SkeletonGroundTruthCheck
+{
+    public required string CheckName { get; init; }
+    public required bool Passed { get; init; }
+    public string Expected { get; init; } = string.Empty;
+    public string Actual { get; init; } = string.Empty;
+    public string Detail { get; init; } = string.Empty;
+
+    /// <summary>A failed check that undermines the package's core claim (tamper, non-reproduction) blocks; degraded verifiability does not.</summary>
+    public bool BlocksMerge { get; init; }
+}
+
+/// <summary>
+/// The auditor's independently established ground truth for a work package.
+/// Every check names expected vs actual — a mismatch is review material by
+/// construction, never a judgment call.
+/// </summary>
+public sealed record SkeletonGroundTruthVerification
+{
+    public IReadOnlyList<SkeletonGroundTruthCheck> Checks { get; init; } = [];
+    public IReadOnlyList<SkeletonGroundTruthCheck> Mismatches => Checks.Where(check => !check.Passed).ToList();
+    public string Boundary { get; init; } = BoundaryText;
+
+    public const string BoundaryText =
+        "Ground-truth verification is evidence, not judgment: it compares the package's claims against " +
+        "durable evidence and independent re-execution. It grants nothing and blocks nothing by itself — " +
+        "mismatches enter the critic review as findings, and the human gate stays separate.";
+}
+
+/// <summary>
+/// Establishes ground truth for a work package independently of the package's own
+/// claims: re-hashes the package against the hash announced at halt, checks the
+/// claimed command evidence exists, checks the package for internal contradictions,
+/// and re-executes the proposed changes plus authored tests in a fresh disposable
+/// workspace. The verifier is the deterministic harness AROUND the critic — the
+/// boxed critic agent itself remains review-only with RunTool and MutateSource
+/// forbidden; it consumes this verification as evidence.
+/// </summary>
+public interface ISkeletonCriticGroundTruthVerifier
+{
+    Task<SkeletonGroundTruthVerification> VerifyAsync(
+        string runId,
+        SkeletonCriticPackage package,
+        string packagePath,
+        string packageSha256,
+        CancellationToken cancellationToken = default);
 }

@@ -38,6 +38,7 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
     private readonly IRunEventStore _events;
     private readonly ILLMService _llm;
     private readonly IStoredManualIndependentCriticAgentService _storedCritic;
+    private readonly ISkeletonCriticGroundTruthVerifier _groundTruth;
     private readonly IConfiguration _configuration;
 
     public SkeletonCriticReviewService(
@@ -46,6 +47,7 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
         IRunEventStore events,
         ILLMService llm,
         IStoredManualIndependentCriticAgentService storedCritic,
+        ISkeletonCriticGroundTruthVerifier groundTruth,
         IConfiguration configuration)
     {
         _tickets = tickets;
@@ -53,6 +55,7 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
         _events = events;
         _llm = llm;
         _storedCritic = storedCritic;
+        _groundTruth = groundTruth;
         _configuration = configuration;
     }
 
@@ -99,10 +102,16 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
                 cancellationToken).ConfigureAwait(false);
         }
 
+        // P1-2: trust but verify. Ground truth is established BEFORE the model
+        // reviews, from durable evidence and independent re-execution — the critic
+        // does not take the courier's word for what the package claims.
+        var verification = await _groundTruth.VerifyAsync(request.RunId, package, packagePath, packageHash, cancellationToken)
+            .ConfigureAwait(false);
+
         string response;
         try
         {
-            response = await _llm.GetResponseAsync(BuildPrompt(package), cancellationToken).ConfigureAwait(false);
+            response = await _llm.GetResponseAsync(BuildPrompt(package, verification), cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -119,6 +128,31 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
 
         var packageEvidenceRefs = new[] { packagePath, $"critic-package-sha256:{packageHash}" };
         var reviewRequestId = $"skeleton-critic-{request.RunId}-{Guid.NewGuid():N}";
+
+        // Mismatches between claim and evidence become findings automatically —
+        // by construction, not by the model's judgment or anyone's mood.
+        var groundTruthDrafts = verification.Mismatches
+            .Select(mismatch => new ManualCriticFindingDraft
+            {
+                Severity = mismatch.BlocksMerge ? CriticSeverity.Critical : CriticSeverity.High,
+                Title = $"Ground truth mismatch: {mismatch.CheckName}",
+                Problem = $"Expected: {mismatch.Expected}. Evidence shows: {mismatch.Actual}. {mismatch.Detail}",
+                WhyItMatters = "The package's claims and the durable evidence disagree. The critic trusts evidence, not the courier — an unverifiable or contradicted claim cannot support the human gate's decision.",
+                RequiredFix = "Investigate why the claim and the evidence diverge, then produce a fresh run whose package verifies.",
+                EvidenceRefs = packageEvidenceRefs,
+                BlocksMerge = mismatch.BlocksMerge,
+                RequiresHumanReview = true
+            })
+            .ToList();
+
+        // The verdict floor is set by evidence: a blocking mismatch forces
+        // RecommendBlock and any mismatch forbids a clean verdict, regardless of
+        // how agreeable the model chose to be.
+        var verdict = parsed.Verdict;
+        if (groundTruthDrafts.Any(draft => draft.BlocksMerge))
+            verdict = CriticReviewVerdict.RecommendBlock;
+        else if (groundTruthDrafts.Count > 0 && verdict is CriticReviewVerdict.NoObjection or CriticReviewVerdict.CommentOnly)
+            verdict = CriticReviewVerdict.RequestChanges;
         var stored = _storedCritic.ExecuteAndStore(
             new ManualCriticReviewRequest
             {
@@ -151,20 +185,21 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
                         IsAuthoritativeForAction = false
                     }
                 ],
-                FindingDrafts = parsed.Findings
-                    .Select(finding => new ManualCriticFindingDraft
-                    {
-                        Severity = finding.Severity,
-                        Title = finding.Title,
-                        Problem = finding.Problem,
-                        WhyItMatters = finding.WhyItMatters,
-                        RequiredFix = finding.RequiredFix,
-                        EvidenceRefs = packageEvidenceRefs,
-                        BlocksMerge = finding.BlocksMerge,
-                        RequiresHumanReview = true
-                    })
+                FindingDrafts = groundTruthDrafts
+                    .Concat(parsed.Findings
+                        .Select(finding => new ManualCriticFindingDraft
+                        {
+                            Severity = finding.Severity,
+                            Title = finding.Title,
+                            Problem = finding.Problem,
+                            WhyItMatters = finding.WhyItMatters,
+                            RequiredFix = finding.RequiredFix,
+                            EvidenceRefs = packageEvidenceRefs,
+                            BlocksMerge = finding.BlocksMerge,
+                            RequiresHumanReview = true
+                        }))
                     .ToList(),
-                RequestedVerdict = parsed.Verdict
+                RequestedVerdict = verdict
             },
             new ManualAgentExecutionSpecialisationSelection
             {
@@ -196,6 +231,8 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
                 ["findingCount"] = output.Findings.Count.ToString(),
                 ["blockingFindingCount"] = blockingCount.ToString(),
                 ["packageSha256"] = packageHash,
+                ["groundTruthCheckCount"] = verification.Checks.Count.ToString(),
+                ["groundTruthMismatchCount"] = verification.Mismatches.Count.ToString(),
                 ["requestedByUserId"] = request.RequestedByUserId
             }, cancellationToken).ConfigureAwait(false);
 
@@ -205,6 +242,7 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
             CriticAgentRunId = stored.AgentRunId,
             ReviewId = output.ReviewResultId,
             Verdict = output.Verdict.ToString(),
+            GroundTruth = verification,
             Findings = output.Findings
                 .Select(finding => new SkeletonCriticReviewFindingDto
                 {
@@ -224,7 +262,7 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
     /// It carries no team memory, no prior conversation, and no builder narrative
     /// beyond what the package itself records at full fidelity.
     /// </summary>
-    private static string BuildPrompt(SkeletonCriticPackage package)
+    private static string BuildPrompt(SkeletonCriticPackage package, SkeletonGroundTruthVerification verification)
     {
         var lines = new List<string>
         {
@@ -268,6 +306,16 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
         lines.Add("Build/test command results:");
         foreach (var command in package.CommandResults)
             lines.Add($"- {command.DisplayName}: exit {command.ExitCode}{(command.TimedOut ? " (timed out)" : "")}");
+
+        // P1-2: the ground truth was established independently, before you read this.
+        // It is evidence, not memory — re-hash, internal consistency, receipts, and a
+        // fresh re-execution of the package's own contents.
+        lines.Add(string.Empty);
+        lines.Add("INDEPENDENT GROUND-TRUTH VERIFICATION (do not take the package's claims over these results):");
+        foreach (var check in verification.Checks)
+            lines.Add($"- [{(check.Passed ? "PASS" : "FAIL")}] {check.CheckName}: {check.Detail}");
+        if (verification.Mismatches.Count > 0)
+            lines.Add("Failed checks above are already recorded as findings; weigh everything else against them.");
 
         lines.Add(string.Empty);
         lines.Add("Respond with ONLY a JSON object, no prose, no code fences:");
