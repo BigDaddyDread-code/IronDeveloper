@@ -8,6 +8,19 @@ public sealed record DisposableWorkspaceCommand
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(2);
 }
 
+/// <summary>
+/// A declarative file change applied inside the disposable workspace after it is
+/// materialized and before any command runs. Data, not code: paths must stay inside
+/// the workspace (validated by the execution service) and can never reach the source
+/// repository. Workspace mutation is not source mutation.
+/// </summary>
+public sealed record DisposableWorkspaceFileWrite
+{
+    public required string RelativePath { get; init; }
+    public string? Content { get; init; }
+    public bool IsDeletion { get; init; }
+}
+
 public sealed record DisposableWorkspaceRunRequest
 {
     public required string RunId { get; init; }
@@ -17,6 +30,7 @@ public sealed record DisposableWorkspaceRunRequest
     public bool CleanWorkspaceOnSuccess { get; init; } = true;
     public bool PreserveWorkspaceOnFailure { get; init; } = true;
     public bool PreserveWorkspaceOnCancellation { get; init; } = true;
+    public IReadOnlyList<DisposableWorkspaceFileWrite> FileWrites { get; init; } = [];
     public IReadOnlyList<DisposableWorkspaceCommand> Commands { get; init; } = [];
 }
 
