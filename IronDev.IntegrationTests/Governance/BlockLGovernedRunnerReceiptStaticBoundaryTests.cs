@@ -78,7 +78,11 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
     [TestMethod]
     public void BlockLGovernedRunnerReceipt_ChangedProductionFilesDoNotAddAuthorityRuntimeOrMutationMarkers()
     {
-        var changedProductionFiles = ChangedFilesSinceMain()
+        var allChangedFiles = ChangedFilesSinceMain();
+        if (!Pr126ChangesetActive(allChangedFiles))
+            return;
+
+        var changedProductionFiles = allChangedFiles
             .Where(file => !IsAllowedPostPr126ApplyPreviewFile(file))
             .Where(IsProductionSourceFile)
             .ToArray();

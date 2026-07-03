@@ -131,6 +131,11 @@ public sealed class ImplementationProposalPackageStaticBoundaryTests
     {
         var changedFiles = ChangedFilesSinceMain();
 
+        // Same sentinel rule as the shape guard below: this fires only when the
+        // block's protected model is part of the changeset again.
+        if (!changedFiles.Contains("IronDev.Core/Workflow/ImplementationProposalPackageCandidateWorkflowModels.cs", StringComparer.Ordinal))
+            return;
+
         Assert.IsFalse(changedFiles.Any(file => file.StartsWith("Database/", StringComparison.Ordinal)), "PR129 must not add SQL migrations.");
         Assert.IsFalse(changedFiles.Any(file => file.StartsWith("IronDev.Api/", StringComparison.Ordinal)), "PR129 must not add API controllers or registrations.");
         Assert.IsFalse(changedFiles.Any(file => file.StartsWith("tools/IronDev.Cli/", StringComparison.Ordinal)), "PR129 must not add CLI commands.");

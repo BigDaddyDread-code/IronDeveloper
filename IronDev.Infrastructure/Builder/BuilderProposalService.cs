@@ -80,7 +80,11 @@ public sealed class BuilderProposalService : IBuilderProposalService
 
         if (!readiness.IsReady)
         {
-            throw new InvalidOperationException($"Build blocked: {readiness.Message} " + string.Join(" ", readiness.BlockingIssues));
+            // Typed so callers can tell a readiness block (user resolves the ticket)
+            // apart from proposal/model/service failures (operator investigates).
+            throw new BuildReadinessBlockedException(
+                $"Build blocked: {readiness.Message} " + string.Join(" ", readiness.BlockingIssues),
+                readiness.BlockingIssues);
         }
 
         var context = await _contextService.AssembleContextAsync(projectId, ticketId, ct);
