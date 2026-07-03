@@ -21,6 +21,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history so origin/main exists: the changeset-shape guards diff
+          # origin/main...HEAD, and without the ref they either throw (newer
+          # helpers) or pass vacuously (older ones). A guard that cannot see the
+          # diff is not evidence.
+          fetch-depth: 0
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
