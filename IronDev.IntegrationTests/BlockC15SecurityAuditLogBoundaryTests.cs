@@ -145,11 +145,21 @@ public sealed class BlockC15SecurityAuditLogBoundaryTests
         AssertDoesNotContain(tenantController, "Metadata = request", "tenant audit construction");
     }
 
+    // History: at Block C15 this test pinned "no admin mutation endpoints exist yet" —
+    // no controller was allowed to emit AdminSecurityChange events at all. Tenant user
+    // administration (list/create/role/remove membership) was later added deliberately
+    // as a governed, tenant-scoped surface. The boundary this test protects is now:
+    // no generic /api/admin surface, no "Admin" god-controller, and AdminSecurityChange
+    // events may be emitted ONLY by the allowlisted tenant-user controller — which must
+    // earn the exemption by auditing both denial and success paths fail-closed.
     [TestMethod]
-    public void BlockC15_DoesNotAddAdminMutationEndpoints()
+    public void BlockC15_AdminMutationStaysGovernedTenantScopedAndAudited()
     {
+        const string allowedAdminChangeEmitter = "TenantUsersController.cs";
+
         var controllerDirectory = Path.Combine(RepositoryRoot(), "IronDev.Api", "Controllers");
         var controllerFiles = Directory.GetFiles(controllerDirectory, "*.cs");
+        var allowedEmitterSeen = false;
 
         foreach (var controllerFile in controllerFiles)
         {
@@ -158,8 +168,30 @@ public sealed class BlockC15SecurityAuditLogBoundaryTests
             AssertDoesNotContain(name, "Admin", "controller filename");
             AssertDoesNotContain(source, "[Route(\"api/admin", name);
             AssertDoesNotContain(source, "[Route(\"/api/admin", name);
-            AssertDoesNotContain(source, "AdminSecurityChange", name);
+
+            if (string.Equals(name, allowedAdminChangeEmitter, StringComparison.Ordinal))
+            {
+                allowedEmitterSeen = true;
+
+                // The exemption is earned, not free: the governed surface must be
+                // tenant-scoped, authenticated, and audit denials and successes.
+                StringAssert.Contains(source, "[Route(\"api/tenants/{tenantId:int}/users\")]");
+                StringAssert.Contains(source, "[Authorize]");
+                StringAssert.Contains(source, "AdminSecurityChangeDenied");
+                StringAssert.Contains(source, "AdminSecurityChangeSucceeded");
+                StringAssert.Contains(source, "Status503ServiceUnavailable");
+                StringAssert.Contains(source, "role decides visibility, never mutation authority",
+                    "The governed admin surface must state its non-authority boundary.");
+            }
+            else
+            {
+                AssertDoesNotContain(source, "AdminSecurityChange", name);
+            }
         }
+
+        Assert.IsTrue(allowedEmitterSeen,
+            $"Expected the governed tenant user administration controller '{allowedAdminChangeEmitter}' to exist. " +
+            "If it was renamed or removed, update this boundary deliberately.");
     }
 
     [TestMethod]

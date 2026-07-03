@@ -297,6 +297,7 @@ A label does not make a slow test safe.
 | `StorageReview` | 4 | 28 | 0 | 4 |
 | `Store` | 12 | 130 | 0 | 12 |
 | `TenantIsolation` | 1 | 9 | 0 | 1 |
+| `TenantUsersAdmin` | 1 | 12 | 0 | 1 |
 | `ThoughtLedgerGovernanceReference` | 2 | 14 | 0 | 2 |
 | `ThoughtLedgerHandoffEntry` | 1 | 18 | 0 | 1 |
 | `ToolRequestStore` | 1 | 11 | 0 | 1 |
