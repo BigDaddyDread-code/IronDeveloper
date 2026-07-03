@@ -140,6 +140,7 @@ A label does not make a slow test safe.
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
 | `Boundary` | 13 | 106 | 0 | 13 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
+| `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `Contract` | 14 | 113 | 0 | 14 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
