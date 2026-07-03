@@ -290,6 +290,26 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return ToDto(run, projectId, ticketId, requiresHumanApproval: false);
         }
 
+        // P1-3: every critic finding must carry a human disposition before the gate
+        // will even evaluate approval evidence. A finding is not a veto — the human
+        // may accept the risk, defer the fix, or reject the finding — but it cannot
+        // be ignored. Evaluated from durable events alone.
+        var continueEvents = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        var undispositioned = UndispositionedFindingIds(continueEvents);
+        if (undispositioned.Count > 0)
+        {
+            await PublishAsync(runId, "ContinuationRefused",
+                $"Continuation refused: {undispositioned.Count} critic finding(s) have no human disposition. " +
+                "A finding is not a veto, but it cannot be ignored — record a disposition for every finding, then request continuation again.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["refusedReason"] = "UndispositionedFindings",
+                    ["undispositionedFindingIds"] = string.Join(",", undispositioned),
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+            return ToDto(run, projectId, ticketId, requiresHumanApproval: true);
+        }
+
         // The requirement is recomputed from durable evidence, never trusted from the
         // request: the package hash on disk is what the approval must have bound to.
         var packagePath = CriticPackagePath(ResolveEvidenceRoot(), runId);
@@ -417,6 +437,18 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return await RefuseApplyAsync(run, projectId, ticketId,
                 "ContinuationNotUnblocked",
                 "Apply requires a continuation unblocked by an accepted approval. Request continuation first.",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        // P1-3, re-checked live at the mutation step: a critic review recorded
+        // AFTER continuation still binds — its findings must be dispositioned
+        // before anything lands.
+        var undispositionedAtApply = UndispositionedFindingIds(events);
+        if (undispositionedAtApply.Count > 0)
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                "UndispositionedFindings",
+                $"{undispositionedAtApply.Count} critic finding(s) have no human disposition. A finding is not a veto, but it cannot be ignored — record dispositions, then request apply again.",
                 cancellationToken).ConfigureAwait(false);
         }
 
@@ -727,6 +759,18 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             })
             .ToList();
 
+        // Finding dispositions (P1-3): the human decisions recorded against findings.
+        var findingDispositions = events
+            .Where(runEvent => runEvent.EventType == "SkeletonFindingDispositionRecorded")
+            .Select(runEvent => new SkeletonRunFindingDispositionTrace
+            {
+                FindingId = Payload(runEvent, "findingId"),
+                Disposition = Payload(runEvent, "disposition"),
+                Reason = Payload(runEvent, "reason"),
+                DecidedByUserId = Payload(runEvent, "decidedByUserId")
+            })
+            .ToList();
+
         // Apply link (P0-4): stages from durable events, receipts checked on disk.
         SkeletonRunApplyTrace? applyTrace = null;
         var appliedEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "SkeletonApplied");
@@ -808,6 +852,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             CriticPackage = packageTrace,
             Approval = approvalTrace,
             CriticReviews = criticReviews,
+            FindingDispositions = findingDispositions,
             Apply = applyTrace,
             Gaps = gaps,
             LoopComplete = loopComplete
@@ -816,6 +861,28 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
 
     private static string Payload(RunEventDto runEvent, string key) =>
         runEvent.Payload.TryGetValue(key, out var value) ? value : string.Empty;
+
+    /// <summary>
+    /// P1-3: finding ids from recorded critic reviews minus recorded dispositions,
+    /// computed over durable event strings alone — the orchestrator enforces the
+    /// invariant without ever touching critic types.
+    /// </summary>
+    private static IReadOnlyList<string> UndispositionedFindingIds(IReadOnlyList<RunEventDto> events)
+    {
+        var dispositioned = events
+            .Where(runEvent => runEvent.EventType == "SkeletonFindingDispositionRecorded")
+            .Select(runEvent => Payload(runEvent, "findingId"))
+            .Where(findingId => !string.IsNullOrEmpty(findingId))
+            .ToHashSet(StringComparer.Ordinal);
+
+        return events
+            .Where(runEvent => runEvent.EventType == "SkeletonCriticReviewRecorded")
+            .SelectMany(runEvent => Payload(runEvent, "findingIds")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Distinct(StringComparer.Ordinal)
+            .Where(findingId => !dispositioned.Contains(findingId))
+            .ToList();
+    }
 
     private async Task<TicketBuildRunDto> BlockAsync(
         string runId,

@@ -32,6 +32,13 @@ public sealed record SkeletonRunReport
     /// </summary>
     public IReadOnlyList<SkeletonRunCriticReviewTrace> CriticReviews { get; init; } = [];
 
+    /// <summary>
+    /// P1-3: the human dispositions recorded for critic findings. Every finding
+    /// must carry one before the gate evaluates approval — a finding is not a
+    /// veto, but it cannot be ignored.
+    /// </summary>
+    public IReadOnlyList<SkeletonRunFindingDispositionTrace> FindingDispositions { get; init; } = [];
+
     public SkeletonRunApplyTrace? Apply { get; init; }
 
     /// <summary>Every loop link the report could not verify, by name. Empty means every observed link verified.</summary>
@@ -127,6 +134,15 @@ public sealed record SkeletonRunCriticReviewTrace
     /// <summary>P1-2: how many ground-truth checks ran and how many found claim/evidence mismatches.</summary>
     public int GroundTruthCheckCount { get; init; }
     public int GroundTruthMismatchCount { get; init; }
+}
+
+/// <summary>A human disposition recorded for a critic finding. A decision, not approval.</summary>
+public sealed record SkeletonRunFindingDispositionTrace
+{
+    public string FindingId { get; init; } = string.Empty;
+    public string Disposition { get; init; } = string.Empty;
+    public string Reason { get; init; } = string.Empty;
+    public string DecidedByUserId { get; init; } = string.Empty;
 }
 
 public sealed record SkeletonRunApplyStageTrace

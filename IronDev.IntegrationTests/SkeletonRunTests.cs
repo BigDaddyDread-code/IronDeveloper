@@ -419,6 +419,110 @@ public sealed class SkeletonRunTests
         Assert.IsFalse(rooted.Succeeded, "Rooted paths are not usable test files.");
     }
 
+    // ── P1-3: finding → disposition, enforced at the gate ─────────────────────
+
+    private static Task PublishCriticReview(SkeletonHarness harness, string runId, string findingIds) =>
+        harness.Events.PublishAsync(new RunEventDto
+        {
+            RunId = runId,
+            EventType = "SkeletonCriticReviewRecorded",
+            Message = "Independent critic review recorded.",
+            Payload = new Dictionary<string, string>
+            {
+                ["reviewId"] = "critic-review-x",
+                ["verdict"] = "RequestChanges",
+                ["findingCount"] = findingIds.Split(',').Length.ToString(),
+                ["findingIds"] = findingIds
+            }
+        });
+
+    private static Task PublishDisposition(SkeletonHarness harness, string runId, string findingId) =>
+        harness.Events.PublishAsync(new RunEventDto
+        {
+            RunId = runId,
+            EventType = "SkeletonFindingDispositionRecorded",
+            Message = "Finding dispositioned.",
+            Payload = new Dictionary<string, string>
+            {
+                ["findingId"] = findingId,
+                ["disposition"] = "AcceptRisk",
+                ["reason"] = "Risk owned for the walking skeleton.",
+                ["decidedByUserId"] = "user-9"
+            }
+        });
+
+    [TestMethod]
+    public async Task ContinueAsync_UndispositionedFindings_RefusesEvenWithAValidApproval()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCriticReview(harness, run.RunId, "f-1,f-2");
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status,
+            "A valid approval does not outrank an unanswered finding: every finding must carry a human disposition first.");
+        var refused = harness.Events.All("ContinuationRefused")
+            .Single(runEvent => runEvent.Payload["refusedReason"] == "UndispositionedFindings");
+        Assert.AreEqual("f-1,f-2", refused.Payload["undispositionedFindingIds"],
+            "The refusal names every unanswered finding — the next safe action is explicit.");
+    }
+
+    [TestMethod]
+    public async Task ContinueAsync_EveryFindingDispositioned_ProceedsWithApproval()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCriticReview(harness, run.RunId, "f-1,f-2");
+        await PublishDisposition(harness, run.RunId, "f-1");
+        await PublishDisposition(harness, run.RunId, "f-2");
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(RunLifecycleState.Completed.ToString(), result!.Status,
+            "Dispositioned findings remove the finding blockage; the approval gate then decides as before. " +
+            "A finding is not a veto — the human decision, recorded, is what the gate demanded.");
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_ReviewRecordedAfterContinuation_BlocksApplyUntilDispositioned()
+    {
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        // The critic speaks late — after continuation, before apply. The finding
+        // still binds: the invariant is re-checked live at the mutation step.
+        await PublishCriticReview(harness, run.RunId, "f-late");
+
+        var refused = await harness.Service.ApplyAsync(ProjectId, TicketId, run.RunId);
+        Assert.AreEqual("UndispositionedFindings", harness.Events.Single("SkeletonApplyRefused").Payload["refusedReason"]);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), refused!.Status);
+    }
+
+    [TestMethod]
+    public async Task GetRunReport_IncludesFindingDispositions()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        await PublishCriticReview(harness, run!.RunId, "f-1");
+        await PublishDisposition(harness, run.RunId, "f-1");
+
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(1, report!.FindingDispositions.Count);
+        Assert.AreEqual("f-1", report.FindingDispositions[0].FindingId);
+        Assert.AreEqual("AcceptRisk", report.FindingDispositions[0].Disposition);
+        Assert.AreEqual("Risk owned for the walking skeleton.", report.FindingDispositions[0].Reason,
+            "The report shows the decision AND its reason — the audit trail of the human's judgment.");
+    }
+
     // ── P0-4: controlled apply through the governed workspace spine ───────────
 
     [TestMethod]

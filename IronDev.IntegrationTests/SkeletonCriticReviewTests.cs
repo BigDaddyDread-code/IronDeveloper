@@ -454,6 +454,104 @@ public sealed class SkeletonCriticReviewTests
         Assert.IsFalse(reExecution.BlocksMerge, "Degraded verifiability informs the human; it does not manufacture a block.");
     }
 
+    // ── P1-3: dispositions — decisions about findings, never approval ────────
+
+    private static SkeletonFindingDispositionService BuildDispositionService(RecordingEventStore events) =>
+        new(
+            new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ProjectId, TenantId = 3, Title = "Add book sorting" }),
+            new StubRunStore(new RunRecord { RunId = RunId, ProjectId = ProjectId, TicketId = TicketId, State = RunLifecycleState.PausedForApproval }),
+            events);
+
+    private static Task SeedReviewWithFindings(RecordingEventStore events, string findingIds) =>
+        events.PublishAsync(new RunEventDto
+        {
+            RunId = RunId,
+            EventType = "SkeletonCriticReviewRecorded",
+            Payload = new Dictionary<string, string> { ["findingIds"] = findingIds }
+        });
+
+    private static SkeletonFindingDispositionRequest DispositionRequest(
+        string findingId = "f-1",
+        SkeletonFindingDispositionKind kind = SkeletonFindingDispositionKind.AcceptRisk,
+        string reason = "Risk owned: sort locale nuance acceptable for the sandbox catalog.") => new()
+    {
+        ProjectId = ProjectId,
+        TicketId = TicketId,
+        RunId = RunId,
+        FindingId = findingId,
+        Disposition = kind,
+        Reason = reason,
+        DecidedByUserId = "user-9"
+    };
+
+    [TestMethod]
+    public async Task Disposition_RecordsADurableDecision_ThatIsNotApproval()
+    {
+        var events = new RecordingEventStore();
+        await SeedReviewWithFindings(events, "f-1,f-2");
+        var service = BuildDispositionService(events);
+
+        var outcome = await service.RecordAsync(DispositionRequest("f-1"));
+
+        Assert.IsTrue(outcome!.Succeeded, outcome.FailureReason);
+        StringAssert.Contains(outcome.Boundary, "not approval");
+
+        var recorded = events.Single("SkeletonFindingDispositionRecorded");
+        Assert.AreEqual("f-1", recorded.Payload["findingId"]);
+        Assert.AreEqual("AcceptRisk", recorded.Payload["disposition"]);
+        Assert.AreEqual("user-9", recorded.Payload["decidedByUserId"]);
+        StringAssert.Contains(recorded.Message, "not approval");
+    }
+
+    [TestMethod]
+    public async Task Disposition_ForAFindingTheCriticNeverMade_IsRefused()
+    {
+        var events = new RecordingEventStore();
+        await SeedReviewWithFindings(events, "f-1");
+        var service = BuildDispositionService(events);
+
+        var outcome = await service.RecordAsync(DispositionRequest("f-invented"));
+
+        Assert.IsFalse(outcome!.Succeeded);
+        StringAssert.Contains(outcome.FailureReason, "critic actually made");
+        Assert.AreEqual(0, events.All("SkeletonFindingDispositionRecorded").Count);
+    }
+
+    [TestMethod]
+    public async Task Disposition_WithoutAReason_IsRefused()
+    {
+        var events = new RecordingEventStore();
+        await SeedReviewWithFindings(events, "f-1");
+        var service = BuildDispositionService(events);
+
+        var outcome = await service.RecordAsync(DispositionRequest(reason: "  "));
+
+        Assert.IsFalse(outcome!.Succeeded);
+        StringAssert.Contains(outcome.FailureReason, "dismissals are not decisions");
+    }
+
+    [TestMethod]
+    public void DispositionService_HoldsNoApprovalSurface()
+    {
+        var source = File.ReadAllText(RepositoryFile("IronDev.Infrastructure", "Services", "SkeletonFindingDispositionService.cs"));
+
+        foreach (var forbidden in new[]
+        {
+            "AcceptedApproval",
+            "SatisfyPolicy",
+            "ApprovalGranted",
+            "ControlledSourceApply",
+            "TransitionAsync"
+        })
+        {
+            Assert.IsFalse(source.Contains(forbidden, StringComparison.OrdinalIgnoreCase),
+                $"A disposition records a decision about a finding; it cannot approve, transition runs, or touch executors: {forbidden}");
+        }
+
+        StringAssert.Contains(source, "not approval");
+        StringAssert.Contains(source, "grants nothing");
+    }
+
     // ── Parser ────────────────────────────────────────────────────────────────
 
     [TestMethod]
