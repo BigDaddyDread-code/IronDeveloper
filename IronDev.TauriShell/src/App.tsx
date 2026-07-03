@@ -1,10 +1,10 @@
 import { AppProviders } from './app/AppProviders';
-import { IronDevShell } from './shell/IronDevShell';
+import { FlowShell } from './flow/FlowShell';
 
 export default function App() {
   return (
     <AppProviders>
-      <IronDevShell />
+      <FlowShell />
     </AppProviders>
   );
 }

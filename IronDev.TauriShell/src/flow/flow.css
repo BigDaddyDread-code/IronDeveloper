@@ -1,0 +1,690 @@
+/* Flow-first shell design system. Source of visual truth: Docs/ux/flow-first-ux-spec.md */
+
+.fl-root {
+  --fl-ink: #22262b;
+  --fl-ink2: #4a5057;
+  --fl-muted: #7a8087;
+  --fl-ground: #f4f4f1;
+  --fl-panel: #ffffff;
+  --fl-line: #e4e4de;
+  --fl-line2: #d2d2ca;
+  --fl-acc: #0e6b54;
+  --fl-acc-soft: #e2f0eb;
+  --fl-acc-ink: #0a4a3b;
+  --fl-gate: #a8690f;
+  --fl-gate-soft: #f7eddc;
+  --fl-gate-ink: #7a4c0a;
+  --fl-red: #a63232;
+  --fl-red-soft: #f6e4e4;
+  --fl-blue: #2b5d8c;
+  --fl-blue-soft: #e4edf5;
+  --fl-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --fl-mono: "Cascadia Code", Consolas, ui-monospace, monospace;
+
+  min-height: 100vh;
+  background: var(--fl-ground);
+  color: var(--fl-ink);
+  font-family: var(--fl-sans);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.fl-root *,
+.fl-root *::before,
+.fl-root *::after {
+  box-sizing: border-box;
+}
+
+.fl-appbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  background: var(--fl-panel);
+  border-bottom: 1px solid var(--fl-line);
+}
+
+.fl-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 650;
+  font-size: 14px;
+}
+
+.fl-brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--fl-ink);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fl-brand-proj {
+  font-weight: 400;
+  color: var(--fl-ink2);
+  font-size: 13px;
+}
+
+.fl-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.fl-nav button {
+  font-family: var(--fl-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fl-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.fl-nav button:hover {
+  background: var(--fl-ground);
+  color: var(--fl-ink);
+}
+
+.fl-nav button.fl-on {
+  background: var(--fl-ink);
+  color: #fff;
+}
+
+.fl-userbit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--fl-ink2);
+}
+
+.fl-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--fl-acc-soft);
+  color: var(--fl-acc-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.fl-main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.fl-h1 {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0 0 2px;
+}
+
+.fl-sub {
+  color: var(--fl-ink2);
+  font-size: 13px;
+  margin: 0 0 18px;
+}
+
+.fl-panel-box {
+  background: var(--fl-panel);
+  border: 1px solid var(--fl-line);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.fl-plabel {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fl-muted);
+  font-weight: 650;
+  margin: 0 0 12px;
+}
+
+/* Stage rail */
+
+.fl-rail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fl-stage {
+  font-size: 12.5px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  color: var(--fl-muted);
+}
+
+.fl-stage.fl-active {
+  background: var(--fl-ink);
+  color: #fff;
+  font-weight: 600;
+}
+
+.fl-stage.fl-done {
+  background: var(--fl-acc-soft);
+  color: var(--fl-acc-ink);
+  font-weight: 600;
+}
+
+.fl-gatechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fl-gatechip.fl-locked {
+  color: var(--fl-gate-ink);
+}
+
+.fl-gatechip.fl-open {
+  color: var(--fl-acc);
+}
+
+.fl-gate-glyph {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 2px solid currentColor;
+  position: relative;
+}
+
+.fl-locked .fl-gate-glyph::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: -5px;
+  width: 4px;
+  height: 4px;
+  border: 2px solid currentColor;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
+}
+
+.fl-open .fl-gate-glyph {
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Work item layout */
+
+.fl-cols {
+  display: grid;
+  grid-template-columns: 1.12fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+@media (max-width: 820px) {
+  .fl-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fl-msg {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  margin-bottom: 8px;
+  max-width: 94%;
+}
+
+.fl-msg.fl-user {
+  background: var(--fl-ground);
+}
+
+.fl-msg.fl-sys {
+  border: 1px solid var(--fl-line);
+  color: var(--fl-ink2);
+}
+
+.fl-chatform {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fl-chatform input {
+  flex: 1;
+  font-family: var(--fl-sans);
+  font-size: 13px;
+  border: 1px solid var(--fl-line2);
+  border-radius: 9px;
+  padding: 8px 12px;
+  background: var(--fl-panel);
+  color: var(--fl-ink);
+}
+
+.fl-chatform input:focus-visible {
+  outline: 2px solid var(--fl-blue);
+  outline-offset: 1px;
+}
+
+/* Contract rail */
+
+.fl-crit {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13.5px;
+  padding: 5px 0;
+}
+
+.fl-crit-mark {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.fl-crit-mark.fl-yes {
+  background: var(--fl-acc-soft);
+  color: var(--fl-acc-ink);
+}
+
+.fl-crit-mark.fl-pend {
+  border: 1.5px dashed var(--fl-line2);
+  color: var(--fl-muted);
+}
+
+.fl-crit-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.fl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fl-chip {
+  font-size: 12px;
+  border: 1px solid var(--fl-line2);
+  border-radius: 999px;
+  padding: 3px 11px;
+  color: var(--fl-ink2);
+  white-space: nowrap;
+}
+
+.fl-chip.fl-ok {
+  border-color: var(--fl-acc-soft);
+  background: var(--fl-acc-soft);
+  color: var(--fl-acc-ink);
+}
+
+.fl-qbox {
+  background: var(--fl-gate-soft);
+  color: var(--fl-gate-ink);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13px;
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+/* Footer gate strip */
+
+.fl-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid var(--fl-line);
+  margin-top: 16px;
+  padding-top: 14px;
+  flex-wrap: wrap;
+}
+
+.fl-gatemsg {
+  font-size: 13px;
+  color: var(--fl-gate-ink);
+}
+
+.fl-gatemsg.fl-okmsg {
+  color: var(--fl-acc-ink);
+}
+
+/* Buttons */
+
+.fl-btn {
+  font-family: var(--fl-sans);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 8px 18px;
+  border: 1px solid var(--fl-line2);
+  background: var(--fl-panel);
+  color: var(--fl-ink);
+  cursor: pointer;
+}
+
+.fl-btn:hover {
+  background: var(--fl-ground);
+}
+
+.fl-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fl-btn.fl-pri {
+  background: var(--fl-ink);
+  border-color: var(--fl-ink);
+  color: #fff;
+}
+
+.fl-btn.fl-mini {
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+.fl-btn:focus-visible {
+  outline: 2px solid var(--fl-blue);
+  outline-offset: 2px;
+}
+
+/* Board */
+
+.fl-board {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .fl-board {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.fl-col {
+  background: var(--fl-panel);
+  border: 1px solid var(--fl-line);
+  border-radius: 9px;
+  padding: 9px;
+  min-width: 0;
+}
+
+.fl-colh {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fl-muted);
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 4px 8px;
+}
+
+.fl-card {
+  background: var(--fl-ground);
+  border: 1px solid var(--fl-line);
+  border-radius: 8px;
+  padding: 10px 11px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: var(--fl-sans);
+}
+
+.fl-card:hover {
+  border-color: var(--fl-line2);
+  background: var(--fl-panel);
+}
+
+.fl-card:focus-visible {
+  outline: 2px solid var(--fl-blue);
+  outline-offset: 1px;
+}
+
+.fl-card-id {
+  font-family: var(--fl-mono);
+  font-size: 10.5px;
+  color: var(--fl-muted);
+}
+
+.fl-card-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 2px 0 6px;
+  color: var(--fl-ink);
+}
+
+.fl-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-weight: 600;
+}
+
+.fl-tag.fl-amber {
+  background: var(--fl-gate-soft);
+  color: var(--fl-gate-ink);
+}
+
+.fl-tag.fl-green {
+  background: var(--fl-acc-soft);
+  color: var(--fl-acc-ink);
+}
+
+.fl-tag.fl-redt {
+  background: var(--fl-red-soft);
+  color: var(--fl-red);
+}
+
+.fl-tag.fl-bluet {
+  background: var(--fl-blue-soft);
+  color: var(--fl-blue);
+}
+
+/* Settings */
+
+.fl-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .fl-settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fl-banner {
+  background: var(--fl-blue-soft);
+  color: var(--fl-blue);
+  border-radius: 9px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.fl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.fl-table th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fl-muted);
+  font-weight: 650;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--fl-line);
+}
+
+.fl-table td {
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px dashed var(--fl-line);
+  vertical-align: middle;
+}
+
+.fl-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.fl-select {
+  font-family: var(--fl-sans);
+  font-size: 12.5px;
+  border: 1px solid var(--fl-line2);
+  border-radius: 7px;
+  padding: 5px 8px;
+  background: var(--fl-panel);
+  color: var(--fl-ink);
+}
+
+.fl-radio-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--fl-line);
+  border-radius: 9px;
+  padding: 11px 13px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.fl-radio-card.fl-sel {
+  border-color: var(--fl-acc);
+  background: var(--fl-acc-soft);
+}
+
+.fl-radio-card input {
+  margin-top: 3px;
+  accent-color: var(--fl-acc);
+}
+
+.fl-radio-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  margin: 0;
+}
+
+.fl-radio-desc {
+  font-size: 12.5px;
+  color: var(--fl-ink2);
+  margin: 1px 0 0;
+}
+
+.fl-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--fl-line);
+  font-size: 13px;
+}
+
+.fl-toggle-row:last-child {
+  border-bottom: 0;
+}
+
+.fl-lockednote {
+  font-size: 11.5px;
+  color: var(--fl-muted);
+}
+
+.fl-switch {
+  appearance: none;
+  width: 34px;
+  height: 19px;
+  border-radius: 999px;
+  background: var(--fl-line2);
+  position: relative;
+  cursor: pointer;
+  flex: none;
+  border: 0;
+}
+
+.fl-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 120ms ease;
+}
+
+.fl-switch:checked {
+  background: var(--fl-gate);
+}
+
+.fl-switch:checked::after {
+  left: 17px;
+}
+
+.fl-switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fl-switch:focus-visible {
+  outline: 2px solid var(--fl-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-switch::after {
+    transition: none;
+  }
+}
+
+.fl-empty {
+  color: var(--fl-muted);
+  font-size: 13px;
+  padding: 14px 0;
+  text-align: center;
+}
+
+.fl-error {
+  background: var(--fl-red-soft);
+  color: var(--fl-red);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13px;
+  margin: 10px 0;
+}
