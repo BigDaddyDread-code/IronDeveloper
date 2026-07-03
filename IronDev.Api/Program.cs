@@ -193,6 +193,8 @@ builder.Services.AddScoped<ITicketEvidenceSummaryService, TicketEvidenceSummaryS
 builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
 builder.Services.AddScoped<ITicketSkeletonRunService, TicketSkeletonRunService>();
+builder.Services.AddSingleton<IApprovalSatisfactionEvaluator, ApprovalSatisfactionEvaluator>();
+builder.Services.AddSingleton<IWorkflowApprovalHaltEvaluator, WorkflowApprovalHaltEvaluator>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();
 builder.Services.AddSingleton<DiscussionCodeScenarioCatalog>();
 builder.Services.AddSingleton<IBuildScenarioCatalog>(sp => sp.GetRequiredService<DiscussionCodeScenarioCatalog>());

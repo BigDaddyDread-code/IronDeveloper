@@ -1,5 +1,6 @@
 using System.Text.Json;
 using IronDev.Core.Builder;
+using IronDev.Core.Governance;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
@@ -13,24 +14,36 @@ using IronDev.Services;
 namespace IronDev.Infrastructure.Services;
 
 /// <summary>
-/// P0-1 walking-skeleton orchestrator. Chains existing governed services into one run:
+/// Walking-skeleton orchestrator. Chains existing governed services into one run:
 /// readiness (enforced inside proposal generation) → proposal (persisted as evidence
 /// with an id) → disposable workspace → declarative file writes in-workspace →
-/// dotnet build + dotnet test → evidence packaged.
+/// dotnet build + dotnet test → evidence packaged → critic package prepared →
+/// halted for approval.
 ///
-/// Boundary: no new authority — composition only. Blocked states are explicit and
-/// terminal for the run; there is no approval shortcut because there is no approval
-/// surface here at all. The run ends at "evidence packaged" — critic review, human
-/// approval, and any apply remain separate governed steps.
+/// Boundary: no new authority — composition only. Blocked states are explicit;
+/// a successful run halts PausedForApproval, and the ONLY unblock is a live
+/// AcceptedApprovalRecord matching the run's requirement exactly (target kind,
+/// run id, critic-package hash, capability code) and unexpired — evaluated through
+/// the approval satisfaction and workflow halt evaluators. This service consumes
+/// approval evidence; it can never create, grant, or simulate approval, and
+/// continuation is not apply permission. Halt is not approval.
 /// </summary>
 public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
 {
+    // Canonical governance vocabulary: a skeleton continuation is a workflow
+    // continuation request, approved as workflow-continuation input.
+    public const string ApprovalTargetKind = AcceptedApprovalTargetKinds.WorkflowContinuationRequest;
+    public const string ContinueCapabilityCode = "skeleton-run.continue";
+
     private readonly ITicketService _tickets;
     private readonly IProjectService _projects;
     private readonly IBuilderProposalService _proposals;
     private readonly IDisposableWorkspaceExecutionService _workspaces;
     private readonly IRunStore _runs;
     private readonly IRunEventStore _events;
+    private readonly IAcceptedApprovalStore _approvals;
+    private readonly IApprovalSatisfactionEvaluator _approvalSatisfaction;
+    private readonly IWorkflowApprovalHaltEvaluator _approvalHalt;
     private readonly IConfiguration _configuration;
 
     public TicketSkeletonRunService(
@@ -40,6 +53,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         IDisposableWorkspaceExecutionService workspaces,
         IRunStore runs,
         IRunEventStore events,
+        IAcceptedApprovalStore approvals,
+        IApprovalSatisfactionEvaluator approvalSatisfaction,
+        IWorkflowApprovalHaltEvaluator approvalHalt,
         IConfiguration configuration)
     {
         _tickets = tickets;
@@ -48,6 +64,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _workspaces = workspaces;
         _runs = runs;
         _events = events;
+        _approvals = approvals;
+        _approvalSatisfaction = approvalSatisfaction;
+        _approvalHalt = approvalHalt;
         _configuration = configuration;
     }
 
@@ -160,19 +179,175 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         var packagePath = await PersistCriticPackageAsync(
             run.RunId, evidenceRoot, proposalId, ticket, proposal, workspaceResult, cancellationToken).ConfigureAwait(false);
 
+        var packageHash = ComputeSha256(await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false));
+
         await PublishAsync(run.RunId, "CriticReviewPackageReady",
             "Critic review package prepared. A package is review material, not a review: the independent critic reviews it through its own governed surface, and nothing here is approval.",
             projectId, ticketId, new Dictionary<string, string>
             {
                 ["packageId"] = $"critic-pkg-{run.RunId}",
                 ["packagePath"] = packagePath,
+                ["packageSha256"] = packageHash,
                 ["proposalId"] = proposalId,
                 ["currentNode"] = "SkeletonRun"
             }, cancellationToken).ConfigureAwait(false);
 
+        // P0-3: a successful run halts for approval. The halt names the exact approval
+        // requirement a human must record through the accepted-approvals surface —
+        // bound to the critic-package hash so approval attaches to precisely what was
+        // reviewed. Halt is not approval.
+        if (workspaceResult.Succeeded)
+        {
+            await _runs.TransitionAsync(new RunStateTransition
+            {
+                RunId = run.RunId,
+                State = RunLifecycleState.PausedForApproval,
+                Summary = "Halted for approval. Halt is not approval: continuation requires a live accepted approval matching this run's requirement."
+            }, cancellationToken).ConfigureAwait(false);
+
+            await PublishAsync(run.RunId, "ApprovalRequiredHalt",
+                "Halted for approval. Halt is not approval: record an accepted approval matching this requirement, then request continuation.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["approvalProjectId"] = ApprovalProjectGuid(projectId).ToString("D"),
+                    ["approvalTargetKind"] = ApprovalTargetKind,
+                    ["approvalTargetId"] = run.RunId,
+                    ["approvalTargetHash"] = packageHash,
+                    ["capabilityCode"] = ContinueCapabilityCode,
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+        }
+
         var updated = await _runs.GetAsync(run.RunId, cancellationToken).ConfigureAwait(false) ?? run;
-        return ToDto(updated, projectId, ticketId);
+        return ToDto(updated, projectId, ticketId, requiresHumanApproval: updated.State == RunLifecycleState.PausedForApproval);
     }
+
+    public async Task<TicketBuildRunDto?> ContinueAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default)
+    {
+        var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
+        if (ticket is null || ticket.ProjectId != projectId)
+            return null;
+
+        var run = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (run is null || run.ProjectId != projectId || run.TicketId != ticketId)
+            return null;
+
+        if (run.State != RunLifecycleState.PausedForApproval)
+        {
+            await PublishAsync(runId, "ContinuationRefused",
+                $"Continuation refused: the run is {run.State}, not awaiting approval. Continuation applies only to approval halts.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["refusedReason"] = "NotAwaitingApproval",
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+            return ToDto(run, projectId, ticketId, requiresHumanApproval: false);
+        }
+
+        // The requirement is recomputed from durable evidence, never trusted from the
+        // request: the package hash on disk is what the approval must have bound to.
+        var packagePath = CriticPackagePath(ResolveEvidenceRoot(), runId);
+        if (!File.Exists(packagePath))
+        {
+            await PublishAsync(runId, "ContinuationRefused",
+                "Continuation refused: the critic package evidence is missing, so the approval requirement cannot be recomputed.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["refusedReason"] = "CriticPackageEvidenceMissing",
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+            return ToDto(run, projectId, ticketId, requiresHumanApproval: true);
+        }
+
+        var packageHash = ComputeSha256(await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false));
+        var requirement = new ApprovalRequirement
+        {
+            ProjectId = ApprovalProjectGuid(projectId),
+            ApprovalTargetKind = ApprovalTargetKind,
+            ApprovalTargetId = runId,
+            ApprovalTargetHash = packageHash,
+            CapabilityCode = ContinueCapabilityCode,
+            ApprovalPurpose = AcceptedApprovalPurposes.WorkflowContinuationInput,
+            EvaluatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        // Live store query is the only unblock: no cached flag, no request field.
+        var candidates = await _approvals.ListByTargetAsync(
+            requirement.ProjectId, ApprovalTargetKind, runId, cancellationToken).ConfigureAwait(false);
+
+        var satisfied = candidates
+            .Select(candidate => _approvalSatisfaction.Evaluate(requirement, candidate))
+            .FirstOrDefault(evaluation => evaluation.IsSatisfied);
+
+        var haltState = _approvalHalt.Evaluate(new WorkflowApprovalHaltEvaluationRequest
+        {
+            WorkflowStepId = $"skeleton-continue-{runId}",
+            RequiredApprovals =
+            [
+                new WorkflowApprovalHaltRequirement
+                {
+                    Kind = WorkflowApprovalRequirementKind.HumanApprovalReference,
+                    RequirementId = $"skeleton-continue-{runId}",
+                    SafeSummary = "A live accepted approval matching this run's requirement is required."
+                }
+            ],
+            AvailableApprovalEvidence = satisfied is null
+                ? []
+                :
+                [
+                    new WorkflowApprovalEvidenceReference
+                    {
+                        Kind = WorkflowApprovalRequirementKind.HumanApprovalReference,
+                        ReferenceId = $"skeleton-continue-{runId}",
+                        SafeSummary = $"Accepted approval {satisfied.AcceptedApprovalId} verified against the run's requirement."
+                    }
+                ]
+        });
+
+        if (haltState.Status != WorkflowApprovalHaltStatus.ApprovalEvidencePresentForFutureExecution)
+        {
+            await PublishAsync(runId, "ApprovalRequiredHalt",
+                "Continuation refused: no live accepted approval satisfies this run's requirement. Halt is not approval.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["refusedReason"] = "MissingOrUnsatisfiedApproval",
+                    ["candidateCount"] = candidates.Count.ToString(),
+                    ["approvalTargetHash"] = packageHash,
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+            var still = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
+            return ToDto(still, projectId, ticketId, requiresHumanApproval: true);
+        }
+
+        await _runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = runId,
+            State = RunLifecycleState.Completed,
+            Summary = $"Continuation allowed by accepted approval {satisfied!.AcceptedApprovalId}. Approval evidence was verified; it is not apply permission — controlled apply remains a separate governed step."
+        }, cancellationToken).ConfigureAwait(false);
+
+        await PublishAsync(runId, "SkeletonContinuationUnblocked",
+            "Continuation allowed: a live accepted approval matched this run's requirement exactly. Approval is not apply permission; controlled apply remains a separate governed step.",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
+                ["approvalTargetHash"] = packageHash,
+                ["currentNode"] = "SkeletonRun"
+            }, cancellationToken).ConfigureAwait(false);
+
+        var updated = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
+        return ToDto(updated, projectId, ticketId, requiresHumanApproval: false);
+    }
+
+    /// <summary>
+    /// Deterministic governance-scope Guid for an int project id, so approvals recorded
+    /// through the Guid-scoped accepted-approvals surface can address skeleton runs.
+    /// </summary>
+    public static Guid ApprovalProjectGuid(int projectId) =>
+        Guid.ParseExact($"{projectId:D8}-0000-0000-0000-000000000000", "D");
+
+    private static string ComputeSha256(byte[] bytes) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
 
     public async Task<SkeletonCriticPackage?> GetCriticPackageAsync(
         int projectId,
@@ -327,14 +502,14 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         return proposalId;
     }
 
-    private static TicketBuildRunDto ToDto(RunRecord run, int projectId, long ticketId) => new()
+    private static TicketBuildRunDto ToDto(RunRecord run, int projectId, long ticketId, bool requiresHumanApproval = false) => new()
     {
         RunId = run.RunId,
         ProjectId = projectId,
         TicketId = ticketId,
         Status = run.State.ToString(),
         CurrentNode = "SkeletonRun",
-        RequiresHumanApproval = false,
+        RequiresHumanApproval = requiresHumanApproval,
         Message = run.FailureReason ?? run.Summary
     };
 
