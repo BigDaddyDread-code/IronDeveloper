@@ -221,6 +221,22 @@ public sealed class TicketsController : ControllerBase
         return result is null ? NotFound() : Ok(result);
     }
 
+    /// <summary>
+    /// GET skeleton-runs/{runId}/critic-package — the full-fidelity review package a
+    /// completed skeleton run prepared for the independent critic. Read-only review
+    /// material: serving it grants, requests, and simulates nothing.
+    /// </summary>
+    [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/critic-package")]
+    public async Task<ActionResult<SkeletonCriticPackage>> GetSkeletonCriticPackage(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken ct)
+    {
+        var package = await _skeletonRuns.GetCriticPackageAsync(projectId, ticketId, runId, ct);
+        return package is null ? NotFound() : Ok(package);
+    }
+
     [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/build-runs")]
     public async Task<ActionResult<IReadOnlyList<TicketBuildRunSummaryDto>>> GetBuildRuns(
         int projectId,

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
@@ -84,18 +85,28 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         }
 
         // Gate stays at its owning step: readiness is evaluated (and enforced) inside
-        // proposal generation. A readiness block becomes an explicit blocked run state.
+        // proposal generation. A readiness block becomes an explicit blocked run state;
+        // any other proposal failure is classified separately so the next safe action
+        // points at the right person (user resolves the ticket vs operator investigates).
         BuilderProposal proposal;
         try
         {
             proposal = await _proposals.GenerateProposalAsync(ticketId, cancellationToken).ConfigureAwait(false);
         }
-        catch (InvalidOperationException exception)
+        catch (BuildReadinessBlockedException exception)
         {
             return await BlockAsync(run.RunId, projectId, ticketId,
                 "ReadinessBlocked",
                 exception.Message,
                 "Resolve the blocking issues on the ticket, then start a new skeleton run.",
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return await BlockAsync(run.RunId, projectId, ticketId,
+                "ProposalGenerationFailed",
+                exception.Message,
+                "This is a service failure, not a ticket problem. Check the proposal service and model provider, then start a new skeleton run.",
                 cancellationToken).ConfigureAwait(false);
         }
 
@@ -143,8 +154,46 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 ["currentNode"] = "SkeletonRun"
             }, cancellationToken).ConfigureAwait(false);
 
+        // P0-2: prepare the critic's review package at full fidelity. The package is
+        // review material only — the run does not create, request, or simulate the
+        // review itself; that belongs to the critic through its own governed surface.
+        var packagePath = await PersistCriticPackageAsync(
+            run.RunId, evidenceRoot, proposalId, ticket, proposal, workspaceResult, cancellationToken).ConfigureAwait(false);
+
+        await PublishAsync(run.RunId, "CriticReviewPackageReady",
+            "Critic review package prepared. A package is review material, not a review: the independent critic reviews it through its own governed surface, and nothing here is approval.",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["packageId"] = $"critic-pkg-{run.RunId}",
+                ["packagePath"] = packagePath,
+                ["proposalId"] = proposalId,
+                ["currentNode"] = "SkeletonRun"
+            }, cancellationToken).ConfigureAwait(false);
+
         var updated = await _runs.GetAsync(run.RunId, cancellationToken).ConfigureAwait(false) ?? run;
         return ToDto(updated, projectId, ticketId);
+    }
+
+    public async Task<SkeletonCriticPackage?> GetCriticPackageAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken cancellationToken = default)
+    {
+        var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
+        if (ticket is null || ticket.ProjectId != projectId)
+            return null;
+
+        var run = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (run is null || run.ProjectId != projectId || run.TicketId != ticketId)
+            return null;
+
+        var packagePath = CriticPackagePath(ResolveEvidenceRoot(), runId);
+        if (!File.Exists(packagePath))
+            return null;
+
+        var json = await File.ReadAllTextAsync(packagePath, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Deserialize<SkeletonCriticPackage>(json, JsonOptions);
     }
 
     private async Task<TicketBuildRunDto> BlockAsync(
@@ -189,6 +238,61 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 IsDeletion = change.IsDeletion
             })
             .ToList();
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
+
+    private static string CriticPackagePath(string evidenceRoot, string runId) =>
+        Path.Combine(evidenceRoot, runId, "evidence", "critic-package.json");
+
+    private static async Task<string> PersistCriticPackageAsync(
+        string runId,
+        string evidenceRoot,
+        string proposalId,
+        IronDev.Data.Models.ProjectTicket ticket,
+        BuilderProposal proposal,
+        DisposableWorkspaceRunResult workspaceResult,
+        CancellationToken cancellationToken)
+    {
+        var commandResults = workspaceResult.Commands
+            .Select(command => new SkeletonCriticPackageCommandResult
+            {
+                DisplayName = command.DisplayName,
+                ExitCode = command.ExitCode,
+                TimedOut = command.TimedOut,
+                DurationMs = command.DurationMs,
+                StandardOutputRef = command.StandardOutputPath,
+                StandardErrorRef = command.StandardErrorPath
+            })
+            .ToList();
+
+        var evidenceRefs = new List<string>
+        {
+            Path.Combine(evidenceRoot, runId, "evidence", "proposal.json"),
+            workspaceResult.EvidencePath
+        };
+
+        var package = SkeletonCriticPackageBuilder.Build(
+            runId,
+            proposalId,
+            ticket.Id,
+            ticket.ProjectId,
+            ticket.Title ?? string.Empty,
+            ticket.AcceptanceCriteria,
+            proposal,
+            commandResults,
+            evidenceRefs,
+            workspaceResult.Succeeded);
+
+        var packagePath = CriticPackagePath(evidenceRoot, runId);
+        Directory.CreateDirectory(Path.GetDirectoryName(packagePath)!);
+        await File.WriteAllTextAsync(packagePath, JsonSerializer.Serialize(package, JsonOptions), cancellationToken).ConfigureAwait(false);
+        return packagePath;
+    }
 
     private static async Task<string> PersistProposalEvidenceAsync(
         string runId,

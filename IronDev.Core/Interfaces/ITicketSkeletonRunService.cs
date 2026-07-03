@@ -1,3 +1,4 @@
+using IronDev.Core.Builder;
 using IronDev.Core.Workflow;
 
 namespace IronDev.Core.Interfaces;
@@ -17,4 +18,11 @@ public interface ITicketSkeletonRunService
 {
     /// <summary>Starts a skeleton run. Returns null when the ticket does not belong to the project.</summary>
     Task<TicketBuildRunDto?> StartAsync(int projectId, long ticketId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the critic review package a completed skeleton run prepared. Read-only:
+    /// the package is review material for the independent critic; serving it grants,
+    /// requests, and simulates nothing.
+    /// </summary>
+    Task<SkeletonCriticPackage?> GetCriticPackageAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default);
 }

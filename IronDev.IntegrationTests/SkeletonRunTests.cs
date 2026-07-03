@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
@@ -63,7 +64,7 @@ public sealed class SkeletonRunTests
     public async Task StartAsync_ReadinessBlocked_BlocksExplicitly_GateStaysAtOwningStep()
     {
         var harness = SkeletonHarness.Create(proposalBehavior: () =>
-            throw new InvalidOperationException("Build blocked: index is stale."));
+            throw new BuildReadinessBlockedException("Build blocked: index is stale.", ["index is stale"]));
 
         var result = await harness.Service.StartAsync(ProjectId, TicketId);
 
@@ -71,6 +72,22 @@ public sealed class SkeletonRunTests
         StringAssert.StartsWith(result!.Message, "Blocked: ReadinessBlocked");
         StringAssert.Contains(result.Message, "index is stale");
         Assert.AreEqual("ReadinessBlocked", harness.Events.Single("SkeletonRunBlocked").Payload["blockedReason"]);
+        Assert.AreEqual(0, harness.Workspaces.Requests.Count);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_ProposalServiceFailure_IsClassifiedForOperators_NotAsTicketProblem()
+    {
+        var harness = SkeletonHarness.Create(proposalBehavior: () =>
+            throw new InvalidOperationException("Model provider timed out."));
+
+        var result = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        Assert.IsNotNull(result);
+        StringAssert.StartsWith(result!.Message, "Blocked: ProposalGenerationFailed");
+        var blocked = harness.Events.Single("SkeletonRunBlocked");
+        Assert.AreEqual("ProposalGenerationFailed", blocked.Payload["blockedReason"]);
+        StringAssert.Contains(blocked.Payload["nextSafeAction"], "service failure");
         Assert.AreEqual(0, harness.Workspaces.Requests.Count);
     }
 
@@ -132,6 +149,82 @@ public sealed class SkeletonRunTests
         StringAssert.Contains(await File.ReadAllTextAsync(proposalEvidence), "It is not approval");
     }
 
+    // ── P0-2: the critic package ──────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task StartAsync_PreparesCriticPackage_AtFullFidelity()
+    {
+        var harness = SkeletonHarness.Create(proposalBehavior: () => new BuilderProposal
+        {
+            TicketId = TicketId,
+            ProjectId = ProjectId,
+            Summary = "Add book sorting.",
+            Rationale = "Sorting is a criterion.",
+            Changes =
+            [
+                new ProposedFileChange
+                {
+                    FilePath = "src/Catalog/SortOptions.cs",
+                    Description = "New sort options enum",
+                    IsValid = true,
+                    IsNewFile = true,
+                    Diff = "+public enum SortOptions { Title }",
+                    FullContentAfter = "public enum SortOptions { Title }"
+                }
+            ]
+        });
+
+        var result = await harness.Service.StartAsync(ProjectId, TicketId);
+        Assert.IsNotNull(result);
+
+        var readyEvent = harness.Events.Single("CriticReviewPackageReady");
+        StringAssert.Contains(readyEvent.Message, "not a review");
+        StringAssert.StartsWith(readyEvent.Payload["packageId"], "critic-pkg-");
+
+        var package = await harness.Service.GetCriticPackageAsync(ProjectId, TicketId, result!.RunId);
+        Assert.IsNotNull(package, "The prepared package must be readable back.");
+        Assert.AreEqual(1, package!.Changes.Count);
+        Assert.AreEqual("+public enum SortOptions { Title }", package.Changes[0].Diff, "The critic gets the exact diff.");
+        Assert.AreEqual("public enum SortOptions { Title }", package.Changes[0].FullContentAfter, "The critic gets the complete proposed content, never a thin manifest.");
+        StringAssert.Contains(package.Boundary, "not a review");
+        StringAssert.Contains(package.Boundary, "grants nothing");
+    }
+
+    [TestMethod]
+    public void CriticPackageContract_CarriesNoVerdictFindingOrAuthoritySurface()
+    {
+        var propertyNames = typeof(SkeletonCriticPackage)
+            .GetProperties()
+            .Select(property => property.Name)
+            .ToArray();
+
+        foreach (var forbidden in new[] { "Verdict", "Finding", "Approve", "Approval", "Decision", "Authority" })
+        {
+            Assert.IsFalse(
+                propertyNames.Any(name => name.Contains(forbidden, StringComparison.OrdinalIgnoreCase)),
+                $"The critic package is review material and must carry no review-output or authority surface: {forbidden}");
+        }
+    }
+
+    [TestMethod]
+    public void SkeletonRunService_DoesNotCreateOrSimulateCriticReviews()
+    {
+        var source = File.ReadAllText(RepositoryFile("IronDev.Infrastructure", "Services", "TicketSkeletonRunService.cs"));
+
+        foreach (var forbidden in new[]
+        {
+            "ExecuteAndStore",
+            "ManualCriticReviewRequest",
+            "CriticReviewResult",
+            "FindingDraft",
+            "RequestedVerdict"
+        })
+        {
+            Assert.IsFalse(source.Contains(forbidden, StringComparison.OrdinalIgnoreCase),
+                $"The orchestrator packages work for the critic; it must never write the critic's review: {forbidden}");
+        }
+    }
+
     // ── No approval surface, statically ───────────────────────────────────────
 
     [TestMethod]
@@ -166,8 +259,12 @@ public sealed class SkeletonRunTests
             .Select(method => method.Name)
             .ToArray();
 
-        CollectionAssert.AreEquivalent(new[] { "StartAsync" }, methods,
-            "The skeleton contract is start-only: no approve, apply, promote, or continue surface.");
+        // History: P0-1 pinned the contract to StartAsync only. P0-2 adds exactly one
+        // read: serving the prepared critic package. Reading review material grants,
+        // requests, and simulates nothing — the contract still has no approve, apply,
+        // promote, review-create, or continue surface.
+        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync" }, methods,
+            "The skeleton contract is start + read-package only: no approve, apply, promote, review-create, or continue surface.");
     }
 
     // ── Workspace containment: file writes cannot escape ──────────────────────
