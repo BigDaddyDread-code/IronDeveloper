@@ -167,7 +167,7 @@ public sealed class ReadOnlyApprovalPackageReviewUiStaticBoundaryTests
     [TestMethod]
     public void ApprovalPackageReviewUi_IsRoutedFromGovernancePathOnly()
     {
-        var shell = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.TauriShell", "src", "shell", "IronDevShell.tsx"));
+        var shell = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.TauriShell", "src", "flow", "library", "governanceRoutes.ts"));
         StringAssert.Contains(shell, "/governance/approval-packages");
         StringAssert.Contains(shell, "ApprovalPackageReviewRoute");
     }
@@ -213,7 +213,9 @@ public sealed class ReadOnlyApprovalPackageReviewUiStaticBoundaryTests
         [
             Path.Combine(root, "IronDev.TauriShell", "src", "features", "governance", "ApprovalPackageReviewRoute.tsx"),
             Path.Combine(root, "IronDev.TauriShell", "src", "features", "governance", "ApprovalPackageReviewTypes.ts"),
-            Path.Combine(root, "IronDev.TauriShell", "src", "shell", "IronDevShell.tsx")
+            Path.Combine(root, "IronDev.TauriShell", "src", "flow", "FlowShell.tsx"),
+            Path.Combine(root, "IronDev.TauriShell", "src", "flow", "library", "governanceRoutes.ts"),
+            Path.Combine(root, "IronDev.TauriShell", "src", "flow", "library", "GovernanceHost.tsx")
         ];
     }
 

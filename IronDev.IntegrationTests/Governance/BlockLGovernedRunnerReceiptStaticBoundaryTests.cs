@@ -10,12 +10,25 @@ namespace IronDev.IntegrationTests.Governance;
 [TestClass]
 public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
 {
+    // The changeset-shape guards below belong to the PR that introduced this block.
+    // Post-merge they can only fire meaningfully when PR126's own receipt is part of
+    // the changeset again; on unrelated branches the diff legitimately contains other
+    // work. (The CI shallow checkout made these pass vacuously while every local
+    // feature branch failed them.)
+    private const string Pr126Sentinel = "Docs/receipts/PR126_BLOCK_L_GOVERNED_RUNNER_RECEIPT.md";
+
+    private static bool Pr126ChangesetActive(IEnumerable<string> changedFiles) =>
+        changedFiles.Contains(Pr126Sentinel, StringComparer.Ordinal);
+
     [TestMethod]
     public void BlockLGovernedRunnerReceipt_Pr126ChangedFilesAreDocsAndTestsOnly()
     {
         var changedFiles = ChangedFilesSinceMain()
             .Where(file => !IsAllowedPostPr126ApplyPreviewFile(file))
             .ToArray();
+
+        if (!Pr126ChangesetActive(changedFiles))
+            return;
 
         foreach (var file in changedFiles)
         {
@@ -29,7 +42,11 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
     [TestMethod]
     public void BlockLGovernedRunnerReceipt_NoProductionWorkflowCodeChangedByPr126()
     {
-        var changedProductionWorkflowFiles = ChangedFilesSinceMain()
+        var allChangedFiles = ChangedFilesSinceMain();
+        if (!Pr126ChangesetActive(allChangedFiles))
+            return;
+
+        var changedProductionWorkflowFiles = allChangedFiles
             .Where(file => !IsAllowedPostPr126ApplyPreviewFile(file))
             .Where(file => file.StartsWith("IronDev.Core/Workflow/", StringComparison.Ordinal) ||
                            file.StartsWith("IronDev.Infrastructure/", StringComparison.Ordinal) ||
@@ -46,6 +63,9 @@ public sealed class BlockLGovernedRunnerReceiptStaticBoundaryTests
         var changedFiles = ChangedFilesSinceMain()
             .Where(file => !IsAllowedPostPr126ApplyPreviewFile(file))
             .ToArray();
+
+        if (!Pr126ChangesetActive(changedFiles))
+            return;
 
         Assert.IsFalse(changedFiles.Any(file => file.StartsWith("Database/", StringComparison.Ordinal)), "PR126 must not add SQL migrations or SQL scripts.");
         Assert.IsFalse(changedFiles.Any(file => file.Contains("Controller", StringComparison.OrdinalIgnoreCase)), "PR126 must not add API controllers.");

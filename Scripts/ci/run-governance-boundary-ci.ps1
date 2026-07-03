@@ -171,6 +171,13 @@ Invoke-GovernanceBoundaryTestLane `
     -Name "Security boundary tests" `
     -Filter $securityBoundaryFilter
 
+# The static boundary category is the wall of source/contract scans, including the
+# read-only UI surface checks. It previously ran in no CI lane, so a broken static
+# check could stay green for weeks. Selection here is coverage, not approval.
+Invoke-GovernanceBoundaryTestLane `
+    -Name "Static boundary tests" `
+    -Filter "TestCategory=StaticBoundary"
+
 Invoke-ApiBoundaryTestLane `
     -Name "API boundary tests" `
     -Filter $apiBoundaryFilter

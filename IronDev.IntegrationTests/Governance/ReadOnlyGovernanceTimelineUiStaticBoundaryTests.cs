@@ -188,7 +188,9 @@ public sealed class ReadOnlyGovernanceTimelineUiStaticBoundaryTests
             Path.Combine(root, "IronDev.TauriShell", "src", "features", "governance", "GovernanceTimelineRoute.tsx"),
             Path.Combine(root, "IronDev.TauriShell", "src", "app", "routes.ts"),
             Path.Combine(root, "IronDev.TauriShell", "src", "state", "useWorkspaceNavigation.tsx"),
-            Path.Combine(root, "IronDev.TauriShell", "src", "shell", "IronDevShell.tsx"),
+            Path.Combine(root, "IronDev.TauriShell", "src", "flow", "FlowShell.tsx"),
+            Path.Combine(root, "IronDev.TauriShell", "src", "flow", "library", "governanceRoutes.ts"),
+            Path.Combine(root, "IronDev.TauriShell", "src", "flow", "library", "GovernanceHost.tsx"),
             Path.Combine(root, "IronDev.TauriShell", "src", "api", "ironDevApi.ts"),
             Path.Combine(root, "IronDev.TauriShell", "src", "api", "types.ts")
         ];

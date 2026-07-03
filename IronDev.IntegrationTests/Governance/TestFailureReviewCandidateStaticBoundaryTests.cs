@@ -122,6 +122,12 @@ public sealed class TestFailureReviewCandidateStaticBoundaryTests
     {
         var changedFiles = ChangedFilesSinceMain();
 
+        // This changeset-shape guard belongs to the PR that introduced the block.
+        // Post-merge it fires only when the block's protected model changes again;
+        // unrelated branches legitimately contain other work.
+        if (!changedFiles.Contains("IronDev.Core/Workflow/TestFailureReviewCandidateWorkflowModels.cs", StringComparer.Ordinal))
+            return;
+
         foreach (var file in changedFiles)
         {
             Assert.IsTrue(

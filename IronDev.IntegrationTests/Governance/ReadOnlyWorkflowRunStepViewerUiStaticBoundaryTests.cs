@@ -11,11 +11,11 @@ public sealed class ReadOnlyWorkflowRunStepViewerUiStaticBoundaryTests
     public void WorkflowRunStepViewerUi_RouteIsRegisteredAsReadOnlyInspection()
     {
         var routes = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.TauriShell", "src", "app", "routes.ts"));
-        var shell = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.TauriShell", "src", "shell", "IronDevShell.tsx"));
+        var shell = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.TauriShell", "src", "flow", "library", "governanceRoutes.ts"));
 
         StringAssert.Contains(routes, "/workflows/");
         StringAssert.Contains(shell, "WorkflowRunStepViewerRoute");
-        StringAssert.Contains(shell, "startsWith('/workflows/runs')");
+        StringAssert.Contains(shell, "'/workflows/runs'");
     }
 
     [TestMethod]

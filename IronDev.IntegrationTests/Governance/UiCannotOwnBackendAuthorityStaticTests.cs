@@ -25,7 +25,8 @@ public sealed class UiCannotOwnBackendAuthorityStaticTests
             Assert.IsTrue(File.Exists(FullPath(relativePath)), $"Missing expected read-only UI surface: {relativePath}");
         }
 
-        Assert.IsTrue(File.Exists(FullPath(Path.Combine("IronDev.TauriShell", "src", "shell", "IronDevShell.tsx"))));
+        Assert.IsTrue(File.Exists(FullPath(Path.Combine("IronDev.TauriShell", "src", "flow", "FlowShell.tsx"))));
+        Assert.IsTrue(File.Exists(FullPath(Path.Combine("IronDev.TauriShell", "src", "flow", "library", "governanceRoutes.ts"))));
         Assert.IsTrue(File.Exists(FullPath(Path.Combine("IronDev.TauriShell", "src", "app", "routes.ts"))));
         Assert.IsTrue(File.Exists(FullPath(Path.Combine("IronDev.TauriShell", "src", "api", "ironDevApi.ts"))));
     }
@@ -92,7 +93,9 @@ public sealed class UiCannotOwnBackendAuthorityStaticTests
     [TestMethod]
     public void UiObservabilityRoutes_DoNotDeclareAuthorityPaths()
     {
-        var routeText = File.ReadAllText(FullPath(Path.Combine("IronDev.TauriShell", "src", "shell", "IronDevShell.tsx"))) +
+        var routeText = File.ReadAllText(FullPath(Path.Combine("IronDev.TauriShell", "src", "flow", "library", "governanceRoutes.ts"))) +
+            "\n" +
+            File.ReadAllText(FullPath(Path.Combine("IronDev.TauriShell", "src", "flow", "FlowShell.tsx"))) +
             "\n" +
             File.ReadAllText(FullPath(Path.Combine("IronDev.TauriShell", "src", "app", "routes.ts")));
 
