@@ -44,7 +44,7 @@ Useful switches:
 1.  **Create Database**: Create a new database named `IronDeveloper`.
 2.  **Run Setup Script**: Execute `Database/local_dev_setup.sql` against the `IronDeveloper` database.
     *   This script creates all required tables and seeds a default local tenant, user, and project.
-3.  **Connection String**: Update `IronDev.Api/appsettings.Development.json` with your connection string:
+3.  **Connection String**: The committed development and test settings use a generic LocalDB example. Do not commit machine-specific SQL Server names, usernames, passwords, or local paths. If your SQL Server is different, set a local environment variable or API user secret instead:
 
 ```json
 {
@@ -52,6 +52,18 @@ Useful switches:
     "IronDeveloperDb": "Server=(localdb)\\MSSQLLocalDB;Database=IronDeveloper;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;"
   }
 }
+```
+
+PowerShell environment override:
+
+```powershell
+$env:ConnectionStrings__IronDeveloperDb = "Server=(localdb)\MSSQLLocalDB;Database=IronDeveloper;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;"
+```
+
+API user secret override:
+
+```powershell
+dotnet user-secrets set "ConnectionStrings:IronDeveloperDb" "Server=(localdb)\MSSQLLocalDB;Database=IronDeveloper;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;" --project .\IronDev.Api\IronDev.Api.csproj
 ```
 
 ---
@@ -159,7 +171,7 @@ npm run dev
 ## 6. Running Tests
 
 ### Integration Tests
-Requires a local SQL Server instance (configured in `appsettings.Test.json`).
+SQL-backed integration tests use the generic LocalDB test default in `appsettings.Test.json`. Use `ConnectionStrings__IronDeveloperDb` for machine-specific overrides instead of committing local config edits.
 ```powershell
 dotnet test IronDev.IntegrationTests\IronDev.IntegrationTests.csproj --logger "console;verbosity=minimal"
 ```

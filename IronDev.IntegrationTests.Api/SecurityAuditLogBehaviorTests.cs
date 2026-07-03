@@ -20,6 +20,7 @@ public sealed class SecurityAuditLogBehaviorTests
 {
     private const string AdminEmail = "admin@irondev.local";
     private const string AdminPassword = "password123";
+    private const string DefaultTestConnectionString = "Server=(localdb)\\MSSQLLocalDB;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;";
     private const int AssignedTenantId = 1;
     private const int UnassignedTenantId = 2;
     private const string TestJwtKey = "irondev-c15-audit-test-key-not-from-config-32chars";
@@ -260,6 +261,14 @@ public sealed class SecurityAuditLogBehaviorTests
     private static string Serialize(object value) =>
         JsonSerializer.Serialize(value);
 
+    private static string TestConnectionString()
+    {
+        var overrideValue = Environment.GetEnvironmentVariable("ConnectionStrings__IronDeveloperDb");
+        return string.IsNullOrWhiteSpace(overrideValue)
+            ? DefaultTestConnectionString
+            : overrideValue;
+    }
+
     private static WebApplicationFactory<Program> BuildFactory(
         ISecurityAuditLog auditLog,
         int authLoginPermitLimit = 100,
@@ -273,7 +282,7 @@ public sealed class SecurityAuditLogBehaviorTests
                 builder.UseEnvironment("Test");
                 builder.UseSetting("Jwt:Issuer", "irondev-api");
                 builder.UseSetting("Jwt:Audience", "irondev-client");
-                builder.UseSetting("ConnectionStrings:IronDeveloperDb", "Server=DESKTOP-KFA0H13;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;");
+                builder.UseSetting("ConnectionStrings:IronDeveloperDb", TestConnectionString());
                 builder.UseSetting("LocalTest:WorkspaceRoot", Path.Combine(Path.GetTempPath(), "IronDevTestWorkspaces"));
                 builder.UseSetting("LocalTest:LogsRoot", Path.Combine(Path.GetTempPath(), "IronDevTestLogs"));
                 builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:1420");

@@ -17,6 +17,7 @@ namespace IronDev.IntegrationTests.Api;
 public sealed class SensitiveApiRateLimitTests
 {
     private const string TestJwtKey = "irondev-c14-rate-limit-test-key-not-from-config-32chars";
+    private const string DefaultTestConnectionString = "Server=(localdb)\\MSSQLLocalDB;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;";
     private const string AllowedOrigin = "http://localhost:1420";
 
     [TestMethod]
@@ -140,7 +141,7 @@ public sealed class SensitiveApiRateLimitTests
                 builder.UseEnvironment("Test");
                 builder.UseSetting("Jwt:Issuer", "irondev-api");
                 builder.UseSetting("Jwt:Audience", "irondev-client");
-                builder.UseSetting("ConnectionStrings:IronDeveloperDb", "Server=DESKTOP-KFA0H13;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;");
+                builder.UseSetting("ConnectionStrings:IronDeveloperDb", TestConnectionString());
                 builder.UseSetting("LocalTest:WorkspaceRoot", Path.Combine(Path.GetTempPath(), "IronDevTestWorkspaces"));
                 builder.UseSetting("LocalTest:LogsRoot", Path.Combine(Path.GetTempPath(), "IronDevTestLogs"));
                 builder.UseSetting("Cors:AllowedOrigins:0", AllowedOrigin);
@@ -178,6 +179,14 @@ public sealed class SensitiveApiRateLimitTests
             email = "admin@irondev.local",
             password = "rate-limit-test-password"
         };
+
+    private static string TestConnectionString()
+    {
+        var overrideValue = Environment.GetEnvironmentVariable("ConnectionStrings__IronDeveloperDb");
+        return string.IsNullOrWhiteSpace(overrideValue)
+            ? DefaultTestConnectionString
+            : overrideValue;
+    }
 
     private static void AssertDoesNotContain(string source, string unexpected, string sourceName)
     {

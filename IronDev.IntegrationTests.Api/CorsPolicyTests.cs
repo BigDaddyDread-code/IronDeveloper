@@ -157,7 +157,7 @@ public sealed class CorsPolicyTests : ApiTestBase
                 builder.UseEnvironment(environmentName);
                 builder.UseSetting("Jwt:Issuer", "irondev-api");
                 builder.UseSetting("Jwt:Audience", "irondev-client");
-                builder.UseSetting("ConnectionStrings:IronDeveloperDb", "Server=DESKTOP-KFA0H13;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;");
+                builder.UseSetting("ConnectionStrings:IronDeveloperDb", TestConnectionString());
                 builder.UseSetting("LocalTest:WorkspaceRoot", Path.Combine(Path.GetTempPath(), "IronDevTestWorkspaces"));
                 builder.UseSetting("LocalTest:LogsRoot", Path.Combine(Path.GetTempPath(), "IronDevTestLogs"));
                 if (origins is not null)

@@ -12,12 +12,12 @@ This inventory records backend configuration keys, dependency registrations, pac
 
 | File path | Owning backend area | Runtime or test-only | Status | Changed in PR 55 | Reason for change | Behaviour unchanged |
 | --- | --- | --- | --- | --- | --- | --- |
-| `IronDev.Api/appsettings.json` | API host defaults | Runtime | Active | No | Documents API defaults for connection, JWT, and code proposal mode. | Yes |
-| `IronDev.Api/appsettings.Development.json` | API host local development | Runtime | Active | No | Documents local development database override. | Yes |
-| `IronDev.Api/appsettings.LocalTest.json` | LocalTest API host | Runtime test environment | Active | No | Documents isolated LocalTest database/workspace/log roots. | Yes |
-| `IronDev.IntegrationTests/appsettings.Test.json` | integration tests | Test-only | Active | No | Documents integration-test database configuration. | Yes |
-| `IronDev.IntegrationTests.Api/appsettings.Test.json` | API integration tests | Test-only | Active | No | Documents API test host database configuration. | Yes |
-| `IronDev.IntegrationTests.Api/ApiTestBase.cs` | API test host setup | Test-only | Active | No | Supplies test host overrides for JWT, connection string, workspace root, and logs root. | Yes |
+| `IronDev.Api/appsettings.json` | API host defaults | Runtime | Active | No | Documents API defaults for JWT and code proposal mode; shared SQL connection string is intentionally blank. | Yes |
+| `IronDev.Api/appsettings.Development.json` | API host local development | Runtime | Active | No | Documents a generic LocalDB development example only; machine-specific SQL belongs in environment or user-secret overrides. | Yes |
+| `IronDev.Api/appsettings.LocalTest.json` | LocalTest API host | Runtime test environment | Active | No | Documents isolated LocalTest database/workspace/log roots with a generic LocalDB test example. | Yes |
+| `IronDev.IntegrationTests/appsettings.Test.json` | integration tests | Test-only | Active | No | Documents a generic LocalDB test example; machine-specific SQL belongs in `ConnectionStrings__IronDeveloperDb`. | Yes |
+| `IronDev.IntegrationTests.Api/appsettings.Test.json` | API integration tests | Test-only | Active | No | Documents a generic LocalDB API-test example; machine-specific SQL belongs in `ConnectionStrings__IronDeveloperDb`. | Yes |
+| `IronDev.IntegrationTests.Api/ApiTestBase.cs` | API test host setup | Test-only | Active | No | Supplies test host overrides for JWT, generic test connection string, workspace root, and logs root. | Yes |
 
 No configuration file was removed or renamed in PR 55.
 
