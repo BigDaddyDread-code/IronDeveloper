@@ -600,6 +600,41 @@ public sealed class SkeletonRunTests
     }
 
     [TestMethod]
+    public async Task GetRunReport_LinksRecordedCriticReviews_ByReference()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        // P1-1: the critic's own surface publishes this link when a review is
+        // recorded; the report reconstructs it from the durable event alone.
+        await harness.Events.PublishAsync(new RunEventDto
+        {
+            RunId = run!.RunId,
+            EventType = "SkeletonCriticReviewRecorded",
+            Message = "Independent critic review recorded.",
+            Payload = new Dictionary<string, string>
+            {
+                ["criticAgentRunId"] = "manual-independent-critic-abc",
+                ["reviewId"] = "critic-review-abc",
+                ["verdict"] = "RequestChanges",
+                ["findingCount"] = "2",
+                ["blockingFindingCount"] = "1",
+                ["packageSha256"] = "deadbeef"
+            }
+        });
+
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(1, report!.CriticReviews.Count);
+        Assert.AreEqual("critic-review-abc", report.CriticReviews[0].ReviewId);
+        Assert.AreEqual("RequestChanges", report.CriticReviews[0].Verdict);
+        Assert.AreEqual(2, report.CriticReviews[0].FindingCount);
+        Assert.AreEqual(1, report.CriticReviews[0].BlockingFindingCount);
+        Assert.AreEqual("deadbeef", report.CriticReviews[0].PackageSha256,
+            "The report shows which package hash the critic reviewed — comparable to what approval binds to.");
+    }
+
+    [TestMethod]
     public async Task GetRunReport_UnknownRunOrWrongTicket_ReturnsNull()
     {
         var harness = SkeletonHarness.Create();

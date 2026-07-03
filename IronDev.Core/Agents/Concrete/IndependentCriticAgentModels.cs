@@ -25,7 +25,15 @@ public enum CriticReviewSubjectType
     CollectiveMemoryPromotionRequest = 5,
     ExecutionAudit = 6,
     TestReport = 7,
-    ReleaseCandidate = 8
+    ReleaseCandidate = 8,
+
+    /// <summary>
+    /// A skeleton run's critic package: the full-fidelity work package (diffs,
+    /// authored tests, build/test evidence) prepared for independent review.
+    /// P1-1: the subject enters by reference id; the critic pulls the package
+    /// itself from durable evidence.
+    /// </summary>
+    WorkPackage = 9
 }
 
 public sealed record CriticReviewRequest
