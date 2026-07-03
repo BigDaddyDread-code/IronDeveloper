@@ -35,6 +35,7 @@ import type {
   ProjectDocumentVersion,
   ProjectChatSession,
   ProjectImplementationPlan,
+  ProjectFileSummary,
   ProjectSummary,
   ProjectTicket,
   RunReviewPackage,
@@ -230,6 +231,22 @@ class IronDevApiClient {
       method: 'DELETE',
       signal
     });
+  }
+
+  async listCodeIndexFiles(
+    projectId: number,
+    skip = 0,
+    take = 500,
+    signal?: AbortSignal
+  ): Promise<ProjectFileSummary[]> {
+    return this.request<ProjectFileSummary[]>(
+      `/api/projects/${projectId}/code-index/files?skip=${skip}&take=${take}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getCodeIndexFileCount(projectId: number, signal?: AbortSignal): Promise<number> {
+    return this.request<number>(`/api/projects/${projectId}/code-index/file-count`, { method: 'GET', signal });
   }
 
   async getProjects(signal?: AbortSignal): Promise<ProjectSummary[]> {
