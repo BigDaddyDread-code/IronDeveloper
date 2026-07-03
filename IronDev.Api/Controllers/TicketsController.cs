@@ -21,6 +21,7 @@ public sealed class TicketsController : ControllerBase
     private readonly ITicketBuildRunService _buildRuns;
     private readonly ITicketSkeletonRunService _skeletonRuns;
     private readonly ISkeletonCriticReviewService _criticReviews;
+    private readonly ISkeletonFindingDispositionService _findingDispositions;
     private readonly IBuilderReadinessService _readiness;
     private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly ITicketRunReviewService _runReview;
@@ -34,6 +35,7 @@ public sealed class TicketsController : ControllerBase
         ITicketBuildRunService buildRuns,
         ITicketSkeletonRunService skeletonRuns,
         ISkeletonCriticReviewService criticReviews,
+        ISkeletonFindingDispositionService findingDispositions,
         IBuilderReadinessService readiness,
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
@@ -46,6 +48,7 @@ public sealed class TicketsController : ControllerBase
         _buildRuns = buildRuns;
         _skeletonRuns = skeletonRuns;
         _criticReviews = criticReviews;
+        _findingDispositions = findingDispositions;
         _readiness = readiness;
         _evidenceSummary = evidenceSummary;
         _runReview = runReview;
@@ -297,6 +300,48 @@ public sealed class TicketsController : ControllerBase
         }, ct);
         return outcome is null ? NotFound() : Ok(outcome);
     }
+
+    /// <summary>
+    /// POST skeleton-runs/{runId}/findings/{findingId}/disposition — records the
+    /// human decision about a critic finding (accept the risk, defer the fix, or
+    /// reject the finding, with a required reason). A disposition is not approval:
+    /// it removes the finding blockage only, and continuation still requires its
+    /// own live accepted approval.
+    /// </summary>
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/findings/{findingId}/disposition")]
+    public async Task<ActionResult<SkeletonFindingDispositionOutcome>> RecordFindingDisposition(
+        int projectId,
+        long ticketId,
+        string runId,
+        string findingId,
+        [FromBody] FindingDispositionBody body,
+        CancellationToken ct)
+    {
+        if (!Enum.TryParse<SkeletonFindingDispositionKind>(body.Disposition, ignoreCase: true, out var kind))
+        {
+            return BadRequest(new
+            {
+                error = "Disposition must be AcceptRisk, FixInFollowUp, or Reject.",
+                boundary = SkeletonFindingDispositionOutcome.BoundaryText
+            });
+        }
+
+        var outcome = await _findingDispositions.RecordAsync(new SkeletonFindingDispositionRequest
+        {
+            ProjectId = projectId,
+            TicketId = ticketId,
+            RunId = runId,
+            FindingId = findingId,
+            Disposition = kind,
+            Reason = body.Reason ?? string.Empty,
+            DecidedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value
+                ?? "unknown-user"
+        }, ct);
+        return outcome is null ? NotFound() : Ok(outcome);
+    }
+
+    public sealed record FindingDispositionBody(string? Disposition, string? Reason);
 
     /// <summary>
     /// GET skeleton-runs/{runId}/report — reconstructs the whole governed loop from

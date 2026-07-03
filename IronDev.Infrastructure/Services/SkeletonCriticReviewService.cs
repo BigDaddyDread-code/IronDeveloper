@@ -230,6 +230,10 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
                 ["verdict"] = output.Verdict.ToString(),
                 ["findingCount"] = output.Findings.Count.ToString(),
                 ["blockingFindingCount"] = blockingCount.ToString(),
+                // P1-3: finding ids travel in the durable event so the gate can
+                // enforce finding→disposition over event strings alone — the
+                // orchestrator never touches critic types.
+                ["findingIds"] = string.Join(",", output.Findings.Select(finding => finding.FindingId)),
                 ["packageSha256"] = packageHash,
                 ["groundTruthCheckCount"] = verification.Checks.Count.ToString(),
                 ["groundTruthMismatchCount"] = verification.Mismatches.Count.ToString(),
