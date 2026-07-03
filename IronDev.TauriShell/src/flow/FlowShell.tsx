@@ -6,6 +6,7 @@ import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
 import { BoardScreen } from './board/BoardScreen';
 import { FlowSurface } from './flowTypes';
+import { SolutionExplorer } from './library/SolutionExplorer';
 import { SettingsScreen } from './settings/SettingsScreen';
 import { WorkItemScreen } from './workitem/WorkItemScreen';
 
@@ -85,11 +86,13 @@ export function FlowShell() {
         {surface === 'library' ? (
           <div>
             <h1 className="fl-h1">Library</h1>
-            <p className="fl-sub">Reference, not workflow. The solution explorer and governance viewers re-home here.</p>
-            <div className="fl-panel-box">
+            <p className="fl-sub">
+              Reference, not workflow. The tree shows what the code index knows — never the live filesystem.
+            </p>
+            <SolutionExplorer />
+            <div className="fl-panel-box" style={{ marginTop: 16 }}>
               <p className="fl-plabel">Coming next</p>
               <div className="fl-chips">
-                <span className="fl-chip">Solution explorer — needs the code-index list endpoint</span>
                 <span className="fl-chip">ADRs and standards</span>
                 <span className="fl-chip">Governance timeline and the 17 existing viewers</span>
               </div>

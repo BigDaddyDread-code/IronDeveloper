@@ -724,6 +724,13 @@ export interface CreateTenantUserRequest {
   role: string;
 }
 
+export interface ProjectFileSummary {
+  id: number;
+  filePath: string;
+  fileExtension: string;
+  lastIndexedDate: string;
+}
+
 export interface TicketLoadResult {
   tickets: ProjectTicket[];
   status: ApiConnectionStatus;

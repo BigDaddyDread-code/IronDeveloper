@@ -55,6 +55,16 @@ public sealed class TracingCodeIndexServiceDecorator : ICodeIndexService
             ("take", take));
     }
 
+    public async Task<IReadOnlyList<ProjectFileSummary>> ListFilesAsync(int projectId, int skip = 0, int take = 500, CancellationToken cancellationToken = default)
+    {
+        return await TraceAsync(
+            "CodeIndex.ListFiles",
+            projectId,
+            async () => await _inner.ListFilesAsync(projectId, skip, take, cancellationToken),
+            ("skip", skip),
+            ("take", take));
+    }
+
     public async Task<IReadOnlyList<CodeIndexEntry>> GetSymbolsAsync(long fileId, CancellationToken cancellationToken = default)
     {
         return await TraceAsync(

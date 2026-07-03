@@ -24,6 +24,21 @@ public interface ICodeIndexService
     Task<IReadOnlyList<CodeIndexEntry>> GetSymbolsAsync(long fileId, CancellationToken cancellationToken = default);
     Task<int> GetIndexedFileCountAsync(int projectId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CodeIndexEntry>> GetRelevantSnippetsAsync(int projectId, string query, int take = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Pages the indexed file list, ordered by path. Returns summaries only — never file content —
+    /// so the whole tree can be listed cheaply.
+    /// </summary>
+    Task<IReadOnlyList<ProjectFileSummary>> ListFilesAsync(int projectId, int skip = 0, int take = 500, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Lightweight projection of an indexed file for tree/list rendering.</summary>
+public sealed class ProjectFileSummary
+{
+    public long Id { get; init; }
+    public string FilePath { get; init; } = string.Empty;
+    public string FileExtension { get; init; } = string.Empty;
+    public DateTime LastIndexedDate { get; init; }
 }
 
 public sealed class SqlCodeIndexService : ICodeIndexService
@@ -383,6 +398,28 @@ public sealed class SqlCodeIndexService : ICodeIndexService
         var rows = await connection.QueryAsync<ProjectFile>(new CommandDefinition(
             sql,
             new { TenantId = _tenant.TenantId, ProjectId = projectId, Take = take },
+            cancellationToken: cancellationToken));
+
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<ProjectFileSummary>> ListFilesAsync(int projectId, int skip = 0, int take = 500, CancellationToken cancellationToken = default)
+    {
+        var boundedSkip = Math.Max(0, skip);
+        var boundedTake = Math.Clamp(take, 1, 2000);
+
+        const string sql = """
+            SELECT Id, FilePath, FileExtension, LastIndexedDate
+            FROM dbo.ProjectFiles
+            WHERE TenantId = @TenantId AND ProjectId = @ProjectId
+            ORDER BY FilePath
+            OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<ProjectFileSummary>(new CommandDefinition(
+            sql,
+            new { TenantId = _tenant.TenantId, ProjectId = projectId, Skip = boundedSkip, Take = boundedTake },
             cancellationToken: cancellationToken));
 
         return rows.ToList();

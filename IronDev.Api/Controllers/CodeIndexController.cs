@@ -25,6 +25,18 @@ public sealed class CodeIndexController : ControllerBase
     public Task<int> FileCount(int projectId, CancellationToken ct) =>
         _index.GetIndexedFileCountAsync(projectId, ct);
 
+    /// <summary>
+    /// GET files — paged summaries of every indexed file, ordered by path. Renders the
+    /// solution explorer tree from index truth; never returns file content.
+    /// </summary>
+    [HttpGet("files")]
+    public Task<IReadOnlyList<ProjectFileSummary>> ListFiles(
+        int projectId,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 500,
+        CancellationToken ct = default) =>
+        _index.ListFilesAsync(projectId, skip, take, ct);
+
     [HttpGet("files/search")]
     public Task<IReadOnlyList<ProjectFile>> SearchFiles(int projectId, [FromQuery] string q, [FromQuery] int take = 5, CancellationToken ct = default) =>
         _index.SearchFilesAsync(projectId, q, take, ct);
