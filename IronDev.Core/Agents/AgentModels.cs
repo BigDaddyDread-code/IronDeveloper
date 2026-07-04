@@ -38,7 +38,8 @@ public enum AgentKind
     ProposalAgent = 5,
     RetrievalAgent = 6,
     ReportingAgent = 7,
-    HumanProxyAgent = 8
+    HumanProxyAgent = 8,
+    OrchestratorAgent = 9
 }
 
 public enum AgentExecutionMode

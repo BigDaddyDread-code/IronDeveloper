@@ -302,6 +302,10 @@ public sealed class AgentDefinitionValidator : IAgentDefinitionValidator
 
             AgentKind.HumanProxyAgent => Set(AgentExecutionMode.HumanAuthorityProxy),
 
+            AgentKind.OrchestratorAgent => Set(
+                AgentExecutionMode.ProposalOnly,
+                AgentExecutionMode.PassiveAnalysisOnly),
+
             _ => new HashSet<AgentExecutionMode>()
         };
 
@@ -377,6 +381,19 @@ public sealed class AgentDefinitionValidator : IAgentDefinitionValidator
                     AgentCapability.MutateSource,
                     AgentCapability.CallExternalSystem,
                     AgentCapability.PromoteCollectiveMemory),
+
+            AgentKind.OrchestratorAgent =>
+                Set(
+                    AgentCapability.RunTool,
+                    AgentCapability.MutateSource,
+                    AgentCapability.CallExternalSystem,
+                    AgentCapability.PromoteCollectiveMemory,
+                    AgentCapability.RepresentHumanApproval,
+                    AgentCapability.RepresentHumanRejection,
+                    AgentCapability.RepresentHumanPromotionDecision,
+                    AgentCapability.BlockExecution,
+                    AgentCapability.CreateCriticFinding,
+                    AgentCapability.CreateTestReport),
 
             _ => new HashSet<AgentCapability>()
         };

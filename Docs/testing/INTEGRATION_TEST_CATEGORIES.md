@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 614
-- Test classes found: 608
-- Test methods found: 9726
-- Category names found: 228
+- Source files scanned: 616
+- Test classes found: 610
+- Test methods found: 9740
+- Category names found: 229
 
 ## G13 Category Changes
 
@@ -171,6 +171,14 @@ A label does not make a slow test safe.
 - P3-3 does not add UI, API, database schema, source apply, approval, critic execution, test authoring, workflow continuation, release, deployment, memory, or chat/channel behavior.
 - A builder patch package is an implementation attempt against a confirmed contract. It is not approval, test proof, critic review, source apply permission, or workflow continuation.
 
+## P3-1 Orchestrator/BA Contract Boundary
+
+- Added focused `Orchestrator` metadata to the P3-1 Orchestrator/BA agent and contract boundary regression tests.
+- Added broad `Governance`, `Contract`, and `Boundary` metadata to the P3-1 boundary tests.
+- P3-1 does not add `RequiresRealDatabase` or `LongRunning`; the tests validate Core agent definitions, Core contract models, Core validators, receipt wording, and static source boundaries only.
+- P3-1 does not add the durable Orchestrator loop, run start/continue/apply behavior, source mutation, test authoring, critic execution, approval, policy satisfaction, API, UI, SQL schema, release/deployment, memory promotion, or channel/chat behavior.
+- The Orchestrator writes the contract. It does not judge the result.
+
 ## M02 Project Channels Schema
 
 - Added broad `Governance`, `Database`, `RequiresRealDatabase`, `LongRunning`, `Contract`, and `Boundary` metadata to the M02 project channels schema test.
@@ -216,12 +224,12 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 16 | 152 | 0 | 16 |
+| `Boundary` | 18 | 166 | 0 | 18 |
 | `Builder` | 1 | 9 | 0 | 1 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `ConfigBoundary` | 8 | 94 | 0 | 8 |
-| `Contract` | 18 | 168 | 0 | 18 |
+| `Contract` | 20 | 182 | 0 | 20 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -242,7 +250,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 18 | 144 | 0 | 18 |
+| `Governance` | 20 | 158 | 0 | 20 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -278,6 +286,7 @@ A label does not make a slow test safe.
 | `NoAuthorityTransferValidator` | 1 | 13 | 0 | 1 |
 | `OverallMemorySystemDiscussion` | 1 | 10 | 0 | 1 |
 | `OperationStatus` | 1 | 5 | 0 | 1 |
+| `Orchestrator` | 2 | 14 | 0 | 2 |
 | `PatchArtifactApiRegression` | 1 | 4 | 0 | 1 |
 | `PatchArtifactContract` | 1 | 25 | 0 | 1 |
 | `PatchArtifactCreation` | 1 | 21 | 0 | 1 |
