@@ -12,29 +12,52 @@ This guide helps you set up a local development environment for IronDev.
 
 ## Quick Bootstrap
 
-For a local machine that already has .NET and Docker Desktop installed, run this from the repository root:
+Start with the safe local bootstrap check from the repository root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\bootstrap-local.ps1 -CheckOnly
 ```
 
-This restores packages, starts/smoke-tests Weaviate, builds the API/product CLI, and runs focused boundary smoke tests.
+The default mode is check-only. It verifies the repository shape, tool presence, local override status, J08 config-summary contract availability, and J10 root-safety availability without creating files, restoring packages, installing frontend packages, starting services, touching SQL, touching Weaviate, writing evidence, or running governed product flows.
 
-Database setup is opt-in so the script does not accidentally reseed an existing database:
+To prepare only the developer-local override template:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1 -RunDatabaseSetup
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\bootstrap-local.ps1 -Prepare -CreateLocalOverride
 ```
 
-Useful switches:
+To explicitly restore .NET packages:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\bootstrap-local.ps1 -Prepare -RestoreDotNet
+```
+
+To explicitly install frontend packages without starting the UI:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\bootstrap-local.ps1 -Prepare -InstallFrontend
+```
+
+Supported J04 switches:
 
 ```text
--SkipWeaviate
--SkipBuild
--SkipTests
--RunDatabaseSetup
--SqlServerInstance "(localdb)\MSSQLLocalDB"
--DatabaseName "IronDeveloper"
+-CheckOnly
+-Prepare
+-CreateLocalOverride
+-RestoreDotNet
+-InstallFrontend
+-NonInteractive
+-Verbose
+```
+
+The local bootstrap script prepares local convenience. It is not evidence, approval, root safety proof, policy satisfaction, or permission to mutate source, SQL, Weaviate, evidence, or sandbox repositories.
+
+The older `Scripts/setup-local-dev.ps1` remains a higher-power local setup helper for developers who intentionally want restore/build/smoke behavior. Prefer the J04 script first when you want a non-destructive setup check.
+
+Database setup remains separate so a bootstrap command cannot accidentally reseed an existing database:
+
+```text
+Database/local_dev_setup.sql
 ```
 
 ---
