@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 613
-- Test classes found: 607
-- Test methods found: 9717
-- Category names found: 227
+- Source files scanned: 614
+- Test classes found: 608
+- Test methods found: 9726
+- Category names found: 228
 
 ## G13 Category Changes
 
@@ -163,6 +163,14 @@ A label does not make a slow test safe.
 - J07 does not create local files, start services, create or rebuild SQL, ensure or rebuild Weaviate, reset LocalTest data, run smoke, write evidence, change source/runtime authority records, add API/CLI/UI behavior, or claim alpha/merge/release/deployment readiness.
 - The developer doctor reports local readiness blockers. It does not make the machine safe.
 
+## P3-3 Builder Contract-Bound Patch Package
+
+- Added focused `Builder` metadata to the P3-3 builder patch package contract regression test.
+- Added broad `Governance` and `Contract` metadata to the P3-3 builder contract-bound patch package test.
+- P3-3 does not add `RequiresRealDatabase` or `LongRunning`; the test validates Core builder package models, validators, receipt wording, and static production source boundaries only.
+- P3-3 does not add UI, API, database schema, source apply, approval, critic execution, test authoring, workflow continuation, release, deployment, memory, or chat/channel behavior.
+- A builder patch package is an implementation attempt against a confirmed contract. It is not approval, test proof, critic review, source apply permission, or workflow continuation.
+
 ## M02 Project Channels Schema
 
 - Added broad `Governance`, `Database`, `RequiresRealDatabase`, `LongRunning`, `Contract`, and `Boundary` metadata to the M02 project channels schema test.
@@ -209,10 +217,11 @@ A label does not make a slow test safe.
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
 | `Boundary` | 16 | 152 | 0 | 16 |
+| `Builder` | 1 | 9 | 0 | 1 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `ConfigBoundary` | 8 | 94 | 0 | 8 |
-| `Contract` | 17 | 159 | 0 | 17 |
+| `Contract` | 18 | 168 | 0 | 18 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -233,7 +242,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 17 | 135 | 0 | 17 |
+| `Governance` | 18 | 144 | 0 | 18 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
