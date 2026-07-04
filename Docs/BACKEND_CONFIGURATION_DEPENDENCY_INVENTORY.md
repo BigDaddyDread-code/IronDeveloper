@@ -19,6 +19,7 @@ This inventory records backend configuration keys, dependency registrations, pac
 | `IronDev.IntegrationTests/appsettings.Test.json` | integration tests | Test-only | Active | No | Documents a generic LocalDB test example; machine-specific SQL belongs in `ConnectionStrings__IronDeveloperDb`. | Yes |
 | `IronDev.IntegrationTests.Api/appsettings.Test.json` | API integration tests | Test-only | Active | No | Documents a generic LocalDB API-test example; machine-specific SQL belongs in `ConnectionStrings__IronDeveloperDb`. | Yes |
 | `IronDev.IntegrationTests.Api/ApiTestBase.cs` | API test host setup | Test-only | Active | No | Supplies test host overrides for JWT, generic test connection string, workspace root, and logs root. | Yes |
+| `Scripts/local/bootstrap-local.ps1` | local developer bootstrap diagnostics | Local developer tooling | Active | No | J04 check-only bootstrap script for repository/tool/local override status and optional explicit restore/install actions. | Yes when not invoked |
 
 No configuration file was removed or renamed in PR 55.
 
@@ -48,6 +49,30 @@ Root safety integration is intentionally read-only. Until J10 root-safety valida
 J08 adds no endpoint, no startup logging, no bootstrap behavior, no SQL connectivity check, no Weaviate connectivity check, no schema change, and no source-apply, approval, critic, workflow, release, or deployment authority.
 
 Boundary: a config summary is diagnostic evidence for a human. It is not approval, authority, policy satisfaction, root safety proof, or permission to mutate anything.
+
+## J04 safe local bootstrap script
+
+J04 adds `Scripts/local/bootstrap-local.ps1` as a safe local developer bootstrap entrypoint.
+
+Default behavior is check-only:
+
+- verify repository shape
+- verify .NET SDK and Git command presence
+- report frontend package status
+- report ignored/untracked local override status
+- report whether the J08 redacted config summary Core contract is present
+- report J10 root safety as `NotEvaluated` unless a future root-safety contract is present
+- print next safe actions
+
+The default check-only path does not create files or directories, restore packages, install frontend packages, start the UI, call SQL, create or rebuild databases, start or rebuild Weaviate, write evidence, invoke source apply, invoke rollback, run release/deploy paths, or continue workflow.
+
+Prepare mode can copy `IronDev.Api/appsettings.Development.Local.example.json` to the ignored `IronDev.Api/appsettings.Development.Local.json` only when `-Prepare -CreateLocalOverride` is supplied and the target file is absent. It does not overwrite an existing local override.
+
+Prepare mode can run `dotnet restore IronDev.slnx` only when `-Prepare -RestoreDotNet` is supplied. It can run frontend package install inside `IronDev.TauriShell` only when `-Prepare -InstallFrontend` is supplied. It does not start the API, start the UI, call Docker, call SQL, or call Weaviate.
+
+The bootstrap script does not print raw connection strings, API keys, JWT keys, token values, authorization headers, local override contents, or full user-local paths.
+
+Boundary: The local bootstrap script prepares local convenience. It is not evidence, approval, root safety proof, policy satisfaction, or permission to mutate source, SQL, Weaviate, evidence, or sandbox repositories.
 
 ## Backend configuration keys
 

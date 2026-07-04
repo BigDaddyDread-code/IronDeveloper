@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 608
-- Test classes found: 602
-- Test methods found: 9645
-- Category names found: 225
+- Source files scanned: 609
+- Test classes found: 603
+- Test methods found: 9655
+- Category names found: 226
 
 ## G13 Category Changes
 
@@ -131,6 +131,14 @@ A label does not make a slow test safe.
 - J08 does not add SQL connectivity checks, SQL bootstrap, SQL rebuild, Weaviate bootstrap/rebuild, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, or production runtime behavior.
 - Config summaries help humans debug setup. They do not bless the setup.
 
+## J04 Local Bootstrap Script
+
+- Added focused `ConfigBoundary` and `LocalBootstrap` metadata to the J04 local bootstrap script regression test.
+- J04 does not add `RequiresRealDatabase` or `LongRunning`; the test executes the script against a disposable fake repository and reads script, docs, receipt, and static repository metadata only.
+- J04 verifies default check-only behavior, explicit local override copy behavior, no overwrite behavior, output redaction, no SQL/Weaviate/product-flow bootstrap behavior, and non-authority boundary wording.
+- J04 does not add SQL connectivity checks, SQL bootstrap, SQL rebuild, Weaviate bootstrap/rebuild, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, or production runtime behavior.
+- Local bootstrap helps a developer stand up. It does not bless where they stand.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -172,7 +180,7 @@ A label does not make a slow test safe.
 | `Boundary` | 13 | 106 | 0 | 13 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
-| `ConfigBoundary` | 4 | 32 | 0 | 4 |
+| `ConfigBoundary` | 5 | 42 | 0 | 5 |
 | `Contract` | 14 | 113 | 0 | 14 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
@@ -213,6 +221,7 @@ A label does not make a slow test safe.
 | `L4FailureModeReport` | 1 | 8 | 0 | 1 |
 | `L4InvariantRegression` | 1 | 14 | 0 | 1 |
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
+| `LocalBootstrap` | 1 | 10 | 0 | 1 |
 | `LongRunning` | 39 | 410 | 0 | 39 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
