@@ -14,9 +14,9 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 612
-- Test classes found: 606
-- Test methods found: 9707
+- Source files scanned: 613
+- Test classes found: 607
+- Test methods found: 9717
 - Category names found: 227
 
 ## G13 Category Changes
@@ -33,11 +33,11 @@ A label does not make a slow test safe.
 - new categories added: `RequiresRealDatabase`, `LongRunning`, `ManualLocal`.
 - categories not added: `Slow`, `Quarantined`, `RequiresExternalDependency`, `RequiresLocalTooling`.
 - counts by category:
-  - `RequiresRealDatabase`: 39 test classes, 410 test methods, 39 files.
-  - `LongRunning`: 39 test classes, 410 test methods, 39 files.
+  - `RequiresRealDatabase`: 40 test classes, 420 test methods, 40 files.
+  - `LongRunning`: 40 test classes, 420 test methods, 40 files.
   - `ManualLocal`: 1 test class, 1 test method, 1 file.
-- test classes affected: 39 store/real-database-shaped integration classes plus 1 manual local legacy class.
-- test methods affected if source-countable: 410 `RequiresRealDatabase`/`LongRunning` methods and 1 `ManualLocal` method.
+- test classes affected: 40 store/real-database-shaped integration classes plus 1 manual local legacy class.
+- test methods affected if source-countable: 420 `RequiresRealDatabase`/`LongRunning` methods and 1 `ManualLocal` method.
 - tests moved into explicit slow/quarantine visibility: store and real-database-shaped classes are now explicitly visible through `RequiresRealDatabase` and `LongRunning`; the existing manual local ignored task is visible through `ManualLocal`.
 - tests remain in default lanes: no CI filters were changed, no tests were deleted, and no default lane exclusion was added.
 - selection-only pending execution proof: most `RequiresRealDatabase`/`LongRunning` rows remain `SelectionOnlyPendingExecution` until a slow/SQL lane executes them.
@@ -163,6 +163,13 @@ A label does not make a slow test safe.
 - J07 does not create local files, start services, create or rebuild SQL, ensure or rebuild Weaviate, reset LocalTest data, run smoke, write evidence, change source/runtime authority records, add API/CLI/UI behavior, or claim alpha/merge/release/deployment readiness.
 - The developer doctor reports local readiness blockers. It does not make the machine safe.
 
+## M02 Project Channels Schema
+
+- Added broad `Governance`, `Database`, `RequiresRealDatabase`, `LongRunning`, `Contract`, and `Boundary` metadata to the M02 project channels schema test.
+- M02 adds `Database/migrate_project_channels.sql` and Core channel contract models only.
+- M02 does not add API endpoints, UI, message services, Ask IronDev behavior, reactions, sockets, notifications, workflow commands, approval from chat, release/deployment from chat, memory promotion from chat, or existing ProjectChatSessions migration.
+- Channel schema stores collaboration state only.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -201,15 +208,15 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 15 | 142 | 0 | 15 |
+| `Boundary` | 16 | 152 | 0 | 16 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `ConfigBoundary` | 8 | 94 | 0 | 8 |
-| `Contract` | 16 | 149 | 0 | 16 |
+| `Contract` | 17 | 159 | 0 | 17 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
-| `Database` | 1 | 8 | 0 | 1 |
+| `Database` | 2 | 18 | 0 | 2 |
 | `DatabaseMigrationReceipt` | 1 | 7 | 0 | 1 |
 | `DatabaseMigration` | 2 | 12 | 0 | 2 |
 | `Decision` | 2 | 12 | 0 | 2 |
@@ -226,7 +233,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 16 | 125 | 0 | 16 |
+| `Governance` | 17 | 135 | 0 | 17 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -247,7 +254,7 @@ A label does not make a slow test safe.
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
 | `LocalBootstrap` | 2 | 30 | 0 | 2 |
 | `LocalSql` | 1 | 16 | 0 | 1 |
-| `LongRunning` | 39 | 410 | 0 | 39 |
+| `LongRunning` | 40 | 420 | 0 | 40 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
 | `MemoryPromotionRequestPackage` | 1 | 7 | 0 | 1 |
@@ -333,7 +340,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessGateEvaluator` | 1 | 30 | 0 | 1 |
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
-| `RequiresRealDatabase` | 39 | 410 | 0 | 39 |
+| `RequiresRealDatabase` | 40 | 420 | 0 | 40 |
 | `Retention` | 2 | 16 | 0 | 2 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |
