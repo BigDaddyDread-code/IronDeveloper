@@ -25,6 +25,7 @@ public sealed class TicketsController : ControllerBase
     private readonly ISkeletonBatchMapService _batchMaps;
     private readonly ISkeletonBatchPlanService _batchPlans;
     private readonly ISkeletonBatchRunService _skeletonBatchRuns;
+    private readonly ISkeletonGateRecommendationService _gateRecommendations;
     private readonly IBuilderReadinessService _readiness;
     private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly ITicketRunReviewService _runReview;
@@ -42,6 +43,7 @@ public sealed class TicketsController : ControllerBase
         ISkeletonBatchMapService batchMaps,
         ISkeletonBatchPlanService batchPlans,
         ISkeletonBatchRunService skeletonBatchRuns,
+        ISkeletonGateRecommendationService gateRecommendations,
         IBuilderReadinessService readiness,
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
@@ -58,6 +60,7 @@ public sealed class TicketsController : ControllerBase
         _batchMaps = batchMaps;
         _batchPlans = batchPlans;
         _skeletonBatchRuns = skeletonBatchRuns;
+        _gateRecommendations = gateRecommendations;
         _readiness = readiness;
         _evidenceSummary = evidenceSummary;
         _runReview = runReview;
@@ -467,6 +470,23 @@ public sealed class TicketsController : ControllerBase
     }
 
     public sealed record FindingDispositionBody(string? Disposition, string? Reason);
+
+    /// <summary>
+    /// GET skeleton-runs/{runId}/gate-recommendation — policy's risk-tier advice
+    /// for a halted run's gate (P2-6). Recommendation only: policy cannot click,
+    /// and the P1-6 catch-rate is a hard input — no measured net, no
+    /// recommendation beyond human judgment. Read-only; grants nothing.
+    /// </summary>
+    [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/gate-recommendation")]
+    public async Task<ActionResult<SkeletonGateRecommendation>> GetGateRecommendation(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken ct)
+    {
+        var recommendation = await _gateRecommendations.RecommendAsync(projectId, ticketId, runId, ct);
+        return recommendation is null ? NotFound() : Ok(recommendation);
+    }
 
     /// <summary>
     /// GET skeleton-runs/{runId}/report — reconstructs the whole governed loop from
