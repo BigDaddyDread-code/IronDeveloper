@@ -23,6 +23,7 @@ public sealed class TicketsController : ControllerBase
     private readonly ISkeletonCriticReviewService _criticReviews;
     private readonly ISkeletonFindingDispositionService _findingDispositions;
     private readonly ISkeletonBatchMapService _batchMaps;
+    private readonly ISkeletonBatchPlanService _batchPlans;
     private readonly IBuilderReadinessService _readiness;
     private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly ITicketRunReviewService _runReview;
@@ -38,6 +39,7 @@ public sealed class TicketsController : ControllerBase
         ISkeletonCriticReviewService criticReviews,
         ISkeletonFindingDispositionService findingDispositions,
         ISkeletonBatchMapService batchMaps,
+        ISkeletonBatchPlanService batchPlans,
         IBuilderReadinessService readiness,
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
@@ -52,6 +54,7 @@ public sealed class TicketsController : ControllerBase
         _criticReviews = criticReviews;
         _findingDispositions = findingDispositions;
         _batchMaps = batchMaps;
+        _batchPlans = batchPlans;
         _readiness = readiness;
         _evidenceSummary = evidenceSummary;
         _runReview = runReview;
@@ -312,6 +315,43 @@ public sealed class TicketsController : ControllerBase
     public async Task<ActionResult<SkeletonBatchMapRecord>> GetBatchMap(int projectId, string mapId, CancellationToken ct)
     {
         var record = await _batchMaps.GetAsync(projectId, mapId, ct);
+        return record is null ? NotFound() : Ok(record);
+    }
+
+    /// <summary>
+    /// POST batch-plans — sequences a sealed dependency map into execution waves
+    /// (P2-2). Derives only from a map whose seal verifies; cycles are named
+    /// blockers for the human, never auto-broken. A plan is a proposal: it grants
+    /// nothing and runs nothing.
+    /// </summary>
+    [HttpPost("api/projects/{projectId:int}/batch-plans")]
+    public async Task<ActionResult<SkeletonBatchPlanOutcome>> PlanBatch(
+        int projectId,
+        [FromBody] BatchPlanRequestBody body,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(body.MapId))
+        {
+            return BadRequest(new { error = "MapId is required.", boundary = SkeletonBatchPlan.BoundaryText });
+        }
+
+        var outcome = await _batchPlans.PlanAsync(
+            projectId,
+            body.MapId,
+            User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value
+                ?? "unknown-user",
+            ct);
+        return Ok(outcome);
+    }
+
+    public sealed record BatchPlanRequestBody(string? MapId);
+
+    /// <summary>GET batch-plans/{planId} — reads a stored plan back with its integrity re-verified.</summary>
+    [HttpGet("api/projects/{projectId:int}/batch-plans/{planId}")]
+    public async Task<ActionResult<SkeletonBatchPlanRecord>> GetBatchPlan(int projectId, string planId, CancellationToken ct)
+    {
+        var record = await _batchPlans.GetAsync(projectId, planId, ct);
         return record is null ? NotFound() : Ok(record);
     }
 
