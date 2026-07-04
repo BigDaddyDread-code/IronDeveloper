@@ -32,6 +32,10 @@ public sealed record SkeletonTestAuthoringResult
     public required bool Succeeded { get; init; }
     public IReadOnlyList<SkeletonAuthoredTest> Tests { get; init; } = [];
     public string FailureReason { get; init; } = string.Empty;
+
+    /// <summary>AG-2: which model authored these tests — provenance the run stamps into its events.</summary>
+    public string ModelProvider { get; init; } = string.Empty;
+    public string ModelName { get; init; } = string.Empty;
 }
 
 /// <summary>

@@ -9,6 +9,7 @@ import {
   saveApprovalPolicy
 } from './approvalPolicy';
 import { FlowRole, flowRoles } from './usersDraft';
+import { AgentsPanel } from './AgentsPanel';
 
 const apiRoles = ['Owner', 'TenantAdmin', 'Approver', 'Reviewer', 'Operator', 'Viewer', 'Member'];
 
@@ -304,6 +305,10 @@ export function SettingsScreen() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <AgentsPanel />
       </div>
     </div>
   );

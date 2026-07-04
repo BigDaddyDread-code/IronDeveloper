@@ -5,6 +5,9 @@ import type {
   ApiStatus,
   BuildReadinessResult,
   CreateAcceptedApprovalUiRequest,
+  SkeletonAgentProfile,
+  SkeletonAgentProfileOutcome,
+  SkeletonAgentProfileUpdate,
   SkeletonBatchMapOutcome,
   SkeletonBatchPlanOutcome,
   SkeletonBatchRunOutcome,
@@ -815,6 +818,25 @@ class IronDevApiClient {
       `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/report`,
       { method: 'GET', signal }
     );
+  }
+
+  // AG-1: agent profiles — read and edit the model + voice each agent runs on.
+  // Voice and model only; the backend refuses secrets and grants no authority.
+
+  async listAgentProfiles(signal?: AbortSignal): Promise<SkeletonAgentProfile[]> {
+    return this.request<SkeletonAgentProfile[]>('/api/v1/agent-profiles', { method: 'GET', signal });
+  }
+
+  async updateAgentProfile(
+    role: string,
+    update: SkeletonAgentProfileUpdate,
+    signal?: AbortSignal
+  ): Promise<SkeletonAgentProfileOutcome> {
+    return this.request<SkeletonAgentProfileOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}`, {
+      method: 'PUT',
+      body: update,
+      signal
+    });
   }
 
   // P2: batch — detect the dependency map, sequence it into a plan, run it wave
