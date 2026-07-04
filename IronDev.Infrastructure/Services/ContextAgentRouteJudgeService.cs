@@ -240,7 +240,7 @@ Return this JSON shape:
 {{
   ""requestKind"": ""GeneralChat|InspectCode|ExplainCode|VerifyImplementation|CreateTicket|CreateTicketsFromDiscussion|ChangeImplementation|ReplaceArchitecture|BuildTicket|ArchitectureAdvice|ArchitectureDecisionExploration"",
   ""confidence"": 0.0,
-  ""effectiveWorkText"": ""Expanded and resolved request text (e.g. 'industry standard' -> 'industry standard persistence for BookSeller')"",
+  ""effectiveWorkText"": ""Expanded and resolved request text (e.g. 'industry standard' -> 'industry standard persistence for the active project')"",
   ""reason"": """",
   ""contextModeHint"": ""Exploration"",
   ""allowCodeSearch"": true,
@@ -258,7 +258,7 @@ Return this JSON shape:
 CONTINUATION RESOLUTION RULE:
 If UserRequest is short, vague, or a follow-up (e.g. ""industry standard"", ""yes"", ""that one"", ""how?"", ""why?""):
 1. Use RecentConversationSummary to resolve what the user is actually asking about.
-2. Set effectiveWorkText to the fully resolved question (e.g. ""What is the industry-standard approach for BookSeller persistence?"").
+2. Set effectiveWorkText to the fully resolved question (e.g. ""What is the industry-standard approach for this project's persistence?"").
 3. If RecentConversationSummary does not provide enough context, set needsClarification=true.
 
 ARCHITECTURE ADVICE RULE:

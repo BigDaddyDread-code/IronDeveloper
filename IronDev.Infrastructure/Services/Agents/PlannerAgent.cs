@@ -26,9 +26,7 @@ public sealed class PlannerAgent : StaticIronDevAgent
         }
 
         var goal = RequireInput(request, "goal");
-        var project = request.Inputs.TryGetValue("project", out var projectValue) && !string.IsNullOrWhiteSpace(projectValue)
-            ? projectValue
-            : "BookSeller";
+        var project = RequireInput(request, "project");
         var runId = string.IsNullOrWhiteSpace(request.DogfoodRunId)
             ? $"PlannerAgent-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
             : request.DogfoodRunId;

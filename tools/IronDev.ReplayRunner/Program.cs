@@ -749,9 +749,9 @@ static async Task<int> HandleAgentQualityRunGateCommandAsync(string[] args, Json
 
 static async Task<int> HandleAgentPlannerDraftTestPlanCommandAsync(string[] args, JsonSerializerOptions options)
 {
-    var project = ReadOption(args, "--project") ?? "BookSeller";
+    var project = ReadOption(args, "--project");
     var goal = ReadOption(args, "--goal") ?? ReadPositionalText(args, 3);
-    if (string.IsNullOrWhiteSpace(goal))
+    if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(goal))
     {
         Console.Error.WriteLine("Usage: IronDev.ReplayRunner agent planner draft-test-plan --project <project> --goal <goal> [--run-id id] [--live-llm] [--model-profile profile] [--json]");
         return 2;

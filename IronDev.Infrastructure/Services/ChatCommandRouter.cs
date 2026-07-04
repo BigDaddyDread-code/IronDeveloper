@@ -415,11 +415,11 @@ public sealed class ChatCommandRouter : IChatCommandRouter
     {
         var hasProjectKnowledgeTarget =
             ContainsAny(lower, "project knowledge", "project memory", "architecture") &&
-            ContainsAny(lower, "bookseller", "book seller", "bookstore", "irondev", "ida", "project");
+            ContainsAny(lower, "irondev", "ida", "project");
 
         var rememberForProject =
             ContainsAny(lower, "remember this for", "remember that for", "save this for", "save that for") &&
-            ContainsAny(lower, "bookseller", "book seller", "bookstore", "irondev", "ida");
+            ContainsAny(lower, "irondev", "ida", "project");
 
         if (!hasProjectKnowledgeTarget && !rememberForProject)
             return false;

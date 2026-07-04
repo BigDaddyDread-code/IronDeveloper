@@ -114,13 +114,6 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         if (ctx.IsExternalProject)
         {
             sb.AppendLine("NOTE: This is an EXTERNAL project. Do not make assumptions based on IronDev internals.");
-            if (ctx.ProjectName.Contains("BookSeller", StringComparison.OrdinalIgnoreCase))
-            {
-                sb.AppendLine("- For SearchByTitle, modify the existing method in BookService.cs only.");
-                sb.AppendLine("- Use the existing private _books field for filtering.");
-                sb.AppendLine("- Return matching books using a case-insensitive, partial contains match.");
-                sb.AppendLine("- DO NOT create a new Book class; use BookSeller.Core.Models.Book.");
-            }
         }
 
         sb.AppendLine();
