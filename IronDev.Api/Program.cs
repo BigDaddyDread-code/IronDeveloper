@@ -68,6 +68,7 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+Program.AddDevelopmentLocalConfiguration(builder);
 builder.Host.UseSerilog();
 builder.Host.UseDefaultServiceProvider(options =>
 {
@@ -798,7 +799,58 @@ static IRunReportService CreateRunReportService(IConfiguration configuration)
 }
 
 // Expose Program for WebApplicationFactory in integration tests.
-public partial class Program { }
+public partial class Program
+{
+    private const string DevelopmentLocalSettingsFileName = "appsettings.Development.Local.json";
+
+    public static void AddDevelopmentLocalConfiguration(WebApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        if (!builder.Environment.IsDevelopment())
+            return;
+
+        builder.Configuration.AddJsonFile(
+            DevelopmentLocalSettingsFileName,
+            optional: true,
+            reloadOnChange: true);
+        MoveDevelopmentLocalConfigurationBeforeHigherPrecedenceSources(builder.Configuration);
+    }
+
+    private static void MoveDevelopmentLocalConfigurationBeforeHigherPrecedenceSources(ConfigurationManager configuration)
+    {
+        var sources = configuration.Sources;
+        var localSource = sources.LastOrDefault(IsDevelopmentLocalJsonSource);
+        if (localSource is null)
+            return;
+
+        sources.Remove(localSource);
+
+        var insertAt = sources.Count;
+        for (var index = 0; index < sources.Count; index++)
+        {
+            if (!IsHigherPrecedenceConfigurationSource(sources[index]))
+                continue;
+
+            insertAt = index;
+            break;
+        }
+
+        sources.Insert(insertAt, localSource);
+    }
+
+    private static bool IsDevelopmentLocalJsonSource(IConfigurationSource source) =>
+        source is Microsoft.Extensions.Configuration.Json.JsonConfigurationSource jsonSource &&
+        string.Equals(jsonSource.Path, DevelopmentLocalSettingsFileName, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsHigherPrecedenceConfigurationSource(IConfigurationSource source)
+    {
+        var sourceType = source.GetType().FullName ?? source.GetType().Name;
+        return sourceType.Contains("UserSecrets", StringComparison.OrdinalIgnoreCase) ||
+            sourceType.Contains("EnvironmentVariables", StringComparison.OrdinalIgnoreCase) ||
+            sourceType.Contains("CommandLine", StringComparison.OrdinalIgnoreCase);
+    }
+}
 
 internal sealed record StartupEnvironmentSafetyContext(
     string ConnectionString,
