@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/BookSeller.Domain/BookSeller.Domain.csproj" />
+  <Project Path="tests/BookSeller.Domain.Tests/BookSeller.Domain.Tests.csproj" />
+</Solution>

@@ -1,0 +1,35 @@
+{
+  "project": {
+    "name": "BookSeller",
+    "description": "Demo target for the governed loop. A small book catalog domain: the sample compiles green as-is, and these tickets describe features deliberately not implemented yet — the Builder earns the demo by solving them live.",
+    "relativePath": "Samples/BookSeller",
+    "buildCommand": "dotnet build BookSeller.slnx",
+    "testCommand": "dotnet test BookSeller.slnx"
+  },
+  "tickets": [
+    {
+      "key": "validate-book",
+      "title": "Reject invalid books at the door",
+      "summary": "A Book can currently be constructed with an empty ISBN, an empty title, or a negative price, and the catalog will happily store it. Invalid books must be rejected when constructed so every downstream consumer can trust a Book that exists.",
+      "acceptanceCriteria": "1) Constructing a Book with a null, empty, or whitespace ISBN throws ArgumentException naming the isbn parameter. 2) Constructing a Book with a null, empty, or whitespace title throws ArgumentException naming the title parameter. 3) Constructing a Book with a negative price throws ArgumentOutOfRangeException naming the price parameter. 4) A book with a valid ISBN, title, author, and non-negative price constructs exactly as before. 5) A price of zero remains valid (free promotional books exist).",
+      "technicalNotes": "Validate in the Book constructor in src/BookSeller.Domain/Book.cs. Do not change the public property surface. Existing tests must keep passing.",
+      "blockedBy": []
+    },
+    {
+      "key": "search-by-author",
+      "title": "Find books by author",
+      "summary": "The catalog can only look a book up by exact ISBN. Readers browse by author. Add an author search to Catalog that returns every matching book.",
+      "acceptanceCriteria": "1) Catalog exposes a method that takes an author name and returns all books by that author. 2) Matching is case-insensitive (searching 'hunt & thomas' finds 'Hunt & Thomas'). 3) An author with no books in the catalog yields an empty collection, never null. 4) Books added after a search are found by subsequent searches. 5) Existing ISBN lookup behaviour is unchanged.",
+      "technicalNotes": "Extend src/BookSeller.Domain/Catalog.cs. Keep the in-memory storage; a simple scan over the stored books is fine at this size.",
+      "blockedBy": []
+    },
+    {
+      "key": "bulk-discount",
+      "title": "Bulk orders earn a discount",
+      "summary": "PricingService charges a flat price-times-quantity for every order line. Schools and book clubs buying in bulk should get 10% off. Depends on book validation landing first: discount math must be able to trust that a stored price is never negative.",
+      "acceptanceCriteria": "1) An order line of 10 or more copies of the same book is priced at 90% of the flat total. 2) An order line of fewer than 10 copies is priced flat, exactly as before. 3) The discounted total is rounded to 2 decimal places using away-from-zero rounding. 4) A quantity of zero or a negative quantity throws ArgumentOutOfRangeException naming the quantity parameter. 5) A zero-priced book totals zero at any quantity, discounted or not.",
+      "technicalNotes": "Extend PriceFor in src/BookSeller.Domain/PricingService.cs. The 10-copy threshold and 10% rate can be private constants; no configuration surface is wanted at this size.",
+      "blockedBy": ["validate-book"]
+    }
+  ]
+}
