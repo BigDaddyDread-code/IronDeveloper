@@ -116,7 +116,8 @@ public sealed class SkeletonCriticCanaryRunner : ISkeletonCriticCanaryRunner
                 tickets,
                 runs,
                 events,
-                new AgreeableModel(),
+                new AgreeableAgentResolver(),
+                new SkeletonAgentProfileService(configuration),
                 new CanaryStoredCritic(),
                 verifier,
                 configuration);
@@ -209,6 +210,21 @@ public sealed class SkeletonCriticCanaryRunner : ISkeletonCriticCanaryRunner
     {
         public Task<string> GetResponseAsync(string prompt, CancellationToken ct = default) =>
             Task.FromResult("{\"verdict\":\"NoObjection\",\"findings\":[]}");
+    }
+
+    /// <summary>Resolves every role to the agreeable model — the corpus measures structure, not the model's mood.</summary>
+    private sealed class AgreeableAgentResolver : IronDev.Core.Agents.IAgentLlmResolver
+    {
+        public Task<IronDev.Core.Agents.SkeletonAgentLlm> ResolveAsync(
+            IronDev.Core.Agents.SkeletonAgentRole role,
+            CancellationToken ct = default) =>
+            Task.FromResult(new IronDev.Core.Agents.SkeletonAgentLlm
+            {
+                Role = role,
+                Llm = new AgreeableModel(),
+                Provider = "fake",
+                Model = "canary-agreeable"
+            });
     }
 
     /// <summary>Runs the real review-only validation chain and keeps the result in memory — the eval never touches production stores.</summary>

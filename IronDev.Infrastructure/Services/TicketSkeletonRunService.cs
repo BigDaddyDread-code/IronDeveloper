@@ -46,6 +46,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private readonly IWorkflowApprovalHaltEvaluator _approvalHalt;
     private readonly ISkeletonTestAuthoringService _testAuthoring;
     private readonly ISkeletonMutationLeaseService _mutationLeases;
+    private readonly SkeletonRunDriftDetector _driftDetector;
     private readonly IConfiguration _configuration;
 
     public TicketSkeletonRunService(
@@ -73,6 +74,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _approvalHalt = approvalHalt;
         _testAuthoring = testAuthoring;
         _mutationLeases = mutationLeases;
+        _driftDetector = new SkeletonRunDriftDetector(events);
         _configuration = configuration;
     }
 
@@ -176,6 +178,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 projectId, ticketId, new Dictionary<string, string>
                 {
                     ["authoredTestCount"] = authoredTests.Count.ToString(),
+                    // AG-2: which model authored the tests.
+                    ["modelProvider"] = authoring.ModelProvider,
+                    ["modelName"] = authoring.ModelName,
                     ["currentNode"] = "SkeletonRun"
                 }, cancellationToken).ConfigureAwait(false);
         }
@@ -307,7 +312,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // overlapping changes after this package was prepared, this run's evidence
         // describes a source that no longer exists — no point evaluating findings
         // or approvals on a run the world already invalidated.
-        var staleBecause = await DetectStalenessAsync(projectId, runId, cancellationToken).ConfigureAwait(false);
+        var staleBecause = await _driftDetector.DetectAsync(projectId, runId, ResolveEvidenceRoot(), cancellationToken).ConfigureAwait(false);
         if (staleBecause is not null)
         {
             await PublishAsync(runId, "ContinuationRefused",
@@ -493,7 +498,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
 
         // P2-5, re-checked live at the mutation step: an upstream that applied
         // between continuation and apply still invalidates this run's evidence.
-        var staleAtApply = await DetectStalenessAsync(projectId, runId, cancellationToken).ConfigureAwait(false);
+        var staleAtApply = await _driftDetector.DetectAsync(projectId, runId, ResolveEvidenceRoot(), cancellationToken).ConfigureAwait(false);
         if (staleAtApply is not null)
         {
             return await RefuseApplyAsync(run, projectId, ticketId,
@@ -767,7 +772,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             testAuthoringTrace = new SkeletonRunTestAuthoringTrace
             {
                 Authored = true,
-                AuthoredTestCount = int.TryParse(Payload(authoredEvent, "authoredTestCount"), out var testCount) ? testCount : 0
+                AuthoredTestCount = int.TryParse(Payload(authoredEvent, "authoredTestCount"), out var testCount) ? testCount : 0,
+                ModelProvider = Payload(authoredEvent, "modelProvider"),
+                ModelName = Payload(authoredEvent, "modelName")
             };
         }
         else if (authoringSkippedEvent is not null)
@@ -852,7 +859,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
                 PackageSha256 = Payload(runEvent, "packageSha256"),
                 GroundTruthCheckCount = int.TryParse(Payload(runEvent, "groundTruthCheckCount"), out var checkCount) ? checkCount : 0,
-                GroundTruthMismatchCount = int.TryParse(Payload(runEvent, "groundTruthMismatchCount"), out var mismatchCount) ? mismatchCount : 0
+                GroundTruthMismatchCount = int.TryParse(Payload(runEvent, "groundTruthMismatchCount"), out var mismatchCount) ? mismatchCount : 0,
+                ModelProvider = Payload(runEvent, "modelProvider"),
+                ModelName = Payload(runEvent, "modelName")
             })
             .ToList();
 
@@ -928,7 +937,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // before spending an approval on a run the world already invalidated.
         if (run.State is RunLifecycleState.PausedForApproval or RunLifecycleState.Completed)
         {
-            var staleReason = await DetectStalenessAsync(projectId, runId, cancellationToken).ConfigureAwait(false);
+            var staleReason = await _driftDetector.DetectAsync(projectId, runId, ResolveEvidenceRoot(), cancellationToken).ConfigureAwait(false);
             if (staleReason is not null)
                 gaps.Add(staleReason);
         }
@@ -968,84 +977,6 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
 
     private static string Payload(RunEventDto runEvent, string key) =>
         runEvent.Payload.TryGetValue(key, out var value) ? value : string.Empty;
-
-    /// <summary>
-    /// P2-5 — re-plan on drift. A halted run's evidence describes the source as it
-    /// was when the package was prepared. If another run APPLIED overlapping
-    /// changes to the project after that moment, the evidence describes a source
-    /// that no longer exists — the run is stale, and the gate never consumes a
-    /// stale package. Detection is durable-evidence only: the upstream's
-    /// SkeletonApplied event and both runs' critic packages on disk. An upstream
-    /// whose footprint cannot be read is treated as overlapping — conservative,
-    /// and the reason says so. Returns the named staleness reason, or null.
-    /// </summary>
-    private async Task<string?> DetectStalenessAsync(int projectId, string runId, CancellationToken cancellationToken)
-    {
-        var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
-        var packageReady = events.FirstOrDefault(runEvent => runEvent.EventType == "CriticReviewPackageReady");
-        if (packageReady is null)
-            return null;
-
-        var preparedAtUtc = packageReady.TimestampUtc;
-        var footprint = await ReadPackageFootprintAsync(runId, cancellationToken).ConfigureAwait(false);
-
-        var recentRunIds = await _events.GetRecentRunIdsAsync(200, cancellationToken).ConfigureAwait(false);
-        foreach (var otherRunId in recentRunIds.Where(candidate => !string.Equals(candidate, runId, StringComparison.Ordinal)))
-        {
-            var otherEvents = await _events.GetEventsAsync(otherRunId, cancellationToken).ConfigureAwait(false);
-            var applied = otherEvents.FirstOrDefault(runEvent =>
-                runEvent.EventType == "SkeletonApplied" &&
-                Payload(runEvent, "projectId") == projectId.ToString() &&
-                runEvent.TimestampUtc > preparedAtUtc);
-            if (applied is null)
-                continue;
-
-            var otherFootprint = await ReadPackageFootprintAsync(otherRunId, cancellationToken).ConfigureAwait(false);
-            if (footprint is null || otherFootprint is null)
-            {
-                return
-                    $"Run {otherRunId} applied changes to this project after this run's package was prepared, and a " +
-                    "footprint could not be read — treated as overlapping, conservatively and by name. The halt evidence " +
-                    "describes a source that no longer exists: start a fresh skeleton run. The gate never consumes a stale package.";
-            }
-
-            var shared = footprint.Intersect(otherFootprint, StringComparer.OrdinalIgnoreCase)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            if (shared.Count > 0)
-            {
-                return
-                    $"Run {otherRunId} applied changes overlapping this run's footprint ({string.Join(", ", shared)}) after " +
-                    "this package was prepared. The halt evidence describes a source that no longer exists: start a fresh " +
-                    "skeleton run. The gate never consumes a stale package.";
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>A run's predicted footprint from its critic package on disk, normalized; null when unreadable.</summary>
-    private async Task<IReadOnlyList<string>?> ReadPackageFootprintAsync(string runId, CancellationToken cancellationToken)
-    {
-        var packagePath = CriticPackagePath(ResolveEvidenceRoot(), runId);
-        if (!File.Exists(packagePath))
-            return null;
-
-        try
-        {
-            var package = JsonSerializer.Deserialize<SkeletonCriticPackage>(
-                await File.ReadAllTextAsync(packagePath, cancellationToken).ConfigureAwait(false), JsonOptions);
-            return package?.Changes
-                .Select(change => (change.FilePath ?? string.Empty).Replace('\\', '/').TrimStart('/').Trim())
-                .Where(path => path.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
 
     /// <summary>
     /// P1-3: finding ids from recorded critic reviews minus recorded dispositions,

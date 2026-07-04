@@ -1,5 +1,6 @@
 using System.Text.Json;
 using IronDev.Core;
+using IronDev.Core.Agents;
 using IronDev.Core.Agents.Concrete;
 using IronDev.Core.Builder;
 using IronDev.Core.RunReports;
@@ -36,7 +37,8 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
     private readonly ITicketService _tickets;
     private readonly IRunStore _runs;
     private readonly IRunEventStore _events;
-    private readonly ILLMService _llm;
+    private readonly IAgentLlmResolver _llmResolver;
+    private readonly ISkeletonAgentProfileService _profiles;
     private readonly IStoredManualIndependentCriticAgentService _storedCritic;
     private readonly ISkeletonCriticGroundTruthVerifier _groundTruth;
     private readonly IConfiguration _configuration;
@@ -45,7 +47,8 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
         ITicketService tickets,
         IRunStore runs,
         IRunEventStore events,
-        ILLMService llm,
+        IAgentLlmResolver llmResolver,
+        ISkeletonAgentProfileService profiles,
         IStoredManualIndependentCriticAgentService storedCritic,
         ISkeletonCriticGroundTruthVerifier groundTruth,
         IConfiguration configuration)
@@ -53,7 +56,8 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
         _tickets = tickets;
         _runs = runs;
         _events = events;
-        _llm = llm;
+        _llmResolver = llmResolver;
+        _profiles = profiles;
         _storedCritic = storedCritic;
         _groundTruth = groundTruth;
         _configuration = configuration;
@@ -108,10 +112,18 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
         var verification = await _groundTruth.VerifyAsync(request.RunId, package, packagePath, packageHash, cancellationToken)
             .ConfigureAwait(false);
 
+        // AG-2: the Critic runs on its own profile's model and voice — but its
+        // input is still blind by contract (the package + ground truth only), and
+        // the code-owned prompt body always wins over the profile. A skill.md
+        // cannot hand the critic the builder's reasoning.
+        var agent = await _llmResolver.ResolveAsync(SkeletonAgentRole.Critic, cancellationToken).ConfigureAwait(false);
+        var profile = await _profiles.GetAsync(SkeletonAgentRole.Critic, cancellationToken).ConfigureAwait(false);
+        var prompt = SkeletonAgentPromptComposer.Compose(profile, BuildPrompt(package, verification));
+
         string response;
         try
         {
-            response = await _llm.GetResponseAsync(BuildPrompt(package, verification), cancellationToken).ConfigureAwait(false);
+            response = await agent.Llm.GetResponseAsync(prompt, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -237,6 +249,10 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
                 ["packageSha256"] = packageHash,
                 ["groundTruthCheckCount"] = verification.Checks.Count.ToString(),
                 ["groundTruthMismatchCount"] = verification.Mismatches.Count.ToString(),
+                // AG-2: which model reviewed — a catch-rate is meaningless without
+                // knowing which configured critic was measured.
+                ["modelProvider"] = agent.Provider,
+                ["modelName"] = agent.Model,
                 ["requestedByUserId"] = request.RequestedByUserId
             }, cancellationToken).ConfigureAwait(false);
 

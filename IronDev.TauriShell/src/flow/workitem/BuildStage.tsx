@@ -43,7 +43,8 @@ export function BuildStage({ run, report, onRefreshReport }: BuildStageProps) {
           {report.testAuthoring ? (
             <p style={{ fontSize: 13, color: 'var(--fl-ink2)' }} data-testid="flow.build.testAuthoring">
               {report.testAuthoring.authored
-                ? `${report.testAuthoring.authoredTestCount} test(s) authored from the acceptance criteria — blind to the builder's diff.`
+                ? `${report.testAuthoring.authoredTestCount} test(s) authored from the acceptance criteria — blind to the builder's diff.` +
+                  (report.testAuthoring.modelName ? ` (model: ${report.testAuthoring.modelProvider}/${report.testAuthoring.modelName})` : '')
                 : `Test authoring skipped: ${report.testAuthoring.skippedReason} The criterion-to-test matrix has no cells and the review will say so.`}
             </p>
           ) : null}

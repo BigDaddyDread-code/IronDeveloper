@@ -1103,6 +1103,8 @@ export interface SkeletonRunTestAuthoringTrace {
   authored: boolean;
   authoredTestCount: number;
   skippedReason: string;
+  modelProvider: string;
+  modelName: string;
 }
 
 export interface SkeletonRunCriticPackageTrace {
@@ -1270,6 +1272,8 @@ export interface SkeletonRunCriticReviewTrace {
   packageSha256: string;
   groundTruthCheckCount: number;
   groundTruthMismatchCount: number;
+  modelProvider: string;
+  modelName: string;
 }
 
 export interface SkeletonRunFindingDispositionTrace {
@@ -1376,4 +1380,31 @@ export interface SkeletonGateRecommendation {
   reasons: string[];
   measurementInput?: SkeletonGateMeasurementInput | null;
   boundary: string;
+}
+
+// ── AG-1: agent profiles (voice + model, never authority) ──
+
+export interface SkeletonAgentProfile {
+  role: string;
+  provider: string;
+  model: string;
+  baseUrl: string;
+  timeoutSeconds: number;
+  skill: string;
+  personality: string;
+  boundary: string;
+}
+
+export interface SkeletonAgentProfileUpdate {
+  provider: string;
+  model: string;
+  timeoutSeconds: number;
+  skill: string;
+  personality: string;
+}
+
+export interface SkeletonAgentProfileOutcome {
+  succeeded: boolean;
+  failureReason: string;
+  profile?: SkeletonAgentProfile | null;
 }

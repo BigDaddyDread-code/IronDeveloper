@@ -1,0 +1,61 @@
+using System.Collections.Concurrent;
+using IronDev.Core.Agents;
+
+namespace IronDev.Infrastructure.Services;
+
+/// <summary>
+/// AG-4 — in-memory ephemeral per-agent scratchpad. Keyed by (runId, role);
+/// unshared across agents, ungoverned, and dropped by ClearRun. The Critic role
+/// is refused by construction — memory is not a thing the critic is allowed to
+/// have, and the guard throws rather than quietly no-op'ing so the exclusion can
+/// never rot into a silent leak.
+///
+/// Boundary: this is a working scratchpad, not authority and not durable memory.
+/// It grants nothing, persists nothing, and shares nothing between agents — a
+/// deliberate non-channel so no belief can travel from one role to another and
+/// collapse their independence.
+/// </summary>
+public sealed class SkeletonAgentScratchpad : ISkeletonAgentScratchpad
+{
+    // A visible, printable delimiter — no control characters in source or in keys.
+    private const string Separator = "::";
+
+    private readonly ConcurrentDictionary<string, string> _entries = new(StringComparer.Ordinal);
+
+    public void Write(string runId, SkeletonAgentRole role, string key, string value)
+    {
+        Guard(role);
+        _entries[Compose(runId, role, key)] = value;
+    }
+
+    public string? Read(string runId, SkeletonAgentRole role, string key)
+    {
+        Guard(role);
+        return _entries.TryGetValue(Compose(runId, role, key), out var value) ? value : null;
+    }
+
+    public IReadOnlyDictionary<string, string> ReadAll(string runId, SkeletonAgentRole role)
+    {
+        Guard(role);
+        var prefix = $"{runId}{Separator}{role}{Separator}";
+        return _entries
+            .Where(pair => pair.Key.StartsWith(prefix, StringComparison.Ordinal))
+            .ToDictionary(pair => pair.Key[prefix.Length..], pair => pair.Value, StringComparer.Ordinal);
+    }
+
+    public void ClearRun(string runId)
+    {
+        var prefix = $"{runId}{Separator}";
+        foreach (var key in _entries.Keys.Where(candidate => candidate.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+            _entries.TryRemove(key, out _);
+    }
+
+    private static void Guard(SkeletonAgentRole role)
+    {
+        if (!ISkeletonAgentScratchpad.RoleMayHoldMemory(role))
+            throw new SkeletonAgentMemoryForbiddenException(role);
+    }
+
+    private static string Compose(string runId, SkeletonAgentRole role, string key) =>
+        $"{runId}{Separator}{role}{Separator}{key}";
+}

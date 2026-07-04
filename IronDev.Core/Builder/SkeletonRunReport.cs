@@ -78,6 +78,10 @@ public sealed record SkeletonRunTestAuthoringTrace
     public bool Authored { get; init; }
     public int AuthoredTestCount { get; init; }
     public string SkippedReason { get; init; } = string.Empty;
+
+    /// <summary>AG-2: which model authored the tests.</summary>
+    public string ModelProvider { get; init; } = string.Empty;
+    public string ModelName { get; init; } = string.Empty;
 }
 
 public sealed record SkeletonRunCriticPackageTrace
@@ -141,6 +145,10 @@ public sealed record SkeletonRunCriticReviewTrace
     /// <summary>P1-2: how many ground-truth checks ran and how many found claim/evidence mismatches.</summary>
     public int GroundTruthCheckCount { get; init; }
     public int GroundTruthMismatchCount { get; init; }
+
+    /// <summary>AG-2: which model reviewed — a catch-rate is meaningless without knowing which configured critic was measured.</summary>
+    public string ModelProvider { get; init; } = string.Empty;
+    public string ModelName { get; init; } = string.Empty;
 }
 
 /// <summary>A human disposition recorded for a critic finding. A decision, not approval.</summary>

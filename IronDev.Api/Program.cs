@@ -195,6 +195,9 @@ builder.Services.AddScoped<ITicketEvidenceSummaryService, TicketEvidenceSummaryS
 builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
 builder.Services.AddScoped<ITicketSkeletonRunService, TicketSkeletonRunService>();
+builder.Services.AddScoped<ISkeletonAgentProfileService, SkeletonAgentProfileService>();
+builder.Services.AddScoped<IAgentLlmResolver, AgentLlmResolver>();
+builder.Services.AddSingleton<ISkeletonAgentScratchpad, SkeletonAgentScratchpad>();
 builder.Services.AddScoped<ISkeletonTestAuthoringService, SkeletonTestAuthoringService>();
 builder.Services.AddScoped<ISkeletonCriticReviewService, SkeletonCriticReviewService>();
 builder.Services.AddScoped<ISkeletonCriticGroundTruthVerifier, SkeletonCriticGroundTruthVerifier>();

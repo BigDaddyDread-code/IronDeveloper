@@ -56,6 +56,7 @@ export function FindingsPanel({
           Review {review.reviewId}: verdict <strong>{review.verdict}</strong> · {review.findingCount} finding(s) (
           {review.blockingFindingCount} blocking) · ground truth {review.groundTruthMismatchCount} mismatch(es) in{' '}
           {review.groundTruthCheckCount} check(s)
+          {review.modelName ? ` · reviewed by ${review.modelProvider}/${review.modelName}` : ''}
         </p>
       ))}
 

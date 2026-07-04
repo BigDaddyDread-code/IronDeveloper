@@ -1,5 +1,6 @@
 using System.Text.Json;
 using IronDev.Core;
+using IronDev.Core.Agents;
 using IronDev.Core.Builder;
 
 namespace IronDev.Infrastructure.Services;
@@ -9,6 +10,12 @@ namespace IronDev.Infrastructure.Services;
 /// the request's requirement surface — the contract has no field for the builder's
 /// diff, and this implementation adds none. Failures degrade explicitly: the caller
 /// reports authoring as skipped rather than silently shipping a run with no tests.
+///
+/// AG-2: the Tester runs on whatever model its profile configures, and its profile's
+/// personality/skill frame the prompt — but the code-owned body below (the blind-by-
+/// contract requirement surface and the strict JSON contract) always comes last and
+/// always wins. A skill.md can change the tester's phrasing; it cannot hand the tester
+/// the builder's code or loosen the output contract.
 /// </summary>
 public sealed class SkeletonTestAuthoringService : ISkeletonTestAuthoringService
 {
@@ -17,9 +24,14 @@ public sealed class SkeletonTestAuthoringService : ISkeletonTestAuthoringService
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly ILLMService _llm;
+    private readonly IAgentLlmResolver _llmResolver;
+    private readonly ISkeletonAgentProfileService _profiles;
 
-    public SkeletonTestAuthoringService(ILLMService llm) => _llm = llm;
+    public SkeletonTestAuthoringService(IAgentLlmResolver llmResolver, ISkeletonAgentProfileService profiles)
+    {
+        _llmResolver = llmResolver;
+        _profiles = profiles;
+    }
 
     public async Task<SkeletonTestAuthoringResult> AuthorTestsAsync(SkeletonTestAuthoringRequest request, CancellationToken cancellationToken = default)
     {
@@ -32,21 +44,27 @@ public sealed class SkeletonTestAuthoringService : ISkeletonTestAuthoringService
             };
         }
 
+        var agent = await _llmResolver.ResolveAsync(SkeletonAgentRole.Tester, cancellationToken).ConfigureAwait(false);
+        var profile = await _profiles.GetAsync(SkeletonAgentRole.Tester, cancellationToken).ConfigureAwait(false);
+        var prompt = SkeletonAgentPromptComposer.Compose(profile, BuildPrompt(request));
+
         string response;
         try
         {
-            response = await _llm.GetResponseAsync(BuildPrompt(request), cancellationToken).ConfigureAwait(false);
+            response = await agent.Llm.GetResponseAsync(prompt, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             return new SkeletonTestAuthoringResult
             {
                 Succeeded = false,
-                FailureReason = $"Test authoring model call failed: {exception.Message}"
+                FailureReason = $"Test authoring model call failed: {exception.Message}",
+                ModelProvider = agent.Provider,
+                ModelName = agent.Model
             };
         }
 
-        return TryParse(response);
+        return TryParse(response) with { ModelProvider = agent.Provider, ModelName = agent.Model };
     }
 
     private static string BuildPrompt(SkeletonTestAuthoringRequest request) =>

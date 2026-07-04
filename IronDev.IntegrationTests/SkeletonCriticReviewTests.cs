@@ -761,7 +761,8 @@ public sealed class SkeletonCriticReviewTests
                 new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ProjectId, TenantId = 3, Title = "Add book sorting" }),
                 new StubRunStore(new RunRecord { RunId = RunId, ProjectId = ProjectId, TicketId = TicketId, State = RunLifecycleState.PausedForApproval }),
                 events,
-                llm,
+                new StubAgentLlmResolver(llm),
+                new SkeletonAgentProfileService(configuration),
                 storedCritic,
                 new StubGroundTruthVerifier(groundTruth ?? AllChecksPass),
                 configuration);
@@ -844,6 +845,20 @@ public sealed class SkeletonCriticReviewTests
             LastPrompt = prompt;
             return Task.FromResult(behavior());
         }
+    }
+
+    private sealed class StubAgentLlmResolver(ILLMService llm) : IronDev.Core.Agents.IAgentLlmResolver
+    {
+        public Task<IronDev.Core.Agents.SkeletonAgentLlm> ResolveAsync(
+            IronDev.Core.Agents.SkeletonAgentRole role,
+            CancellationToken ct = default) =>
+            Task.FromResult(new IronDev.Core.Agents.SkeletonAgentLlm
+            {
+                Role = role,
+                Llm = llm,
+                Provider = "fake",
+                Model = "stub-model"
+            });
     }
 
     private sealed class StubGroundTruthVerifier(Func<SkeletonGroundTruthVerification> behavior) : ISkeletonCriticGroundTruthVerifier
