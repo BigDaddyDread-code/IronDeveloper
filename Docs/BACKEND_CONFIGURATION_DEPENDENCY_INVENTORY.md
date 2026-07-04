@@ -14,12 +14,28 @@ This inventory records backend configuration keys, dependency registrations, pac
 | --- | --- | --- | --- | --- | --- | --- |
 | `IronDev.Api/appsettings.json` | API host defaults | Runtime | Active | No | Documents API defaults for JWT and code proposal mode; shared SQL connection string is intentionally blank. | Yes |
 | `IronDev.Api/appsettings.Development.json` | API host local development | Runtime | Active | No | Documents a generic LocalDB development example only; machine-specific SQL belongs in environment or user-secret overrides. | Yes |
+| `IronDev.Api/appsettings.Development.Local.json` | API host developer-local override | Runtime local development only | Ignored/untracked | No | Optional Development-only override loaded after committed development settings and before user secrets, environment variables, and command-line. Added in J02 as local convenience only. | Yes when absent |
 | `IronDev.Api/appsettings.LocalTest.json` | LocalTest API host | Runtime test environment | Active | No | Documents isolated LocalTest database/workspace/log roots with a generic LocalDB test example. | Yes |
 | `IronDev.IntegrationTests/appsettings.Test.json` | integration tests | Test-only | Active | No | Documents a generic LocalDB test example; machine-specific SQL belongs in `ConnectionStrings__IronDeveloperDb`. | Yes |
 | `IronDev.IntegrationTests.Api/appsettings.Test.json` | API integration tests | Test-only | Active | No | Documents a generic LocalDB API-test example; machine-specific SQL belongs in `ConnectionStrings__IronDeveloperDb`. | Yes |
 | `IronDev.IntegrationTests.Api/ApiTestBase.cs` | API test host setup | Test-only | Active | No | Supplies test host overrides for JWT, generic test connection string, workspace root, and logs root. | Yes |
 
 No configuration file was removed or renamed in PR 55.
+
+## J02 development local override
+
+`IronDev.Api/appsettings.Development.Local.json` is an ignored, optional developer-local override source. The API host loads it only when `IWebHostEnvironment.IsDevelopment()` is true.
+
+Precedence for the API host is:
+
+1. `appsettings.json`
+2. `appsettings.Development.json`
+3. `appsettings.Development.Local.json`
+4. API user secrets, when available
+5. environment variables
+6. command-line arguments
+
+The local override file is never required for CI, tests, production-like environments, LocalTest, or shared development. It is not evidence, not authority, not bootstrap, not environment validation, and not permission to run SQL, Weaviate, source mutation, evidence mutation, sandbox mutation, release, deployment, or workflow behavior.
 
 ## Backend configuration keys
 

@@ -44,7 +44,7 @@ Useful switches:
 1.  **Create Database**: Create a new database named `IronDeveloper`.
 2.  **Run Setup Script**: Execute `Database/local_dev_setup.sql` against the `IronDeveloper` database.
     *   This script creates all required tables and seeds a default local tenant, user, and project.
-3.  **Connection String**: The committed development and test settings use a generic LocalDB example. Do not commit machine-specific SQL Server names, usernames, passwords, or local paths. If your SQL Server is different, set a local environment variable or API user secret instead:
+3.  **Connection String**: The committed development and test settings use a generic LocalDB example. Do not commit machine-specific SQL Server names, usernames, passwords, or local paths. If your SQL Server is different, set a local environment variable, API user secret, or ignored API local override instead:
 
 ```json
 {
@@ -68,43 +68,96 @@ dotnet user-secrets set "ConnectionStrings:IronDeveloperDb" "Server=(localdb)\MS
 
 ---
 
-## 2. Configure AI Provider
+## 2. Development Local Override
 
-IronDev supports multiple AI providers. Configure your choice in `appsettings.Development.json`.
+The API can load an ignored developer-only override file when the host environment is `Development`:
+
+```text
+IronDev.Api/appsettings.Development.Local.json
+```
+
+This file is optional. If it is absent, startup behavior is unchanged. It is ignored by git and must stay untracked.
+
+Use it for machine-specific development settings such as local SQL, AI provider, Weaviate endpoints, workspace roots, and evidence roots. Do not use it for CI, production, LocalTest, Test, shared defaults, bootstrap, schema changes, evidence, approval, source apply, release, deployment, or workflow behavior.
+
+Configuration precedence for the API host is:
+
+1. `appsettings.json`
+2. `appsettings.Development.json`
+3. `appsettings.Development.Local.json`
+4. API user secrets, when available
+5. environment variables
+6. command-line arguments
+
+That means environment variables and CI/runtime secrets still override the local file.
+
+Start from the placeholder-only example if you want a template:
+
+```powershell
+Copy-Item .\IronDev.Api\appsettings.Development.Local.example.json .\IronDev.Api\appsettings.Development.Local.json
+```
+
+Example shape:
+
+```json
+{
+  "ConnectionStrings": {
+    "IronDeveloperDb": ""
+  },
+  "Ai": {
+    "Provider": "",
+    "Model": "",
+    "ApiKey": ""
+  },
+  "Weaviate": {
+    "Enabled": false,
+    "HttpEndpoint": "",
+    "GrpcEndpoint": ""
+  }
+}
+```
+
+Keep real values on your own machine only. A local override file is convenience, not shared configuration, not evidence, not authority, and not a runtime contract.
+
+---
+
+## 3. Configure AI Provider
+
+IronDev supports multiple AI providers. Configure your choice in `IronDev.Api/appsettings.Development.Local.json`, API user secrets, or environment variables. Keep committed `appsettings.Development.json` generic.
 
 ### Option A: OpenAI (Default)
 ```json
 "Ai": {
-  "Provider": "OpenAI",
-  "Model": "gpt-4o",
-  "ApiKey": "your-api-key-here"
+  "Provider": "",
+  "Model": "",
+  "ApiKey": ""
 }
 ```
 
 ### Option B: Local OpenAI-Compatible (vLLM, LMStudio, Ollama v1)
 ```json
 "Ai": {
-  "Provider": "LocalOpenAI",
-  "Model": "qwen2.5-coder:latest",
-  "BaseUrl": "http://localhost:11434/v1",
-  "ApiKey": "local-dev-key"
+  "Provider": "",
+  "Model": "",
+  "BaseUrl": "",
+  "ApiKey": ""
 }
 ```
 
 ### Option C: Ollama (Native API)
 ```json
 "Ai": {
-  "Provider": "Ollama",
-  "Model": "qwen2.5-coder:latest",
-  "BaseUrl": "http://localhost:11434"
+  "Provider": "",
+  "Model": "",
+  "BaseUrl": ""
 }
 ```
 
 ---
 
-## 3. Optional Weaviate Semantic Memory
+## 4. Optional Weaviate Semantic Memory
 
-Weaviate is optional for local development. IronDev defaults to safe startup with Weaviate disabled, while `IronDev.Api/appsettings.Development.json` can enable it when Docker is running.
+Weaviate is optional for local development. IronDev defaults to safe startup with Weaviate disabled; use `IronDev.Api/appsettings.Development.Local.json`, API user secrets, or environment variables when you want to enable it on your machine.
 
 Start the local container:
 
@@ -135,7 +188,7 @@ For full setup and settings, see [Docs/weaviate-local-setup.md](weaviate-local-s
 
 ---
 
-## 4. Build & Launch
+## 5. Build & Launch
 
 ### Main Application
 Build the solution:
@@ -158,7 +211,7 @@ npm run dev
 
 ---
 
-## 5. Login & First Steps
+## 6. Login & First Steps
 
 1.  **Login**:
     *   **Email**: `bob@irondev.local`
@@ -168,7 +221,7 @@ npm run dev
 
 ---
 
-## 6. Running Tests
+## 7. Running Tests
 
 ### Integration Tests
 SQL-backed integration tests use the generic LocalDB test default in `appsettings.Test.json`. Use `ConnectionStrings__IronDeveloperDb` for machine-specific overrides instead of committing local config edits.

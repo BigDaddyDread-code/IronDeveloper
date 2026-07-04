@@ -14,9 +14,9 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 606
-- Test classes found: 600
-- Test methods found: 9627
+- Source files scanned: 607
+- Test classes found: 601
+- Test methods found: 9633
 - Category names found: 225
 
 ## G13 Category Changes
@@ -107,6 +107,14 @@ A label does not make a slow test safe.
 - J01 does not add SQL bootstrap, SQL rebuild, Weaviate bootstrap, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, or production runtime behavior.
 - Local SQL configuration is developer convenience. It is not authority, not evidence, and not a shared runtime contract.
 
+## J02 Development Local Override
+
+- Added focused `ConfigBoundary` metadata to the J02 development local override regression test.
+- J02 does not add `RequiresRealDatabase` or `LongRunning`; the test reads tracked config/docs/example/receipt metadata and constructs in-memory API configuration builders only.
+- J02 verifies Development-only optional local override loading, ignored/untracked local file protection, environment-variable precedence, and placeholder-only documentation.
+- J02 does not add SQL bootstrap, SQL rebuild, Weaviate bootstrap, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, or production runtime behavior.
+- Local override configuration is developer convenience. It is not shared configuration, not evidence, not authority, and not a runtime contract.
+
 ## J03 Validate No Local Machine Names In Committed Config
 
 - Added focused `ConfigBoundary` metadata to the J03 tracked-file repository hygiene regression test.
@@ -156,7 +164,7 @@ A label does not make a slow test safe.
 | `Boundary` | 13 | 106 | 0 | 13 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
-| `ConfigBoundary` | 2 | 14 | 0 | 2 |
+| `ConfigBoundary` | 3 | 20 | 0 | 3 |
 | `Contract` | 14 | 113 | 0 | 14 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
