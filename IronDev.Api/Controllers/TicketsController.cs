@@ -24,6 +24,7 @@ public sealed class TicketsController : ControllerBase
     private readonly ISkeletonFindingDispositionService _findingDispositions;
     private readonly ISkeletonBatchMapService _batchMaps;
     private readonly ISkeletonBatchPlanService _batchPlans;
+    private readonly ISkeletonBatchRunService _skeletonBatchRuns;
     private readonly IBuilderReadinessService _readiness;
     private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly ITicketRunReviewService _runReview;
@@ -40,6 +41,7 @@ public sealed class TicketsController : ControllerBase
         ISkeletonFindingDispositionService findingDispositions,
         ISkeletonBatchMapService batchMaps,
         ISkeletonBatchPlanService batchPlans,
+        ISkeletonBatchRunService skeletonBatchRuns,
         IBuilderReadinessService readiness,
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
@@ -55,6 +57,7 @@ public sealed class TicketsController : ControllerBase
         _findingDispositions = findingDispositions;
         _batchMaps = batchMaps;
         _batchPlans = batchPlans;
+        _skeletonBatchRuns = skeletonBatchRuns;
         _readiness = readiness;
         _evidenceSummary = evidenceSummary;
         _runReview = runReview;
@@ -353,6 +356,48 @@ public sealed class TicketsController : ControllerBase
     {
         var record = await _batchPlans.GetAsync(projectId, planId, ct);
         return record is null ? NotFound() : Ok(record);
+    }
+
+    /// <summary>
+    /// POST batch-runs — starts a batch over a sealed, schedulable plan (P2-3):
+    /// wave-1 tickets get their walking-skeleton runs. The batch composes
+    /// single-ticket loops and can only ever START them — every gate stays human,
+    /// per ticket. Advance is requested, never self-acting.
+    /// </summary>
+    [HttpPost("api/projects/{projectId:int}/batch-runs")]
+    public async Task<ActionResult<SkeletonBatchRunOutcome>> StartBatchRun(
+        int projectId,
+        [FromBody] BatchRunRequestBody body,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(body.PlanId))
+        {
+            return BadRequest(new { error = "PlanId is required.", boundary = SkeletonBatchRunStatus.BoundaryText });
+        }
+
+        var outcome = await _skeletonBatchRuns.StartAsync(
+            projectId,
+            body.PlanId,
+            User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value
+                ?? "unknown-user",
+            ct);
+        return Ok(outcome);
+    }
+
+    public sealed record BatchRunRequestBody(string? PlanId);
+
+    /// <summary>POST batch-runs/{batchId}/advance — starts tickets whose upstreams have applied since the last advance.</summary>
+    [HttpPost("api/projects/{projectId:int}/batch-runs/{batchId}/advance")]
+    public async Task<ActionResult<SkeletonBatchRunOutcome>> AdvanceBatchRun(int projectId, string batchId, CancellationToken ct) =>
+        Ok(await _skeletonBatchRuns.AdvanceAsync(projectId, batchId, ct));
+
+    /// <summary>GET batch-runs/{batchId} — derived live status: per-ticket run state, eligibility, named waits. Read-only.</summary>
+    [HttpGet("api/projects/{projectId:int}/batch-runs/{batchId}")]
+    public async Task<ActionResult<SkeletonBatchRunStatus>> GetBatchRun(int projectId, string batchId, CancellationToken ct)
+    {
+        var status = await _skeletonBatchRuns.GetAsync(projectId, batchId, ct);
+        return status is null ? NotFound() : Ok(status);
     }
 
     /// <summary>
