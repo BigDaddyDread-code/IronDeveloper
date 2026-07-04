@@ -54,10 +54,40 @@ The local bootstrap script prepares local convenience. It is not evidence, appro
 
 The older `Scripts/setup-local-dev.ps1` remains a higher-power local setup helper for developers who intentionally want restore/build/smoke behavior. Prefer the J04 script first when you want a non-destructive setup check.
 
-Database setup remains separate so a bootstrap command cannot accidentally reseed an existing database:
+Database setup remains separate so a bootstrap command cannot accidentally reseed an existing database. After the J04 check, use the guarded J05 command explicitly when you want to create or rebuild a developer-local SQL database:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\sql-local.ps1 -CheckOnly
+```
+
+Create a local database if missing:
 
 ```text
-Database/local_dev_setup.sql
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\sql-local.ps1 `
+  -Create `
+  -ServerInstance "(localdb)\MSSQLLocalDB" `
+  -DatabaseName "IronDeveloper_Local"
+```
+
+Create and apply the local setup script:
+
+```text
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\sql-local.ps1 `
+  -Create `
+  -ApplyLocalDevSetup `
+  -ServerInstance "(localdb)\MSSQLLocalDB" `
+  -DatabaseName "IronDeveloper_Local"
+```
+
+Rebuild requires an exact confirmation phrase:
+
+```text
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\sql-local.ps1 `
+  -Rebuild `
+  -ApplyLocalDevSetup `
+  -ServerInstance "(localdb)\MSSQLLocalDB" `
+  -DatabaseName "IronDeveloper_Local" `
+  -ConfirmRebuild "REBUILD IronDeveloper_Local"
 ```
 
 ---

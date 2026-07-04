@@ -20,6 +20,7 @@ This inventory records backend configuration keys, dependency registrations, pac
 | `IronDev.IntegrationTests.Api/appsettings.Test.json` | API integration tests | Test-only | Active | No | Documents a generic LocalDB API-test example; machine-specific SQL belongs in `ConnectionStrings__IronDeveloperDb`. | Yes |
 | `IronDev.IntegrationTests.Api/ApiTestBase.cs` | API test host setup | Test-only | Active | No | Supplies test host overrides for JWT, generic test connection string, workspace root, and logs root. | Yes |
 | `Scripts/local/bootstrap-local.ps1` | local developer bootstrap diagnostics | Local developer tooling | Active | No | J04 check-only bootstrap script for repository/tool/local override status and optional explicit restore/install actions. | Yes when not invoked |
+| `Scripts/local/sql-local.ps1` | local developer SQL bootstrap/rebuild command | Local developer tooling | Active | No | J05 guarded local-only SQL command with check-only default and explicit create/rebuild modes. | Yes when not invoked |
 
 No configuration file was removed or renamed in PR 55.
 
@@ -73,6 +74,32 @@ Prepare mode can run `dotnet restore IronDev.slnx` only when `-Prepare -RestoreD
 The bootstrap script does not print raw connection strings, API keys, JWT keys, token values, authorization headers, local override contents, or full user-local paths.
 
 Boundary: The local bootstrap script prepares local convenience. It is not evidence, approval, root safety proof, policy satisfaction, or permission to mutate source, SQL, Weaviate, evidence, or sandbox repositories.
+
+## J05 guarded local SQL command
+
+J05 adds `Scripts/local/sql-local.ps1` as an explicit local SQL bootstrap/rebuild command.
+
+Default behavior is check-only:
+
+- find repository shape
+- report SQL tool availability
+- classify the SQL target
+- classify the database name
+- classify the setup script path
+- report intended action as not run
+- print next safe actions
+
+The default check-only path does not create or drop databases, apply setup scripts, write local overrides, change appsettings, write evidence, start API/UI, start Weaviate, run migrations, run tests, invoke source apply, invoke rollback, run release/deploy paths, or continue workflow.
+
+Create mode can create only a safe local-looking database name on a classified local target. Create mode never drops an existing database.
+
+Rebuild mode can drop and recreate only the one exact safe local database after `-ConfirmRebuild "REBUILD <DatabaseName>"` is supplied. There is no force mode in J05.
+
+Setup script application requires `-ApplyLocalDevSetup`. The setup script path must resolve to a repository-contained file and cannot be a remote URL or path outside the repository.
+
+J05 uses integrated/local trusted SQL auth only. It does not add SQL username, password, raw connection-string, or credential parameters.
+
+Boundary: The local SQL command may create or rebuild a developer-local database. It is not evidence, approval, root safety proof, policy satisfaction, schema authority, or permission to mutate source, workflows, evidence, or shared SQL targets.
 
 ## Backend configuration keys
 
