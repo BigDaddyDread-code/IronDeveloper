@@ -61,6 +61,7 @@ public sealed class TicketService : ITicketService
                     AcceptanceCriteria = @AcceptanceCriteria, TechnicalNotes = @TechnicalNotes,
                     Status = @Status, Content = @Content, LinkedFilePaths = @LinkedFilePaths,
                     LinkedCodeIndexEntryIds = @LinkedCodeIndexEntryIds, LinkedSymbols = @LinkedSymbols,
+                    BlockedByTicketIds = @BlockedByTicketIds,
                     UnitTests = @UnitTests, IntegrationTests = @IntegrationTests,
                     ManualTests = @ManualTests, RegressionTests = @RegressionTests,
                     BuildValidation = @BuildValidation, ContextSummary = @ContextSummary,
@@ -91,6 +92,7 @@ public sealed class TicketService : ITicketService
                     ticket.LinkedFilePaths,
                     ticket.LinkedCodeIndexEntryIds,
                     ticket.LinkedSymbols,
+                    ticket.BlockedByTicketIds,
                     ticket.UnitTests,
                     ticket.IntegrationTests,
                     ticket.ManualTests,
@@ -104,7 +106,7 @@ public sealed class TicketService : ITicketService
                     ticket.SourceDocumentVersionId
                 },
                 cancellationToken: cancellationToken));
-                
+
             if (rowsAffected == 0)
                 throw new System.InvalidOperationException("Ticket update failed or ticket not found/not owned.");
 
@@ -119,6 +121,7 @@ public sealed class TicketService : ITicketService
                     (TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                      Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
                      Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
+                     BlockedByTicketIds,
                      UnitTests, IntegrationTests, ManualTests, RegressionTests,
                      BuildValidation, ContextSummary, IsGenerated, GenerationNote,
                      SourceChatSessionId, SourceChatMessageId, SourceDocumentVersionId)
@@ -127,6 +130,7 @@ public sealed class TicketService : ITicketService
                     (@TenantId, @ProjectId, @SessionId, @Title, @TicketType, @Priority,
                      @Summary, @Background, @Problem, @AcceptanceCriteria, @TechnicalNotes,
                      @Status, @Content, @LinkedFilePaths, @LinkedCodeIndexEntryIds, @LinkedSymbols,
+                     @BlockedByTicketIds,
                      @UnitTests, @IntegrationTests, @ManualTests, @RegressionTests,
                      @BuildValidation, @ContextSummary, @IsGenerated, @GenerationNote,
                      @SourceChatSessionId, @SourceChatMessageId, @SourceDocumentVersionId);
@@ -178,6 +182,7 @@ public sealed class TicketService : ITicketService
                 Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
                 Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
+                BlockedByTicketIds,
                 UnitTests, IntegrationTests, ManualTests, RegressionTests,
                 BuildValidation, ContextSummary, IsGenerated, GenerationNote,
                 SourceChatSessionId, SourceChatMessageId, SourceDocumentVersionId, CreatedDate
@@ -206,6 +211,7 @@ public sealed class TicketService : ITicketService
                 Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
                 Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
+                BlockedByTicketIds,
                 UnitTests, IntegrationTests, ManualTests, RegressionTests,
                 BuildValidation, ContextSummary, IsGenerated, GenerationNote,
                 SourceChatSessionId, SourceChatMessageId, SourceDocumentVersionId, CreatedDate
@@ -258,6 +264,11 @@ public sealed class TicketService : ITicketService
             IF COL_LENGTH('dbo.ProjectTickets', 'SourceDocumentVersionId') IS NULL
             BEGIN
                 ALTER TABLE dbo.ProjectTickets ADD SourceDocumentVersionId BIGINT NULL;
+            END
+
+            IF COL_LENGTH('dbo.ProjectTickets', 'BlockedByTicketIds') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD BlockedByTicketIds NVARCHAR(MAX) NULL;
             END
             """;
 

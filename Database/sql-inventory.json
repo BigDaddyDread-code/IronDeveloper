@@ -487,6 +487,25 @@
                         "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
                     },
                     {
+                        "id":  "database.migrate-ticket-blocked-by",
+                        "path":  "Database/migrate_ticket_blocked_by.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "P2-1 batch dependency map: ProjectTickets.BlockedByTicketIds, the human's explicit ordering. Also guarded in local_dev_setup.sql."
+                    },
+                    {
                         "id":  "database.migrate-tool-execution-audit",
                         "path":  "Database/migrate_tool_execution_audit.sql",
                         "kind":  "migration-script",

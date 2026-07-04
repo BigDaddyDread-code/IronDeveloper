@@ -251,6 +251,11 @@ BEGIN
     ALTER TABLE dbo.ProjectTickets ADD SourceChatMessageId BIGINT NULL;
 END
 
+IF COL_LENGTH('dbo.ProjectTickets', 'BlockedByTicketIds') IS NULL
+BEGIN
+    ALTER TABLE dbo.ProjectTickets ADD BlockedByTicketIds NVARCHAR(MAX) NULL;
+END
+
 IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ArtifactSourceReferences

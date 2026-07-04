@@ -218,6 +218,14 @@ public sealed class ProjectTicket
     public string? LinkedFilePaths { get; set; }
     public string? LinkedCodeIndexEntryIds { get; set; }
     public string? LinkedSymbols { get; set; }
+
+    /// <summary>
+    /// P2-1: comma-separated ids of tickets this ticket is blocked by — the
+    /// human's explicit ordering, one evidence source for the batch dependency
+    /// map. Declaring a dependency schedules nothing by itself.
+    /// </summary>
+    public string? BlockedByTicketIds { get; set; }
+
     public string? UnitTests { get; set; }
     public string? IntegrationTests { get; set; }
     public string? ManualTests { get; set; }

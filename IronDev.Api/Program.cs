@@ -201,6 +201,7 @@ builder.Services.AddScoped<ISkeletonCriticGroundTruthVerifier, SkeletonCriticGro
 builder.Services.AddScoped<ISkeletonFindingDispositionService, SkeletonFindingDispositionService>();
 builder.Services.AddScoped<ISkeletonCriticCanaryRunner, SkeletonCriticCanaryRunner>();
 builder.Services.AddScoped<ISkeletonCanaryMeasurementService, SkeletonCanaryMeasurementService>();
+builder.Services.AddScoped<ISkeletonBatchMapService, SkeletonBatchMapService>();
 builder.Services.AddSingleton<IApprovalSatisfactionEvaluator, ApprovalSatisfactionEvaluator>();
 builder.Services.AddSingleton<IWorkflowApprovalHaltEvaluator, WorkflowApprovalHaltEvaluator>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();

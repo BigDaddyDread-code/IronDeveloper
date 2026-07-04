@@ -22,6 +22,7 @@ public sealed class TicketsController : ControllerBase
     private readonly ITicketSkeletonRunService _skeletonRuns;
     private readonly ISkeletonCriticReviewService _criticReviews;
     private readonly ISkeletonFindingDispositionService _findingDispositions;
+    private readonly ISkeletonBatchMapService _batchMaps;
     private readonly IBuilderReadinessService _readiness;
     private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly ITicketRunReviewService _runReview;
@@ -36,6 +37,7 @@ public sealed class TicketsController : ControllerBase
         ITicketSkeletonRunService skeletonRuns,
         ISkeletonCriticReviewService criticReviews,
         ISkeletonFindingDispositionService findingDispositions,
+        ISkeletonBatchMapService batchMaps,
         IBuilderReadinessService readiness,
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
@@ -49,6 +51,7 @@ public sealed class TicketsController : ControllerBase
         _skeletonRuns = skeletonRuns;
         _criticReviews = criticReviews;
         _findingDispositions = findingDispositions;
+        _batchMaps = batchMaps;
         _readiness = readiness;
         _evidenceSummary = evidenceSummary;
         _runReview = runReview;
@@ -273,6 +276,43 @@ public sealed class TicketsController : ControllerBase
     {
         var package = await _skeletonRuns.GetCriticPackageAsync(projectId, ticketId, runId, ct);
         return package is null ? NotFound() : Ok(package);
+    }
+
+    /// <summary>
+    /// POST batch-maps — detects the dependency map for a batch of tickets
+    /// (P2-1): explicit blocks plus predicted footprint overlaps, every edge with
+    /// a named reason, persisted as hash-sealed evidence. A map is advisory: it
+    /// schedules nothing, starts nothing, and grants nothing.
+    /// </summary>
+    [HttpPost("api/projects/{projectId:int}/batch-maps")]
+    public async Task<ActionResult<SkeletonBatchMapOutcome>> DetectBatchMap(
+        int projectId,
+        [FromBody] BatchMapRequestBody body,
+        CancellationToken ct)
+    {
+        if (body.TicketIds is null || body.TicketIds.Count == 0)
+        {
+            return BadRequest(new { error = "TicketIds is required.", boundary = SkeletonBatchMap.BoundaryText });
+        }
+
+        var outcome = await _batchMaps.DetectAsync(
+            projectId,
+            body.TicketIds,
+            User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value
+                ?? "unknown-user",
+            ct);
+        return outcome is null ? NotFound() : Ok(outcome);
+    }
+
+    public sealed record BatchMapRequestBody(IReadOnlyList<long>? TicketIds);
+
+    /// <summary>GET batch-maps/{mapId} — reads a stored map back with its integrity re-verified.</summary>
+    [HttpGet("api/projects/{projectId:int}/batch-maps/{mapId}")]
+    public async Task<ActionResult<SkeletonBatchMapRecord>> GetBatchMap(int projectId, string mapId, CancellationToken ct)
+    {
+        var record = await _batchMaps.GetAsync(projectId, mapId, ct);
+        return record is null ? NotFound() : Ok(record);
     }
 
     /// <summary>
