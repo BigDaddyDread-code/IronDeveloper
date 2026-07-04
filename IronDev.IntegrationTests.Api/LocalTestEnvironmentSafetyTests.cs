@@ -10,6 +10,7 @@ namespace IronDev.IntegrationTests.Api;
 public sealed class LocalTestEnvironmentSafetyTests
 {
     private const string TestJwtKey = "localtest-safety-jwt-key-for-c12-tests-32chars";
+    private const string DefaultTestSqlServer = "(localdb)\\MSSQLLocalDB";
 
     [TestMethod]
     public async Task LocalTest_WithClearlyIsolatedResources_Starts()
@@ -141,10 +142,10 @@ public sealed class LocalTestEnvironmentSafetyTests
 
     private static string BuildConnectionString(string databaseName)
     {
-        const string baseConnectionString = "Server=DESKTOP-KFA0H13;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;";
+        const string baseConnectionString = "Server=" + DefaultTestSqlServer + ";Integrated Security=True;Encrypt=True;TrustServerCertificate=True;";
         return string.IsNullOrWhiteSpace(databaseName)
             ? baseConnectionString
-            : $"Server=DESKTOP-KFA0H13;Database={databaseName};Integrated Security=True;Encrypt=True;TrustServerCertificate=True;";
+            : $"Server={DefaultTestSqlServer};Database={databaseName};Integrated Security=True;Encrypt=True;TrustServerCertificate=True;";
     }
 
     private sealed class TemporaryEnvironmentVariable : IDisposable

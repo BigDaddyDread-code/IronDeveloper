@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 604
-- Test classes found: 598
-- Test methods found: 9613
-- Category names found: 224
+- Source files scanned: 605
+- Test classes found: 599
+- Test methods found: 9620
+- Category names found: 225
 
 ## G13 Category Changes
 
@@ -100,6 +100,13 @@ A label does not make a slow test safe.
 - H14 does not add a SQL migration, alter tables, add indexes, alter stored procedures, alter triggers, change permissions, change API/CLI/UI behavior, change Docker compose behavior, change deployment config, change Weaviate rebuild behavior, require live Weaviate, require Docker, implement raw payload redaction, implement artifact retention, implement source-apply/rollback/workflow/release/deploy behavior, or add migration runner/DbUp work.
 - Weaviate auth protects the index. It does not make index content authoritative.
 
+## J01 Remove Hardcoded Machine SQL Config
+
+- Added focused `ConfigBoundary` metadata to the J01 committed-config hygiene regression test.
+- J01 does not add `RequiresRealDatabase` or `LongRunning`; the test reads tracked config files, `.gitignore`, receipt text, and static repository metadata only.
+- J01 does not add SQL bootstrap, SQL rebuild, Weaviate bootstrap, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, or production runtime behavior.
+- Local SQL configuration is developer convenience. It is not authority, not evidence, and not a shared runtime contract.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -141,6 +148,7 @@ A label does not make a slow test safe.
 | `Boundary` | 13 | 106 | 0 | 13 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
+| `ConfigBoundary` | 1 | 7 | 0 | 1 |
 | `Contract` | 14 | 113 | 0 | 14 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |

@@ -21,6 +21,7 @@ namespace IronDev.IntegrationTests.Api;
 public abstract class ApiTestBase
 {
     private const string TestJwtKey = "irondev-test-only-jwt-key-not-from-committed-config-32chars";
+    private const string DefaultTestConnectionString = "Server=(localdb)\\MSSQLLocalDB;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;";
     protected static WebApplicationFactory<Program> Factory { get; private set; } = default!;
     protected static HttpClient Client { get; private set; } = default!;
     protected static string ConnectionString { get; private set; } = string.Empty;
@@ -51,7 +52,7 @@ public abstract class ApiTestBase
                     // Force non-secret configuration values into the builder so Program.cs picks them up.
                     builder.UseSetting("Jwt:Issuer", "irondev-api");
                     builder.UseSetting("Jwt:Audience", "irondev-client");
-                    builder.UseSetting("ConnectionStrings:IronDeveloperDb", "Server=DESKTOP-KFA0H13;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;");
+                    builder.UseSetting("ConnectionStrings:IronDeveloperDb", TestConnectionString());
                     builder.UseSetting("LocalTest:WorkspaceRoot", Path.Combine(Path.GetTempPath(), "IronDevTestWorkspaces"));
                     builder.UseSetting("LocalTest:LogsRoot", Path.Combine(Path.GetTempPath(), "IronDevTestLogs"));
                     builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:1420");
@@ -634,5 +635,13 @@ public abstract class ApiTestBase
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         return client;
+    }
+
+    protected static string TestConnectionString()
+    {
+        var overrideValue = Environment.GetEnvironmentVariable("ConnectionStrings__IronDeveloperDb");
+        return string.IsNullOrWhiteSpace(overrideValue)
+            ? DefaultTestConnectionString
+            : overrideValue;
     }
 }

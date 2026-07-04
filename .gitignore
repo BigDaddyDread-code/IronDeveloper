@@ -35,6 +35,9 @@ artifacts/
 appsettings.Production.json
 appsettings.Staging.json
 appsettings.Development.json
+appsettings.Development.Local.json
+appsettings.LocalTest.Local.json
+appsettings.Test.Local.json
 **/secrets.json
 **/*.pfx
 **/*.p12

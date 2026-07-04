@@ -43,9 +43,19 @@ public abstract class IntegrationTestBase
     [TestInitialize]
     public virtual async Task TestInitialize()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.Test.json")
-            .Build();
+        var configurationBuilder = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.Test.json");
+
+        var connectionStringOverride = Environment.GetEnvironmentVariable("ConnectionStrings__IronDeveloperDb");
+        if (!string.IsNullOrWhiteSpace(connectionStringOverride))
+        {
+            configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:IronDeveloperDb"] = connectionStringOverride
+            });
+        }
+
+        var configuration = configurationBuilder.Build();
 
         ConnectionString = configuration.GetConnectionString("IronDeveloperDb")
             ?? throw new InvalidOperationException("Missing test connection string.");
