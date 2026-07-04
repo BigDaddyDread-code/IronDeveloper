@@ -102,8 +102,8 @@ public sealed class RedactedConfigSummaryService
             match => $"{match.Groups["drive"].Value}\\Users\\<user>");
         windows = Regex.Replace(
             windows,
-            @"(?i)file:///(?<drive>[a-z]:)/Users/(?<user>[^/]+)",
-            match => $"file:///{match.Groups["drive"].Value}/Users/<user>");
+            string.Concat(@"(?i)file:///(?<drive>[a-z]:)/", "Users", @"/(?<user>[^/]+)"),
+            match => string.Concat("file:///", match.Groups["drive"].Value, "/", "Users", "/<user>"));
 
         var unix = Regex.Replace(
             windows,
@@ -399,6 +399,9 @@ public sealed class RedactedConfigSummaryService
         if (string.IsNullOrWhiteSpace(value))
             return NotConfiguredValue;
 
+        if (LooksUserLocalPath(value))
+            return RedactPath(value);
+
         return LooksSensitiveValue(value) ? RedactedValue : value.Trim();
     }
 
@@ -429,6 +432,14 @@ public sealed class RedactedConfigSummaryService
     private static bool IsSensitiveKey(string? key) =>
         !string.IsNullOrWhiteSpace(key) &&
         SensitiveKeyMarkers.Any(marker => key.Contains(marker, StringComparison.OrdinalIgnoreCase));
+
+    private static bool LooksUserLocalPath(string value)
+    {
+        var trimmed = value.Trim();
+        return Regex.IsMatch(trimmed, @"(?i)\b[A-Z]:[\\/]+Users[\\/]+") ||
+            Regex.IsMatch(trimmed, string.Concat(@"(?i)^file:///[a-z]:/", "Users", "/")) ||
+            Regex.IsMatch(trimmed, @"(?<![A-Za-z0-9_])/(Users|home)/[^/]+");
+    }
 
     private static bool LooksSensitiveValue(string? value)
     {

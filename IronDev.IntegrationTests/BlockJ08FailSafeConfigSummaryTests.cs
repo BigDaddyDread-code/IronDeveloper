@@ -80,6 +80,23 @@ public sealed class BlockJ08FailSafeConfigSummaryTests
     }
 
     [TestMethod]
+    public void J08_ConfigSummary_RedactsUserPathsInGenericValues()
+    {
+        var rawPath = WindowsUserPath("Robert", ".irondev", "logs");
+        var summary = BuildSummary([
+            new ConfigValueInput("SomeFeature:OutputPath", rawPath, "local file")
+        ]);
+        var value = summary.RedactedValues.Single(item => item.Key == "SomeFeature:OutputPath");
+        var serialized = Serialize(summary);
+
+        Assert.AreEqual(RedactedConfigValueVisibility.NonSensitive, value.Visibility);
+        StringAssert.Contains(value.Value, "<user>");
+        AssertDoesNotContain(value.Value, "Robert", "redacted value");
+        AssertDoesNotContain(serialized, "Robert", "summary");
+        AssertDoesNotContain(serialized, rawPath, "summary");
+    }
+
+    [TestMethod]
     public void J08_ConfigSummary_ReportsLocalOverridePresenceWithoutContents()
     {
         const string localOverrideContents = "local-override-file-content-must-not-print";

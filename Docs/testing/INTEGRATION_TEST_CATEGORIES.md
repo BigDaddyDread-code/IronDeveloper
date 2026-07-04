@@ -16,7 +16,7 @@ A label does not make a slow test safe.
 
 - Source files scanned: 608
 - Test classes found: 602
-- Test methods found: 9644
+- Test methods found: 9645
 - Category names found: 225
 
 ## G13 Category Changes
@@ -172,7 +172,7 @@ A label does not make a slow test safe.
 | `Boundary` | 13 | 106 | 0 | 13 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
-| `ConfigBoundary` | 4 | 31 | 0 | 4 |
+| `ConfigBoundary` | 4 | 32 | 0 | 4 |
 | `Contract` | 14 | 113 | 0 | 14 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
