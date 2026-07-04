@@ -14,9 +14,9 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 607
-- Test classes found: 601
-- Test methods found: 9633
+- Source files scanned: 608
+- Test classes found: 602
+- Test methods found: 9644
 - Category names found: 225
 
 ## G13 Category Changes
@@ -123,6 +123,14 @@ A label does not make a slow test safe.
 - J03 does not add runtime behavior, bootstrap behavior, schema changes, SQL migrations, SQL rebuild, Weaviate bootstrap/rebuild, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, or production runtime behavior.
 - Local machine names, local paths, and local SQL instances are developer-local facts. They are not shared configuration, not evidence, not authority, and not a runtime contract.
 
+## J08 Fail-Safe Config Summary With Secret Redaction
+
+- Added focused `ConfigBoundary` metadata to the J08 redacted config summary regression test.
+- J08 does not add `RequiresRealDatabase` or `LongRunning`; the test constructs in-memory config summary inputs and reads Core source, docs, and receipt metadata only.
+- J08 verifies raw connection strings are never emitted, sensitive keys are redacted, user-local paths are redacted, local override presence is reported without contents, environment-variable precedence can be represented without values, root safety is `NotEvaluated` without J10, and no bootstrap/mutation surface is added.
+- J08 does not add SQL connectivity checks, SQL bootstrap, SQL rebuild, Weaviate bootstrap/rebuild, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, or production runtime behavior.
+- Config summaries help humans debug setup. They do not bless the setup.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -164,7 +172,7 @@ A label does not make a slow test safe.
 | `Boundary` | 13 | 106 | 0 | 13 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
-| `ConfigBoundary` | 3 | 20 | 0 | 3 |
+| `ConfigBoundary` | 4 | 31 | 0 | 4 |
 | `Contract` | 14 | 113 | 0 | 14 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |

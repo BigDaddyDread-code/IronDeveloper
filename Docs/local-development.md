@@ -121,7 +121,29 @@ Keep real values on your own machine only. A local override file is convenience,
 
 ---
 
-## 3. Configure AI Provider
+## 3. Redacted Configuration Summary
+
+J08 adds a Core-only redacted configuration summary contract for local/development diagnostics. The summary can report safe derived metadata such as:
+
+- which configuration sources are present or loaded
+- whether SQL configuration is present
+- SQL provider shape, database name, server kind, authentication mode, and whether a credential key exists
+- AI provider/model status and base URL host/port only
+- Weaviate enabled/auth status and endpoint host/port only
+- local root configuration status with redacted user paths
+- feature flag state as status only
+
+The summary never prints raw connection strings, API keys, JWT keys, token values, authorization headers, local override contents, or full user-local paths. For example, user-profile roots such as a Windows `.irondev\workspaces` folder or a Linux `.irondev/evidence` folder are summarized with the user segment redacted.
+
+Because J10 root-safety validation is not in this slice, root entries report `NotEvaluated` unless a future root-safety validator result is supplied. The summary does not validate roots by itself.
+
+Boundary: a config summary is diagnostic evidence for a human. It is not approval, authority, policy satisfaction, root safety proof, or permission to mutate anything.
+
+If redaction is uncertain, the value is redacted. Debug convenience loses to secret safety.
+
+---
+
+## 4. Configure AI Provider
 
 IronDev supports multiple AI providers. Configure your choice in `IronDev.Api/appsettings.Development.Local.json`, API user secrets, or environment variables. Keep committed `appsettings.Development.json` generic.
 
@@ -155,7 +177,7 @@ IronDev supports multiple AI providers. Configure your choice in `IronDev.Api/ap
 
 ---
 
-## 4. Optional Weaviate Semantic Memory
+## 5. Optional Weaviate Semantic Memory
 
 Weaviate is optional for local development. IronDev defaults to safe startup with Weaviate disabled; use `IronDev.Api/appsettings.Development.Local.json`, API user secrets, or environment variables when you want to enable it on your machine.
 
@@ -188,7 +210,7 @@ For full setup and settings, see [Docs/weaviate-local-setup.md](weaviate-local-s
 
 ---
 
-## 5. Build & Launch
+## 6. Build & Launch
 
 ### Main Application
 Build the solution:
@@ -211,7 +233,7 @@ npm run dev
 
 ---
 
-## 6. Login & First Steps
+## 7. Login & First Steps
 
 1.  **Login**:
     *   **Email**: `bob@irondev.local`
@@ -221,7 +243,7 @@ npm run dev
 
 ---
 
-## 7. Running Tests
+## 8. Running Tests
 
 ### Integration Tests
 SQL-backed integration tests use the generic LocalDB test default in `appsettings.Test.json`. Use `ConnectionStrings__IronDeveloperDb` for machine-specific overrides instead of committing local config edits.
