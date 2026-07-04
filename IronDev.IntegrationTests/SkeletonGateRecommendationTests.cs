@@ -43,6 +43,57 @@ public sealed class SkeletonGateRecommendationTests
     }
 
     [TestMethod]
+    public async Task NoCriticReview_CannotReceiveLowRiskRecommendation()
+    {
+        var harness = GateHarness.Create();
+        harness.Report = harness.Report with
+        {
+            CriticReviews = [],
+            FindingDispositions = []
+        };
+
+        var recommendation = await harness.Service.RecommendAsync(ProjectId, TicketId, RunId);
+
+        Assert.IsNotNull(recommendation);
+        Assert.AreEqual(SkeletonGateRiskTier.HumanRequired, recommendation.Tier);
+        Assert.AreEqual(SkeletonGateRecommendationKinds.HumanJudgmentRequired, recommendation.Recommendation);
+        Assert.IsFalse(recommendation.Reasons.All(reason => reason.StartsWith("[pass]")),
+            "An empty critic-review set cannot pass every named low-risk check.");
+        Assert.IsTrue(recommendation.Reasons.Any(reason => reason.Contains("No critic review", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsTrue(recommendation.Reasons.Any(reason => reason.Contains("critic never reviewed", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(recommendation.Reasons.Any(reason =>
+                reason.StartsWith("[pass]", StringComparison.OrdinalIgnoreCase)
+                && reason.Contains("Every critic finding carries", StringComparison.OrdinalIgnoreCase)),
+            "Finding-disposition checks must not pass vacuously when the critic never reviewed the run.");
+        Assert.IsFalse(recommendation.Reasons.Any(reason =>
+                reason.StartsWith("[pass]", StringComparison.OrdinalIgnoreCase)
+                && reason.Contains("No critic review recorded a blocking finding", StringComparison.OrdinalIgnoreCase)),
+            "No blocking finding only means something after a critic review exists.");
+        StringAssert.Contains(recommendation.Boundary, "policy cannot click");
+    }
+
+    [TestMethod]
+    public async Task EmptyCriticReviews_AreNotEquivalentToCleanCriticReviews()
+    {
+        var clean = GateHarness.Create();
+        var cleanRecommendation = await clean.Service.RecommendAsync(ProjectId, TicketId, RunId);
+
+        var unreviewed = GateHarness.Create();
+        unreviewed.Report = unreviewed.Report with { CriticReviews = [] };
+        var unreviewedRecommendation = await unreviewed.Service.RecommendAsync(ProjectId, TicketId, RunId);
+
+        Assert.AreEqual(SkeletonGateRiskTier.Low, cleanRecommendation!.Tier);
+        Assert.AreEqual(SkeletonGateRecommendationKinds.PolicyWouldApprove, cleanRecommendation.Recommendation);
+        Assert.IsTrue(cleanRecommendation.Reasons.Any(reason =>
+            reason.Contains("At least one critic review is recorded", StringComparison.OrdinalIgnoreCase)));
+
+        Assert.AreEqual(SkeletonGateRiskTier.HumanRequired, unreviewedRecommendation!.Tier);
+        Assert.AreEqual(SkeletonGateRecommendationKinds.HumanJudgmentRequired, unreviewedRecommendation.Recommendation);
+        Assert.IsTrue(unreviewedRecommendation.Reasons.Any(reason =>
+            reason.Contains("Policy cannot advise on work the critic never reviewed", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [TestMethod]
     public async Task NoMeasurement_NoRecommendation_EvalEarnsAutonomy()
     {
         var harness = GateHarness.Create(noMeasurement: true);
@@ -157,7 +208,18 @@ public sealed class SkeletonGateRecommendationTests
             "ApplyAsync",
             "TransitionAsync",
             "PublishAsync",
-            "RecordAsync"
+            "RecordAsync",
+            "RecordApproval",
+            "RequestCriticReview",
+            "RunCritic",
+            "CreateCriticReview",
+            "AutoApprove",
+            "AutoContinue",
+            "AutoApply",
+            "PolicyCanClick",
+            "PolicyApproved",
+            "ReleaseReady",
+            "DeploymentReady"
         })
         {
             Assert.IsFalse(source.Contains(forbidden, StringComparison.OrdinalIgnoreCase),

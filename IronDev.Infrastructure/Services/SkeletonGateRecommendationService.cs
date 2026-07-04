@@ -94,15 +94,23 @@ public sealed class SkeletonGateRecommendationService : ISkeletonGateRecommendat
             "Every acceptance criterion has a covering test.",
             $"{report.CriticPackage?.UncoveredCriterionCount ?? 0} acceptance criteria have no covering test — owning a coverage hole is a human decision.");
 
-        var findingIds = report.CriticReviews.SelectMany(review => review.FindingIds).Distinct(StringComparer.Ordinal).ToList();
+        var criticReviews = report.CriticReviews;
+        var criticReviewPresent = criticReviews.Count > 0;
+        Check(criticReviewPresent,
+            "At least one critic review is recorded for this run.",
+            "No critic review is recorded for this run. Policy cannot advise on work the critic never reviewed.");
+
+        var findingIds = criticReviews.SelectMany(review => review.FindingIds).Distinct(StringComparer.Ordinal).ToList();
         var dispositioned = report.FindingDispositions.Select(disposition => disposition.FindingId).ToHashSet(StringComparer.Ordinal);
-        Check(findingIds.All(dispositioned.Contains),
+        Check(criticReviewPresent && findingIds.All(dispositioned.Contains),
             "Every critic finding carries a human disposition.",
-            $"{findingIds.Count(findingId => !dispositioned.Contains(findingId))} critic finding(s) await a human disposition.");
-        Check(report.CriticReviews.All(review => review.BlockingFindingCount == 0),
+            criticReviewPresent
+                ? $"{findingIds.Count(findingId => !dispositioned.Contains(findingId))} critic finding(s) await a human disposition."
+                : "No critic review is recorded, so finding disposition coverage cannot be evaluated.");
+        Check(criticReviewPresent && criticReviews.All(review => review.BlockingFindingCount == 0),
             "No critic review recorded a blocking finding.",
             "A critic review recorded a blocking finding — a recommendation cannot speak over the critic's strongest objection.");
-        Check(report.CriticReviews.All(review => review.GroundTruthMismatchCount == 0),
+        Check(criticReviewPresent && criticReviews.All(review => review.GroundTruthMismatchCount == 0),
             "Ground-truth verification found no claim/evidence mismatches.",
             "Ground-truth verification found mismatches — evidence that disagrees with its courier is a human's problem.");
         Check(!report.Gaps.Any(gap => gap.Contains("no longer exists", StringComparison.Ordinal)),
