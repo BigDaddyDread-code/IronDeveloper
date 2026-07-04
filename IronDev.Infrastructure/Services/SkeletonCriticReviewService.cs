@@ -250,6 +250,7 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
             Findings = output.Findings
                 .Select(finding => new SkeletonCriticReviewFindingDto
                 {
+                    FindingId = finding.FindingId,
                     Severity = finding.Severity.ToString(),
                     Title = finding.Title,
                     Problem = finding.Problem,

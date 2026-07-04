@@ -30,6 +30,55 @@ test('build stage renders the halted run and review renders the matrix and gate'
   await expect(page.getByTestId('flow.review.requestApply')).toBeDisabled();
 });
 
+test('an uncovered criterion is rendered as UNCOVERED, not elided', async ({ page }) => {
+  await mockTicketWorkspace(page);
+  await mockSkeletonRun(page, { continuationUnblocked: false, uncovered: true });
+
+  await openTicketStage(page);
+  await page.getByTestId('flow.ticket.startRun').click();
+  await page.getByTestId('flow.build.toReview').click();
+
+  await expect(page.getByTestId('flow.review.matrix')).toContainText('Catalog paging keeps sort order');
+  await expect(page.getByTestId('flow.review.uncovered')).toContainText('UNCOVERED');
+  await expect(page.getByTestId('flow.review.matrix')).toContainText('Catalog paging keeps sort order');
+});
+
+test('requesting a critic review surfaces findings and the findings gate blocks until dispositioned', async ({ page }) => {
+  await mockTicketWorkspace(page);
+  const state = await mockSkeletonRun(page, { continuationUnblocked: false });
+
+  await openTicketStage(page);
+  await page.getByTestId('flow.ticket.startRun').click();
+  await page.getByTestId('flow.build.toReview').click();
+
+  await page.getByTestId('flow.review.requestCritic').click();
+  expect(state.criticReviewRequested).toBe(true);
+
+  await expect(page.getByTestId('flow.review.criticVerdict')).toContainText('RequestChanges');
+  await expect(page.getByTestId('flow.review.findings')).toContainText('Sort ignores culture');
+  await expect(page.getByTestId('flow.review.findingsGate')).toContainText('await a human disposition');
+
+  await page.getByTestId('flow.review.dispositionReason').fill('Locale nuance acceptable for the sandbox catalog.');
+  await page.getByTestId('flow.review.recordDisposition').click();
+
+  expect(state.dispositionRequests[0].findingId).toBe('f-1');
+  expect(state.dispositionRequests[0].reason).toContain('Locale nuance');
+  await expect(page.getByTestId('flow.review.disposition')).toContainText('AcceptRisk');
+  await expect(page.getByTestId('flow.review.findingsGate')).toContainText('carries a human disposition');
+});
+
+test('a finding with no disposition warns at the human gate', async ({ page }) => {
+  await mockTicketWorkspace(page);
+  await mockSkeletonRun(page, { continuationUnblocked: false, withFinding: true });
+
+  await openTicketStage(page);
+  await page.getByTestId('flow.ticket.startRun').click();
+  await page.getByTestId('flow.build.toReview').click();
+
+  await expect(page.getByTestId('flow.review.requirement')).toContainText('skeleton-run.continue');
+  await expect(page.getByText('the backend will refuse continuation until every finding is answered')).toBeVisible();
+});
+
 test('recording an approval posts to the governed surface and continuation consumes it', async ({ page }) => {
   await mockTicketWorkspace(page);
   const state = await mockSkeletonRun(page, { continuationUnblocked: false });
@@ -76,17 +125,46 @@ interface SkeletonMockState {
   applyRefusedReason?: string;
   applyRequested: boolean;
   approvalRequestBody: Record<string, unknown>;
+  criticReviews: unknown[];
+  findingDispositions: { findingId: string; disposition: string; reason: string; decidedByUserId: string }[];
+  criticReviewRequested: boolean;
+  dispositionRequests: { findingId: string; disposition: string; reason: string }[];
+  uncovered: boolean;
 }
 
 async function mockSkeletonRun(
   page: Page,
-  options: { continuationUnblocked: boolean; applyRefusedReason?: string }
+  options: {
+    continuationUnblocked: boolean;
+    applyRefusedReason?: string;
+    withFinding?: boolean;
+    uncovered?: boolean;
+  }
 ): Promise<SkeletonMockState> {
   const state: SkeletonMockState = {
     continuationUnblocked: options.continuationUnblocked,
     applyRefusedReason: options.applyRefusedReason,
     applyRequested: false,
-    approvalRequestBody: {}
+    approvalRequestBody: {},
+    criticReviews: options.withFinding
+      ? [
+          {
+            criticAgentRunId: 'critic-run-1',
+            reviewId: 'critic-review-1',
+            verdict: 'RequestChanges',
+            findingCount: 1,
+            blockingFindingCount: 0,
+            findingIds: ['f-1'],
+            packageSha256: PACKAGE_HASH,
+            groundTruthCheckCount: 5,
+            groundTruthMismatchCount: 0
+          }
+        ]
+      : [],
+    findingDispositions: [],
+    criticReviewRequested: false,
+    dispositionRequests: [],
+    uncovered: options.uncovered ?? false
   };
 
   const runDto = (status: string, message: string | null = null) => ({
@@ -126,7 +204,9 @@ async function mockSkeletonRun(
           existsOnDisk: true,
           announcedSha256: PACKAGE_HASH,
           sha256OnDisk: PACKAGE_HASH,
-          hashVerified: true
+          hashVerified: true,
+          criterionCount: state.uncovered ? 2 : 1,
+          uncoveredCriterionCount: state.uncovered ? 1 : 0
         },
         approval: {
           targetKind: 'workflow-continuation-request',
@@ -137,6 +217,8 @@ async function mockSkeletonRun(
           continuationUnblocked: state.continuationUnblocked,
           acceptedApprovalId: state.continuationUnblocked ? 'b2c3d4e5-0000-0000-0000-000000000001' : ''
         },
+        criticReviews: state.criticReviews,
+        findingDispositions: state.findingDispositions,
         apply: null,
         gaps: [],
         loopComplete: false,
@@ -176,6 +258,12 @@ async function mockSkeletonRun(
             coversCriterion: 'Catalog sorts by title ascending'
           }
         ],
+        criterionCoverage: state.uncovered
+          ? [
+              { criterion: 'Catalog sorts by title ascending', covered: true, coveringTests: ['tests/skeleton/SortTests.cs'] },
+              { criterion: 'Catalog paging keeps sort order', covered: false, coveringTests: [] }
+            ]
+          : [{ criterion: 'Catalog sorts by title ascending', covered: true, coveringTests: ['tests/skeleton/SortTests.cs'] }],
         commandResults: [{ displayName: 'dotnet build', exitCode: 0, timedOut: false, durationMs: 4000 }],
         evidenceRefs: [],
         workspaceRunSucceeded: true,
@@ -183,6 +271,70 @@ async function mockSkeletonRun(
       })
     });
   });
+
+  await page.route(`**/irondev-api/api/projects/7/tickets/42/skeleton-runs/${RUN_ID}/critic-review`, async (route) => {
+    state.criticReviewRequested = true;
+    state.criticReviews = [
+      {
+        criticAgentRunId: 'critic-run-1',
+        reviewId: 'critic-review-1',
+        verdict: 'RequestChanges',
+        findingCount: 1,
+        blockingFindingCount: 0,
+        findingIds: ['f-1'],
+        packageSha256: PACKAGE_HASH,
+        groundTruthCheckCount: 5,
+        groundTruthMismatchCount: 0
+      }
+    ];
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        succeeded: true,
+        failureReason: '',
+        criticAgentRunId: 'critic-run-1',
+        reviewId: 'critic-review-1',
+        verdict: 'RequestChanges',
+        findings: [
+          {
+            findingId: 'f-1',
+            severity: 'High',
+            title: 'Sort ignores culture',
+            problem: 'The diff compares titles ordinally.',
+            whyItMatters: 'Criterion says alphabetical for users.',
+            requiredFix: 'Use culture-aware comparison.',
+            blocksMerge: false
+          }
+        ],
+        groundTruth: { checks: [], mismatches: [], boundary: 'Ground truth is evidence, not judgment.' },
+        boundary: 'Critic findings are advisory.'
+      })
+    });
+  });
+
+  await page.route(
+    `**/irondev-api/api/projects/7/tickets/42/skeleton-runs/${RUN_ID}/findings/*/disposition`,
+    async (route) => {
+      const body = route.request().postDataJSON() as { disposition: string; reason: string };
+      const findingId = route.request().url().split('/findings/')[1].split('/disposition')[0];
+      state.dispositionRequests.push({ findingId, disposition: body.disposition, reason: body.reason });
+      state.findingDispositions = [
+        { findingId, disposition: body.disposition, reason: body.reason, decidedByUserId: '7' }
+      ];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          succeeded: true,
+          failureReason: '',
+          findingId,
+          disposition: body.disposition,
+          boundary: 'A disposition is a human decision about a finding; it is not approval.'
+        })
+      });
+    }
+  );
 
   await page.route(`**/irondev-api/api/v1/projects/${APPROVAL_PROJECT_GUID}/accepted-approvals`, async (route) => {
     state.approvalRequestBody = route.request().postDataJSON() as Record<string, unknown>;

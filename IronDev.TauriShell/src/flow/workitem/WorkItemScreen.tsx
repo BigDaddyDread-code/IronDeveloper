@@ -4,6 +4,7 @@ import type {
   BuildReadinessResult,
   ProjectTicket,
   SkeletonCriticPackage,
+  SkeletonCriticReviewOutcome,
   SkeletonRunReport,
   TicketBuildRunDto
 } from '../../api/types';
@@ -76,6 +77,13 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
   const [isStartingRun, setIsStartingRun] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [gateNotice, setGateNotice] = useState<string | null>(null);
+  const [criticOutcome, setCriticOutcome] = useState<SkeletonCriticReviewOutcome | null>(null);
+
+  const hasUndispositionedFindings = useMemo(() => {
+    const reviews = report?.criticReviews ?? [];
+    const dispositioned = new Set((report?.findingDispositions ?? []).map((disposition) => disposition.findingId));
+    return reviews.flatMap((review) => review.findingIds).some((findingId) => !dispositioned.has(findingId));
+  }, [report]);
 
   useEffect(() => {
     if (!ticket || project.selectedProjectId === null || ticket.id === undefined) {
@@ -123,13 +131,14 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
     return [
       { afterStage: 'shape', label: 'ready', state: 'open' },
       { afterStage: 'ticket', label: 'readiness', state: readiness?.isReady ? 'open' : 'locked' },
+      { afterStage: 'build', label: 'findings', state: hasUndispositionedFindings ? 'locked' : 'open' },
       {
         afterStage: 'review',
         label: 'human gate',
         state: report?.approval?.continuationUnblocked === true ? 'open' : 'locked'
       }
     ];
-  }, [stage, shapeBlockers.length, readiness?.isReady, report?.approval?.continuationUnblocked]);
+  }, [stage, shapeBlockers.length, readiness?.isReady, hasUndispositionedFindings, report?.approval?.continuationUnblocked]);
 
   const sendPrompt = useCallback(
     async (event: FormEvent) => {
@@ -263,6 +272,55 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
     }
   }, [project.selectedProjectId, ticket, isStartingRun, session.client, refreshRunEvidence]);
 
+  const requestCriticReview = useCallback(async () => {
+    if (project.selectedProjectId === null || ticket?.id === undefined || run === null || busyAction !== null) {
+      return;
+    }
+    setBusyAction('critic');
+    setErrorMessage(null);
+    try {
+      const outcome = await session.client.requestSkeletonCriticReview(project.selectedProjectId, ticket.id, run.runId);
+      setCriticOutcome(outcome);
+      if (!outcome.succeeded) {
+        setGateNotice(outcome.failureReason);
+      }
+      await refreshRunEvidence(run);
+    } catch (error: unknown) {
+      setErrorMessage(describeApiError(error, 'The critic review request failed.'));
+    } finally {
+      setBusyAction(null);
+    }
+  }, [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence]);
+
+  const recordDisposition = useCallback(
+    async (findingId: string, disposition: string, reason: string) => {
+      if (project.selectedProjectId === null || ticket?.id === undefined || run === null || busyAction !== null) {
+        return;
+      }
+      setBusyAction('disposition');
+      setErrorMessage(null);
+      try {
+        const outcome = await session.client.recordFindingDisposition(
+          project.selectedProjectId,
+          ticket.id,
+          run.runId,
+          findingId,
+          disposition,
+          reason
+        );
+        if (!outcome.succeeded) {
+          setErrorMessage(outcome.failureReason);
+        }
+        await refreshRunEvidence(run);
+      } catch (error: unknown) {
+        setErrorMessage(describeApiError(error, 'The disposition was refused.'));
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence]
+  );
+
   const recordApproval = useCallback(async () => {
     const requirement = report?.approval;
     if (project.selectedProjectId === null || run === null || !requirement || busyAction !== null) {
@@ -366,7 +424,10 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
             <ReviewStage
               criticPackage={criticPackage}
               report={report}
+              criticOutcome={criticOutcome}
               busyAction={busyAction}
+              onRequestCriticReview={() => void requestCriticReview()}
+              onRecordDisposition={(findingId, disposition, reason) => void recordDisposition(findingId, disposition, reason)}
               onRecordApproval={() => void recordApproval()}
               onRequestContinuation={() => void requestContinuation()}
               onRequestApply={() => void requestApply()}

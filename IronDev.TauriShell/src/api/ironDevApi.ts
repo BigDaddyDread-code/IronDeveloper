@@ -6,6 +6,8 @@ import type {
   BuildReadinessResult,
   CreateAcceptedApprovalUiRequest,
   SkeletonCriticPackage,
+  SkeletonCriticReviewOutcome,
+  SkeletonFindingDispositionOutcome,
   SkeletonRunReport,
   ChatCompletionRequest,
   ChatCompletionResponse,
@@ -807,6 +809,37 @@ class IronDevApiClient {
     return this.request<SkeletonRunReport>(
       `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/report`,
       { method: 'GET', signal }
+    );
+  }
+
+  // P1-7: the critic's own surface and the disposition surface. A review is
+  // advisory (a finding is not a veto); a disposition is a human decision about
+  // a finding (it is not approval). The backend enforces both invariants.
+
+  async requestSkeletonCriticReview(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<SkeletonCriticReviewOutcome> {
+    return this.request<SkeletonCriticReviewOutcome>(
+      `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/critic-review`,
+      { method: 'POST', signal }
+    );
+  }
+
+  async recordFindingDisposition(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    findingId: string,
+    disposition: string,
+    reason: string,
+    signal?: AbortSignal
+  ): Promise<SkeletonFindingDispositionOutcome> {
+    return this.request<SkeletonFindingDispositionOutcome>(
+      `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/findings/${encodeURIComponent(findingId)}/disposition`,
+      { method: 'POST', body: { disposition, reason }, signal }
     );
   }
 

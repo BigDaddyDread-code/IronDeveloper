@@ -28,6 +28,9 @@ public sealed record SkeletonCriticReviewRequest
 /// <summary>One advisory finding, projected for the requester. The durable record lives in the agent-run audit store.</summary>
 public sealed record SkeletonCriticReviewFindingDto
 {
+    /// <summary>The durable finding id — what a disposition answers (P1-3).</summary>
+    public required string FindingId { get; init; }
+
     public required string Severity { get; init; }
     public required string Title { get; init; }
     public required string Problem { get; init; }
