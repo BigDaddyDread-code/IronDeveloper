@@ -1,7 +1,5 @@
 using IronDev.Core.Builder;
 
-namespace IronDev.Infrastructure.Builder;
-
 public sealed class TraceableBuildAgentSpine
 {
     private readonly BuildBriefCompiler _briefCompiler = new();
