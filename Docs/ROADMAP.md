@@ -2,7 +2,7 @@
 
 ## Historical Authority Spine Rollout (Blocks P to Y)
 
-The original backend authority rollout plan (detailed in [BLOCK_P0_TO_Y_AUTHORITY_ROADMAP.md](file:///c:/Users/bob/source/repos/AIDeveloper/Docs/BLOCK_P0_TO_Y_AUTHORITY_ROADMAP.md)) is fully completed. It established the core validation and authority chain:
+The original backend authority rollout plan (detailed in [BLOCK_P0_TO_Y_AUTHORITY_ROADMAP.md](BLOCK_P0_TO_Y_AUTHORITY_ROADMAP.md)) is fully completed. It established the core validation and authority chain:
 `accepted approval record -> policy satisfaction record -> controlled dry-run -> patch artifact -> controlled source apply -> rollback -> workflow continuation -> release readiness gate`
 
 Framing the project as currently in "Block L" with source-write authority as next, or listing repository writes/PR creation as future rollout work, is historical. The backend authority spine is fully built.

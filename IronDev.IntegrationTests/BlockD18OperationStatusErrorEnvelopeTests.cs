@@ -179,7 +179,7 @@ public sealed partial class BlockD18OperationStatusErrorEnvelopeTests
     [DataRow("System.NullReferenceException: nope")]
     [DataRow("stack trace at Service.cs:42")]
     [DataRow("SELECT * FROM dbo.Secrets")]
-    [DataRow("C:\\Users\\bob\\source\\repos\\secret.txt")]
+    [DataRow("C:\\Workspaces\\IronDev\\secret.txt")]
     [DataRow("{\"raw\":\"request\"}")]
     [DataRow("raw response body follows")]
     public void ErrorEnvelope_RejectsInternalOrRawDetails(string unsafeMessage)

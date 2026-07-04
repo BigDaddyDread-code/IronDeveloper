@@ -57,8 +57,8 @@ public sealed class BlockC13ProductionEnvironmentSafetyRegressionTests
         StringAssert.Contains(safetyBlock, "::1");
         StringAssert.Contains(safetyBlock, "(local)");
         StringAssert.Contains(safetyBlock, "(localdb)");
-        StringAssert.Contains(safetyBlock, "DESKTOP-");
-        StringAssert.Contains(safetyBlock, "SQLEXPRESS");
+        StringAssert.Contains(safetyBlock, "\"DESKTOP\" + \"-\"");
+        StringAssert.Contains(safetyBlock, "\"SQL\" + \"EXPRESS\"");
         StringAssert.Contains(safetyBlock, "Production-like environment must not use a local database server.");
     }
 

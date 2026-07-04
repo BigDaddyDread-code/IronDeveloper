@@ -564,7 +564,7 @@ public sealed class BlockE05RollbackReceiptPersistenceHardeningTests
         AssertNoStaticToken(source, string.Concat("Pass", "word="));
         AssertNoStaticToken(source, string.Concat("Bear", "er "));
         AssertNoStaticToken(source, string.Concat("PRI", "VATE ", "KE", "Y-----"));
-        AssertNoStaticToken(source, string.Concat("Server=db;", "User Id=sa;"));
+        AssertNoStaticToken(source, string.Concat("Server=db;", "User Id", "=sa;"));
     }
 
     [TestMethod]

@@ -5,7 +5,7 @@ title: BookSeller Supervised Dogfood Review 117
 document_type: ArchitectureCheckpoint
 authority: Accepted
 status: Current
-source: C:\Users\bob\source\repos\AIDeveloper\Docs\BOOKSELLER_SUPERVISED_DOGFOOD_REVIEW_117.md
+source: Docs/BOOKSELLER_SUPERVISED_DOGFOOD_REVIEW_117.md
 created_utc: 2026-05-22T22:55:00Z
 primary_retrieval_questions:
   - What happens when Codex oversees IDA against BookSeller?

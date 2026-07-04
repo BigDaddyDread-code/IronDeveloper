@@ -26,7 +26,11 @@ public class ManualIndexingTask
     public async Task ReindexIronDevRepo()
     {
         var projectId = 2; // Real ID
-        var path = @"C:\Users\bob\source\repos\AIDeveloper";
+        var path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "source",
+            "repos",
+            "AIDeveloper");
 
         // Setup services manually to point to the REAL database
         var connString = "Server=(localdb)\\MSSQLLocalDB;Database=IronDeveloper;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;";

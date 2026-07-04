@@ -13,7 +13,7 @@ This is a migration application receipt, not a new feature.
 - `IronDeveloper_Test`
 - `IronDeveloper`
 
-Server name format: local SQL Server instance or named instance supplied by `-Server`, for example `DESKTOP-KFA0H13` or `.\SQLEXPRESS`. No credentials or secrets are recorded in this receipt.
+Server name format: local SQL Server instance or named instance supplied by `-Server`, for example `(localdb)\MSSQLLocalDB` or another placeholder-based local server value. No credentials or secrets are recorded in this receipt.
 
 ## Migration scripts applied
 
@@ -43,17 +43,17 @@ The order matters because `governance.ToolRequest` has a foreign key to `governa
 For the test database:
 
 ```powershell
-.\Database\apply-migrations.ps1 -Server "DESKTOP-KFA0H13" -Database "IronDeveloper_Test" -TrustServerCertificate
-.\Database\apply-migrations.ps1 -Server "DESKTOP-KFA0H13" -Database "IronDeveloper_Test" -TrustServerCertificate
-.\Database\verify-migrations.ps1 -Server "DESKTOP-KFA0H13" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\apply-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\apply-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\verify-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
 ```
 
 For the local development database:
 
 ```powershell
-.\Database\apply-migrations.ps1 -Server "DESKTOP-KFA0H13" -Database "IronDeveloper" -TrustServerCertificate
-.\Database\apply-migrations.ps1 -Server "DESKTOP-KFA0H13" -Database "IronDeveloper" -TrustServerCertificate
-.\Database\verify-migrations.ps1 -Server "DESKTOP-KFA0H13" -Database "IronDeveloper" -TrustServerCertificate
+.\Database\apply-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper" -TrustServerCertificate
+.\Database\apply-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper" -TrustServerCertificate
+.\Database\verify-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper" -TrustServerCertificate
 ```
 
 ## Local receipt status
@@ -85,6 +85,6 @@ PR 74b should prove real database stored-procedure/API smoke behaviour against t
 Recorded on 2026-06-12.
 
 - `IronDeveloper_Test`: covered by `DatabaseMigrationApplicationReceiptTests`; migrations apply repeatedly and verification passes.
-- `IronDeveloper`: `Database/apply-migrations.ps1` was run twice with `-Server "DESKTOP-KFA0H13" -Database "IronDeveloper" -TrustServerCertificate`, then `Database/verify-migrations.ps1` passed.
+- `IronDeveloper`: `Database/apply-migrations.ps1` was run twice with a redacted local SQL server value and `-Database "IronDeveloper" -TrustServerCertificate`, then `Database/verify-migrations.ps1` passed.
 - Verified objects include governance schema, governance event table/procedures/append-only trigger, tool request table/procedures, `FK_ToolRequest_GovernanceEvent`, and JSON/version constraints.
 - This receipt does not prove API smoke behavior against the migrated database. That remains PR 74b.

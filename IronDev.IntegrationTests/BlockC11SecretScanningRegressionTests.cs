@@ -20,7 +20,7 @@ public sealed partial class BlockC11SecretScanningRegressionTests
         new("IronDev.Api/Auth/JwtSigningKeyResolver.cs", "OldJwtPlaceholder", "OldCommittedPlaceholderKey", "runtime rejection constant for the old committed JWT placeholder"),
         new("IronDev.IntegrationTests/BlockC06JwtSecretConfigurationTests.cs", "OldJwtPlaceholder", "OldPlaceholderKey", "focused test proves the old JWT placeholder cannot be accepted"),
         new("IronDev.IntegrationTests/BlockC07JwtStartupValidationTests.cs", "OldJwtPlaceholder", "OldPlaceholderKey", "focused test proves the old JWT placeholder cannot be accepted"),
-        new("IronDev.Infrastructure/Services/LlmTraceService.cs", "PasswordConnectionString", "Password=[^;]+;", "redaction regex pattern, not a concrete connection string"),
+        new("IronDev.Infrastructure/Services/LlmTraceService.cs", "PasswordConnectionString", "Password" + "=[^;]+;", "redaction regex pattern, not a concrete connection string"),
         new("IronDev.IntegrationTests/ProjectContextExportServiceTests.cs", "PasswordConnectionString", "SuperSecretPassword123", "fake test-only connection string used to prove export sanitisation"),
         new("IronDev.IntegrationTests/ApiCliContract/ApiCliBoundaryContractTests.cs", "OpenAiApiKeyPattern", "sk-" + "live-api-cli-contract-secret", "fake test-only token proves CLI secret redaction"),
         new("IronDev.IntegrationTests/Agents/AgentModelAuditSanitisationTests.cs", "PasswordConnectionString", "password=" + "abc123secret", "fake test-only password proves audit sanitisation"),

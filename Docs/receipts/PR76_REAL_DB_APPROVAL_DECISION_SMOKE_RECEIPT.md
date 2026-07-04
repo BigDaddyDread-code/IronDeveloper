@@ -5,8 +5,8 @@ PR76 adds a durable SQL-backed approval decision store.
 Smoke command:
 
 ```powershell
-.\Database\smoke-approval-decision.ps1 -Server "DESKTOP-KFA0H13" -Database "IronDeveloper" -TrustServerCertificate
-.\Database\smoke-approval-decision.ps1 -Server "DESKTOP-KFA0H13" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\smoke-approval-decision.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper" -TrustServerCertificate
+.\Database\smoke-approval-decision.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
 ```
 
 Expected receipt fields:

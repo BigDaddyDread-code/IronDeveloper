@@ -5,7 +5,7 @@ title: BookSeller Supervised Iteration Campaign 118
 document_type: ArchitectureCheckpoint
 authority: Accepted
 status: Current
-source: C:\Users\bob\source\repos\AIDeveloper\Docs\BOOKSELLER_SUPERVISED_ITERATION_CAMPAIGN_118.md
+source: Docs/BOOKSELLER_SUPERVISED_ITERATION_CAMPAIGN_118.md
 created_utc: 2026-05-22T23:20:00Z
 primary_retrieval_questions:
   - What is the BookSeller supervised 10-run campaign?

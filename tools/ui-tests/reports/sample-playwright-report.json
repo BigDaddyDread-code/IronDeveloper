@@ -1,6 +1,6 @@
 {
   "config": {
-    "rootDir": "C:\\Users\\bob\\source\\repos\\AIDeveloper\\tools\\ui-tests\\tests"
+    "rootDir": "tools/ui-tests/tests"
   },
   "suites": [
     {
