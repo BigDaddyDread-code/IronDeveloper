@@ -2,7 +2,7 @@
 
 > [!IMPORTANT]
 > **Status: Historical / Fully Completed**
-> This roadmap was the plan for rolling out the backend authority chain. All Blocks (P through Y) have been implemented and validated via regression testing. The current active plans are tracked in [ROADMAP.md](file:///c:/Users/bob/source/repos/AIDeveloper/Docs/ROADMAP.md).
+> This roadmap was the plan for rolling out the backend authority chain. All Blocks (P through Y) have been implemented and validated via regression testing. The current active plans are tracked in [ROADMAP.md](ROADMAP.md).
 
 ## Purpose
 

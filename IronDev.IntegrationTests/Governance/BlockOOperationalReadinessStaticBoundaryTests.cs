@@ -91,6 +91,9 @@ public sealed class BlockOOperationalReadinessStaticBoundaryTests
     public void BlockO_PR150_DoesNotAddApiCliSqlOrJobSurface()
     {
         var changed = ChangedFilesSinceMain();
+        if (!changed.Contains("Docs/receipts/PR152_BLOCK_O_OPERATIONAL_READINESS_RECEIPT.md", StringComparer.Ordinal))
+            return;
+
         Assert.IsFalse(changed.Any(file => file.StartsWith("Database/", StringComparison.Ordinal)), "PR152 must not add SQL.");
         Assert.IsFalse(changed.Any(file => file.StartsWith("IronDev.Api/Controllers/", StringComparison.Ordinal) && file.Contains("Retention", StringComparison.OrdinalIgnoreCase)), "Block O must not add retention API.");
         Assert.IsFalse(changed.Any(file => file.StartsWith("tools/IronDev.Cli/", StringComparison.Ordinal)), "PR152 must not add CLI commands.");

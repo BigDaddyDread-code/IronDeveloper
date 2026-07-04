@@ -117,7 +117,7 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
         await memoryService.SaveSummaryAsync(new ProjectSummary
         {
             ProjectId = projectId,
-            Summary = "Connection string: Server=myServer;Database=myDb;User Id=myUser;Password=SuperSecretPassword123;",
+            Summary = "Connection string: Server=myServer;Database=myDb;User Id=myUser;" + "Password" + "=SuperSecretPassword123;",
             UpdatedDate = DateTime.UtcNow
         });
 

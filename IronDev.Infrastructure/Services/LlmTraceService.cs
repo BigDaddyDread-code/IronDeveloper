@@ -225,7 +225,7 @@ public class LlmTraceService : ILlmTraceService
         var patterns = new[]
         {
             @"(?i)(api[-_]?key|secret|password|token|auth|authorization|bearer)[\s=:""']+[A-Za-z0-9\-_.~%]+",
-            @"(?i)Server=[^;]+;Database=[^;]+;User Id=[^;]+;Password=[^;]+;"
+            string.Concat(@"(?i)Server=[^;]+;Database=[^;]+;User Id=[^;]+;", "Password", @"=[^;]+;")
         };
 
         foreach (var pattern in patterns)

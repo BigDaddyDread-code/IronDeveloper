@@ -25,7 +25,7 @@ public class BuilderSafetyTests : IntegrationTestBase
         // Seed a project that looks like IronDev (contains 'AIDeveloper' in path)
         var projectId = await SeedProjectAsync();
         var project = await projectService.GetByIdAsync(projectId);
-        project!.LocalPath = @"C:\Users\bob\source\repos\AIDeveloper";
+        project!.LocalPath = @"C:\Workspaces\AIDeveloper";
         project.Name = "IronDev";
         // We'd need to update the DB if GetByIdAsync pulls from DB, but SeedProjectAsync might already be enough if we use the right path.
         // Actually, SeedProjectAsync probably inserts into DB.

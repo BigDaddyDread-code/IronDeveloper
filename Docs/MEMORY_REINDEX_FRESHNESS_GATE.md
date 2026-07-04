@@ -5,7 +5,7 @@ title: Memory Reindex Freshness Gate
 document_type: ArchitectureCheckpoint
 authority: Accepted
 status: Current
-source: C:\Users\bob\source\repos\AIDeveloper\Docs\MEMORY_REINDEX_FRESHNESS_GATE.md
+source: Docs/MEMORY_REINDEX_FRESHNESS_GATE.md
 created_utc: 2026-05-23T09:30:00Z
 primary_retrieval_questions:
   - Does IronDev memory reindexing keep current accepted memory fresh?

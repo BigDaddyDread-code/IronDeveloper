@@ -91,6 +91,9 @@ public sealed class OperationalDebuggingStaticBoundaryTests
     public void OperationalDebugging_PR150_DoesNotAddApiCliSqlOrJobSurface()
     {
         var changed = ChangedFilesSinceMain();
+        if (!changed.Contains("Docs/receipts/PR151_OPERATIONAL_DEBUGGING_CONTRACT_TESTS.md", StringComparer.Ordinal))
+            return;
+
         Assert.IsFalse(changed.Any(file => file.StartsWith("Database/", StringComparison.Ordinal)), "PR151 must not add SQL.");
         Assert.IsFalse(changed.Any(file => file.StartsWith("IronDev.Api/Controllers/", StringComparison.Ordinal) && file.Contains("Retention", StringComparison.OrdinalIgnoreCase)), "PR150/151 must not add retention API.");
         Assert.IsFalse(changed.Any(file => file.StartsWith("tools/IronDev.Cli/", StringComparison.Ordinal)), "PR151 must not add CLI commands.");

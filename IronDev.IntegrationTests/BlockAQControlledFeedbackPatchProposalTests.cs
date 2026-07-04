@@ -98,7 +98,7 @@ public sealed class BlockAQControlledFeedbackPatchProposalTests
     public void BlockAQ_Builder_BlocksAbsoluteTraversalAndEnvironmentShapedPaths()
     {
         var package = CreatePackage(
-            Candidate("windows-drive", FeedbackDisposition.Remediate, false, @"C:\Users\bob\file.cs"),
+            Candidate("windows-drive", FeedbackDisposition.Remediate, false, @"C:\Workspaces\file.cs"),
             Candidate("drive-forward", FeedbackDisposition.Remediate, false, "D:/repo/file.cs"),
             Candidate("unc", FeedbackDisposition.Remediate, false, @"\\server\share\file.cs"),
             Candidate("rooted", FeedbackDisposition.Remediate, false, "/tmp/file.cs"),

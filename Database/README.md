@@ -23,8 +23,8 @@ The order matters because each durable ledger depends on the earlier governance 
 ## Apply migrations
 
 ```powershell
-.\Database\apply-migrations.ps1 -Server ".\SQLEXPRESS" -Database "IronDeveloper" -TrustServerCertificate
-.\Database\apply-migrations.ps1 -Server ".\SQLEXPRESS" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\apply-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper" -TrustServerCertificate
+.\Database\apply-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
 ```
 
 The script also supports `-ConnectionString` for test automation.
@@ -40,8 +40,8 @@ The script:
 ## Verify migrations
 
 ```powershell
-.\Database\verify-migrations.ps1 -Server ".\SQLEXPRESS" -Database "IronDeveloper" -TrustServerCertificate
-.\Database\verify-migrations.ps1 -Server ".\SQLEXPRESS" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\verify-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper" -TrustServerCertificate
+.\Database\verify-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
 ```
 
 The verifier checks the governance schema, governance event table/procedures/trigger, tool request, tool gate decision, approval decision, policy decision event, dogfood receipt, and ThoughtLedger governance reference tables/procedures/triggers/foreign keys plus key JSON/version constraints.

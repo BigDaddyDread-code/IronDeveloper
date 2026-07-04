@@ -11,9 +11,9 @@ The smoke script records one dogfood receipt through `governance.usp_DogfoodRece
 Run database-backed smoke commands sequentially.
 
 ```powershell
-.\Database\apply-migrations.ps1 -Server ".\SQLEXPRESS" -Database "IronDeveloper_Test" -TrustServerCertificate
-.\Database\verify-migrations.ps1 -Server ".\SQLEXPRESS" -Database "IronDeveloper_Test" -TrustServerCertificate
-.\Database\smoke-dogfood-receipt.ps1 -Server ".\SQLEXPRESS" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\apply-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\verify-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\smoke-dogfood-receipt.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
 ```
 
 Repeat against `IronDeveloper` only after the test database receipt is clean.

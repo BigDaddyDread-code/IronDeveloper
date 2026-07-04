@@ -51,7 +51,7 @@ function Wait-HttpOk {
 }
 
 function Get-NodeCommand {
-    $bundled = "C:\Users\bob\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
+    $bundled = Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
     if (Test-Path $bundled) {
         return $bundled
     }

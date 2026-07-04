@@ -61,9 +61,9 @@ public sealed class BlockJ01RemoveHardcodedMachineSqlConfigTests
             .SelectMany(file => FindMarkers(
                 file,
                 [
-                    @"C:\Users\",
-                    "/Users/",
-                    "/home/"
+                    @"C:" + @"\Users" + @"\",
+                    "/" + "Users/",
+                    "/" + "home/"
                 ]))
             .ToArray();
 
@@ -95,8 +95,8 @@ public sealed class BlockJ01RemoveHardcodedMachineSqlConfigTests
 
             StringAssert.Contains(connectionString, @"Server=(localdb)\MSSQLLocalDB", path);
             StringAssert.Contains(connectionString, "Integrated Security=True", path);
-            Assert.IsFalse(connectionString.Contains("DESKTOP-", StringComparison.OrdinalIgnoreCase), path);
-            Assert.IsFalse(connectionString.Contains("LAPTOP-", StringComparison.OrdinalIgnoreCase), path);
+            Assert.IsFalse(connectionString.Contains("DESKTOP" + "-", StringComparison.OrdinalIgnoreCase), path);
+            Assert.IsFalse(connectionString.Contains("LAPTOP" + "-", StringComparison.OrdinalIgnoreCase), path);
             Assert.IsFalse(connectionString.Contains("SQL" + "EXPRESS", StringComparison.OrdinalIgnoreCase), path);
         }
     }

@@ -5,7 +5,7 @@ title: Disposable Workspace Apply Completion Checkpoint
 document_type: ArchitectureCheckpoint
 authority: Draft
 status: Proposed
-source: C:\Users\bob\source\repos\AIDeveloper\Docs\DISPOSABLE_WORKSPACE_APPLY_COMPLETION_CHECKPOINT.md
+source: Docs/DISPOSABLE_WORKSPACE_APPLY_COMPLETION_CHECKPOINT.md
 created_utc: 2026-05-23T09:00:00Z
 primary_retrieval_questions:
   - What has IronDev proven about disposable workspace apply?

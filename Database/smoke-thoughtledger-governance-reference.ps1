@@ -1,5 +1,5 @@
 param(
-    [string]$Server = ".\SQLEXPRESS",
+    [string]$Server = "(localdb)\MSSQLLocalDB",
     [string]$Database = "IronDeveloper_Test",
     [string]$ConnectionString,
     [switch]$TrustServerCertificate

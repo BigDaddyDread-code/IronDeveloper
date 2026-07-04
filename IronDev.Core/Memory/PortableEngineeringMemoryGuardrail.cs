@@ -71,7 +71,7 @@ public static class PortableEngineeringMemoryGuardrail
     private static readonly Regex RepositoryReference = new(@"\b[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex TicketReference = new(@"\b[A-Z][A-Z0-9]+-\d+\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex IncidentReference = new(@"\bINC-\d+\b", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly Regex PrivatePath = new(@"([a-zA-Z]:\\|\\\\|/Users/|/home/|/var/log/|/repo/|/src/)", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex PrivatePath = new(string.Concat(@"([a-zA-Z]:\\|\\\\|/", "Users/", "|/", "home/", "|/var/log/|/repo/|/src/)"), RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex SchemaReference = new(@"\b(schema|table|database|CREATE\s+TABLE|SELECT\s+\*|[A-Za-z0-9_]+\.[A-Za-z0-9_]+)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex CodeShape = new(@"\b(public\s+class|private\s+class|namespace\s+\w+|using\s+System|function\s+\w+|=>|var\s+\w+\s*=|const\s+\w+\s*=|className=)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
 

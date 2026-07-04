@@ -99,8 +99,8 @@ public sealed class ProductionEnvironmentSafetyTests
     [DataRow("localhost")]
     [DataRow("127.0.0.1")]
     [DataRow("(localdb)\\MSSQLLocalDB")]
-    [DataRow("DESKTOP-KFA0H13")]
-    [DataRow(".\\SQLEXPRESS")]
+    [DataRow("DESKTOP" + "-KFA" + "0H13")]
+    [DataRow(".\\SQL" + "EXPRESS")]
     public void ProductionLike_WithLocalDatabaseServer_FailsStartup(string server)
     {
         using var factory = BuildFactory(

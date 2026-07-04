@@ -5,7 +5,7 @@ title: Disposable Workspace Phase Report
 document_type: Decision
 authority: Accepted
 status: Current
-source: C:\Users\bob\source\repos\AIDeveloper\Docs\DISPOSABLE_WORKSPACE_PHASE_REPORT.md
+source: Docs/DISPOSABLE_WORKSPACE_PHASE_REPORT.md
 dogfood_phase: DisposableWorkspaceApplyProof
 created_utc: 2026-05-23T10:30:00Z
 primary_retrieval_questions:

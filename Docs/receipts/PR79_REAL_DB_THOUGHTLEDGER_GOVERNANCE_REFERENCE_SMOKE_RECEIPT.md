@@ -3,7 +3,7 @@
 ## Command
 
 ```powershell
-.\Database\smoke-thoughtledger-governance-reference.ps1 -Server ".\SQLEXPRESS" -Database "IronDeveloper_Test" -TrustServerCertificate
+.\Database\smoke-thoughtledger-governance-reference.ps1 -Server "(localdb)\MSSQLLocalDB" -Database "IronDeveloper_Test" -TrustServerCertificate
 ```
 
 ## Boundary

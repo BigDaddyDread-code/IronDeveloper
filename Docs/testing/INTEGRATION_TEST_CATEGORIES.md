@@ -14,9 +14,9 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 605
-- Test classes found: 599
-- Test methods found: 9620
+- Source files scanned: 606
+- Test classes found: 600
+- Test methods found: 9627
 - Category names found: 225
 
 ## G13 Category Changes
@@ -107,6 +107,14 @@ A label does not make a slow test safe.
 - J01 does not add SQL bootstrap, SQL rebuild, Weaviate bootstrap, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, or production runtime behavior.
 - Local SQL configuration is developer convenience. It is not authority, not evidence, and not a shared runtime contract.
 
+## J03 Validate No Local Machine Names In Committed Config
+
+- Added focused `ConfigBoundary` metadata to the J03 tracked-file repository hygiene regression test.
+- J03 does not add `RequiresRealDatabase` or `LongRunning`; the test reads tracked text-like files, docs, `.gitignore`, and receipt text only.
+- J03 excludes generated/build output, generated `tools/dogfood/proofs/` artifacts, and the generated `tools/dogfood/knowledge/` mirror; it does not hide `Docs/`, scripts, source files, workflows, or shared config.
+- J03 does not add runtime behavior, bootstrap behavior, schema changes, SQL migrations, SQL rebuild, Weaviate bootstrap/rebuild, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, or production runtime behavior.
+- Local machine names, local paths, and local SQL instances are developer-local facts. They are not shared configuration, not evidence, not authority, and not a runtime contract.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -148,7 +156,7 @@ A label does not make a slow test safe.
 | `Boundary` | 13 | 106 | 0 | 13 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
-| `ConfigBoundary` | 1 | 7 | 0 | 1 |
+| `ConfigBoundary` | 2 | 14 | 0 | 2 |
 | `Contract` | 14 | 113 | 0 | 14 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |

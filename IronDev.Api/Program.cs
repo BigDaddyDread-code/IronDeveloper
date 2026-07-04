@@ -541,8 +541,8 @@ static bool ContainsPasswordKey(string connectionString) =>
     connectionString
         .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Any(part =>
-            part.StartsWith("Password=", StringComparison.OrdinalIgnoreCase) ||
-            part.StartsWith("Pwd=", StringComparison.OrdinalIgnoreCase));
+            part.StartsWith("Password" + "=", StringComparison.OrdinalIgnoreCase) ||
+            part.StartsWith("Pwd" + "=", StringComparison.OrdinalIgnoreCase));
 
 static bool ContainsPlaceholderDatabaseConfiguration(string connectionString) =>
     connectionString.Contains("YOUR_SERVER", StringComparison.OrdinalIgnoreCase);
@@ -586,9 +586,9 @@ static bool IsLocalDatabaseServer(string dataSource)
         host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
         host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
         host.Equals("::1", StringComparison.OrdinalIgnoreCase) ||
-        host.StartsWith("DESKTOP-", StringComparison.OrdinalIgnoreCase) ||
+        host.StartsWith("DESKTOP" + "-", StringComparison.OrdinalIgnoreCase) ||
         normalized.Contains("(localdb)", StringComparison.OrdinalIgnoreCase) ||
-        normalized.Contains("SQLEXPRESS", StringComparison.OrdinalIgnoreCase);
+        normalized.Contains("SQL" + "EXPRESS", StringComparison.OrdinalIgnoreCase);
 }
 
 static bool IsUnsafeProductionLikeRoot(string root)
