@@ -14,9 +14,9 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 610
-- Test classes found: 604
-- Test methods found: 9671
+- Source files scanned: 611
+- Test classes found: 605
+- Test methods found: 9687
 - Category names found: 227
 
 ## G13 Category Changes
@@ -147,6 +147,14 @@ A label does not make a slow test safe.
 - J05 does not add SQL migrations, runtime SQL store behavior, Weaviate bootstrap/rebuild, Docker orchestration, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, or production runtime behavior.
 - Local SQL bootstrap prepares a disposable developer database. It does not prove product readiness.
 
+## J06 Local Weaviate Bootstrap/Rebuild Command
+
+- Added focused `ConfigBoundary`, `Weaviate`, `Boundary`, and `Contract` metadata to the J06 local Weaviate command regression test.
+- J06 does not add `RequiresRealDatabase` or `LongRunning`; the test executes the script against a disposable fake repository and reads script, docs, receipt, and static repository metadata only.
+- J06 verifies default check-only behavior, loopback-only endpoint classification, local collection-name classification, exact rebuild confirmation, schema-path guarding, no J04/J05 automatic invocation, no credential/service/demo/smoke parameter surface, and non-authority boundary wording.
+- J06 does not start Docker or Weaviate, load demo vectors, load BookSeller data, run alpha smoke, write evidence, change source/SQL/runtime authority records, add API/CLI/UI behavior, or claim alpha/merge/release/deployment readiness.
+- Local Weaviate state is a disposable derived index. Rebuilding it is setup convenience, not authority, approval, evidence, or readiness.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -185,11 +193,11 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 13 | 106 | 0 | 13 |
+| `Boundary` | 14 | 122 | 0 | 14 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
-| `ConfigBoundary` | 6 | 58 | 0 | 6 |
-| `Contract` | 14 | 113 | 0 | 14 |
+| `ConfigBoundary` | 7 | 74 | 0 | 7 |
+| `Contract` | 15 | 129 | 0 | 15 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -380,7 +388,7 @@ A label does not make a slow test safe.
 | `WorkflowStepThoughtLedger` | 1 | 9 | 0 | 1 |
 | `WorkflowTransitionRecord` | 1 | 25 | 0 | 1 |
 | `WorkflowTransitionRecordStore` | 1 | 24 | 0 | 1 |
-| `Weaviate` | 2 | 20 | 0 | 2 |
+| `Weaviate` | 3 | 36 | 0 | 3 |
 
 ## CI-Facing Category Counts
 

@@ -90,6 +90,33 @@ powershell -ExecutionPolicy Bypass -File .\Scripts\local\sql-local.ps1 `
   -ConfirmRebuild "REBUILD IronDeveloper_Local"
 ```
 
+Local Weaviate setup is also separate. J06 checks or prepares only developer-local Weaviate collections and never starts Docker, starts Weaviate, loads demo vectors, runs alpha smoke, writes evidence, or claims readiness:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\weaviate-local.ps1 -CheckOnly
+```
+
+Ensure the local schema against an already-running loopback Weaviate instance:
+
+```text
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\weaviate-local.ps1 `
+  -EnsureSchema `
+  -Endpoint http://localhost:8080 `
+  -CollectionName IronDeveloper_Local
+```
+
+Rebuild requires an exact collection confirmation phrase:
+
+```text
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\weaviate-local.ps1 `
+  -Rebuild `
+  -Endpoint http://localhost:8080 `
+  -CollectionName IronDeveloper_Local `
+  -ConfirmRebuild "REBUILD IronDeveloper_Local"
+```
+
+Local Weaviate state is a disposable derived index. Rebuilding it is setup convenience, not authority, approval, evidence, alpha readiness, release readiness, or product truth.
+
 ---
 
 ## 1. Local Database Setup
