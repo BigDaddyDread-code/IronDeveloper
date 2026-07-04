@@ -1,46 +1,25 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
 
 /// <summary>
-/// D-1 — the demo target is executable proof, not theatre. This suite is the
-/// build-path guarantee behind the alpha demo:
-///  - Samples/BookSeller compiles and its own tests pass AS-IS (the fixture
-///    tickets describe features deliberately not implemented — the Builder
-///    earns the demo by solving them live; nothing here pre-bakes answers);
-///  - TestFixtures/BookSeller/tickets.json is complete, its dependency chain
-///    resolves and yields more than one wave (so the batch demo sequences),
-///    and it names no approvals, capabilities, or gates;
-///  - nothing in the sample or fixtures points at machine-specific paths — a
-///    clean machine can run the demo without hidden local knowledge.
+/// D-1 — static guards on the demo target's honesty. These are file/JSON reads
+/// only (fast, no build), so they ride the governance-boundary lane:
+///  - the ticket fixtures are complete enough for the readiness gate;
+///  - the dependency chain resolves and yields more than one wave, so the batch
+///    demo actually sequences;
+///  - the fixtures name no approvals/capabilities/gates and know no machine;
+///  - the sample does NOT already implement the ticket features — if someone
+///    pre-bakes an answer, this goes red. A demo that only works because the
+///    machine already knows the trick is a lie with screenshots.
+/// The slow half (actually building and testing the sample) lives in
+/// AlphaSampleBuildSmokeTests under the LongRunning lane.
 /// </summary>
 [TestClass]
-[TestCategory("LongRunning")]
-[TestCategory("SkeletonRun")]
-public sealed class AlphaSampleSmokeTests
+[TestCategory("StaticBoundary")]
+public sealed class AlphaSampleFixtureBoundaryTests
 {
-    [TestMethod]
-    public void Sample_CompilesGreen_AsIs()
-    {
-        var sampleRoot = Path.Combine(RepoRoot(), "Samples", "BookSeller");
-        var (exitCode, output) = RunDotnet("build BookSeller.slnx", sampleRoot);
-
-        Assert.AreEqual(0, exitCode,
-            $"Samples/BookSeller must compile as-is — a demo that does not build is theatre.{Environment.NewLine}{Tail(output)}");
-    }
-
-    [TestMethod]
-    public void SampleTests_PassGreen_AsIs()
-    {
-        var sampleRoot = Path.Combine(RepoRoot(), "Samples", "BookSeller");
-        var (exitCode, output) = RunDotnet("test BookSeller.slnx", sampleRoot);
-
-        Assert.AreEqual(0, exitCode,
-            $"The sample's own tests must pass as-is — the loop's workspace runs them, so a red baseline poisons every run.{Environment.NewLine}{Tail(output)}");
-    }
-
     [TestMethod]
     public void Fixtures_AreCompleteEnoughToPassTheReadinessGate()
     {
@@ -110,13 +89,13 @@ public sealed class AlphaSampleSmokeTests
     {
         // The demo is earned live. If the sample already implements the ticket
         // features, the demo proves nothing — this pins the "unsolved" baseline.
+        // Implementation-shaped markers only; a comment pointing at a ticket
+        // implements nothing.
         var domainDir = Path.Combine(RepoRoot(), "Samples", "BookSeller", "src", "BookSeller.Domain");
         var book = File.ReadAllText(Path.Combine(domainDir, "Book.cs"));
         var catalog = File.ReadAllText(Path.Combine(domainDir, "Catalog.cs"));
         var pricing = File.ReadAllText(Path.Combine(domainDir, "PricingService.cs"));
 
-        // Implementation-shaped markers only — the sources may (and do) carry
-        // comments pointing at the tickets; a comment implements nothing.
         Assert.IsFalse(book.Contains("throw", StringComparison.Ordinal),
             "Book.cs must not pre-implement validation — the validate-book ticket is solved live.");
         Assert.IsFalse(catalog.Contains("book.Author", StringComparison.Ordinal) || catalog.Contains("ByAuthor", StringComparison.Ordinal),
@@ -127,18 +106,15 @@ public sealed class AlphaSampleSmokeTests
 
     // ── fixture model + helpers ────────────────────────────────────────────
 
-    private sealed record FixtureFile(FixtureProject Project, List<FixtureTicket> Tickets);
+    internal sealed record FixtureFile(FixtureProject Project, List<FixtureTicket> Tickets);
 
-    private sealed record FixtureProject(
+    internal sealed record FixtureProject(
         string Name, string Description, string RelativePath, string BuildCommand, string TestCommand);
 
-    private sealed record FixtureTicket(
+    internal sealed record FixtureTicket(
         string Key, string Title, string Summary, string AcceptanceCriteria, string TechnicalNotes, List<string> BlockedBy);
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private static FixtureFile LoadFixture()
     {
@@ -147,32 +123,10 @@ public sealed class AlphaSampleSmokeTests
         return fixture;
     }
 
-    private static string FixturePath() =>
+    internal static string FixturePath() =>
         Path.Combine(RepoRoot(), "TestFixtures", "BookSeller", "tickets.json");
 
-    private static (int ExitCode, string Output) RunDotnet(string arguments, string workingDirectory)
-    {
-        var startInfo = new ProcessStartInfo("dotnet", arguments)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        using var process = Process.Start(startInfo)!;
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        Assert.IsTrue(process.WaitForExit(TimeSpan.FromMinutes(5)), $"dotnet {arguments} timed out.");
-        return (process.ExitCode, stdout + stderr);
-    }
-
-    private static string Tail(string output)
-    {
-        var lines = output.Split('\n');
-        return string.Join('\n', lines.Skip(Math.Max(0, lines.Length - 25)));
-    }
-
-    private static string RepoRoot()
+    internal static string RepoRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
