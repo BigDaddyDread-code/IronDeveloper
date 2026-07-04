@@ -11,6 +11,11 @@ import { useSessionContext } from '../../state/useSessionContext';
 // User-selectable providers only — 'fake' is test/local, never offered here.
 const PROVIDERS = ['openai', 'localopenai', 'ollama', 'custom'];
 
+// AG-7 — the orchestrator runs no model: it deterministically composes the loop
+// and enforces the gates. Showing it a provider/model/voice editor would be a
+// lie, so its card says what it actually is and offers nothing to configure.
+const DETERMINISTIC_ROLES = ['Orchestrator'];
+
 export function AgentsPanel() {
   const session = useSessionContext();
   const [profiles, setProfiles] = useState<SkeletonAgentProfile[]>([]);
@@ -91,11 +96,19 @@ export function AgentsPanel() {
 
       {profiles.map((profile) => {
         const draft = drafts[profile.role] ?? profile;
+        const isDeterministic = DETERMINISTIC_ROLES.includes(profile.role);
         return (
           <div className="fl-panel-box" key={profile.role} style={{ marginTop: 10 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}`}>
             <p className="fl-plabel" style={{ marginTop: 0 }}>
               {profile.role}
             </p>
+            {isDeterministic ? (
+              <p className="fl-empty" style={{ marginTop: 0 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.deterministic`}>
+                Deterministic — the orchestrator composes the loop and enforces the gates. It runs no model, so there is
+                nothing to configure here. (It never judges whether the work is satisfactory; only the human gate approves.)
+              </p>
+            ) : (
+            <>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <select
                 className="fl-select"
@@ -147,6 +160,8 @@ export function AgentsPanel() {
               </button>
               {savedRole === profile.role ? <span style={{ fontSize: 12.5, color: 'var(--fl-acc-ink)' }}>Saved.</span> : null}
             </div>
+            </>
+            )}
           </div>
         );
       })}

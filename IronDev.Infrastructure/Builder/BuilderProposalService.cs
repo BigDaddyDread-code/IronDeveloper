@@ -171,7 +171,9 @@ public sealed class BuilderProposalService : IBuilderProposalService
                 : inner.OriginalRequest,
             Summary         = inner.Summary,
             Rationale       = inner.Rationale,
-            GeneratedAt     = DateTime.UtcNow
+            GeneratedAt     = DateTime.UtcNow,
+            ModelProvider   = inner.ModelProvider,
+            ModelName       = inner.ModelName
         };
 
         foreach (var change in inner.FileChanges)

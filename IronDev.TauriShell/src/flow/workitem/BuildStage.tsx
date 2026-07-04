@@ -35,8 +35,9 @@ export function BuildStage({ run, report, onRefreshReport }: BuildStageProps) {
       ) : (
         <>
           {report.proposal ? (
-            <p style={{ fontSize: 13, color: 'var(--fl-ink2)' }}>
+            <p style={{ fontSize: 13, color: 'var(--fl-ink2)' }} data-testid="flow.build.proposal">
               Proposal {report.proposal.proposalId} · {report.proposal.fileChangeCount} file change(s)
+              {report.proposal.modelName ? ` · built by ${report.proposal.modelProvider}/${report.proposal.modelName}` : ''}
             </p>
           ) : null}
 

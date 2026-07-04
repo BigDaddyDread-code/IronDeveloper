@@ -1097,6 +1097,8 @@ export interface SkeletonRunProposalTrace {
   fileChangeCount: number;
   evidenceRef: string;
   evidenceExistsOnDisk: boolean;
+  modelProvider: string;
+  modelName: string;
 }
 
 export interface SkeletonRunTestAuthoringTrace {

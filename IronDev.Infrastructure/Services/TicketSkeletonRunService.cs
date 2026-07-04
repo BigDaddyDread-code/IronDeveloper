@@ -154,6 +154,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         {
             ["proposalId"] = proposalId,
             ["fileChangeCount"] = fileWrites.Count.ToString(),
+            // AG-6: which configured model the Builder ran on.
+            ["modelProvider"] = proposal.ModelProvider ?? string.Empty,
+            ["modelName"] = proposal.ModelName ?? string.Empty,
             ["currentNode"] = "SkeletonRun"
         }, cancellationToken).ConfigureAwait(false);
 
@@ -757,7 +760,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 ProposalId = Payload(proposalEvent, "proposalId"),
                 FileChangeCount = int.TryParse(Payload(proposalEvent, "fileChangeCount"), out var count) ? count : 0,
                 EvidenceRef = proposalPath,
-                EvidenceExistsOnDisk = proposalOnDisk
+                EvidenceExistsOnDisk = proposalOnDisk,
+                ModelProvider = Payload(proposalEvent, "modelProvider"),
+                ModelName = Payload(proposalEvent, "modelName")
             };
             if (!proposalOnDisk)
                 gaps.Add("Proposal evidence file is missing from disk.");
