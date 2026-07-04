@@ -132,6 +132,9 @@ public sealed record SkeletonRunCriticReviewTrace
     public int FindingCount { get; init; }
     public int BlockingFindingCount { get; init; }
 
+    /// <summary>The durable finding ids on this review — what dispositions must answer (P1-3).</summary>
+    public IReadOnlyList<string> FindingIds { get; init; } = [];
+
     /// <summary>The package hash the critic reviewed — comparable against the approval's target hash.</summary>
     public string PackageSha256 { get; init; } = string.Empty;
 

@@ -1,19 +1,24 @@
-import { useState } from 'react';
-import type { SkeletonCriticPackage, SkeletonRunReport } from '../../api/types';
+import type { SkeletonCriticPackage, SkeletonCriticReviewOutcome, SkeletonRunReport } from '../../api/types';
+import { ApprovalGate } from './ApprovalGate';
+import { CriterionTestMatrix } from './CriterionTestMatrix';
+import { CriticPackageViewer } from './CriticPackageViewer';
+import { FindingsPanel } from './FindingsPanel';
 
-// Review stage — the critic package at full fidelity plus the human gate.
+// Review stage — the stage orchestrates; the sections render.
 //
 // Boundary: everything actionable here is a REQUEST to a governed backend
-// surface that enforces its own gate. Recording an approval binds a human
-// decision to the exact package hash that was reviewed; it is not policy
-// satisfaction, not continuation, not apply. Continuation and apply are
-// requests the backend verifies live and refuses on its own evidence.
-// The UI records and requests; it can never grant.
+// surface that enforces its own gate. The critic's findings are advisory,
+// every finding needs a human disposition, an approval binds to the reviewed
+// package hash, and the backend verifies all of it live. The UI records and
+// requests; it can never grant.
 
 interface ReviewStageProps {
   criticPackage: SkeletonCriticPackage | null;
   report: SkeletonRunReport | null;
+  criticOutcome: SkeletonCriticReviewOutcome | null;
   busyAction: string | null;
+  onRequestCriticReview: () => void;
+  onRecordDisposition: (findingId: string, disposition: string, reason: string) => void;
   onRecordApproval: () => void;
   onRequestContinuation: () => void;
   onRequestApply: () => void;
@@ -22,14 +27,14 @@ interface ReviewStageProps {
 export function ReviewStage({
   criticPackage,
   report,
+  criticOutcome,
   busyAction,
+  onRequestCriticReview,
+  onRecordDisposition,
   onRecordApproval,
   onRequestContinuation,
   onRequestApply
 }: ReviewStageProps) {
-  const [openDiff, setOpenDiff] = useState<string | null>(null);
-  const approval = report?.approval ?? null;
-
   if (criticPackage === null) {
     return (
       <>
@@ -39,125 +44,40 @@ export function ReviewStage({
     );
   }
 
+  const criticReviews = report?.criticReviews ?? [];
+  const dispositions = report?.findingDispositions ?? [];
+  const dispositionedIds = new Set(dispositions.map((disposition) => disposition.findingId));
+  const hasUndispositionedFindings = criticReviews
+    .flatMap((review) => review.findingIds)
+    .some((findingId) => !dispositionedIds.has(findingId));
+
   return (
     <>
-      <p className="fl-plabel">Proposed change — full fidelity</p>
-      <p style={{ fontSize: 13.5, marginTop: 0 }}>{criticPackage.proposalSummary || 'No summary.'}</p>
-      <p style={{ fontSize: 12.5, color: 'var(--fl-ink2)' }}>
-        Workspace build/test: {criticPackage.workspaceRunSucceeded ? 'succeeded' : 'FAILED'} ·{' '}
-        {criticPackage.commandResults.map((command) => `${command.displayName} (exit ${command.exitCode})`).join(' · ') || 'no commands recorded'}
-      </p>
-
-      <div data-testid="flow.review.changes">
-        {criticPackage.changes.map((change) => (
-          <div className="fl-qbox" key={change.filePath}>
-            <span style={{ width: '100%' }}>
-              <strong style={{ fontSize: 12.5 }}>
-                {change.filePath}
-                {change.isNewFile ? ' · new' : change.isDeletion ? ' · deletion' : ''}
-              </strong>
-              {change.description ? (
-                <span style={{ display: 'block', fontSize: 12.5, color: 'var(--fl-ink2)' }}>{change.description}</span>
-              ) : null}
-              <button
-                className="fl-btn"
-                style={{ marginTop: 6 }}
-                onClick={() => setOpenDiff((prev) => (prev === change.filePath ? null : change.filePath))}
-              >
-                {openDiff === change.filePath ? 'Hide diff' : 'Show diff'}
-              </button>
-              {openDiff === change.filePath ? (
-                <pre
-                  style={{
-                    fontSize: 11.5,
-                    overflowX: 'auto',
-                    background: 'var(--fl-bg2, rgba(0,0,0,0.04))',
-                    padding: 8,
-                    borderRadius: 6
-                  }}
-                >
-                  {change.diff || change.fullContentAfter || '(no diff recorded)'}
-                </pre>
-              ) : null}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <p className="fl-plabel" style={{ marginTop: 14 }}>
-        Criterion → test matrix
-      </p>
-      {criticPackage.authoredTests.length === 0 ? (
-        <p className="fl-empty" data-testid="flow.review.matrix">
-          The matrix has no cells: no tests were authored for this run. That absence is visible by design — it is part of what
-          you are approving.
-        </p>
-      ) : (
-        <table className="fl-table" data-testid="flow.review.matrix">
-          <thead>
-            <tr>
-              <th>Criterion</th>
-              <th>Authored test</th>
-            </tr>
-          </thead>
-          <tbody>
-            {criticPackage.authoredTests.map((test) => (
-              <tr key={test.relativePath}>
-                <td>{test.coversCriterion || '(criterion not named)'}</td>
-                <td>{test.relativePath}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <p style={{ fontSize: 12, color: 'var(--fl-ink2)' }}>
-        Authored tests derive from the acceptance criteria and never see the builder&apos;s diff. They ran in the disposable
-        workspace; they are not applied to the source repository.
-      </p>
-
-      <p className="fl-plabel" style={{ marginTop: 14 }}>
-        Human gate
-      </p>
-      {approval === null ? (
-        <p className="fl-empty">No approval requirement recorded yet.</p>
+      <CriticPackageViewer criticPackage={criticPackage} />
+      <CriterionTestMatrix criticPackage={criticPackage} />
+      <FindingsPanel
+        criticOutcome={criticOutcome}
+        criticReviews={criticReviews}
+        dispositions={dispositions}
+        busyAction={busyAction}
+        onRequestCriticReview={onRequestCriticReview}
+        onRecordDisposition={onRecordDisposition}
+      />
+      {report?.approval ? (
+        <ApprovalGate
+          approval={report.approval}
+          hasUndispositionedFindings={hasUndispositionedFindings}
+          busyAction={busyAction}
+          onRecordApproval={onRecordApproval}
+          onRequestContinuation={onRequestContinuation}
+          onRequestApply={onRequestApply}
+        />
       ) : (
         <>
-          <p style={{ fontSize: 12.5, color: 'var(--fl-ink2)' }} data-testid="flow.review.requirement">
-            Requirement: {approval.capabilityCode} on {approval.targetKind} · bound to package hash{' '}
-            <code>{approval.targetHash.slice(0, 12)}…</code>. An approval attaches to exactly what was reviewed — if the
-            package changes, the approval no longer satisfies.
+          <p className="fl-plabel" style={{ marginTop: 14 }}>
+            Human gate
           </p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button
-              className="fl-btn fl-pri"
-              disabled={busyAction !== null || approval.continuationUnblocked}
-              onClick={onRecordApproval}
-              data-testid="flow.review.recordApproval"
-            >
-              {busyAction === 'record' ? 'Recording…' : 'Record my approval'}
-            </button>
-            <button
-              className="fl-btn"
-              disabled={busyAction !== null || approval.continuationUnblocked}
-              onClick={onRequestContinuation}
-              data-testid="flow.review.requestContinuation"
-            >
-              {busyAction === 'continue' ? 'Requesting…' : 'Request continuation'}
-            </button>
-            <button
-              className="fl-btn"
-              disabled={busyAction !== null || !approval.continuationUnblocked}
-              onClick={onRequestApply}
-              data-testid="flow.review.requestApply"
-            >
-              {busyAction === 'apply' ? 'Requesting…' : 'Request controlled apply'}
-            </button>
-          </div>
-          <p style={{ fontSize: 12, color: 'var(--fl-ink2)' }}>
-            Recording an approval is a human decision entering the record — it is not continuation, and continuation is not
-            apply permission. Each request is verified live by the backend against its own evidence; a refusal names its
-            reason.
-          </p>
+          <p className="fl-empty">No approval requirement recorded yet.</p>
         </>
       )}
     </>

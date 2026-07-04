@@ -1079,6 +1079,7 @@ export interface SkeletonCriticPackage {
   proposalRationale: string;
   changes: SkeletonCriticPackageChange[];
   authoredTests: SkeletonAuthoredTest[];
+  criterionCoverage: SkeletonCriterionCoverage[];
   commandResults: SkeletonCriticPackageCommandResult[];
   evidenceRefs: string[];
   workspaceRunSucceeded: boolean;
@@ -1111,6 +1112,8 @@ export interface SkeletonRunCriticPackageTrace {
   announcedSha256: string;
   sha256OnDisk: string;
   hashVerified: boolean;
+  criterionCount: number;
+  uncoveredCriterionCount: number;
 }
 
 export interface SkeletonRunApprovalTrace {
@@ -1154,6 +1157,8 @@ export interface SkeletonRunReport {
   testAuthoring?: SkeletonRunTestAuthoringTrace | null;
   criticPackage?: SkeletonRunCriticPackageTrace | null;
   approval?: SkeletonRunApprovalTrace | null;
+  criticReviews: SkeletonRunCriticReviewTrace[];
+  findingDispositions: SkeletonRunFindingDispositionTrace[];
   apply?: SkeletonRunApplyTrace | null;
   gaps: string[];
   loopComplete: boolean;
@@ -1201,4 +1206,75 @@ export interface AcceptedApprovalReadModelUi {
   approvedByActorDisplayName?: string | null;
   acceptedAtUtc?: string | null;
   expiresAtUtc?: string | null;
+}
+
+// ── P1-4/P1-7: coverage matrix + critic review + dispositions ──
+
+export interface SkeletonCriterionCoverage {
+  criterion: string;
+  covered: boolean;
+  coveringTests: string[];
+}
+
+export interface SkeletonCriticReviewFinding {
+  findingId: string;
+  severity: string;
+  title: string;
+  problem: string;
+  whyItMatters: string;
+  requiredFix: string;
+  blocksMerge: boolean;
+}
+
+export interface SkeletonGroundTruthCheck {
+  checkName: string;
+  passed: boolean;
+  expected: string;
+  actual: string;
+  detail: string;
+  blocksMerge: boolean;
+}
+
+export interface SkeletonGroundTruthVerification {
+  checks: SkeletonGroundTruthCheck[];
+  mismatches: SkeletonGroundTruthCheck[];
+  boundary: string;
+}
+
+export interface SkeletonCriticReviewOutcome {
+  succeeded: boolean;
+  failureReason: string;
+  criticAgentRunId: string;
+  reviewId: string;
+  verdict: string;
+  findings: SkeletonCriticReviewFinding[];
+  groundTruth?: SkeletonGroundTruthVerification | null;
+  boundary: string;
+}
+
+export interface SkeletonFindingDispositionOutcome {
+  succeeded: boolean;
+  failureReason: string;
+  findingId: string;
+  disposition: string;
+  boundary: string;
+}
+
+export interface SkeletonRunCriticReviewTrace {
+  criticAgentRunId: string;
+  reviewId: string;
+  verdict: string;
+  findingCount: number;
+  blockingFindingCount: number;
+  findingIds: string[];
+  packageSha256: string;
+  groundTruthCheckCount: number;
+  groundTruthMismatchCount: number;
+}
+
+export interface SkeletonRunFindingDispositionTrace {
+  findingId: string;
+  disposition: string;
+  reason: string;
+  decidedByUserId: string;
 }
