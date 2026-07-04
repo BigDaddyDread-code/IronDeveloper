@@ -37,6 +37,18 @@ Precedence for the API host is:
 
 The local override file is never required for CI, tests, production-like environments, LocalTest, or shared development. It is not evidence, not authority, not bootstrap, not environment validation, and not permission to run SQL, Weaviate, source mutation, evidence mutation, sandbox mutation, release, deployment, or workflow behavior.
 
+## J08 redacted config summary
+
+J08 adds a Core-only redacted configuration summary contract. It reports source presence/order, safe SQL-derived metadata, AI provider/model status, AI base URL host/port, Weaviate enabled/auth status, local root status, and feature flag state without emitting raw connection strings, secret values, local override file contents, or full user-local paths.
+
+Connection strings may be parsed into derived metadata such as database name, server kind, authentication mode, and whether a credential key exists. The raw connection string is never emitted. Sensitive keys such as API keys, JWT keys, tokens, authorization values, client secrets, private keys, and credential-shaped values are redacted.
+
+Root safety integration is intentionally read-only. Until J10 root-safety validation exists, configured roots are reported as `NotEvaluated`; J08 does not invent root safety or validate roots itself.
+
+J08 adds no endpoint, no startup logging, no bootstrap behavior, no SQL connectivity check, no Weaviate connectivity check, no schema change, and no source-apply, approval, critic, workflow, release, or deployment authority.
+
+Boundary: a config summary is diagnostic evidence for a human. It is not approval, authority, policy satisfaction, root safety proof, or permission to mutate anything.
+
 ## Backend configuration keys
 
 | Key | Owning option class or consumer | Required or optional | Default behaviour | Test coverage | Status | Changed in PR 55 |
@@ -62,6 +74,7 @@ The local override file is never required for CI, tests, production-like environ
 | `Embedding:*` | `CodeIntelligenceServiceCollectionExtensions`, `EmbeddingOptions` | Optional | Uses options defaults and `OPENAI_API_KEY` fallback. | code intelligence tests. | Active | No |
 | `Weaviate:*` | `CodeIntelligenceServiceCollectionExtensions`, `WeaviateOptions` | Optional unless Weaviate path is enabled | Disabled/empty options prevent active vector client use. | semantic memory/index boundary tests. | Active | No |
 | `SemanticRanking:*` | `SemanticRankingOptions` | Optional | Uses option defaults. | semantic ranking tests. | Active | No |
+| redacted config summary request values | `RedactedConfigSummaryService` | Optional diagnostic input | Values are summarized as non-sensitive status, redacted values, or safe derived metadata only. | J08 config summary tests. | Diagnostic only | No |
 
 No configuration key was renamed, removed, or given a new default in PR 55.
 
