@@ -1278,3 +1278,102 @@ export interface SkeletonRunFindingDispositionTrace {
   reason: string;
   decidedByUserId: string;
 }
+
+// ── P2-1..P2-7: batch (dependency map → plan → run) + gate recommendation ──
+
+export interface SkeletonBatchDependencyEdge {
+  fromTicketId: number;
+  toTicketId: number;
+  kind: string;
+  reason: string;
+  sharedPaths: string[];
+}
+
+export interface SkeletonBatchMap {
+  projectId: number;
+  ticketIds: number[];
+  edges: SkeletonBatchDependencyEdge[];
+  warnings: string[];
+  boundary: string;
+}
+
+export interface SkeletonBatchMapOutcome {
+  succeeded: boolean;
+  failureReason: string;
+  mapId: string;
+  detectedAtUtc: string;
+  map?: SkeletonBatchMap | null;
+}
+
+export interface SkeletonBatchWave {
+  waveNumber: number;
+  ticketIds: number[];
+}
+
+export interface SkeletonBatchCycleBlocker {
+  ticketIds: number[];
+  detail: string;
+}
+
+export interface SkeletonBatchPlan {
+  projectId: number;
+  mapId: string;
+  waves: SkeletonBatchWave[];
+  cycleBlockers: SkeletonBatchCycleBlocker[];
+  warnings: string[];
+  schedulable: boolean;
+  boundary: string;
+}
+
+export interface SkeletonBatchPlanOutcome {
+  succeeded: boolean;
+  failureReason: string;
+  planId: string;
+  plannedAtUtc: string;
+  plan?: SkeletonBatchPlan | null;
+}
+
+export interface SkeletonBatchTicketStatus {
+  ticketId: number;
+  wave: number;
+  runId: string;
+  runStatus: string;
+  eligible: boolean;
+  waitingOn: string[];
+}
+
+export interface SkeletonBatchRunStatus {
+  batchId: string;
+  planId: string;
+  projectId: number;
+  requestedByUserId: string;
+  startedAtUtc: string;
+  tickets: SkeletonBatchTicketStatus[];
+  batchComplete: boolean;
+  boundary: string;
+}
+
+export interface SkeletonBatchRunOutcome {
+  succeeded: boolean;
+  failureReason: string;
+  startedRuns: Record<string, string>;
+  status?: SkeletonBatchRunStatus | null;
+}
+
+export interface SkeletonGateMeasurementInput {
+  measurementId: string;
+  catchRate: number;
+  controlClean: boolean;
+  reExecutionAvailable: boolean;
+  verified: boolean;
+  measuredAtUtc: string;
+}
+
+export interface SkeletonGateRecommendation {
+  runId: string;
+  tier: string;
+  recommendation: string;
+  reasons: string[];
+  measurementInput?: SkeletonGateMeasurementInput | null;
+  boundary: string;
+}

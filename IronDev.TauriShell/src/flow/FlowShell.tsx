@@ -4,6 +4,7 @@ import type { ProjectTicket } from '../api/types';
 import { SignInRoute } from '../features/auth/SignInRoute';
 import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
+import { BatchScreen } from './batch/BatchScreen';
 import { BoardScreen } from './board/BoardScreen';
 import { FlowSurface } from './flowTypes';
 import { GovernanceHost } from './library/GovernanceHost';
@@ -81,6 +82,13 @@ export function FlowShell() {
             Work item
           </button>
           <button
+            className={surface === 'batch' ? 'fl-on' : ''}
+            onClick={() => setSurface('batch')}
+            data-testid="flow.nav.batch"
+          >
+            Batch
+          </button>
+          <button
             className={surface === 'library' ? 'fl-on' : ''}
             onClick={() => setSurface('library')}
             data-testid="flow.nav.library"
@@ -102,7 +110,8 @@ export function FlowShell() {
       </header>
 
       <main className="fl-main">
-        {surface === 'board' ? <BoardScreen onOpenWorkItem={openWorkItem} /> : null}
+        {surface === 'board' ? <BoardScreen onOpenWorkItem={openWorkItem} onOpenBatch={() => setSurface('batch')} /> : null}
+        {surface === 'batch' ? <BatchScreen /> : null}
         {surface === 'workitem' ? (
           <WorkItemScreen
             ticket={activeTicket}

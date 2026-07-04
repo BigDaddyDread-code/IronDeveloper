@@ -1,4 +1,4 @@
-export type FlowSurface = 'board' | 'workitem' | 'library' | 'settings';
+export type FlowSurface = 'board' | 'workitem' | 'batch' | 'library' | 'settings';
 
 export type WorkItemStage = 'shape' | 'ticket' | 'build' | 'review' | 'done';
 

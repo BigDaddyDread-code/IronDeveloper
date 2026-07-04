@@ -5,9 +5,14 @@ import type {
   ApiStatus,
   BuildReadinessResult,
   CreateAcceptedApprovalUiRequest,
+  SkeletonBatchMapOutcome,
+  SkeletonBatchPlanOutcome,
+  SkeletonBatchRunOutcome,
+  SkeletonBatchRunStatus,
   SkeletonCriticPackage,
   SkeletonCriticReviewOutcome,
   SkeletonFindingDispositionOutcome,
+  SkeletonGateRecommendation,
   SkeletonRunReport,
   ChatCompletionRequest,
   ChatCompletionResponse,
@@ -808,6 +813,60 @@ class IronDevApiClient {
   ): Promise<SkeletonRunReport> {
     return this.request<SkeletonRunReport>(
       `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/report`,
+      { method: 'GET', signal }
+    );
+  }
+
+  // P2: batch — detect the dependency map, sequence it into a plan, run it wave
+  // by wave, advance it, and read policy's advisory gate recommendation. Every
+  // call is a REQUEST to a governed endpoint; the backend owns every decision.
+
+  async detectBatchMap(projectId: number, ticketIds: number[], signal?: AbortSignal): Promise<SkeletonBatchMapOutcome> {
+    return this.request<SkeletonBatchMapOutcome>(`/api/projects/${projectId}/batch-maps`, {
+      method: 'POST',
+      body: { ticketIds },
+      signal
+    });
+  }
+
+  async planBatch(projectId: number, mapId: string, signal?: AbortSignal): Promise<SkeletonBatchPlanOutcome> {
+    return this.request<SkeletonBatchPlanOutcome>(`/api/projects/${projectId}/batch-plans`, {
+      method: 'POST',
+      body: { mapId },
+      signal
+    });
+  }
+
+  async startBatchRun(projectId: number, planId: string, signal?: AbortSignal): Promise<SkeletonBatchRunOutcome> {
+    return this.request<SkeletonBatchRunOutcome>(`/api/projects/${projectId}/batch-runs`, {
+      method: 'POST',
+      body: { planId },
+      signal
+    });
+  }
+
+  async advanceBatchRun(projectId: number, batchId: string, signal?: AbortSignal): Promise<SkeletonBatchRunOutcome> {
+    return this.request<SkeletonBatchRunOutcome>(
+      `/api/projects/${projectId}/batch-runs/${encodeURIComponent(batchId)}/advance`,
+      { method: 'POST', signal }
+    );
+  }
+
+  async getBatchRun(projectId: number, batchId: string, signal?: AbortSignal): Promise<SkeletonBatchRunStatus> {
+    return this.request<SkeletonBatchRunStatus>(
+      `/api/projects/${projectId}/batch-runs/${encodeURIComponent(batchId)}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getGateRecommendation(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    signal?: AbortSignal
+  ): Promise<SkeletonGateRecommendation> {
+    return this.request<SkeletonGateRecommendation>(
+      `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/gate-recommendation`,
       { method: 'GET', signal }
     );
   }

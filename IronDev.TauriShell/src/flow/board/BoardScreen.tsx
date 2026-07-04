@@ -6,6 +6,7 @@ import { WorkItemStage, stageLabels, stageOrder } from '../flowTypes';
 
 interface BoardScreenProps {
   onOpenWorkItem: (ticket: ProjectTicket | null) => void;
+  onOpenBatch: () => void;
 }
 
 function stageForTicket(ticket: ProjectTicket): WorkItemStage {
@@ -42,7 +43,7 @@ function tagForTicket(ticket: ProjectTicket): { label: string; cls: string } {
   return { label: ticket.priority ?? 'ready to assess', cls: 'fl-tag fl-bluet' };
 }
 
-export function BoardScreen({ onOpenWorkItem }: BoardScreenProps) {
+export function BoardScreen({ onOpenWorkItem, onOpenBatch }: BoardScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
   const [tickets, setTickets] = useState<ProjectTicket[]>([]);
@@ -81,11 +82,7 @@ export function BoardScreen({ onOpenWorkItem }: BoardScreenProps) {
           <p className="fl-sub">Work items flow left to right. A card moves when its gate is satisfied, never before.</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className="fl-btn"
-            disabled
-            title="Batch sequencing arrives with the dependency layer. Not available yet."
-          >
+          <button className="fl-btn" onClick={onOpenBatch} data-testid="flow.board.batch">
             Run queue
           </button>
           <button className="fl-btn fl-pri" onClick={() => onOpenWorkItem(null)} data-testid="flow.board.new">
