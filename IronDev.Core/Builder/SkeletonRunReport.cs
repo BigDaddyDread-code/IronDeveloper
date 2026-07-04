@@ -71,6 +71,10 @@ public sealed record SkeletonRunProposalTrace
     public int FileChangeCount { get; init; }
     public string EvidenceRef { get; init; } = string.Empty;
     public bool EvidenceExistsOnDisk { get; init; }
+
+    /// <summary>AG-6: which model the Builder ran on to produce this proposal.</summary>
+    public string ModelProvider { get; init; } = string.Empty;
+    public string ModelName { get; init; } = string.Empty;
 }
 
 public sealed record SkeletonRunTestAuthoringTrace

@@ -35,6 +35,10 @@ public sealed class BuilderProposal
     public List<string> ValidationWarnings { get; set; } = new();
     public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>AG-6: which configured model the Builder ran on.</summary>
+    public string ModelProvider { get; set; } = string.Empty;
+    public string ModelName { get; set; } = string.Empty;
+
     public bool HasValidationIssues => ValidationIssues.Count > 0 || Changes.Exists(c => !c.IsValid);
     public bool HasValidationWarnings => ValidationWarnings.Count > 0;
     public string ValidationSummary =>

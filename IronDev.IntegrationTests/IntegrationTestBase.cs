@@ -6,6 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Data.SqlClient;
 using Dapper;
 using IronDev.Core;
+using IronDev.Core.Agents;
 using IronDev.Core.Auth;
 using IronDev.Core.KnowledgeCompiler;
 using IronDev.Data;
@@ -55,6 +56,14 @@ public abstract class IntegrationTestBase
             });
         }
 
+        // AG-6: agents resolve their LLM per profile; in tests every agent uses the
+        // fake provider (no network, no key), so the resolver returns FakeLlmService.
+        configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Ai:Provider"] = "fake",
+            ["AgentProfiles:Root"] = Path.Combine(Path.GetTempPath(), $"irondev-test-agent-profiles-{Guid.NewGuid():N}")
+        });
+
         var configuration = configurationBuilder.Build();
 
         ConnectionString = configuration.GetConnectionString("IronDeveloperDb")
@@ -92,6 +101,8 @@ public abstract class IntegrationTestBase
         services.AddScoped<ISemanticArtefactRepository, SemanticArtefactRepository>();
         services.AddScoped<ISemanticChunkRepository, SemanticChunkRepository>();
         services.AddScoped<IBuilderReadinessService, BuilderReadinessService>();
+        services.AddScoped<ISkeletonAgentProfileService, SkeletonAgentProfileService>();
+        services.AddScoped<IAgentLlmResolver, AgentLlmResolver>();
         services.AddScoped<ICodeChangeProposalService, CodeChangeProposalService>();
         services.AddScoped<IChatClarificationClassifier, LlmChatClarificationClassifier>();
         services.AddScoped<IDotNetBuildService, DotNetRunnerService>();

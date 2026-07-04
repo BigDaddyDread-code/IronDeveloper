@@ -26,6 +26,23 @@ test('agents panel edits a model and voice and saves through the governed endpoi
   expect(state.lastUpdate.body.model).toBe('llama3');
 });
 
+test('the orchestrator card is honest — deterministic, no model to configure', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockAgentProfiles(page);
+
+  await page.goto('/');
+  await page.getByTestId('flow.nav.settings').click();
+
+  await expect(page.getByTestId('flow.settings.agent.orchestrator')).toBeVisible();
+  // It states what it is...
+  await expect(page.getByTestId('flow.settings.agent.orchestrator.deterministic')).toContainText('runs no model');
+  // ...and offers nothing to configure (no dead provider dropdown).
+  await expect(page.getByTestId('flow.settings.agent.orchestrator.provider')).toHaveCount(0);
+  await expect(page.getByTestId('flow.settings.agent.orchestrator.save')).toHaveCount(0);
+  // A real model-running agent still has its editor.
+  await expect(page.getByTestId('flow.settings.agent.builder.provider')).toBeVisible();
+});
+
 test('a secret in a profile is refused and shown honestly', async ({ page }) => {
   await mockWorkspace(page);
   await mockAgentProfiles(page, { refuseSecret: true });

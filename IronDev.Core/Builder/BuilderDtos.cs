@@ -82,6 +82,10 @@ public sealed class CodeChangeProposal
     public string OriginalRequest { get; set; } = "";
     public string StandardsCompliance { get; set; } = "";
     public List<FileChangeProposal> FileChanges { get; set; } = [];
+
+    /// <summary>AG-6: which configured model the Builder ran on to produce this proposal.</summary>
+    public string ModelProvider { get; set; } = "";
+    public string ModelName     { get; set; } = "";
 }
 
 // ── Review/approval surface ───────────────────────────────────────────────

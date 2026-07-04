@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using IronDev.Core;
+using IronDev.Core.Agents;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
@@ -15,25 +16,34 @@ namespace IronDev.Infrastructure.Builder;
 /// <summary>
 /// Phase 3 implementation of ICodeChangeProposalService.
 ///
-/// Builds a strict builder prompt from TicketBuildContext,
-/// calls ILLMService.GetResponseAsync, and parses the returned JSON
-/// into a CodeChangeProposal.
+/// Builds a strict builder prompt from TicketBuildContext, resolves the BUILDER
+/// agent's configured LLM (AG-6 — any agent any model), composes its voice
+/// around the code-owned prompt body (personality + skill FIRST, the strict
+/// task LAST and authoritative), calls the model, and parses the returned JSON
+/// into a CodeChangeProposal stamped with which model produced it.
 ///
 /// Contract:
 ///   - No files written.
 ///   - No dotnet build.
 ///   - No Weaviate calls.
+///   - The Builder's skill.md can flavor HOW it works; it can never remove the
+///     code-owned output contract — the composed body comes last and wins.
 ///   - Returns an empty-FileChanges proposal if the LLM returns no changes.
 ///   - Throws InvalidOperationException with a clear message on invalid JSON.
 /// </summary>
 public sealed class CodeChangeProposalService : ICodeChangeProposalService
 {
-    private readonly ILLMService      _llm;
-    private readonly ILlmTraceService _llmTraceService;
+    private readonly IAgentLlmResolver          _llmResolver;
+    private readonly ISkeletonAgentProfileService _profiles;
+    private readonly ILlmTraceService           _llmTraceService;
 
-    public CodeChangeProposalService(ILLMService llm, ILlmTraceService llmTraceService)
+    public CodeChangeProposalService(
+        IAgentLlmResolver           llmResolver,
+        ISkeletonAgentProfileService profiles,
+        ILlmTraceService            llmTraceService)
     {
-        _llm = llm;
+        _llmResolver = llmResolver;
+        _profiles = profiles;
         _llmTraceService = llmTraceService;
     }
 
@@ -41,7 +51,11 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         TicketBuildContext context,
         CancellationToken  cancellationToken = default)
     {
-        var prompt = BuildPrompt(context);
+        // AG-6: the Builder runs the model its profile configures, with its voice
+        // framing the code-owned prompt (which stays last and authoritative).
+        var profile = await _profiles.GetAsync(SkeletonAgentRole.Builder, cancellationToken).ConfigureAwait(false);
+        var agent = await _llmResolver.ResolveAsync(SkeletonAgentRole.Builder, cancellationToken).ConfigureAwait(false);
+        var prompt = SkeletonAgentPromptComposer.Compose(profile, BuildPrompt(context));
 
         // ── Call LLM with tracing ─────────────────────────────────────────────
         var trace = new LlmTraceEntry
@@ -58,11 +72,13 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             CreatedAt = DateTime.UtcNow
         };
 
+        trace.ParsedResponseSummary = $"Builder model: {agent.Provider}/{agent.Model}";
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string rawJson;
         try
         {
-            rawJson = await _llm.GetResponseAsync(prompt, cancellationToken);
+            rawJson = await agent.Llm.GetResponseAsync(prompt, cancellationToken);
             trace.WasSuccessful = true;
             trace.RawResponseText = rawJson;
         }
@@ -83,7 +99,9 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
         {
             var proposal = ParseProposal(rawJson, context.TicketId);
             proposal.OriginalRequest = context.TicketSummary;
-            
+            proposal.ModelProvider = agent.Provider;
+            proposal.ModelName = agent.Model;
+
             trace.ProposedFileCount = proposal.FileChanges.Count;
             trace.ProposedFilesList = string.Join(", ", proposal.FileChanges.ConvertAll(c => c.FilePath));
             trace.ParsedResponseSummary = $"Proposed {proposal.FileChanges.Count} file changes.";
