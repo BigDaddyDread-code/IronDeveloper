@@ -1398,7 +1398,6 @@ export interface SkeletonAgentProfile {
 export interface SkeletonAgentProfileUpdate {
   provider: string;
   model: string;
-  baseUrl: string;
   timeoutSeconds: number;
   skill: string;
   personality: string;

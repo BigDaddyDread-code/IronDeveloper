@@ -27,24 +27,31 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
         var profile = await _profiles.GetAsync(role, cancellationToken).ConfigureAwait(false);
         var global = _configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 
-        var provider = string.IsNullOrWhiteSpace(profile.Provider) ? global.Provider : profile.Provider;
+        var provider = (string.IsNullOrWhiteSpace(profile.Provider) ? global.Provider : profile.Provider)?.Trim() ?? string.Empty;
         var options = new LlmOptions
         {
             Provider = provider,
             Model = string.IsNullOrWhiteSpace(profile.Model) ? global.Model : profile.Model,
-            BaseUrl = string.IsNullOrWhiteSpace(profile.BaseUrl) ? global.BaseUrl : profile.BaseUrl,
+            // BaseUrl is deployment config only — never sourced from a profile.
+            BaseUrl = global.BaseUrl,
             TimeoutSeconds = profile.TimeoutSeconds > 0 ? profile.TimeoutSeconds : global.TimeoutSeconds,
             // The key stays out of the profile — it comes from config/env, as before.
             ApiKey = global.ApiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
         };
 
-        ILLMService llm = (provider?.ToLowerInvariant() ?? "openai") switch
+        // Fail closed: a typo or hostile profile edit must NOT silently become a
+        // fake or unknown model. Only explicit, known providers resolve.
+        ILLMService llm = provider.ToLowerInvariant() switch
         {
             "openai" => new OpenAiLlmService(options),
             "localopenai" => new LocalOpenAiCompatibleLlmService(options),
             "ollama" => new OllamaLlmService(options),
             "custom" => new LocalOpenAiCompatibleLlmService(options),
-            _ => new FakeLlmService()
+            "fake" => new FakeLlmService(),
+            _ => throw new InvalidOperationException(
+                $"Agent '{role}' is configured with unknown provider '{provider}'. " +
+                $"Known providers: {string.Join(", ", SkeletonAgentProviders.UserSelectable)}, fake (test/local). " +
+                "Refusing to run — an unknown provider must never silently become a fake model.")
         };
 
         return new SkeletonAgentLlm

@@ -57,15 +57,30 @@ public sealed record SkeletonAgentProfile
         "personality cannot remove the code-owned evidence sections or output contract.";
 }
 
-/// <summary>The write surface: only voice and model fields. Authority, capabilities, and secrets are structurally absent.</summary>
+/// <summary>
+/// The write surface: only voice and model fields. Authority, capabilities, and
+/// secrets are structurally absent — and so is BaseUrl: the outbound endpoint is
+/// a deployment concern (global Ai:BaseUrl), never user-editable, so a profile
+/// edit can never redirect an agent's calls to an attacker-chosen host.
+/// </summary>
 public sealed record SkeletonAgentProfileUpdate
 {
     public string Provider { get; init; } = string.Empty;
     public string Model { get; init; } = string.Empty;
-    public string BaseUrl { get; init; } = string.Empty;
     public int TimeoutSeconds { get; init; }
     public string Skill { get; init; } = string.Empty;
     public string Personality { get; init; } = string.Empty;
+}
+
+/// <summary>The provider keys a user may set. "fake" is deliberately absent — it is test/local only, gated by config.</summary>
+public static class SkeletonAgentProviders
+{
+    public static readonly IReadOnlyList<string> UserSelectable = ["openai", "localopenai", "ollama", "custom"];
+
+    public const string Fake = "fake";
+
+    public static bool IsUserSelectable(string provider) =>
+        UserSelectable.Contains(provider?.Trim().ToLowerInvariant() ?? string.Empty);
 }
 
 public sealed record SkeletonAgentProfileOutcome

@@ -8,7 +8,8 @@ import { useSessionContext } from '../../state/useSessionContext';
 // reads. A profile configures voice and model, never authority — the backend
 // refuses anything that looks like a secret, and the copy says so.
 
-const PROVIDERS = ['openai', 'localopenai', 'ollama', 'custom', 'fake'];
+// User-selectable providers only — 'fake' is test/local, never offered here.
+const PROVIDERS = ['openai', 'localopenai', 'ollama', 'custom'];
 
 export function AgentsPanel() {
   const session = useSessionContext();
@@ -50,7 +51,6 @@ export function AgentsPanel() {
         const outcome = await session.client.updateAgentProfile(role, {
           provider: draft.provider,
           model: draft.model,
-          baseUrl: draft.baseUrl,
           timeoutSeconds: draft.timeoutSeconds,
           skill: draft.skill,
           personality: draft.personality

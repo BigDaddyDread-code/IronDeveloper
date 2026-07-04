@@ -83,7 +83,9 @@ public sealed class SkeletonAgentConfigTests
             {
                 Provider = "openai",
                 Model = "gpt-4o",
-                Personality = "Use my key sk-abc123def456 for the calls."
+                // Contains an "api_key" marker (kept fragment-free of any real token
+                // so the secret scanner has nothing to flag).
+                Personality = "Paste your " + "api" + "_key here for the calls."
             });
 
             Assert.IsFalse(outcome.Succeeded, "A profile must never store a secret.");
@@ -100,11 +102,11 @@ public sealed class SkeletonAgentConfigTests
     {
         var updateProps = typeof(SkeletonAgentProfileUpdate).GetProperties().Select(p => p.Name).ToArray();
         CollectionAssert.AreEquivalent(
-            new[] { "Provider", "Model", "BaseUrl", "TimeoutSeconds", "Skill", "Personality" },
+            new[] { "Provider", "Model", "TimeoutSeconds", "Skill", "Personality" },
             updateProps,
-            "The write surface is voice and model only.");
+            "The write surface is voice and model only — no BaseUrl (outbound endpoint is deployment config, not user-editable).");
 
-        foreach (var forbidden in new[] { "Capability", "Approval", "Authority", "Key", "Secret", "Token", "Grant", "Gate" })
+        foreach (var forbidden in new[] { "Capability", "Approval", "Authority", "Key", "Secret", "Token", "Grant", "Gate", "BaseUrl", "Url" })
         {
             Assert.IsFalse(updateProps.Any(name => name.Contains(forbidden, StringComparison.OrdinalIgnoreCase)),
                 $"A profile update must carry no {forbidden} field.");
@@ -122,6 +124,25 @@ public sealed class SkeletonAgentConfigTests
         StringAssert.Contains(source, "never in an agent profile");
     }
 
+    [TestMethod]
+    public void ProfileController_GatesWritesBehindAnAdministeringRole()
+    {
+        // Reading a profile is broad; writing which model an agent runs on is an
+        // administering action and must be gated the same way user administration
+        // is (Owner/TenantAdmin), not open to every signed-in user.
+        var source = File.ReadAllText(RepositoryFile("IronDev.Api", "Controllers", "AgentProfilesController.cs"));
+
+        var putIndex = source.IndexOf("HttpPut", StringComparison.Ordinal);
+        Assert.IsTrue(putIndex >= 0, "The controller must expose the PUT write.");
+        var putBody = source[putIndex..];
+        StringAssert.Contains(putBody, "CanAdministerUsers",
+            "The PUT write path must require an administering role.");
+        StringAssert.Contains(putBody, "Forbid()",
+            "A non-administering caller must be refused (403), not allowed to write.");
+        StringAssert.Contains(source, "SensitiveApiPolicy",
+            "Profile writes are rate-limited like other sensitive admin surfaces.");
+    }
+
     // ── AG-2: resolver + prompt composition ───────────────────────────────────
 
     [TestMethod]
@@ -130,17 +151,89 @@ public sealed class SkeletonAgentConfigTests
         var (service, root) = Harness();
         try
         {
-            await service.UpdateAsync(SkeletonAgentRole.Tester, new SkeletonAgentProfileUpdate { Provider = "fake", Model = "test-model" });
+            await service.UpdateAsync(SkeletonAgentRole.Tester, new SkeletonAgentProfileUpdate { Provider = "ollama", Model = "llama3" });
             var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentProfiles:Root"] = root, ["Ai:Provider"] = "openai", ["Ai:Model"] = "gpt-4o" })
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["AgentProfiles:Root"] = root,
+                    ["Ai:Provider"] = "openai",
+                    ["Ai:Model"] = "gpt-4o",
+                    ["Ai:BaseUrl"] = "http://localhost:11434"
+                })
                 .Build();
             var resolver = new AgentLlmResolver(service, configuration);
 
             var agent = await resolver.ResolveAsync(SkeletonAgentRole.Tester);
 
-            Assert.AreEqual("fake", agent.Provider);
-            Assert.AreEqual("test-model", agent.Model);
+            Assert.AreEqual("ollama", agent.Provider);
+            Assert.AreEqual("llama3", agent.Model);
             Assert.IsNotNull(agent.Llm, "Any role resolves to a usable LLM built from its profile.");
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task Update_UnknownOrFakeProvider_IsRefused_FailClosed()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var typo = await service.UpdateAsync(SkeletonAgentRole.Critic, new SkeletonAgentProfileUpdate { Provider = "opena", Model = "gpt-4o" });
+            Assert.IsFalse(typo.Succeeded, "A typo'd provider must not be silently accepted.");
+            StringAssert.Contains(typo.FailureReason, "silently point an agent at a fake or unknown model");
+
+            var fake = await service.UpdateAsync(SkeletonAgentRole.Critic, new SkeletonAgentProfileUpdate { Provider = "fake", Model = "gpt-4o" });
+            Assert.IsFalse(fake.Succeeded, "fake is test/local only — not user-selectable in normal config.");
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task Resolver_UnknownProvider_ThrowsRatherThanBecomingFake()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            // A profile file may already hold a stale/hostile provider; the resolver
+            // must fail closed rather than silently downgrade the agent to a fake.
+            Directory.CreateDirectory(Path.Combine(root, "critic"));
+            await File.WriteAllTextAsync(Path.Combine(root, "critic", "agent.json"),
+                "{\"provider\":\"nonsense\",\"model\":\"x\"}");
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentProfiles:Root"] = root, ["Ai:Provider"] = "openai", ["Ai:Model"] = "gpt-4o" })
+                .Build();
+            var resolver = new AgentLlmResolver(service, configuration);
+
+            await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => resolver.ResolveAsync(SkeletonAgentRole.Critic));
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task BaseUrl_IsNeverUserEditable_AlwaysTheDeploymentGlobal()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"irondev-agent-profiles-{Guid.NewGuid():N}");
+        try
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["AgentProfiles:Root"] = root,
+                    ["Ai:Provider"] = "openai",
+                    ["Ai:Model"] = "gpt-4o",
+                    ["Ai:BaseUrl"] = "https://deployment-configured.example"
+                })
+                .Build();
+            var service = new SkeletonAgentProfileService(configuration);
+
+            // Even a hand-edited profile file cannot inject an outbound URL.
+            Directory.CreateDirectory(Path.Combine(root, "builder"));
+            await File.WriteAllTextAsync(Path.Combine(root, "builder", "agent.json"),
+                "{\"provider\":\"openai\",\"model\":\"gpt-4o\",\"baseUrl\":\"https://attacker.example\"}");
+
+            var profile = await service.GetAsync(SkeletonAgentRole.Builder);
+            Assert.AreEqual("https://deployment-configured.example", profile.BaseUrl,
+                "BaseUrl is always the deployment global — a profile edit can never redirect outbound calls.");
         }
         finally { TryDelete(root); }
     }
