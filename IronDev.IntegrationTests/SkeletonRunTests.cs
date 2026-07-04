@@ -227,7 +227,14 @@ public sealed class SkeletonRunTests
             "ManualCriticReviewRequest",
             "CriticReviewResult",
             "FindingDraft",
-            "RequestedVerdict"
+            "RequestedVerdict",
+            "RunCritic(",
+            "RunCriticAsync",
+            "RequestCriticReview",
+            "CreateCriticReview",
+            "AutoCriticReview",
+            "FakeCriticReview",
+            "PlaceholderCriticReview"
         })
         {
             Assert.IsFalse(source.Contains(forbidden, StringComparison.OrdinalIgnoreCase),
@@ -242,8 +249,9 @@ public sealed class SkeletonRunTests
     {
         var harness = SkeletonHarness.Create();
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        await PublishCleanCriticReview(harness, run!.RunId);
 
-        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run!.RunId);
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
         Assert.IsNotNull(result);
         Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status);
@@ -260,6 +268,7 @@ public sealed class SkeletonRunTests
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
         var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
         harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
 
         var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
@@ -273,12 +282,36 @@ public sealed class SkeletonRunTests
     }
 
     [TestMethod]
+    public async Task Continue_WithAcceptedApprovalButNoCriticReview_IsRefused()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status);
+        Assert.IsTrue(result.RequiresHumanApproval);
+        Assert.AreEqual(0, harness.Events.All("SkeletonContinuationUnblocked").Count,
+            "Accepted approval cannot unblock work the critic never reviewed.");
+        var refused = harness.Events.Single("ContinuationRefused");
+        Assert.AreEqual("CriticReviewMissing", refused.Payload["refusedReason"]);
+        Assert.AreEqual("SkeletonRun", refused.Payload["currentNode"]);
+        StringAssert.Contains(refused.Message, "critic never reviewed");
+        Assert.AreEqual(0, harness.Approvals.ListByTargetCallCount,
+            "Missing critic review blocks before approval candidates are consumed.");
+    }
+
+    [TestMethod]
     public async Task ContinueAsync_WithExpiredApproval_StaysHalted()
     {
         var harness = SkeletonHarness.Create();
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
         var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
         harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash, expiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(-5)));
+        await PublishCleanCriticReview(harness, run.RunId);
 
         var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
@@ -292,6 +325,7 @@ public sealed class SkeletonRunTests
         var harness = SkeletonHarness.Create();
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
         harness.Approvals.Seed(ApprovalFor(run!.RunId, targetHash: new string('a', 64)));
+        await PublishCleanCriticReview(harness, run.RunId);
 
         var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
@@ -490,8 +524,15 @@ public sealed class SkeletonRunTests
 
     // ── P1-3: finding → disposition, enforced at the gate ─────────────────────
 
-    private static Task PublishCriticReview(SkeletonHarness harness, string runId, string findingIds) =>
-        harness.Events.PublishAsync(new RunEventDto
+    private static Task PublishCleanCriticReview(SkeletonHarness harness, string runId) =>
+        PublishCriticReview(harness, runId, string.Empty);
+
+    private static Task PublishCriticReview(SkeletonHarness harness, string runId, string findingIds)
+    {
+        var findingIdList = findingIds
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return harness.Events.PublishAsync(new RunEventDto
         {
             RunId = runId,
             EventType = "SkeletonCriticReviewRecorded",
@@ -500,10 +541,11 @@ public sealed class SkeletonRunTests
             {
                 ["reviewId"] = "critic-review-x",
                 ["verdict"] = "RequestChanges",
-                ["findingCount"] = findingIds.Split(',').Length.ToString(),
-                ["findingIds"] = findingIds
+                ["findingCount"] = findingIdList.Length.ToString(),
+                ["findingIds"] = string.Join(",", findingIdList)
             }
         });
+    }
 
     private static Task PublishDisposition(SkeletonHarness harness, string runId, string findingId) =>
         harness.Events.PublishAsync(new RunEventDto
@@ -564,6 +606,7 @@ public sealed class SkeletonRunTests
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
         var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
         harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
         await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
         // The critic speaks late — after continuation, before apply. The finding
@@ -620,12 +663,53 @@ public sealed class SkeletonRunTests
     }
 
     [TestMethod]
+    public async Task Apply_WithContinuationUnblockedButNoCriticReview_IsRefused()
+    {
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await harness.Runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = run.RunId,
+            State = RunLifecycleState.Completed,
+            Summary = "Historical malformed continuation for P3-0b regression."
+        });
+        await harness.Events.PublishAsync(new RunEventDto
+        {
+            RunId = run.RunId,
+            EventType = "SkeletonContinuationUnblocked",
+            Message = "Historical continuation unblocked without a recorded critic review.",
+            Payload = new Dictionary<string, string>
+            {
+                ["acceptedApprovalId"] = Guid.NewGuid().ToString("D"),
+                ["approvalTargetHash"] = packageHash,
+                ["currentNode"] = "SkeletonRun"
+            }
+        });
+
+        var result = await harness.Service.ApplyAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.IsNotNull(result);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), result!.Status);
+        var refused = harness.Events.Single("SkeletonApplyRefused");
+        Assert.AreEqual("CriticReviewMissing", refused.Payload["refusedReason"]);
+        Assert.AreEqual("SkeletonApply", refused.Payload["currentNode"]);
+        StringAssert.Contains(refused.Message, "Source mutation cannot proceed");
+        StringAssert.Contains(refused.Message, "critic never reviewed");
+        Assert.AreEqual(0, harness.Events.All("SkeletonApplyStarted").Count,
+            "Apply must refuse before mutation lease acquisition or source-copy start.");
+        Assert.AreEqual(0, harness.Events.All("SkeletonApplied").Count);
+    }
+
+    [TestMethod]
     public async Task ApplyAsync_ApprovalRevokedAfterContinuation_RefusesAtTheMutationStep()
     {
         var harness = SkeletonHarness.Create(applyEnabled: true);
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
         var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
         harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
         await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
         harness.Approvals.Clear();
 
@@ -665,6 +749,7 @@ public sealed class SkeletonRunTests
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
         var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
         harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
         await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
         var result = await harness.Service.ApplyAsync(ProjectId, TicketId, run.RunId);
@@ -888,6 +973,7 @@ public sealed class SkeletonRunTests
         harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
 
         await PublishUpstreamApply(harness, "upstream-1", "src/Unrelated.cs");
+        await PublishCleanCriticReview(harness, run.RunId);
 
         var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
@@ -906,6 +992,7 @@ public sealed class SkeletonRunTests
         // The upstream landed BEFORE this package was prepared — this run's
         // proposal already saw that world.
         await PublishUpstreamApply(harness, "upstream-1", "src/A.cs", appliedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-5));
+        await PublishCleanCriticReview(harness, run.RunId);
 
         var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
@@ -940,6 +1027,7 @@ public sealed class SkeletonRunTests
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
         var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
         harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
         await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
         // The world moves in the gap between continuation and apply.
@@ -974,6 +1062,7 @@ public sealed class SkeletonRunTests
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
         var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
         harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
         await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
         // Another run already holds the lease over the same footprint
@@ -1008,6 +1097,7 @@ public sealed class SkeletonRunTests
         var run = await harness.Service.StartAsync(ProjectId, TicketId);
         var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
         harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
         await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
 
         var blocked = await harness.Service.ApplyAsync(ProjectId, TicketId, run.RunId);
@@ -1212,6 +1302,7 @@ public sealed class SkeletonRunTests
     {
         public required TicketSkeletonRunService Service { get; init; }
         public required RecordingWorkspaceService Workspaces { get; init; }
+        public required InMemoryRunStore Runs { get; init; }
         public required InMemoryRunEventStore Events { get; init; }
         public required InMemoryAcceptedApprovalStore Approvals { get; init; }
         public required SkeletonMutationLeaseService Leases { get; init; }
@@ -1232,6 +1323,7 @@ public sealed class SkeletonRunTests
 
             var resolvedPath = localPath == "__temp__" ? sourceDir : localPath;
             var workspaces = new RecordingWorkspaceService();
+            var runs = new InMemoryRunStore();
             var events = new InMemoryRunEventStore();
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -1253,7 +1345,7 @@ public sealed class SkeletonRunTests
                     Changes = [new ProposedFileChange { FilePath = "src/A.cs", IsValid = true, FullContentAfter = "class A {}" }]
                 })),
                 workspaces,
-                new InMemoryRunStore(),
+                runs,
                 events,
                 approvals,
                 new ApprovalSatisfactionEvaluator(),
@@ -1266,6 +1358,7 @@ public sealed class SkeletonRunTests
             {
                 Service = service,
                 Workspaces = workspaces,
+                Runs = runs,
                 Events = events,
                 Approvals = approvals,
                 Leases = leases,
@@ -1323,6 +1416,7 @@ public sealed class SkeletonRunTests
         private readonly List<AcceptedApprovalRecord> _records = [];
 
         public int SaveCallCount { get; private set; }
+        public int ListByTargetCallCount { get; private set; }
 
         public void Seed(AcceptedApprovalRecord record) => _records.Add(record);
 
@@ -1338,12 +1432,15 @@ public sealed class SkeletonRunTests
         public Task<AcceptedApprovalRecord?> GetAsync(Guid projectId, Guid acceptedApprovalId, CancellationToken ct = default) =>
             Task.FromResult(_records.FirstOrDefault(r => r.ProjectId == projectId && r.AcceptedApprovalId == acceptedApprovalId));
 
-        public Task<IReadOnlyList<AcceptedApprovalRecord>> ListByTargetAsync(Guid projectId, string approvalTargetKind, string approvalTargetId, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>(_records
+        public Task<IReadOnlyList<AcceptedApprovalRecord>> ListByTargetAsync(Guid projectId, string approvalTargetKind, string approvalTargetId, CancellationToken ct = default)
+        {
+            ListByTargetCallCount++;
+            return Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>(_records
                 .Where(r => r.ProjectId == projectId &&
                             string.Equals(r.ApprovalTargetKind, approvalTargetKind, StringComparison.Ordinal) &&
                             string.Equals(r.ApprovalTargetId, approvalTargetId, StringComparison.Ordinal))
                 .ToList());
+        }
 
         public Task<IReadOnlyList<AcceptedApprovalRecord>> ListByCorrelationAsync(string correlationId, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>([]);
