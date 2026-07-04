@@ -818,6 +818,153 @@ public sealed class SkeletonRunTests
             "A report is scoped to its ticket: identity mismatches reconstruct nothing.");
     }
 
+    // ── P2-5: re-plan on drift — the gate never consumes a stale package ─────
+
+    /// <summary>Fabricates an upstream run that APPLIED to the project: its SkeletonApplied event plus (optionally) its package on disk.</summary>
+    private static async Task PublishUpstreamApply(
+        SkeletonHarness harness,
+        string upstreamRunId,
+        string? footprintFile,
+        DateTimeOffset? appliedAtUtc = null)
+    {
+        if (footprintFile is not null)
+        {
+            var packagePath = Path.Combine(harness.EvidenceRoot, "runs", upstreamRunId, "evidence", "critic-package.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(packagePath)!);
+            var package = new SkeletonCriticPackage
+            {
+                PackageId = $"critic-pkg-{upstreamRunId}",
+                RunId = upstreamRunId,
+                ProposalId = $"prop-{upstreamRunId}",
+                TicketId = 900,
+                ProjectId = ProjectId,
+                TicketTitle = "Upstream ticket",
+                Changes = [new SkeletonCriticPackageChange { FilePath = footprintFile, FullContentAfter = "x", IsNewFile = true }]
+            };
+            await File.WriteAllTextAsync(packagePath, System.Text.Json.JsonSerializer.Serialize(package,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+        }
+
+        await harness.Events.PublishAsync(new RunEventDto
+        {
+            RunId = upstreamRunId,
+            EventType = "SkeletonApplied",
+            Message = "Applied through the governed workspace spine.",
+            TimestampUtc = appliedAtUtc ?? DateTimeOffset.UtcNow.AddSeconds(5),
+            Payload = new Dictionary<string, string> { ["projectId"] = ProjectId.ToString() }
+        });
+    }
+
+    [TestMethod]
+    public async Task ContinueAsync_OverlappingUpstreamApplyAfterHalt_RefusesStale_EvenWithAValidApproval()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+
+        // The world moves: an upstream run applies over this run's footprint
+        // (the harness proposal writes src/A.cs) AFTER the halt.
+        await PublishUpstreamApply(harness, "upstream-1", "src/A.cs");
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status,
+            "A valid approval does not outrank reality: the evidence describes a source that no longer exists.");
+        var refused = harness.Events.All("ContinuationRefused")
+            .Single(runEvent => runEvent.Payload["refusedReason"] == "StaleAfterUpstreamApply");
+        StringAssert.Contains(refused.Payload["staleBecause"], "upstream-1", "The staleness names the upstream run.");
+        StringAssert.Contains(refused.Payload["staleBecause"], "src/A.cs", "The staleness names the shared files.");
+        StringAssert.Contains(refused.Payload["staleBecause"], "start a fresh skeleton run",
+            "The refusal states the next safe action.");
+    }
+
+    [TestMethod]
+    public async Task ContinueAsync_DisjointUpstreamApply_Continues()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+
+        await PublishUpstreamApply(harness, "upstream-1", "src/Unrelated.cs");
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(RunLifecycleState.Completed.ToString(), result!.Status,
+            "Staleness is footprint-scoped: a disjoint upstream apply invalidates nothing here.");
+    }
+
+    [TestMethod]
+    public async Task ContinueAsync_UpstreamAppliedBeforeThisPackageWasPrepared_IsNotStale()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+
+        // The upstream landed BEFORE this package was prepared — this run's
+        // proposal already saw that world.
+        await PublishUpstreamApply(harness, "upstream-1", "src/A.cs", appliedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(RunLifecycleState.Completed.ToString(), result!.Status,
+            "Drift is directional: only applies AFTER the package was prepared invalidate it.");
+    }
+
+    [TestMethod]
+    public async Task ContinueAsync_UpstreamFootprintUnreadable_IsConservativelyStale_AndSaysSo()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+
+        // Applied event with no readable package: overlap is unknowable.
+        await PublishUpstreamApply(harness, "upstream-1", footprintFile: null);
+
+        var result = await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status);
+        var refused = harness.Events.All("ContinuationRefused")
+            .Single(runEvent => runEvent.Payload["refusedReason"] == "StaleAfterUpstreamApply");
+        StringAssert.Contains(refused.Payload["staleBecause"], "treated as overlapping",
+            "What cannot be verified is not treated as safe — conservatively, and by name.");
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_UpstreamAppliesBetweenContinueAndApply_RefusesAtTheMutationStep()
+    {
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        // The world moves in the gap between continuation and apply.
+        await PublishUpstreamApply(harness, "upstream-1", "src/A.cs");
+
+        var result = await harness.Service.ApplyAsync(ProjectId, TicketId, run.RunId);
+
+        Assert.AreEqual("StaleAfterUpstreamApply", harness.Events.Single("SkeletonApplyRefused").Payload["refusedReason"]);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), result!.Status,
+            "Drift is re-checked live at the mutation step — continuation is not a license to apply stale evidence.");
+    }
+
+    [TestMethod]
+    public async Task GetRunReport_NamesStaleness_BeforeAHumanSpendsAnApprovalOnIt()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        await PublishUpstreamApply(harness, "upstream-1", "src/A.cs");
+
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run!.RunId);
+
+        Assert.IsTrue(report!.Gaps.Any(gap => gap.Contains("no longer exists", StringComparison.Ordinal)),
+            "The report names the staleness so the human sees it before approving a dead run.");
+    }
+
     // ── P2-4: mutation lease — overlapping applies take turns ─────────────────
 
     [TestMethod]

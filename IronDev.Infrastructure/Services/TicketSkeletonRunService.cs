@@ -303,6 +303,24 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return ToDto(run, projectId, ticketId, requiresHumanApproval: false);
         }
 
+        // P2-5, checked first: the world may have moved. If an upstream run applied
+        // overlapping changes after this package was prepared, this run's evidence
+        // describes a source that no longer exists — no point evaluating findings
+        // or approvals on a run the world already invalidated.
+        var staleBecause = await DetectStalenessAsync(projectId, runId, cancellationToken).ConfigureAwait(false);
+        if (staleBecause is not null)
+        {
+            await PublishAsync(runId, "ContinuationRefused",
+                $"Continuation refused: {staleBecause}",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["refusedReason"] = "StaleAfterUpstreamApply",
+                    ["staleBecause"] = staleBecause,
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+            return ToDto(run, projectId, ticketId, requiresHumanApproval: true);
+        }
+
         // P1-3: every critic finding must carry a human disposition before the gate
         // will even evaluate approval evidence. A finding is not a veto — the human
         // may accept the risk, defer the fix, or reject the finding — but it cannot
@@ -450,6 +468,17 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return await RefuseApplyAsync(run, projectId, ticketId,
                 "ContinuationNotUnblocked",
                 "Apply requires a continuation unblocked by an accepted approval. Request continuation first.",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        // P2-5, re-checked live at the mutation step: an upstream that applied
+        // between continuation and apply still invalidates this run's evidence.
+        var staleAtApply = await DetectStalenessAsync(projectId, runId, cancellationToken).ConfigureAwait(false);
+        if (staleAtApply is not null)
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                "StaleAfterUpstreamApply",
+                staleAtApply,
                 cancellationToken).ConfigureAwait(false);
         }
 
@@ -874,6 +903,16 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 gaps.Add("The run is Applied but no applied event was recorded.");
         }
 
+        // P2-5: a halted or continued run whose evidence predates an overlapping
+        // upstream apply is stale — named in the report so the human sees it
+        // before spending an approval on a run the world already invalidated.
+        if (run.State is RunLifecycleState.PausedForApproval or RunLifecycleState.Completed)
+        {
+            var staleReason = await DetectStalenessAsync(projectId, runId, cancellationToken).ConfigureAwait(false);
+            if (staleReason is not null)
+                gaps.Add(staleReason);
+        }
+
         var loopComplete = run.State == RunLifecycleState.Applied &&
             gaps.Count == 0 &&
             packageTrace is { HashVerified: true } &&
@@ -909,6 +948,84 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
 
     private static string Payload(RunEventDto runEvent, string key) =>
         runEvent.Payload.TryGetValue(key, out var value) ? value : string.Empty;
+
+    /// <summary>
+    /// P2-5 — re-plan on drift. A halted run's evidence describes the source as it
+    /// was when the package was prepared. If another run APPLIED overlapping
+    /// changes to the project after that moment, the evidence describes a source
+    /// that no longer exists — the run is stale, and the gate never consumes a
+    /// stale package. Detection is durable-evidence only: the upstream's
+    /// SkeletonApplied event and both runs' critic packages on disk. An upstream
+    /// whose footprint cannot be read is treated as overlapping — conservative,
+    /// and the reason says so. Returns the named staleness reason, or null.
+    /// </summary>
+    private async Task<string?> DetectStalenessAsync(int projectId, string runId, CancellationToken cancellationToken)
+    {
+        var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        var packageReady = events.FirstOrDefault(runEvent => runEvent.EventType == "CriticReviewPackageReady");
+        if (packageReady is null)
+            return null;
+
+        var preparedAtUtc = packageReady.TimestampUtc;
+        var footprint = await ReadPackageFootprintAsync(runId, cancellationToken).ConfigureAwait(false);
+
+        var recentRunIds = await _events.GetRecentRunIdsAsync(200, cancellationToken).ConfigureAwait(false);
+        foreach (var otherRunId in recentRunIds.Where(candidate => !string.Equals(candidate, runId, StringComparison.Ordinal)))
+        {
+            var otherEvents = await _events.GetEventsAsync(otherRunId, cancellationToken).ConfigureAwait(false);
+            var applied = otherEvents.FirstOrDefault(runEvent =>
+                runEvent.EventType == "SkeletonApplied" &&
+                Payload(runEvent, "projectId") == projectId.ToString() &&
+                runEvent.TimestampUtc > preparedAtUtc);
+            if (applied is null)
+                continue;
+
+            var otherFootprint = await ReadPackageFootprintAsync(otherRunId, cancellationToken).ConfigureAwait(false);
+            if (footprint is null || otherFootprint is null)
+            {
+                return
+                    $"Run {otherRunId} applied changes to this project after this run's package was prepared, and a " +
+                    "footprint could not be read — treated as overlapping, conservatively and by name. The halt evidence " +
+                    "describes a source that no longer exists: start a fresh skeleton run. The gate never consumes a stale package.";
+            }
+
+            var shared = footprint.Intersect(otherFootprint, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (shared.Count > 0)
+            {
+                return
+                    $"Run {otherRunId} applied changes overlapping this run's footprint ({string.Join(", ", shared)}) after " +
+                    "this package was prepared. The halt evidence describes a source that no longer exists: start a fresh " +
+                    "skeleton run. The gate never consumes a stale package.";
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>A run's predicted footprint from its critic package on disk, normalized; null when unreadable.</summary>
+    private async Task<IReadOnlyList<string>?> ReadPackageFootprintAsync(string runId, CancellationToken cancellationToken)
+    {
+        var packagePath = CriticPackagePath(ResolveEvidenceRoot(), runId);
+        if (!File.Exists(packagePath))
+            return null;
+
+        try
+        {
+            var package = JsonSerializer.Deserialize<SkeletonCriticPackage>(
+                await File.ReadAllTextAsync(packagePath, cancellationToken).ConfigureAwait(false), JsonOptions);
+            return package?.Changes
+                .Select(change => (change.FilePath ?? string.Empty).Replace('\\', '/').TrimStart('/').Trim())
+                .Where(path => path.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>
     /// P1-3: finding ids from recorded critic reviews minus recorded dispositions,
