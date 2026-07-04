@@ -203,6 +203,7 @@ builder.Services.AddScoped<ISkeletonCriticCanaryRunner, SkeletonCriticCanaryRunn
 builder.Services.AddScoped<ISkeletonCanaryMeasurementService, SkeletonCanaryMeasurementService>();
 builder.Services.AddScoped<ISkeletonBatchMapService, SkeletonBatchMapService>();
 builder.Services.AddScoped<ISkeletonBatchPlanService, SkeletonBatchPlanService>();
+builder.Services.AddScoped<ISkeletonBatchRunService, SkeletonBatchRunService>();
 builder.Services.AddSingleton<IApprovalSatisfactionEvaluator, ApprovalSatisfactionEvaluator>();
 builder.Services.AddSingleton<IWorkflowApprovalHaltEvaluator, WorkflowApprovalHaltEvaluator>();
 builder.Services.AddScoped<IDiscussionDocumentService, DiscussionDocumentService>();
