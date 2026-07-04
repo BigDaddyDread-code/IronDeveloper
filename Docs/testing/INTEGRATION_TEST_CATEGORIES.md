@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 616
-- Test classes found: 610
-- Test methods found: 9740
-- Category names found: 229
+- Source files scanned: 617
+- Test classes found: 611
+- Test methods found: 9753
+- Category names found: 230
 
 ## G13 Category Changes
 
@@ -163,6 +163,14 @@ A label does not make a slow test safe.
 - J07 does not create local files, start services, create or rebuild SQL, ensure or rebuild Weaviate, reset LocalTest data, run smoke, write evidence, change source/runtime authority records, add API/CLI/UI behavior, or claim alpha/merge/release/deployment readiness.
 - The developer doctor reports local readiness blockers. It does not make the machine safe.
 
+## P3-2 Tester Criterion-Test Coverage Contract
+
+- Added focused `TesterCoverage` metadata to the P3-2 tester criterion coverage contract regression test.
+- Added broad `Governance`, `Contract`, and `Boundary` metadata to the P3-2 tester coverage contract test.
+- P3-2 does not add `RequiresRealDatabase` or `LongRunning`; the test validates Core tester coverage models, validator behavior, receipt wording, existing skeleton authoring request shape, and static production source boundaries only.
+- P3-2 does not add test execution, a test runner, Builder patch behavior, critic execution, approval, continuation/apply behavior, API, UI, database schema, release/deployment gates, memory topology, or chat/channel behavior.
+- A tester coverage package maps acceptance criteria to test intent. It is not test execution, not test proof, not approval, not critic review, not policy satisfaction, not workflow continuation, not source apply permission, not release readiness, and not deployment readiness.
+
 ## P3-3 Builder Contract-Bound Patch Package
 
 - Added focused `Builder` metadata to the P3-3 builder patch package contract regression test.
@@ -224,12 +232,12 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 18 | 166 | 0 | 18 |
+| `Boundary` | 19 | 179 | 0 | 19 |
 | `Builder` | 1 | 9 | 0 | 1 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `ConfigBoundary` | 8 | 94 | 0 | 8 |
-| `Contract` | 20 | 182 | 0 | 20 |
+| `Contract` | 21 | 195 | 0 | 21 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -250,7 +258,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 20 | 158 | 0 | 20 |
+| `Governance` | 21 | 171 | 0 | 21 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -391,6 +399,7 @@ A label does not make a slow test safe.
 | `Store` | 12 | 130 | 0 | 12 |
 | `TenantIsolation` | 1 | 9 | 0 | 1 |
 | `TenantUsersAdmin` | 1 | 12 | 0 | 1 |
+| `TesterCoverage` | 1 | 13 | 0 | 1 |
 | `ThoughtLedgerGovernanceReference` | 2 | 14 | 0 | 2 |
 | `ThoughtLedgerHandoffEntry` | 1 | 18 | 0 | 1 |
 | `ToolRequestStore` | 1 | 11 | 0 | 1 |
