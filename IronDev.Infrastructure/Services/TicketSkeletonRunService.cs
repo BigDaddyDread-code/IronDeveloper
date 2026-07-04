@@ -45,6 +45,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private readonly IApprovalSatisfactionEvaluator _approvalSatisfaction;
     private readonly IWorkflowApprovalHaltEvaluator _approvalHalt;
     private readonly ISkeletonTestAuthoringService _testAuthoring;
+    private readonly ISkeletonMutationLeaseService _mutationLeases;
     private readonly IConfiguration _configuration;
 
     public TicketSkeletonRunService(
@@ -58,6 +59,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         IApprovalSatisfactionEvaluator approvalSatisfaction,
         IWorkflowApprovalHaltEvaluator approvalHalt,
         ISkeletonTestAuthoringService testAuthoring,
+        ISkeletonMutationLeaseService mutationLeases,
         IConfiguration configuration)
     {
         _tickets = tickets;
@@ -70,6 +72,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _approvalSatisfaction = approvalSatisfaction;
         _approvalHalt = approvalHalt;
         _testAuthoring = testAuthoring;
+        _mutationLeases = mutationLeases;
         _configuration = configuration;
     }
 
@@ -501,68 +504,99 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         var approvedByActorId = candidates.First(candidate => candidate.AcceptedApprovalId == satisfied.AcceptedApprovalId).ApprovedByActorId;
         var package = JsonSerializer.Deserialize<SkeletonCriticPackage>(System.Text.Encoding.UTF8.GetString(packageBytes), JsonOptions)!;
 
-        await PublishAsync(runId, "SkeletonApplyStarted",
-            "Governed apply spine started: copy-only, evidence-chained, into and out of a prepared workspace. No commit, no push, no release.",
-            projectId, ticketId, new Dictionary<string, string>
-            {
-                ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
-                ["approvalTargetHash"] = packageHash,
-                ["currentNode"] = "SkeletonApply"
-            }, cancellationToken).ConfigureAwait(false);
-
-        var spineWorkspaceRoot = ResolveWorkspaceRoot();
-        Directory.CreateDirectory(spineWorkspaceRoot);
-
-        var spineResult = await new SkeletonApplySpine().RunAsync(
-            applyRunId: $"{runId}-apply",
-            sourceRepo: project.LocalPath!,
-            workspaceRoot: spineWorkspaceRoot,
-            approvedPackage: package,
-            approvedByActorId: approvedByActorId,
-            approvalReason: $"Mirrors AcceptedApprovalRecord {satisfied.AcceptedApprovalId:D} bound to package hash {packageHash}. This stage records the decision; it did not make it.",
-            cancellationToken).ConfigureAwait(false);
-
-        foreach (var stage in spineResult.Stages)
+        // P2-4: overlapping applies take turns. The lease covers the approved
+        // package's footprint; a refusal names the holder. A lease is a
+        // concurrency guard, not authority — every gate above was checked
+        // exactly as before, and holding the lease grants nothing.
+        var lease = await _mutationLeases.TryAcquireAsync(new SkeletonMutationLeaseRequest
         {
-            await PublishAsync(runId, "SkeletonApplyStage",
-                $"{stage.Stage}: {(stage.Succeeded ? "completed" : "blocked")} — {stage.Summary}",
-                projectId, ticketId, new Dictionary<string, string>
-                {
-                    ["stage"] = stage.Stage,
-                    ["succeeded"] = stage.Succeeded.ToString().ToLowerInvariant(),
-                    ["errors"] = string.Join(" | ", stage.Errors),
-                    ["currentNode"] = "SkeletonApply"
-                }, cancellationToken).ConfigureAwait(false);
-        }
+            ProjectId = projectId,
+            RunId = runId,
+            TicketId = ticketId,
+            FootprintPaths = package.Changes.Select(change => change.FilePath).ToList(),
+            HolderRef = $"skeleton-run {runId} (ticket {ticketId})"
+        }, cancellationToken).ConfigureAwait(false);
 
-        if (!spineResult.Succeeded)
+        if (!lease.Acquired)
         {
             return await RefuseApplyAsync(run, projectId, ticketId,
-                $"SpineBlocked:{spineResult.FailedStage}",
-                $"The governed apply spine blocked at '{spineResult.FailedStage}'. The workspace evidence chain records why; nothing was silently applied.",
+                "MutationLeaseHeld",
+                lease.RefusedBecause,
                 cancellationToken).ConfigureAwait(false);
         }
 
-        await _runs.TransitionAsync(new RunStateTransition
+        try
         {
-            RunId = runId,
-            State = RunLifecycleState.Applied,
-            Summary = $"Applied through the governed workspace spine under accepted approval {satisfied.AcceptedApprovalId:D}. Copy-only: commit, push, and release remain separate governed steps.",
-            WorkspacePath = spineResult.WorkspacePath
-        }, cancellationToken).ConfigureAwait(false);
+            await PublishAsync(runId, "SkeletonApplyStarted",
+                "Governed apply spine started: copy-only, evidence-chained, into and out of a prepared workspace. No commit, no push, no release.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
+                    ["approvalTargetHash"] = packageHash,
+                    ["mutationLeaseId"] = lease.LeaseId,
+                    ["currentNode"] = "SkeletonApply"
+                }, cancellationToken).ConfigureAwait(false);
 
-        await PublishAsync(runId, "SkeletonApplied",
-            "Applied through the governed workspace spine. The workspace evidence chain is the receipt. Copy-only: commit, push, and release remain separate governed steps.",
-            projectId, ticketId, new Dictionary<string, string>
+            var spineWorkspaceRoot = ResolveWorkspaceRoot();
+            Directory.CreateDirectory(spineWorkspaceRoot);
+
+            var spineResult = await new SkeletonApplySpine().RunAsync(
+                applyRunId: $"{runId}-apply",
+                sourceRepo: project.LocalPath!,
+                workspaceRoot: spineWorkspaceRoot,
+                approvedPackage: package,
+                approvedByActorId: approvedByActorId,
+                approvalReason: $"Mirrors AcceptedApprovalRecord {satisfied.AcceptedApprovalId:D} bound to package hash {packageHash}. This stage records the decision; it did not make it.",
+                cancellationToken).ConfigureAwait(false);
+
+            foreach (var stage in spineResult.Stages)
             {
-                ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
-                ["workspacePath"] = spineResult.WorkspacePath,
-                ["evidenceChain"] = string.Join(",", spineResult.Stages.Select(stage => stage.Stage)),
-                ["currentNode"] = "SkeletonApply"
+                await PublishAsync(runId, "SkeletonApplyStage",
+                    $"{stage.Stage}: {(stage.Succeeded ? "completed" : "blocked")} — {stage.Summary}",
+                    projectId, ticketId, new Dictionary<string, string>
+                    {
+                        ["stage"] = stage.Stage,
+                        ["succeeded"] = stage.Succeeded.ToString().ToLowerInvariant(),
+                        ["errors"] = string.Join(" | ", stage.Errors),
+                        ["currentNode"] = "SkeletonApply"
+                    }, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (!spineResult.Succeeded)
+            {
+                return await RefuseApplyAsync(run, projectId, ticketId,
+                    $"SpineBlocked:{spineResult.FailedStage}",
+                    $"The governed apply spine blocked at '{spineResult.FailedStage}'. The workspace evidence chain records why; nothing was silently applied.",
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            await _runs.TransitionAsync(new RunStateTransition
+            {
+                RunId = runId,
+                State = RunLifecycleState.Applied,
+                Summary = $"Applied through the governed workspace spine under accepted approval {satisfied.AcceptedApprovalId:D}. Copy-only: commit, push, and release remain separate governed steps.",
+                WorkspacePath = spineResult.WorkspacePath
             }, cancellationToken).ConfigureAwait(false);
 
-        var updated = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
-        return ToDto(updated, projectId, ticketId, requiresHumanApproval: false);
+            await PublishAsync(runId, "SkeletonApplied",
+                "Applied through the governed workspace spine. The workspace evidence chain is the receipt. Copy-only: commit, push, and release remain separate governed steps.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
+                    ["workspacePath"] = spineResult.WorkspacePath,
+                    ["evidenceChain"] = string.Join(",", spineResult.Stages.Select(stage => stage.Stage)),
+                    ["currentNode"] = "SkeletonApply"
+                }, cancellationToken).ConfigureAwait(false);
+
+            var updated = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
+            return ToDto(updated, projectId, ticketId, requiresHumanApproval: false);
+        }
+        finally
+        {
+            // The lease releases no matter how the apply ends — a blocked apply
+            // must never wedge the batch behind a dead lock.
+            await _mutationLeases.ReleaseAsync(projectId, lease.LeaseId, CancellationToken.None).ConfigureAwait(false);
+        }
     }
 
     private async Task<TicketBuildRunDto> RefuseApplyAsync(

@@ -818,6 +818,138 @@ public sealed class SkeletonRunTests
             "A report is scoped to its ticket: identity mismatches reconstruct nothing.");
     }
 
+    // ── P2-4: mutation lease — overlapping applies take turns ─────────────────
+
+    [TestMethod]
+    public async Task ApplyAsync_FootprintLeaseHeldByAnotherRun_RefusesNamingTheHolder()
+    {
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        // Another run already holds the lease over the same footprint
+        // (the harness proposal writes src/A.cs).
+        var rival = await harness.Leases.TryAcquireAsync(new SkeletonMutationLeaseRequest
+        {
+            ProjectId = ProjectId,
+            RunId = "rival-run",
+            TicketId = 99,
+            FootprintPaths = ["src/A.cs"],
+            HolderRef = "skeleton-run rival-run (ticket 99)"
+        });
+        Assert.IsTrue(rival.Acquired);
+
+        var result = await harness.Service.ApplyAsync(ProjectId, TicketId, run.RunId);
+
+        var refused = harness.Events.Single("SkeletonApplyRefused");
+        Assert.AreEqual("MutationLeaseHeld", refused.Payload["refusedReason"]);
+        StringAssert.Contains(refused.Message, "rival-run", "The refusal names the holder — never a vague lock error.");
+        StringAssert.Contains(refused.Message, "src/A.cs", "The refusal names the colliding files.");
+        Assert.AreEqual(0, harness.Events.All("SkeletonApplyStarted").Count,
+            "A refused lease means the spine never started — the gate is before the mutation, not around it.");
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), result!.Status);
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_LeaseReleasesEvenWhenTheSpineBlocks_ABlockedApplyNeverWedgesTheBatch()
+    {
+        // The harness's default localPath is a plain temp dir — the spine's
+        // prepare stage blocks (not a git repo). The lease must release anyway.
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await harness.Service.ContinueAsync(ProjectId, TicketId, run.RunId);
+
+        var blocked = await harness.Service.ApplyAsync(ProjectId, TicketId, run.RunId);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), blocked!.Status);
+        StringAssert.Contains(harness.Events.Single("SkeletonApplyStarted").Payload["mutationLeaseId"], "lease-",
+            "The apply held a lease while it ran.");
+
+        var after = await harness.Leases.TryAcquireAsync(new SkeletonMutationLeaseRequest
+        {
+            ProjectId = ProjectId,
+            RunId = "next-run",
+            TicketId = 100,
+            FootprintPaths = ["src/A.cs"],
+            HolderRef = "skeleton-run next-run (ticket 100)"
+        });
+        Assert.IsTrue(after.Acquired, "The blocked apply released its lease — a dead apply must never wedge the batch.");
+    }
+
+    [TestMethod]
+    public async Task MutationLease_OverlapRefusedWithHolderNamed_DisjointCoexists_ReleaseFrees()
+    {
+        var harness = SkeletonHarness.Create();
+        var first = await harness.Leases.TryAcquireAsync(LeaseRequest("run-1", 1, "src/Catalog.cs", "src/Paging.cs"));
+        Assert.IsTrue(first.Acquired);
+
+        var overlapping = await harness.Leases.TryAcquireAsync(LeaseRequest("run-2", 2, "SRC\\catalog.CS"));
+        Assert.IsFalse(overlapping.Acquired, "The same file spelled differently is still the same file.");
+        Assert.AreEqual("run-1", overlapping.HolderRunId);
+        StringAssert.Contains(overlapping.RefusedBecause, "take turns");
+        StringAssert.Contains(overlapping.Boundary, "not authority");
+
+        var disjoint = await harness.Leases.TryAcquireAsync(LeaseRequest("run-3", 3, "src/Other.cs"));
+        Assert.IsTrue(disjoint.Acquired, "Disjoint footprints mutate in parallel — the lease serializes conflicts, not the world.");
+
+        await harness.Leases.ReleaseAsync(ProjectId, first.LeaseId);
+        var retry = await harness.Leases.TryAcquireAsync(LeaseRequest("run-2", 2, "src/Catalog.cs"));
+        Assert.IsTrue(retry.Acquired, "Release frees the footprint.");
+    }
+
+    [TestMethod]
+    public async Task MutationLease_AnExpiredLease_IsIgnoredWithANote_NeverSilently()
+    {
+        // Timeout 0 → the rival's lease expires immediately: a crashed apply
+        // cannot wedge the batch forever, and superseding it is SAID, not silent.
+        var harness = SkeletonHarness.Create(leaseTimeoutMinutes: 0);
+        var stale = await harness.Leases.TryAcquireAsync(LeaseRequest("crashed-run", 1, "src/Catalog.cs"));
+        Assert.IsTrue(stale.Acquired);
+
+        var successor = await harness.Leases.TryAcquireAsync(LeaseRequest("run-2", 2, "src/Catalog.cs"));
+
+        Assert.IsTrue(successor.Acquired);
+        Assert.IsTrue(successor.Notes.Any(note => note.Contains(stale.LeaseId) && note.Contains("expired", StringComparison.OrdinalIgnoreCase)),
+            "The expired lease is named in the acquisition notes.");
+    }
+
+    [TestMethod]
+    public void MutationLeaseService_IsAGuardNotAuthority()
+    {
+        var source = File.ReadAllText(RepositoryFile("IronDev.Infrastructure", "Services", "SkeletonMutationLeaseService.cs"));
+
+        foreach (var forbidden in new[]
+        {
+            "AcceptedApproval",
+            "SatisfyPolicy",
+            "StartAsync",
+            "ContinueAsync",
+            "ApplyAsync",
+            "TransitionAsync",
+            "ControlledSourceApply"
+        })
+        {
+            Assert.IsFalse(source.Contains(forbidden, StringComparison.OrdinalIgnoreCase),
+                $"The lease makes overlapping applies take turns; it must never touch runs or gates: {forbidden}");
+        }
+
+        StringAssert.Contains(source, "not authority");
+        StringAssert.Contains(source, "grants");
+        StringAssert.Contains(source, "MutationLeaseSurfaceKind.SourceApply");
+    }
+
+    private static SkeletonMutationLeaseRequest LeaseRequest(string runId, long ticketId, params string[] paths) => new()
+    {
+        ProjectId = ProjectId,
+        RunId = runId,
+        TicketId = ticketId,
+        FootprintPaths = paths,
+        HolderRef = $"skeleton-run {runId} (ticket {ticketId})"
+    };
+
     // ── No approval surface, statically ───────────────────────────────────────
 
     [TestMethod]
@@ -935,6 +1067,7 @@ public sealed class SkeletonRunTests
         public required RecordingWorkspaceService Workspaces { get; init; }
         public required InMemoryRunEventStore Events { get; init; }
         public required InMemoryAcceptedApprovalStore Approvals { get; init; }
+        public required SkeletonMutationLeaseService Leases { get; init; }
         public required string EvidenceRoot { get; init; }
 
         public static SkeletonHarness Create(
@@ -943,7 +1076,8 @@ public sealed class SkeletonRunTests
             Func<BuilderProposal>? proposalBehavior = null,
             bool applyEnabled = false,
             Func<SkeletonTestAuthoringResult>? testAuthoringBehavior = null,
-            string? acceptanceCriteria = null)
+            string? acceptanceCriteria = null,
+            int? leaseTimeoutMinutes = null)
         {
             var sourceDir = Path.Combine(Path.GetTempPath(), "irondev-skel-src-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(sourceDir);
@@ -956,10 +1090,12 @@ public sealed class SkeletonRunTests
             {
                 ["DisposableBuild:EvidenceRoot"] = evidenceRoot,
                 ["DisposableBuild:WorkspaceRoot"] = Path.Combine(Path.GetTempPath(), "irondev-skel-ws-" + Guid.NewGuid().ToString("N")),
-                ["SkeletonApply:Enabled"] = applyEnabled ? "true" : null
+                ["SkeletonApply:Enabled"] = applyEnabled ? "true" : null,
+                ["MutationLease:TimeoutMinutes"] = leaseTimeoutMinutes?.ToString()
             }).Build();
 
             var approvals = new InMemoryAcceptedApprovalStore();
+            var leases = new SkeletonMutationLeaseService(configuration);
             var service = new TicketSkeletonRunService(
                 new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ticketProjectId ?? ProjectId, Title = "Add book sorting", AcceptanceCriteria = acceptanceCriteria }),
                 new StubProjectService(new Project { Id = ProjectId, TenantId = 1, Name = "BookSeller", LocalPath = resolvedPath }),
@@ -976,6 +1112,7 @@ public sealed class SkeletonRunTests
                 new ApprovalSatisfactionEvaluator(),
                 new WorkflowApprovalHaltEvaluator(),
                 new StubTestAuthoringService(testAuthoringBehavior ?? (() => new SkeletonTestAuthoringResult { Succeeded = true, Tests = [] })),
+                leases,
                 configuration);
 
             return new SkeletonHarness
@@ -984,6 +1121,7 @@ public sealed class SkeletonRunTests
                 Workspaces = workspaces,
                 Events = events,
                 Approvals = approvals,
+                Leases = leases,
                 EvidenceRoot = evidenceRoot
             };
         }
