@@ -12,7 +12,21 @@ This guide helps you set up a local development environment for IronDev.
 
 ## Quick Bootstrap
 
-Start with the safe local bootstrap check from the repository root:
+Start with the developer environment doctor from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\doctor-local.ps1
+```
+
+The doctor is diagnostic only. It reports repository, toolchain, frontend, local override, SQL, Weaviate, LocalTest, API/UI, root-safety, smoke-path, and next-safe-action status where possible. It does not create local files, start services, create or rebuild SQL, ensure or rebuild Weaviate, reset LocalTest data, run smoke, write evidence, approve anything, mutate source, or claim alpha/release readiness.
+
+Use JSON output when another local script needs a stable diagnostic model:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\local\doctor-local.ps1 -Json
+```
+
+After the doctor has reduced the problem to one next safe action, use the safe local bootstrap check when the next step is local setup:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Scripts\local\bootstrap-local.ps1 -CheckOnly

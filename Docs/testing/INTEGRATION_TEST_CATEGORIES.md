@@ -14,9 +14,9 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 611
-- Test classes found: 605
-- Test methods found: 9687
+- Source files scanned: 612
+- Test classes found: 606
+- Test methods found: 9707
 - Category names found: 227
 
 ## G13 Category Changes
@@ -155,6 +155,14 @@ A label does not make a slow test safe.
 - J06 does not start Docker or Weaviate, load demo vectors, load BookSeller data, run alpha smoke, write evidence, change source/SQL/runtime authority records, add API/CLI/UI behavior, or claim alpha/merge/release/deployment readiness.
 - Local Weaviate state is a disposable derived index. Rebuilding it is setup convenience, not authority, approval, evidence, or readiness.
 
+## J07 Developer Environment Doctor
+
+- Added focused `ConfigBoundary`, `LocalBootstrap`, `Boundary`, and `Contract` metadata to the J07 developer environment doctor regression test.
+- J07 does not add `RequiresRealDatabase` or `LongRunning`; the test executes the script against a disposable fake repository and fake local commands, then reads script, docs, receipt, and static repository metadata only.
+- J07 verifies default diagnostic-only behavior, unsafe switch rejection, JSON/Markdown output, J05/J06 check-only delegation, SQL and Weaviate unsafe-target blocking, local override safety, LocalTest safety, redaction, GET-only probes, next-safe-action selection, and non-authority boundary wording.
+- J07 does not create local files, start services, create or rebuild SQL, ensure or rebuild Weaviate, reset LocalTest data, run smoke, write evidence, change source/runtime authority records, add API/CLI/UI behavior, or claim alpha/merge/release/deployment readiness.
+- The developer doctor reports local readiness blockers. It does not make the machine safe.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -193,11 +201,11 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 14 | 122 | 0 | 14 |
+| `Boundary` | 15 | 142 | 0 | 15 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
-| `ConfigBoundary` | 7 | 74 | 0 | 7 |
-| `Contract` | 15 | 129 | 0 | 15 |
+| `ConfigBoundary` | 8 | 94 | 0 | 8 |
+| `Contract` | 16 | 149 | 0 | 16 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -237,7 +245,7 @@ A label does not make a slow test safe.
 | `L4FailureModeReport` | 1 | 8 | 0 | 1 |
 | `L4InvariantRegression` | 1 | 14 | 0 | 1 |
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
-| `LocalBootstrap` | 1 | 10 | 0 | 1 |
+| `LocalBootstrap` | 2 | 30 | 0 | 2 |
 | `LocalSql` | 1 | 16 | 0 | 1 |
 | `LongRunning` | 39 | 410 | 0 | 39 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
