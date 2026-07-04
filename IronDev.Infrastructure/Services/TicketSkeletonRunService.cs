@@ -326,6 +326,18 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // may accept the risk, defer the fix, or reject the finding — but it cannot
         // be ignored. Evaluated from durable events alone.
         var continueEvents = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (!HasRecordedCriticReview(continueEvents))
+        {
+            await PublishAsync(runId, "ContinuationRefused",
+                "Continuation refused: no critic review is recorded for this run. A human cannot continue work the critic never reviewed.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["refusedReason"] = "CriticReviewMissing",
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+            return ToDto(run, projectId, ticketId, requiresHumanApproval: true);
+        }
+
         var undispositioned = UndispositionedFindingIds(continueEvents);
         if (undispositioned.Count > 0)
         {
@@ -468,6 +480,14 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return await RefuseApplyAsync(run, projectId, ticketId,
                 "ContinuationNotUnblocked",
                 "Apply requires a continuation unblocked by an accepted approval. Request continuation first.",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!HasRecordedCriticReview(events))
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                "CriticReviewMissing",
+                "no critic review is recorded for this run. Source mutation cannot proceed on work the critic never reviewed.",
                 cancellationToken).ConfigureAwait(false);
         }
 
@@ -1048,6 +1068,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             .Where(findingId => !dispositioned.Contains(findingId))
             .ToList();
     }
+
+    private static bool HasRecordedCriticReview(IReadOnlyList<RunEventDto> events) =>
+        events.Any(runEvent => string.Equals(runEvent.EventType, "SkeletonCriticReviewRecorded", StringComparison.Ordinal));
 
     private async Task<TicketBuildRunDto> BlockAsync(
         string runId,
