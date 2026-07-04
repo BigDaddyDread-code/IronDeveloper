@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 617
-- Test classes found: 611
-- Test methods found: 9753
-- Category names found: 230
+- Source files scanned: 618
+- Test classes found: 612
+- Test methods found: 9767
+- Category names found: 231
 
 ## G13 Category Changes
 
@@ -171,6 +171,14 @@ A label does not make a slow test safe.
 - P3-2 does not add test execution, a test runner, Builder patch behavior, critic execution, approval, continuation/apply behavior, API, UI, database schema, release/deployment gates, memory topology, or chat/channel behavior.
 - A tester coverage package maps acceptance criteria to test intent. It is not test execution, not test proof, not approval, not critic review, not policy satisfaction, not workflow continuation, not source apply permission, not release readiness, and not deployment readiness.
 
+## P3-4 Sealed Role Evidence Package
+
+- Added focused `SealedRolePackage` metadata to the P3-4 sealed role evidence package contract regression test.
+- Added broad `Governance`, `Contract`, and `Boundary` metadata to the P3-4 sealed role package test.
+- P3-4 does not add `RequiresRealDatabase` or `LongRunning`; the test validates Core sealed package models, validator behavior, in-memory deterministic hashing, receipt wording, and static production source boundaries only.
+- P3-4 does not add runtime package emission, skeleton run integration, test execution, critic execution, critic review recording, finding disposition recording, approval, continuation/apply behavior, API, UI, database schema, release/deployment gates, memory topology, batch behavior, or chat/channel behavior.
+- A sealed role evidence package binds contract, tester coverage, builder patch, critic review, and finding dispositions into a tamper-evident review bundle. It is not approval, not test proof, not critic authority, not policy satisfaction, not workflow continuation, not source apply permission, not release readiness, and not deployment readiness.
+
 ## P3-3 Builder Contract-Bound Patch Package
 
 - Added focused `Builder` metadata to the P3-3 builder patch package contract regression test.
@@ -232,12 +240,12 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 19 | 179 | 0 | 19 |
+| `Boundary` | 20 | 193 | 0 | 20 |
 | `Builder` | 1 | 9 | 0 | 1 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `ConfigBoundary` | 8 | 94 | 0 | 8 |
-| `Contract` | 21 | 195 | 0 | 21 |
+| `Contract` | 22 | 209 | 0 | 22 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -258,7 +266,7 @@ A label does not make a slow test safe.
 | `FailedApplyRecoveryCampaign` | 1 | 32 | 0 | 1 |
 | `FailedContinuationRecoveryCampaign` | 1 | 33 | 0 | 1 |
 | `FailedWorkflowDiagnosisReport` | 2 | 14 | 0 | 2 |
-| `Governance` | 21 | 171 | 0 | 21 |
+| `Governance` | 22 | 185 | 0 | 22 |
 | `GovernanceEvent` | 2 | 14 | 0 | 2 |
 | `GovernanceEventStore` | 1 | 11 | 0 | 1 |
 | `GovernanceSubstrateAuthorityBoundary` | 1 | 10 | 0 | 1 |
@@ -380,6 +388,7 @@ A label does not make a slow test safe.
 | `RollbackSupportReceiptStore` | 1 | 23 | 0 | 1 |
 | `SecretSafety` | 1 | 11 | 0 | 1 |
 | `SemanticMemory` | 1 | 9 | 0 | 1 |
+| `SealedRolePackage` | 1 | 14 | 0 | 1 |
 | `SourceApplyDryRunExecutor` | 1 | 17 | 0 | 1 |
 | `SourceApplyDryRunReceiptStore` | 1 | 11 | 0 | 1 |
 | `SourceApplyDryRunReceiptValidation` | 1 | 11 | 0 | 1 |
