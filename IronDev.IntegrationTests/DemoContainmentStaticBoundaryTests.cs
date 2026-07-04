@@ -10,6 +10,7 @@ namespace IronDev.IntegrationTests;
 /// Sample directories are the inverse: they are the demo's target surface and must grant
 /// nothing — no references into IronDev authority namespaces or governance types.
 /// </summary>
+[TestCategory("StaticBoundary")]
 [TestClass]
 public sealed class DemoContainmentStaticBoundaryTests
 {
