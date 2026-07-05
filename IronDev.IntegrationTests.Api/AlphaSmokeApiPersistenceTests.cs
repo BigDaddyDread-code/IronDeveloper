@@ -6,6 +6,7 @@ using System.Text.Json;
 using IronDev.Api.Controllers;
 using Dapper;
 using IronDev.Core.Builder;
+using IronDev.Core.Chat;
 using IronDev.Core.Governance;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
@@ -233,12 +234,202 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         }
     }
 
-    private static async Task<Project> CreateProjectAsync(HttpClient client, string localPath)
+    [TestMethod]
+    public async Task Rel5_ChatConfirmedTicket_StartsGovernedRun_ThroughSqlBackedApi()
+    {
+        var workspaceParent = TempDir("irondev-rel5-ws");
+        var evidenceRoot = TempDir("irondev-rel5-ev");
+        var sampleCopy = TempDir("irondev-rel5-src");
+        const string userMessage = "Turn this into a ticket: validate the Book constructor so empty ISBN, empty title, and negative price are rejected.";
+
+        try
+        {
+            using var noNodeReuse = DisableMsBuildNodeReuse();
+            CopySample(SampleRoot(), sampleCopy);
+            PrepareRestoredBookSellerSource(sampleCopy);
+            GitInit(sampleCopy);
+
+            using var factory = Factory.WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Test");
+                builder.UseSetting("DisposableBuild:EvidenceRoot", evidenceRoot);
+                builder.UseSetting("DisposableBuild:WorkspaceRoot", workspaceParent);
+                builder.UseSetting("DisposableBuild:BuildTimeoutSeconds", "300");
+                builder.UseSetting("DisposableBuild:TestTimeoutSeconds", "300");
+                builder.UseSetting("SkeletonApply:Enabled", "true");
+                builder.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<IBuilderProposalService>();
+                    services.AddScoped<IBuilderProposalService, DeterministicRel3Builder>();
+                    services.RemoveAll<ISkeletonTestAuthoringService>();
+                    services.AddScoped<ISkeletonTestAuthoringService, EmptyTestAuthoring>();
+                    services.RemoveAll<ISkeletonCriticReviewService>();
+                    services.AddScoped<ISkeletonCriticReviewService, DeterministicCleanCriticReviewService>();
+                    services.RemoveAll<IProjectChatResponseService>();
+                    services.AddScoped<IProjectChatResponseService, DeterministicFormalizationChatResponseService>();
+                    services.RemoveAll<IDraftTicketService>();
+                    services.AddScoped<IDraftTicketService, DeterministicRel5DraftTicketService>();
+                });
+            });
+
+            using var client = factory.CreateClient();
+            await AuthenticateAsync(client);
+
+            var project = await CreateProjectAsync(
+                client,
+                sampleCopy,
+                "BookSeller REL-5",
+                "REL-5 chat to confirmed ticket to governed run smoke fixture.");
+
+            var sessionId = await PostJsonAsync<long>(
+                client,
+                $"/api/projects/{project.Id}/chat/sessions",
+                new ProjectChatSession
+                {
+                    ProjectId = project.Id,
+                    Title = "REL-5 chat ticket smoke"
+                });
+            Assert.IsTrue(sessionId > 0);
+
+            var messageId = await PostJsonAsync<long>(
+                client,
+                $"/api/projects/{project.Id}/chat/sessions/{sessionId}/messages",
+                new ChatMessage
+                {
+                    ProjectId = project.Id,
+                    ChatSessionId = sessionId,
+                    Role = "user",
+                    Message = userMessage,
+                    LinkedFilePaths = "src/BookSeller.Domain/Book.cs",
+                    LinkedSymbols = "Book"
+                });
+            Assert.IsTrue(messageId > 0);
+
+            var completion = await PostJsonAsync<ChatController.ChatCompletionResponse>(
+                client,
+                $"/api/projects/{project.Id}/chat/complete",
+                new ChatController.ChatCompletionRequest(project.Id, sessionId, userMessage, null, "projectQuestion"));
+            Assert.AreEqual("Formalization", completion.Mode);
+            Assert.IsNotNull(completion.Gate);
+            Assert.IsTrue(completion.Gate!.CanCreateTicket);
+
+            var draft = await PostJsonAsync<DraftTicket>(
+                client,
+                $"/api/projects/{project.Id}/tickets/draft",
+                new TicketsController.DraftTicketRequest(
+                    "BookSeller",
+                    "Reject invalid books at the door",
+                    userMessage,
+                    "src/BookSeller.Domain/Book.cs",
+                    "Book",
+                    sessionId,
+                    messageId));
+            Assert.AreEqual(sessionId, draft.SourceChatSessionId);
+            Assert.AreEqual(messageId, draft.SourceMessageId);
+            Assert.AreEqual(userMessage, draft.SourceMessageText);
+
+            var ticket = await PostJsonAsync<ProjectTicket>(
+                client,
+                $"/api/projects/{project.Id}/tickets/draft/confirm",
+                draft);
+            Assert.AreEqual(project.Id, ticket.ProjectId);
+            Assert.AreEqual(sessionId, ticket.SourceChatSessionId);
+            Assert.AreEqual(messageId, ticket.SourceChatMessageId);
+            Assert.IsTrue(ticket.IsGenerated);
+            StringAssert.Contains(ticket.Content, "Source chat excerpt");
+
+            var started = await PostJsonAsync<TicketBuildRunDto>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs",
+                content: null);
+            Assert.AreEqual("PausedForApproval", started.Status);
+            Assert.IsTrue(started.RequiresHumanApproval);
+
+            var haltedReport = await GetJsonAsync<SkeletonRunReport>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/report");
+            Assert.AreEqual("PausedForApproval", haltedReport.Status);
+            Assert.IsFalse(haltedReport.LoopComplete);
+            Assert.IsNotNull(haltedReport.CriticPackage);
+            Assert.IsTrue(haltedReport.CriticPackage!.HashVerified);
+            Assert.IsNotNull(haltedReport.Approval);
+            Assert.IsTrue(haltedReport.Approval!.HaltObserved);
+            Assert.IsFalse(haltedReport.Approval.ContinuationUnblocked);
+            Assert.IsNull(haltedReport.Apply);
+
+            var packageHash = haltedReport.Approval.TargetHash;
+            Assert.IsFalse(string.IsNullOrWhiteSpace(packageHash));
+            Assert.AreEqual(packageHash, haltedReport.CriticPackage.Sha256OnDisk);
+
+            await AssertRel5SqlPersistenceAsync(started.RunId, project.Id, ticket.Id, sessionId, messageId);
+
+            WriteReceipt(new Rel5AlphaSmokeReceipt(
+                Ticket: TicketKey,
+                Project: "BookSeller",
+                ModelMode: "Deterministic",
+                RunUntil: "Gate",
+                RunId: started.RunId,
+                ApiPersisted: true,
+                SqlPersisted: true,
+                ProjectId: project.Id,
+                TicketId: ticket.Id,
+                ChatSessionId: sessionId,
+                ChatMessageId: messageId,
+                DraftConfirmed: true,
+                ChatTurnPersisted: true,
+                SourceMessageLinked: true,
+                GateState: "PausedForApproval",
+                BuildAndTestSucceeded: true,
+                CriticPackageSha256: packageHash,
+                ApprovalTargetHash: packageHash,
+                BuilderModel: "deterministic-fake",
+                AcceptedApprovalCreated: false,
+                AcceptedApprovalRecorded: false,
+                ContinuationRequested: false,
+                ApplyRequested: false,
+                CriticReviewRecorded: false,
+                AcceptedApprovalId: string.Empty,
+                ApplyReceiptPath: string.Empty,
+                ApplyReceiptSha256: string.Empty,
+                FinalState: "PausedForApproval",
+                LoopComplete: false,
+                ReportReconstructable: haltedReport.Gaps.Count == 0,
+                Proves:
+                [
+                    "authenticated API persists a chat session and user message",
+                    "chat complete can classify the turn as Formalization with ticket creation available",
+                    "draft ticket confirmation persists a generated ticket with chat provenance",
+                    "authenticated API starts the existing governed skeleton run from that confirmed ticket",
+                    "run report reconstructs the critic package and approval halt",
+                    "SQL contains chat, ticket provenance, run, and event evidence"
+                ],
+                DoesNotProveYet:
+                [
+                    "a live model",
+                    "accepted approval creation or consumption",
+                    "continuation after approval",
+                    "controlled apply",
+                    "commit, push, release, or deployment"
+                ]));
+        }
+        finally
+        {
+            TryDelete(sampleCopy);
+            TryDelete(workspaceParent);
+            TryDelete(evidenceRoot);
+        }
+    }
+
+    private static async Task<Project> CreateProjectAsync(
+        HttpClient client,
+        string localPath,
+        string name = "BookSeller REL-3",
+        string description = "REL-3 SQL/API persisted alpha smoke fixture.")
     {
         var response = await client.PostAsJsonAsync("/api/projects", new Project
         {
-            Name = "BookSeller REL-3",
-            Description = "REL-3 SQL/API persisted alpha smoke fixture.",
+            Name = name,
+            Description = description,
             LocalPath = localPath
         });
 
@@ -403,6 +594,79 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         Assert.AreEqual(1, approvalCount, "Accepted approval must be persisted and bound to the run/package hash.");
     }
 
+    private static async Task AssertRel5SqlPersistenceAsync(
+        string runId,
+        int projectId,
+        long ticketId,
+        long chatSessionId,
+        long chatMessageId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        var ticket = await connection.QuerySingleAsync<PersistedTicketProvenanceRow>(
+            """
+            SELECT SourceChatSessionId, SourceChatMessageId, IsGenerated
+            FROM dbo.ProjectTickets
+            WHERE Id = @TicketId
+              AND ProjectId = @ProjectId;
+            """,
+            new { TicketId = ticketId, ProjectId = projectId });
+        Assert.AreEqual(chatSessionId, ticket.SourceChatSessionId);
+        Assert.AreEqual(chatMessageId, ticket.SourceChatMessageId);
+        Assert.IsTrue(ticket.IsGenerated);
+
+        var chatMessageCount = await connection.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(*)
+            FROM dbo.ChatMessages
+            WHERE Id = @ChatMessageId
+              AND ChatSessionId = @ChatSessionId
+              AND ProjectId = @ProjectId;
+            """,
+            new { ChatMessageId = chatMessageId, ChatSessionId = chatSessionId, ProjectId = projectId });
+        Assert.AreEqual(1, chatMessageCount, "The confirmed ticket must link back to a persisted chat message.");
+
+        var sourceTypes = (await connection.QueryAsync<string>(
+            """
+            SELECT SourceType
+            FROM dbo.ArtifactSourceReferences
+            WHERE ProjectId = @ProjectId
+              AND ArtifactType = 'Ticket'
+              AND ArtifactId = @TicketId
+            ORDER BY SourceType;
+            """,
+            new { ProjectId = projectId, TicketId = ticketId })).ToArray();
+        CollectionAssert.Contains(sourceTypes, "ChatSession", "Ticket source references must include the chat session.");
+        CollectionAssert.Contains(sourceTypes, "ChatMessage", "Ticket source references must include the user message.");
+
+        var run = await connection.QuerySingleAsync<PersistedRunRow>(
+            "SELECT RunId, ProjectId, TicketId, State FROM dbo.Runs WHERE RunId = @RunId",
+            new { RunId = runId });
+        Assert.AreEqual(projectId, run.ProjectId);
+        Assert.AreEqual(ticketId, run.TicketId);
+        Assert.AreEqual("PausedForApproval", run.State);
+
+        var eventTypes = (await connection.QueryAsync<string>(
+            "SELECT EventType FROM dbo.RunEvents WHERE RunId = @RunId ORDER BY TimestampUtc, Id",
+            new { RunId = runId })).ToArray();
+        foreach (var required in new[]
+                 {
+                     "RunStarted",
+                     "ProposalGenerated",
+                     "SkeletonEvidencePackaged",
+                     "CriticReviewPackageReady",
+                     "ApprovalRequiredHalt"
+                 })
+        {
+            CollectionAssert.Contains(eventTypes, required, $"Missing persisted REL-5 event: {required}");
+        }
+
+        CollectionAssert.DoesNotContain(eventTypes, "SkeletonContinuationUnblocked");
+        CollectionAssert.DoesNotContain(eventTypes, "SkeletonApplyStarted");
+        CollectionAssert.DoesNotContain(eventTypes, "SkeletonApplied");
+    }
+
     private sealed class DeterministicRel3Builder : IBuilderProposalService
     {
         public Task<BuilderProposal> GenerateProposalAsync(long ticketId, CancellationToken ct = default) =>
@@ -506,6 +770,99 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
                 },
                 Findings = []
             };
+        }
+    }
+
+    private sealed class DeterministicFormalizationChatResponseService : IProjectChatResponseService
+    {
+        public Task<ProjectChatResponseResult?> RespondAsync(
+            int projectId,
+            string prompt,
+            ChatGovernanceMode? explicitMode = null,
+            string? dogfoodTraceId = null,
+            string? recentConversationSummary = null,
+            long? sessionId = null,
+            CancellationToken cancellationToken = default)
+        {
+            var decision = new ChatModeDecision(
+                ChatGovernanceMode.Formalization,
+                0.99,
+                "REL-5 deterministic chat response treats the user turn as ticket formalization evidence only.");
+
+            return Task.FromResult<ProjectChatResponseResult?>(new ProjectChatResponseResult(
+                Response: "Draft a ticket to validate Book constructor input. This response is not approval.",
+                Mode: ChatGovernanceMode.Formalization.ToString(),
+                ModeConfidence: decision.Confidence,
+                ModeReason: decision.Reason,
+                Clarification: ChatClarificationState.None,
+                Gate: ChatGovernanceGate.FromDecision(decision),
+                ContextSummary: recentConversationSummary,
+                LinkedFilePaths: "src/BookSeller.Domain/Book.cs",
+                LinkedSymbols: "Book",
+                DogfoodTraceId: dogfoodTraceId,
+                TraceId: 1));
+        }
+    }
+
+    private sealed class DeterministicRel5DraftTicketService : IDraftTicketService
+    {
+        public Task<DraftTicket> GenerateDraftAsync(
+            int projectId,
+            string projectName,
+            string proposedTitle,
+            string messageText,
+            string? linkedFilePaths,
+            string? linkedSymbols,
+            long? sessionId = null,
+            CancellationToken ct = default)
+        {
+            return Task.FromResult(new DraftTicket
+            {
+                SourceChatSessionId = sessionId.GetValueOrDefault(),
+                SourceMessageText = messageText,
+                Title = string.IsNullOrWhiteSpace(proposedTitle) ? "Reject invalid books at the door" : proposedTitle,
+                TicketType = "Task",
+                Priority = "High",
+                Status = "Draft",
+                Summary = "Validate a Book at construction before it enters the domain model.",
+                Background = "The chat turn asks IronDev to turn Book constructor validation into ticket-shaped work.",
+                AcceptanceCriteria = string.Join(Environment.NewLine, new[]
+                {
+                    "- Empty ISBN is rejected.",
+                    "- Empty title is rejected.",
+                    "- Negative price is rejected.",
+                    "- Zero price remains valid."
+                }),
+                LinkedFilePaths = linkedFilePaths,
+                LinkedSymbols = linkedSymbols,
+                ImplementationPlan = "Update the Book constructor guard clauses and keep the existing sample test suite green.",
+                UnitTests = "Add or preserve tests for empty ISBN, empty title, negative price, and zero price.",
+                IntegrationTests = "Run the BookSeller sample tests in the disposable workspace.",
+                ManualTests = "Review the generated diff before any approval.",
+                RegressionTests = "Ensure valid book construction still succeeds.",
+                BuildValidation = "dotnet test BookSeller.slnx",
+                IsGenerated = true,
+                GenerationNote = "Generated by REL-5 deterministic draft service from a persisted chat message. Not approval."
+            });
+        }
+
+        public Task<DraftTicket> RegenerateTestsAsync(int projectId, DraftTicket current, CancellationToken ct = default)
+        {
+            current.UnitTests = string.IsNullOrWhiteSpace(current.UnitTests)
+                ? "Add Book constructor validation tests."
+                : current.UnitTests;
+            current.BuildValidation = string.IsNullOrWhiteSpace(current.BuildValidation)
+                ? "dotnet test BookSeller.slnx"
+                : current.BuildValidation;
+            return Task.FromResult(current);
+        }
+
+        public Task<DraftTicket> GeneratePlanAsync(int projectId, DraftTicket current, CancellationToken ct = default)
+        {
+            current.ImplementationPlan = string.IsNullOrWhiteSpace(current.ImplementationPlan)
+                ? "Update Book constructor validation and rerun the sample tests."
+                : current.ImplementationPlan;
+            return Task.FromResult(current);
         }
     }
 
@@ -614,7 +971,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         throw new DirectoryNotFoundException("Could not locate the repository root.");
     }
 
-    private static void WriteReceipt(Rel3AlphaSmokeReceipt receipt)
+    private static void WriteReceipt(object receipt)
     {
         var path = Environment.GetEnvironmentVariable("ALPHA_SMOKE_RECEIPT");
         if (string.IsNullOrWhiteSpace(path))
@@ -646,6 +1003,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
     }
 
     private sealed record PersistedRunRow(string RunId, int ProjectId, long TicketId, string State);
+    private sealed record PersistedTicketProvenanceRow(long? SourceChatSessionId, long? SourceChatMessageId, bool IsGenerated);
 
     private sealed record Rel3AlphaSmokeReceipt(
         string Ticket,
@@ -657,6 +1015,40 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         bool SqlPersisted,
         int ProjectId,
         long TicketId,
+        string GateState,
+        bool BuildAndTestSucceeded,
+        string CriticPackageSha256,
+        string ApprovalTargetHash,
+        string BuilderModel,
+        bool AcceptedApprovalCreated,
+        bool AcceptedApprovalRecorded,
+        bool ContinuationRequested,
+        bool ApplyRequested,
+        bool CriticReviewRecorded,
+        string AcceptedApprovalId,
+        string ApplyReceiptPath,
+        string ApplyReceiptSha256,
+        string FinalState,
+        bool LoopComplete,
+        bool ReportReconstructable,
+        string[] Proves,
+        string[] DoesNotProveYet);
+
+    private sealed record Rel5AlphaSmokeReceipt(
+        string Ticket,
+        string Project,
+        string ModelMode,
+        string RunUntil,
+        string RunId,
+        bool ApiPersisted,
+        bool SqlPersisted,
+        int ProjectId,
+        long TicketId,
+        long ChatSessionId,
+        long ChatMessageId,
+        bool DraftConfirmed,
+        bool ChatTurnPersisted,
+        bool SourceMessageLinked,
         string GateState,
         bool BuildAndTestSucceeded,
         string CriticPackageSha256,

@@ -421,6 +421,11 @@ try {
         -Project $script:ApiProject `
         -Filter "FullyQualifiedName~AlphaSmokeApiPersistenceTests.Rel3_OneTicket_ReachesApplied_ThroughSqlBackedApi"
 
+    Invoke-TestLane `
+        -Name "REL-5 chat confirmed ticket governed run" `
+        -Project $script:ApiProject `
+        -Filter "FullyQualifiedName~AlphaSmokeApiPersistenceTests.Rel5_ChatConfirmedTicket_StartsGovernedRun_ThroughSqlBackedApi"
+
     $categoryContractFilter = @(
         "FullyQualifiedName~IntegrationTestCategoryContractTests",
         "FullyQualifiedName~SlowQuarantineCategoryContractTests"
