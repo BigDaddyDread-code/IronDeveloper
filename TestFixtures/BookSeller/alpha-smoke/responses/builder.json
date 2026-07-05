@@ -1,0 +1,14 @@
+{
+  "summary": "Validate a Book at construction.",
+  "rationale": "Reject empty ISBN, empty title, and negative price so downstream code can trust a Book that exists.",
+  "changes": [
+    {
+      "filePath": "src/BookSeller.Domain/Book.cs",
+      "description": "Add constructor validation for isbn, title, and price.",
+      "diff": "add guard clauses to the Book constructor",
+      "fullContentAfter": "namespace BookSeller.Domain;\n\npublic sealed class Book\n{\n    public Book(string isbn, string title, string author, decimal price)\n    {\n        if (string.IsNullOrWhiteSpace(isbn))\n            throw new System.ArgumentException(\"ISBN is required.\", nameof(isbn));\n        if (string.IsNullOrWhiteSpace(title))\n            throw new System.ArgumentException(\"Title is required.\", nameof(title));\n        if (price < 0)\n            throw new System.ArgumentOutOfRangeException(nameof(price), \"Price cannot be negative.\");\n\n        Isbn = isbn;\n        Title = title;\n        Author = author;\n        Price = price;\n    }\n\n    public string Isbn { get; }\n    public string Title { get; }\n    public string Author { get; }\n    public decimal Price { get; }\n}\n",
+      "isNewFile": false,
+      "isDeletion": false
+    }
+  ]
+}
