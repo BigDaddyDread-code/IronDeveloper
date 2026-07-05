@@ -17,7 +17,7 @@ A label does not make a slow test safe.
 - Source files scanned: 621
 - Test classes found: 615
 - Test methods found: 9797
-- Category names found: 231
+- Category names found: 232
 
 ## G13 Category Changes
 
@@ -146,6 +146,13 @@ A label does not make a slow test safe.
 - J10 does not add `RequiresRealDatabase` or `LongRunning`; the test validates Core root-safety rules and disposable workspace preflight behavior with temporary local folders only.
 - J10 verifies repository-root, broad-root, relative/traversal/file/reparse-shaped, workspace/evidence overlap, and sandbox-repository hazards fail closed before disposable workspace execution writes workspace or evidence output.
 - J10 does not add SQL connectivity checks, SQL bootstrap, SQL rebuild, Weaviate bootstrap/rebuild, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, or production runtime behavior.
+
+## REL-1 Root Safety Release Gate
+
+- Added focused `ConfigBoundary`, `Boundary`, `Contract`, and `ReleaseReadiness` metadata to the REL-1 root-safety release gate regression test.
+- REL-1 does not add `RequiresRealDatabase` or `LongRunning`; the test validates Core release-gate mapping and script contract markers with temporary local folders only.
+- REL-1 verifies required release root coverage, `NotEvaluated` handling, typed blocker reason mapping, path redaction, smoke artifact root classification, alpha-smoke root-safety blocker vocabulary, and doctor release-gate availability reporting.
+- REL-1 does not add SQL connectivity checks, SQL bootstrap, SQL rebuild, Weaviate bootstrap/rebuild, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, or production runtime behavior.
 - A safe root is a precondition for evidence. It is not evidence, approval, execution authority, or permission to mutate source.
 
 ## J04 Local Bootstrap Script
@@ -384,6 +391,7 @@ A label does not make a slow test safe.
 | `Redaction` | 1 | 8 | 0 | 1 |
 | `Receipt` | 20 | 407 | 0 | 20 |
 | `ReleaseGateNegativeCampaign` | 1 | 30 | 0 | 1 |
+| `ReleaseReadiness` | 1 | 15 | 0 | 1 |
 | `ReleaseReadinessApiRegression` | 1 | 6 | 0 | 1 |
 | `ReleaseReadinessCliRegression` | 1 | 4 | 0 | 1 |
 | `ReleaseReadinessDecisionRecordReadApi` | 1 | 17 | 0 | 1 |

@@ -272,7 +272,9 @@ public sealed class BlockJ10RootSafetyChecksTests
         var source = string.Join(
             Environment.NewLine,
             ReadRepositoryFile("IronDev.Core/Configuration/LocalRootSafetyModels.cs"),
-            ReadRepositoryFile("IronDev.Core/Configuration/LocalRootSafetyValidator.cs"));
+            ReadRepositoryFile("IronDev.Core/Configuration/LocalRootSafetyValidator.cs"),
+            ReadRepositoryFile("IronDev.Core/Configuration/ReleaseRootSafetyGateModels.cs"),
+            ReadRepositoryFile("IronDev.Core/Configuration/ReleaseRootSafetyGate.cs"));
 
         foreach (var marker in new[]
         {

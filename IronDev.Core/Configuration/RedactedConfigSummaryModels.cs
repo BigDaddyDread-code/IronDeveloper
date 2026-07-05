@@ -24,7 +24,8 @@ public enum ConfigRootKind
     DisposableWorkspaceRoot = 3,
     SandboxRepositoryPath = 4,
     CanaryMeasurementRoot = 5,
-    BatchMapEvidenceRoot = 6
+    BatchMapEvidenceRoot = 6,
+    SmokeArtifactRoot = 7
 }
 
 public enum ConfigRootSafetyStatus

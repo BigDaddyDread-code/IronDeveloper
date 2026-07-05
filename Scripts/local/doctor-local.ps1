@@ -667,12 +667,13 @@ try {
 
     $rootSafetyCandidates = @(
         "IronDev.Core/Configuration/LocalRootSafetyValidator.cs",
+        "IronDev.Core/Configuration/ReleaseRootSafetyGate.cs",
         "IronDev.Core/Configuration/RootSafetyValidator.cs",
         "IronDev.Core/Configuration/ConfiguredRootSafetyValidator.cs",
         "Scripts/local/root-safety-local.ps1"
     )
     if ($rootSafetyCandidates | Where-Object { Test-Path (Join-Path $repoRoot $_) } | Select-Object -First 1) {
-        Add-DoctorCheck "RootSafety" "NotEvaluated" "Warning" "RootSafetyContractPresentButNotInvoked" "Run the explicit root-safety validator before external alpha." "ContractPresence" "DiagnosticOnly; NotAuthority; NotEvidence; NotApproval; NotReadiness" 9
+        Add-DoctorCheck "RootSafety" "NotEvaluated" "Warning" "J10RootSafetyReleaseGateAvailableNotInvoked" "Run the explicit root-safety release gate before external alpha." "ContractPresence" "DiagnosticOnly; NotAuthority; NotEvidence; NotApproval; NotReadiness" 9
     }
     else {
         Add-DoctorCheck "RootSafety" "NotEvaluated" "Blocker" "J10RootSafetyUnavailable" "Implement or run J10 root safety before external alpha." "ContractPresence" "DiagnosticOnly; NotAuthority; NotEvidence; NotApproval; NotReadiness" 9

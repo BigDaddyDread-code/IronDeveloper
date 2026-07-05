@@ -32,7 +32,7 @@ After the doctor has reduced the problem to one next safe action, use the safe l
 powershell -ExecutionPolicy Bypass -File .\Scripts\local\bootstrap-local.ps1 -CheckOnly
 ```
 
-The default mode is check-only. It verifies the repository shape, tool presence, local override status, J08 config-summary contract availability, and J10 root-safety availability without creating files, restoring packages, installing frontend packages, starting services, touching SQL, touching Weaviate, writing evidence, or running governed product flows.
+The default mode is check-only. It verifies the repository shape, tool presence, local override status, J08 config-summary contract availability, and J10 root-safety release-gate availability without creating files, restoring packages, installing frontend packages, starting services, touching SQL, touching Weaviate, writing evidence, or running governed product flows.
 
 To prepare only the developer-local override template:
 
@@ -237,7 +237,7 @@ If redaction is uncertain, the value is redacted. Debug convenience loses to sec
 
 ## 3a. Root Safety
 
-J10 adds a reusable Core root-safety validator for local logs, evidence, workspace, disposable workspace, sandbox repository, canary measurement, and batch-map evidence roots.
+J10 adds a reusable Core root-safety validator for local logs, evidence, workspace, disposable workspace, sandbox repository, canary measurement, batch-map evidence, and smoke artifact roots. REL-1 adds a release-facing root-safety gate that maps validator findings to typed release blocker reason codes; it still does not create directories, clean roots, write evidence, execute commands, or grant authority.
 
 Disposable workspace execution validates workspace and evidence roots before it creates directories, writes evidence, or runs workspace commands. Evidence and logs must not live inside disposable workspace roots because disposable cleanup must not erase the evidence trail.
 

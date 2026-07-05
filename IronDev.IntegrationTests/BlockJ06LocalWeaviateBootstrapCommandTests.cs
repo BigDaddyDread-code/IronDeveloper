@@ -359,6 +359,9 @@ public sealed class BlockJ06LocalWeaviateBootstrapCommandTests
     private static bool IsJ10RootSafetyFile(string path) =>
         path.Equals("IronDev.Core/Configuration/LocalRootSafetyModels.cs", StringComparison.OrdinalIgnoreCase) ||
         path.Equals("IronDev.Core/Configuration/LocalRootSafetyValidator.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("IronDev.Core/Configuration/RedactedConfigSummaryModels.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("IronDev.Core/Configuration/ReleaseRootSafetyGateModels.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("IronDev.Core/Configuration/ReleaseRootSafetyGate.cs", StringComparison.OrdinalIgnoreCase) ||
         path.Equals("IronDev.Infrastructure/Services/Workspaces/DisposableWorkspaceExecutionService.cs", StringComparison.OrdinalIgnoreCase) ||
         path.Equals("IronDev.Infrastructure/Services/Workspaces/DisposableWorkspaceReadinessService.cs", StringComparison.OrdinalIgnoreCase);
 
