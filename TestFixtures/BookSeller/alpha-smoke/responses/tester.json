@@ -1,0 +1,7 @@
+[
+  {
+    "relativePath": "tests/BookSeller.Domain.Tests/ValidateBookAuthoredTests.cs",
+    "coversCriterion": "Empty ISBN is rejected at construction.",
+    "content": "using BookSeller.Domain;\nusing Microsoft.VisualStudio.TestTools.UnitTesting;\n\nnamespace BookSeller.Domain.Tests;\n\n[TestClass]\npublic sealed class ValidateBookAuthoredTests\n{\n    [TestMethod]\n    public void Book_WithEmptyIsbn_IsRejected()\n    {\n        Assert.ThrowsExactly<System.ArgumentException>(() => new Book(\"\", \"Title\", \"Author\", 10m));\n    }\n\n    [TestMethod]\n    public void Book_WithNegativePrice_IsRejected()\n    {\n        Assert.ThrowsExactly<System.ArgumentOutOfRangeException>(() => new Book(\"isbn-1\", \"Title\", \"Author\", -1m));\n    }\n\n    [TestMethod]\n    public void Book_WithZeroPrice_IsValid()\n    {\n        var book = new Book(\"isbn-1\", \"Title\", \"Author\", 0m);\n        Assert.AreEqual(0m, book.Price);\n    }\n}\n"
+  }
+]

@@ -24,6 +24,21 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
 
     public async Task<SkeletonAgentLlm> ResolveAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default)
     {
+        // D-2a: the deterministic alpha-smoke provider. Gated by explicit config
+        // (AlphaSmoke:Enabled AND AlphaSmoke:ModelMode=Deterministic), default off,
+        // so it can never be reached in normal operation. It fakes only model
+        // words — the real proposal/tester/critic services still parse and run.
+        if (IsDeterministicAlphaSmoke())
+        {
+            return new SkeletonAgentLlm
+            {
+                Role = role,
+                Llm = new DeterministicAlphaSmokeLlmService(role, _configuration),
+                Provider = DeterministicAlphaSmokeLlmService.ProviderName,
+                Model = $"deterministic-{role.ToString().ToLowerInvariant()}"
+            };
+        }
+
         var profile = await _profiles.GetAsync(role, cancellationToken).ConfigureAwait(false);
         var global = _configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
 
@@ -62,4 +77,8 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
             Model = options.Model
         };
     }
+
+    private bool IsDeterministicAlphaSmoke() =>
+        string.Equals(_configuration["AlphaSmoke:Enabled"], "true", StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(_configuration["AlphaSmoke:ModelMode"], "Deterministic", StringComparison.OrdinalIgnoreCase);
 }
