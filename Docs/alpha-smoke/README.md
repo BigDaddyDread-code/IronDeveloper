@@ -2,9 +2,9 @@
 
 The alpha smoke path makes the D-series dogfood run repeatable from a fresh checkout.
 
-It proves a narrow thing: IronDev can run the BookSeller `validate-book` fixture through the governed skeleton path using deterministic model output. Gate mode stops at the human approval gate. REL-2 applied mode records an explicit deterministic human approval phrase, requests continuation, and applies through the copy-only workspace spine.
+It proves a narrow thing: IronDev can run the BookSeller `validate-book` fixture through the governed skeleton path using deterministic model output. Gate mode stops at the human approval gate. REL-2 applied mode records an explicit deterministic human approval phrase, requests continuation, and applies through the copy-only workspace spine. REL-3 persisted applied mode drives the authenticated API test host against SQL-backed stores and proves the same trail survives project, ticket, run, approval, continuation, apply, and report persistence.
 
-It does not prove alpha readiness, release readiness, deployment readiness, policy satisfaction, live-model quality, SQL/API persistence, product UI approval recording, commit, push, release, deployment, or batch completion.
+It does not prove alpha readiness, release readiness, deployment readiness, policy satisfaction, live-model quality, product UI approval recording, commit, push, release, deployment, or batch completion.
 
 ## Current Runnable Path
 
@@ -36,6 +36,17 @@ Scripts/smoke/alpha-smoke.ps1 `
   -ApprovalPhrase "I approve continuation for run <runId> package <hash>"
 ```
 
+SQL/API persisted deterministic applied smoke:
+
+```powershell
+Scripts/smoke/alpha-smoke.ps1 `
+  -Project BookSeller `
+  -Ticket validate-book `
+  -ModelMode Deterministic `
+  -RunUntil Applied `
+  -RequireExistingAcceptedApproval
+```
+
 Useful output switches:
 
 ```powershell
@@ -53,7 +64,7 @@ By default, mutation-shaped smoke output is written outside the repository under
 - Clean source worktree before running `-RunUntil Gate`.
 - No secrets required for deterministic mode.
 
-Node, SQL, API, UI, and Weaviate are not required by the current deterministic service-level smoke. That is an honest current gap, not a hidden pass.
+Node, UI, and Weaviate are not required by the current deterministic smoke. SQL/API persisted mode uses the in-process API test host and the configured integration-test SQL database; it does not start the product UI or require a live model.
 
 ## What The Gate Smoke Does
 
@@ -70,6 +81,8 @@ Node, SQL, API, UI, and Weaviate are not required by the current deterministic s
 
 ## What The Applied Smoke Adds
 
+REL-2 service-level applied mode:
+
 1. Records deterministic clean critic review evidence.
 2. Requires `-RecordHumanApproval` and the exact hash-bound approval phrase template.
 3. Records an accepted approval bound to the generated run ID and critic package hash.
@@ -78,16 +91,25 @@ Node, SQL, API, UI, and Weaviate are not required by the current deterministic s
 6. Verifies the final report reconstructs the applied loop.
 7. Verifies the apply-copy receipt exists on disk.
 
+REL-3 SQL/API persisted applied mode:
+
+1. Creates the BookSeller project and ticket through authenticated API routes.
+2. Starts the skeleton run through the API and reconstructs the halt report through the API.
+3. Records deterministic clean critic review evidence through the critic-review API route.
+4. Creates and reads back an accepted approval through the accepted-approval API backed by SQL.
+5. Requests continuation through the API and verifies the live SQL-backed approval unblocks the run.
+6. Requests controlled apply through the API and verifies the final API report reaches `Applied`.
+7. Verifies SQL contains the run, event trail, and accepted approval rows.
+
 ## What It Does Not Do
 
-- It does not start API or UI.
-- It does not write tickets through the API.
-- It does not connect to SQL.
+- It does not start the product UI.
 - Gate mode does not request or record a critic review.
 - Gate mode does not record accepted approval.
 - Gate mode does not request continuation.
 - Gate mode does not apply to source.
-- Applied mode records deterministic smoke evidence only; it does not prove product UI/API approval recording.
+- REL-2 applied mode records deterministic smoke evidence only; it does not prove SQL/API persistence.
+- REL-3 persisted mode creates accepted approval through the API, but it does not prove product UI approval recording.
 - It does not release or deploy.
 
 ## Expected Artifacts
@@ -99,7 +121,7 @@ Gate mode writes:
 - `alpha-smoke-summary.md`
 - `alpha-smoke.trx`
 
-The receipt records model mode, run-until target, run ID, gate state, critic package hash, approval target hash, named gaps, and boundary language.
+The receipt records model mode, run-until target, run ID, gate state, critic package hash, approval target hash, named gaps, and boundary language. REL-3 receipts also record API/SQL persistence, project/ticket IDs, accepted approval ID, apply receipt path/hash, and the final reconstructed state.
 
 Readiness mode writes only `alpha-smoke-result.json` and `alpha-smoke-summary.md`; it does not advertise a `run-receipt.json` because no skeleton run has executed yet.
 

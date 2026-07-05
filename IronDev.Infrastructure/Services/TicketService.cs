@@ -156,6 +156,7 @@ public sealed class TicketService : ITicketService
                     ticket.LinkedFilePaths,
                     ticket.LinkedCodeIndexEntryIds,
                     ticket.LinkedSymbols,
+                    ticket.BlockedByTicketIds,
                     ticket.UnitTests,
                     ticket.IntegrationTests,
                     ticket.ManualTests,

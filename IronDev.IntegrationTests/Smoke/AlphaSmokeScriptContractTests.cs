@@ -91,8 +91,10 @@ public sealed class AlphaSmokeScriptContractTests
                      "DotnetMissing",
                      "NodeMissing",
                      "ApiUnavailable",
+                     "ApiAvailable",
                      "ApiAuthMissing",
                      "SqlUnavailable",
+                     "SqlAvailable",
                      "LocalOverrideMissing",
                      "RootSafetyNotEvaluated",
                      "UnsafeRoot",
@@ -101,6 +103,7 @@ public sealed class AlphaSmokeScriptContractTests
                      "LiveModelNotConfigured",
                      "LiveModelModeNotImplemented",
                      "TicketPersistFailed",
+                     "TicketPersisted",
                      "ReadinessBlocked",
                      "SkeletonRunStartFailed",
                      "CriticPackageMissing",
@@ -109,6 +112,7 @@ public sealed class AlphaSmokeScriptContractTests
                      "CriticReviewRecorded",
                      "GateStateUnexpected",
                      "AcceptedApprovalRequired",
+                     "AcceptedApprovalPersisted",
                      "AcceptedApprovalRecorded",
                      "ApprovalPhraseMissing",
                      "ApprovalPhraseMismatch",
@@ -200,6 +204,48 @@ public sealed class AlphaSmokeScriptContractTests
         StringAssert.Contains(source, "\"FullyQualifiedName~AlphaLoopSmokeTests.AlphaSmoke_OneTicket_ReachesApplied_WithDeterministicApproval\"");
         StringAssert.Contains(source, "$env:ALPHA_SMOKE_APPROVAL_PHRASE = $ApprovalPhrase");
         StringAssert.Contains(source, "I approve continuation for run <runId> package <hash>");
+    }
+
+    [TestMethod]
+    public void AlphaSmokeScript_RequireExistingAcceptedApproval_SelectsSqlApiPersistedPath()
+    {
+        var source = File.ReadAllText(RepoFile("Scripts", "smoke", "alpha-smoke.ps1"));
+
+        StringAssert.Contains(source, "-RequireExistingAcceptedApproval");
+        StringAssert.Contains(source, "REL-3 path: the test owns the governed API approval request and proves SQL persistence.");
+        StringAssert.Contains(source, "\"FullyQualifiedName~AlphaSmokeApiPersistenceTests.Rel3_OneTicket_ReachesApplied_ThroughSqlBackedApi\"");
+        StringAssert.Contains(source, "\"IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj\"");
+        StringAssert.Contains(source, "SqlAvailable");
+        StringAssert.Contains(source, "ApiAvailable");
+        StringAssert.Contains(source, "TicketPersisted");
+        StringAssert.Contains(source, "AcceptedApprovalPersisted");
+        StringAssert.Contains(source, "runReceipt.sqlPersisted");
+        StringAssert.Contains(source, "runReceipt.apiPersisted");
+    }
+
+    [TestMethod]
+    public void Rel3FullSqlLane_SeedsApiTestOutputConnectionString_AndApiBaseKeepsCiOverride()
+    {
+        var fullSqlScript = File.ReadAllText(RepoFile("Scripts", "ci", "run-full-sql-integration-ci.ps1"));
+        var apiTestBase = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "ApiTestBase.cs"));
+
+        StringAssert.Contains(fullSqlScript, "IronDev.IntegrationTests.Api\\bin\\Debug\\net10.0\\appsettings.Test.json");
+        StringAssert.Contains(fullSqlScript, "$env:ConnectionStrings__IronDeveloperDb = $connectionString");
+        StringAssert.Contains(fullSqlScript, "REL-3 SQL API alpha smoke");
+        StringAssert.Contains(fullSqlScript, "IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj");
+        StringAssert.Contains(apiTestBase, "[\"Ai:Provider\"] = \"fake\"");
+        StringAssert.Contains(apiTestBase, "services.RemoveAll<ILLMService>()");
+        StringAssert.Contains(apiTestBase, "services.AddScoped<ILLMService, FakeLlmService>()");
+
+        var jsonLoadIndex = apiTestBase.IndexOf("cfg.AddJsonFile(path, optional: false)", StringComparison.Ordinal);
+        var overrideIndex = apiTestBase.IndexOf("[\"ConnectionStrings:IronDeveloperDb\"] = TestConnectionString()", StringComparison.Ordinal);
+        var fakeProviderIndex = apiTestBase.IndexOf("[\"Ai:Provider\"] = \"fake\"", StringComparison.Ordinal);
+
+        Assert.IsTrue(jsonLoadIndex >= 0, "ApiTestBase must load appsettings.Test.json for API integration tests.");
+        Assert.IsTrue(overrideIndex > jsonLoadIndex,
+            "ApiTestBase must reapply the CI/environment connection string after appsettings.Test.json so Linux SQL CI does not fall back to LocalDB.");
+        Assert.IsTrue(fakeProviderIndex > jsonLoadIndex,
+            "ApiTestBase must force fake AI after appsettings.Test.json so SQL/API smoke does not require external model credentials.");
     }
 
     [TestMethod]

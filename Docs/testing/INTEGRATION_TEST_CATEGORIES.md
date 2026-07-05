@@ -14,9 +14,9 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 621
-- Test classes found: 615
-- Test methods found: 9798
+- Source files scanned: 622
+- Test classes found: 616
+- Test methods found: 9799
 - Category names found: 233
 
 ## G13 Category Changes
@@ -33,11 +33,11 @@ A label does not make a slow test safe.
 - new categories added: `RequiresRealDatabase`, `LongRunning`, `ManualLocal`.
 - categories not added: `Slow`, `Quarantined`, `RequiresExternalDependency`, `RequiresLocalTooling`.
 - counts by category:
-  - `RequiresRealDatabase`: 40 test classes, 420 test methods, 40 files.
-  - `LongRunning`: 40 test classes, 420 test methods, 40 files.
+  - `RequiresRealDatabase`: 41 test classes, 421 test methods, 41 files.
+  - `LongRunning`: 41 test classes, 422 test methods, 41 files.
   - `ManualLocal`: 1 test class, 1 test method, 1 file.
-- test classes affected: 40 store/real-database-shaped integration classes plus 1 manual local legacy class.
-- test methods affected if source-countable: 420 `RequiresRealDatabase`/`LongRunning` methods and 1 `ManualLocal` method.
+- test classes affected: 41 store/real-database-shaped integration classes plus 1 manual local legacy class.
+- test methods affected if source-countable: 421 `RequiresRealDatabase` methods, 422 `LongRunning` methods, and 1 `ManualLocal` method.
 - tests moved into explicit slow/quarantine visibility: store and real-database-shaped classes are now explicitly visible through `RequiresRealDatabase` and `LongRunning`; the existing manual local ignored task is visible through `ManualLocal`.
 - tests remain in default lanes: no CI filters were changed, no tests were deleted, and no default lane exclusion was added.
 - selection-only pending execution proof: most `RequiresRealDatabase`/`LongRunning` rows remain `SelectionOnlyPendingExecution` until a slow/SQL lane executes them.
@@ -163,6 +163,15 @@ A label does not make a slow test safe.
 - REL-2 does not add SQL/API persistence, live model proof, UI approval recording, commit, push, release, deployment, or batch completion.
 - Applied is evidence of a governed copy-only source apply. It is not commit, push, release, deployment, or alpha readiness.
 
+## REL-3 SQL/API Persisted Alpha Smoke
+
+- Added focused `AlphaSmoke` and `ReleaseReadiness` metadata to the SQL/API persisted alpha smoke test.
+- REL-3 adds `RequiresRealDatabase` and `LongRunning` metadata because it drives the authenticated API test host against SQL-backed stores and shells out to build/test a disposable BookSeller source copy.
+- REL-3 verifies authenticated API project/ticket creation, skeleton-run halt report reconstruction, critic review recording, accepted-approval API creation/readback, continuation, controlled apply, SQL run/event/approval rows, final report reconstruction, and apply receipt evidence.
+- REL-3 is executed by the explicit full-SQL CI lane filter `AlphaSmokeApiPersistenceTests.Rel3_OneTicket_ReachesApplied_ThroughSqlBackedApi`.
+- REL-3 does not add UI approval recording, live model proof, fresh-machine dogfood proof, commit, push, release, deployment, or batch completion.
+- SQL/API persistence proves the product-path trail exists. It is not approval, policy satisfaction, release readiness, or deployment readiness.
+
 ## J04 Local Bootstrap Script
 
 - Added focused `ConfigBoundary` and `LocalBootstrap` metadata to the J04 local bootstrap script regression test.
@@ -248,7 +257,7 @@ A label does not make a slow test safe.
 | `AcceptedApprovalSqlStore` | 1 | 15 | 0 | 1 |
 | `AgentHandoff` | 3 | 53 | 0 | 3 |
 | `AgentHandoffStore` | 1 | 8 | 0 | 1 |
-| `AlphaSmoke` | 1 | 2 | 0 | 1 |
+| `AlphaSmoke` | 2 | 3 | 0 | 2 |
 | `ApiCliContract` | 3 | 24 | 0 | 3 |
 | `ApiCliReleaseGate` | 1 | 10 | 0 | 1 |
 | `ApplyDryRunAuthorityBoundary` | 1 | 4 | 0 | 1 |
@@ -320,7 +329,7 @@ A label does not make a slow test safe.
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
 | `LocalBootstrap` | 2 | 30 | 0 | 2 |
 | `LocalSql` | 1 | 16 | 0 | 1 |
-| `LongRunning` | 40 | 421 | 0 | 40 |
+| `LongRunning` | 41 | 422 | 0 | 41 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
 | `MemoryPromotionRequestPackage` | 1 | 7 | 0 | 1 |
@@ -400,7 +409,7 @@ A label does not make a slow test safe.
 | `Redaction` | 1 | 8 | 0 | 1 |
 | `Receipt` | 20 | 407 | 0 | 20 |
 | `ReleaseGateNegativeCampaign` | 1 | 30 | 0 | 1 |
-| `ReleaseReadiness` | 2 | 17 | 0 | 2 |
+| `ReleaseReadiness` | 3 | 18 | 0 | 3 |
 | `ReleaseReadinessApiRegression` | 1 | 6 | 0 | 1 |
 | `ReleaseReadinessCliRegression` | 1 | 4 | 0 | 1 |
 | `ReleaseReadinessDecisionRecordReadApi` | 1 | 17 | 0 | 1 |
@@ -408,7 +417,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessGateEvaluator` | 1 | 30 | 0 | 1 |
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
-| `RequiresRealDatabase` | 40 | 420 | 0 | 40 |
+| `RequiresRealDatabase` | 41 | 421 | 0 | 41 |
 | `Retention` | 2 | 16 | 0 | 2 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |

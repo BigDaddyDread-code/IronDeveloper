@@ -38,8 +38,10 @@ $script:KnownReasonCodes = @(
     "NodeMissing",
     "GitMissing",
     "ApiUnavailable",
+    "ApiAvailable",
     "ApiAuthMissing",
     "SqlUnavailable",
+    "SqlAvailable",
     "LocalOverrideMissing",
     "RootSafetyNotEvaluated",
     "UnsafeRoot",
@@ -48,6 +50,7 @@ $script:KnownReasonCodes = @(
     "LiveModelNotConfigured",
     "LiveModelModeNotImplemented",
     "TicketPersistFailed",
+    "TicketPersisted",
     "ReadinessBlocked",
     "SkeletonRunStartFailed",
     "CriticPackageMissing",
@@ -56,6 +59,7 @@ $script:KnownReasonCodes = @(
     "CriticReviewRecorded",
     "GateStateUnexpected",
     "AcceptedApprovalRequired",
+    "AcceptedApprovalPersisted",
     "AcceptedApprovalRecorded",
     "ApprovalPhraseMissing",
     "ApprovalPhraseMismatch",
@@ -415,24 +419,24 @@ if ($Project -ne "BookSeller") {
 
 if ($RunUntil -eq "Applied") {
     if ($RequireExistingAcceptedApproval) {
-        Add-Stage "ApprovalCheck" "Blocked" "AcceptedApprovalRequired" "REL-2 service-level deterministic smoke cannot consume an existing persisted approval. Use -RecordHumanApproval with the exact approval phrase template, or wait for REL-3 SQL/API persistence."
-        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+        # REL-3 path: the test owns the governed API approval request and proves SQL persistence.
     }
-
-    if (-not $RecordHumanApproval) {
+    elseif (-not $RecordHumanApproval) {
         Add-Stage "ApprovalCheck" "Blocked" "AcceptedApprovalRequired" "Applied mode requires explicit -RecordHumanApproval. The smoke never creates approval by default."
         Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
     }
 
-    if ([string]::IsNullOrWhiteSpace($ApprovalPhrase)) {
-        Add-Stage "ApprovalCheck" "Blocked" "ApprovalPhraseMissing" "Applied mode requires -ApprovalPhrase `"I approve continuation for run <runId> package <hash>`"."
-        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
-    }
+    if (-not $RequireExistingAcceptedApproval) {
+        if ([string]::IsNullOrWhiteSpace($ApprovalPhrase)) {
+            Add-Stage "ApprovalCheck" "Blocked" "ApprovalPhraseMissing" "Applied mode requires -ApprovalPhrase `"I approve continuation for run <runId> package <hash>`"."
+            Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+        }
 
-    $expectedApprovalPhraseTemplate = "I approve continuation for run <runId> package <hash>"
-    if ($ApprovalPhrase -ne $expectedApprovalPhraseTemplate) {
-        Add-Stage "ApprovalCheck" "Blocked" "ApprovalPhraseMismatch" "Approval phrase must exactly match the documented template so the smoke can bind it to the generated run id and package hash."
-        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+        $expectedApprovalPhraseTemplate = "I approve continuation for run <runId> package <hash>"
+        if ($ApprovalPhrase -ne $expectedApprovalPhraseTemplate) {
+            Add-Stage "ApprovalCheck" "Blocked" "ApprovalPhraseMismatch" "Approval phrase must exactly match the documented template so the smoke can bind it to the generated run id and package hash."
+            Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+        }
     }
 }
 
@@ -464,9 +468,15 @@ else {
     $env:ALPHA_SMOKE_RECEIPT = $script:ReceiptPath
 }
 Add-Stage "RootSafetyCheck" "Passed" "RootSafetyPassed" "Smoke output root is outside the repository and not under a reparse-point ancestor." @{ outputDirectory = $script:OutputRoot }
-Add-Stage "SqlCheck" "Skipped" "SqlUnavailable" "D-2a deterministic command uses the service-level in-memory smoke path, not SQL."
-Add-Stage "ApiCheck" "Skipped" "ApiUnavailable" "D-2a deterministic command does not start or call the API."
-Add-Gap "D-2a is service-level/in-memory; API and SQL persistence remain later proof."
+if ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
+    Add-Stage "SqlCheck" "Passed" "SqlAvailable" "REL-3 persisted mode uses the API test host with SQL-backed stores."
+    Add-Stage "ApiCheck" "Passed" "ApiAvailable" "REL-3 persisted mode drives the authenticated API routes in-process."
+}
+else {
+    Add-Stage "SqlCheck" "Skipped" "SqlUnavailable" "D-2a/REL-2 deterministic command uses the service-level in-memory smoke path, not SQL."
+    Add-Stage "ApiCheck" "Skipped" "ApiUnavailable" "D-2a/REL-2 deterministic command does not start or call the API."
+    Add-Gap "Service-level mode is in-memory; use -RunUntil Applied -RequireExistingAcceptedApproval for REL-3 SQL/API persistence."
+}
 
 if (-not (Invoke-CheckedCommand "ReadinessCheck" "ReadinessBlocked" {
     dotnet build IronDev.slnx --nologo --verbosity minimal
@@ -488,16 +498,24 @@ if ($RunUntil -eq "Readiness") {
     Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Passed" -ExitCode 0
 }
 
-Add-Stage "TicketPersist" "Skipped" "ProjectImportNotAutomated" "The deterministic smoke resolves the fixture ticket inside the service-level harness; API ticket persistence is a named gap."
+if ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
+    Add-Stage "TicketPersist" "Passed" "TicketPersisted" "REL-3 creates the BookSeller project and ticket through the authenticated API backed by SQL."
+}
+else {
+    Add-Stage "TicketPersist" "Skipped" "ProjectImportNotAutomated" "The deterministic smoke resolves the fixture ticket inside the service-level harness; API ticket persistence is a named gap."
+}
 
-$testFilter = if ($RunUntil -eq "Applied") {
+$testFilter = if ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
+    "FullyQualifiedName~AlphaSmokeApiPersistenceTests.Rel3_OneTicket_ReachesApplied_ThroughSqlBackedApi"
+}
+elseif ($RunUntil -eq "Applied") {
     "FullyQualifiedName~AlphaLoopSmokeTests.AlphaSmoke_OneTicket_ReachesApplied_WithDeterministicApproval"
 }
 else {
     "FullyQualifiedName~AlphaLoopSmokeTests.AlphaSmoke_OneTicket_ReachesHumanGate_WithADeterministicBuilder"
 }
 
-if ($RunUntil -eq "Applied") {
+if ($RunUntil -eq "Applied" -and -not $RequireExistingAcceptedApproval) {
     $env:ALPHA_SMOKE_APPROVAL_PHRASE = $ApprovalPhrase
 }
 else {
@@ -505,7 +523,14 @@ else {
 }
 
 if (-not (Invoke-CheckedCommand "SkeletonRunStart" "SkeletonRunStartFailed" {
-    dotnet test IronDev.IntegrationTests/IronDev.IntegrationTests.csproj `
+    $projectUnderTest = if ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
+        "IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj"
+    }
+    else {
+        "IronDev.IntegrationTests/IronDev.IntegrationTests.csproj"
+    }
+
+    dotnet test $projectUnderTest `
         --no-build `
         --filter $testFilter `
         --logger "console;verbosity=minimal" `
@@ -550,7 +575,17 @@ if ($runReceipt.gateState -ne "PausedForApproval") {
 Add-Stage "GateStateVerify" "Passed" "GateStateVerified" "Run halted at the human approval gate." @{ gateState = $runReceipt.gateState }
 
 if ($RunUntil -eq "Applied") {
-    if (-not $runReceipt.acceptedApprovalRecorded) {
+    if ($RequireExistingAcceptedApproval -and -not $runReceipt.sqlPersisted) {
+        Add-Stage "SqlCheck" "Failed" "SqlUnavailable" "REL-3 expected SQL-persisted run, event, and accepted-approval rows."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+
+    if ($RequireExistingAcceptedApproval -and -not $runReceipt.apiPersisted) {
+        Add-Stage "ApiCheck" "Failed" "ApiUnavailable" "REL-3 expected authenticated API-backed project, ticket, approval, continuation, apply, and report requests."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+
+    if (-not $runReceipt.acceptedApprovalRecorded -and -not $runReceipt.apiPersisted) {
         Add-Stage "ApprovalCheck" "Failed" "AcceptedApprovalRequired" "Applied mode expected a recorded accepted approval bound to the critic package."
         Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
     }
@@ -560,7 +595,12 @@ if ($RunUntil -eq "Applied") {
         Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
     }
 
-    Add-Stage "ApprovalCheck" "Passed" "AcceptedApprovalRecorded" "Hash-bound accepted approval was recorded explicitly for this deterministic smoke run." @{ acceptedApprovalId = $runReceipt.acceptedApprovalId }
+    if ($RequireExistingAcceptedApproval) {
+        Add-Stage "ApprovalCheck" "Passed" "AcceptedApprovalPersisted" "Hash-bound accepted approval was created through the API, persisted in SQL, and consumed by continuation." @{ acceptedApprovalId = $runReceipt.acceptedApprovalId }
+    }
+    else {
+        Add-Stage "ApprovalCheck" "Passed" "AcceptedApprovalRecorded" "Hash-bound accepted approval was recorded explicitly for this deterministic smoke run." @{ acceptedApprovalId = $runReceipt.acceptedApprovalId }
+    }
 
     if (-not $runReceipt.continuationRequested) {
         Add-Stage "ContinuationRequest" "Failed" "ContinuationRefused" "Continuation was not unblocked after accepted approval."
