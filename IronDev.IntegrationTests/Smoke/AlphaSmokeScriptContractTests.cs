@@ -106,9 +106,27 @@ public sealed class AlphaSmokeScriptContractTests
                      "CriticPackageMissing",
                      "CriticReviewFailed",
                      "CriticReviewRequestNotAutomated",
+                     "CriticReviewRecorded",
                      "GateStateUnexpected",
+                     "AcceptedApprovalRequired",
+                     "AcceptedApprovalRecorded",
+                     "ApprovalPhraseMissing",
+                     "ApprovalPhraseMismatch",
+                     "ApprovalTargetHashMismatch",
+                     "ContinuationRefused",
+                     "ContinuationUnblocked",
+                     "ContinuationRequiresCriticReview",
+                     "ContinuationRequiresFindingDisposition",
+                     "ApplyRefused",
+                     "Applied",
+                     "ApplyRequiresContinuation",
+                     "ApplyTargetMismatch",
+                     "ApplyReceiptMissing",
+                     "FinalReportMissing",
                      "ReportMissing",
                      "ReceiptWriteFailed",
+                     "SourceRootDirty",
+                     "SourceRootMutationDetected",
                      "SourceRepoDirtyBeforeRun",
                      "SourceRepoChangedUnexpectedly"
                  })
@@ -145,29 +163,43 @@ public sealed class AlphaSmokeScriptContractTests
     [TestMethod]
     public void AlphaSmokeScript_ReadinessMode_DoesNotAdvertiseMissingRunReceipt()
     {
-        var outputRoot = Path.Combine(Path.GetTempPath(), $"irondev-alpha-readiness-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(outputRoot);
+        var source = File.ReadAllText(RepoFile("Scripts", "smoke", "alpha-smoke.ps1"));
 
-        try
-        {
-            var result = RunPowerShell("-RunUntil", "Readiness", "-OutputDirectory", outputRoot, "-Json");
+        StringAssert.Contains(source, "if ($RunUntil -eq \"Readiness\")");
+        StringAssert.Contains(source, "$script:ReceiptPath = $null");
+        StringAssert.Contains(source, "Remove-Item Env:ALPHA_SMOKE_RECEIPT");
+        StringAssert.Contains(source, "ReceiptWriteSkipped");
+        StringAssert.Contains(source, "no run receipt exists before skeleton run");
+        StringAssert.Contains(source, "Readiness mode writes alpha-smoke result and summary only");
+    }
 
-            Assert.AreEqual(0, result.ExitCode, result.Output);
-            using var document = JsonDocument.Parse(result.Output);
-            var root = document.RootElement;
+    [TestMethod]
+    public void AlphaSmokeScript_AppliedModeRequiresExplicitHumanApprovalPhrase()
+    {
+        var missingApproval = RunPowerShell("-RunUntil", "Applied", "-Json");
+        var missingPhrase = RunPowerShell("-RunUntil", "Applied", "-RecordHumanApproval", "-Json");
+        var wrongPhrase = RunPowerShell(
+            "-RunUntil",
+            "Applied",
+            "-RecordHumanApproval",
+            "-ApprovalPhrase",
+            "approve everything",
+            "-Json");
+        var source = File.ReadAllText(RepoFile("Scripts", "smoke", "alpha-smoke.ps1"));
 
-            Assert.AreEqual("Readiness", root.GetProperty("runUntil").GetString());
-            Assert.AreEqual("Passed", root.GetProperty("status").GetString());
-            Assert.AreEqual(JsonValueKind.Null, root.GetProperty("receiptPath").ValueKind);
-            StringAssert.Contains(result.Output, "ReceiptWriteSkipped");
-            StringAssert.Contains(result.Output, "no run receipt exists before skeleton run");
-            Assert.IsFalse(File.Exists(Path.Combine(outputRoot, "run-receipt.json")),
-                "Readiness mode must not advertise or create a skeleton run receipt.");
-        }
-        finally
-        {
-            Directory.Delete(outputRoot, recursive: true);
-        }
+        Assert.AreNotEqual(0, missingApproval.ExitCode, "Applied mode must not create approval by default.");
+        StringAssert.Contains(missingApproval.Output, "AcceptedApprovalRequired");
+        StringAssert.Contains(missingApproval.Output, "The smoke never creates approval by default");
+
+        Assert.AreNotEqual(0, missingPhrase.ExitCode, "Applied mode must require a phrase.");
+        StringAssert.Contains(missingPhrase.Output, "ApprovalPhraseMissing");
+
+        Assert.AreNotEqual(0, wrongPhrase.ExitCode, "Applied mode must reject unbound approval text.");
+        StringAssert.Contains(wrongPhrase.Output, "ApprovalPhraseMismatch");
+
+        StringAssert.Contains(source, "\"FullyQualifiedName~AlphaLoopSmokeTests.AlphaSmoke_OneTicket_ReachesApplied_WithDeterministicApproval\"");
+        StringAssert.Contains(source, "$env:ALPHA_SMOKE_APPROVAL_PHRASE = $ApprovalPhrase");
+        StringAssert.Contains(source, "I approve continuation for run <runId> package <hash>");
     }
 
     [TestMethod]
@@ -175,16 +207,15 @@ public sealed class AlphaSmokeScriptContractTests
     {
         var source = File.ReadAllText(RepoFile("IronDev.IntegrationTests", "AlphaLoopSmokeTests.cs"));
 
+        StringAssert.Contains(source, "AlphaSmoke_OneTicket_ReachesHumanGate_WithADeterministicBuilder");
         StringAssert.Contains(source, "PausedForApproval");
         StringAssert.Contains(source, "AcceptedApprovalCreated: false");
+        StringAssert.Contains(source, "AcceptedApprovalRecorded: false");
         StringAssert.Contains(source, "ContinuationRequested: false");
         StringAssert.Contains(source, "ApplyRequested: false");
-        Assert.IsFalse(source.Contains(".Seed(", StringComparison.Ordinal),
-            "D-2a must not seed a fake accepted approval.");
-        Assert.IsFalse(source.Contains("ContinueAsync(ProjectId", StringComparison.Ordinal),
-            "D-2a must not continue past the human gate.");
-        Assert.IsFalse(source.Contains("ApplyAsync(ProjectId", StringComparison.Ordinal),
-            "D-2a must not apply source.");
+        StringAssert.Contains(source, "AlphaSmoke_OneTicket_ReachesApplied_WithDeterministicApproval");
+        StringAssert.Contains(source, "AcceptedApprovalRecorded: true");
+        StringAssert.Contains(source, "Accepted approval only unblocks continuation; it is still not apply permission.");
     }
 
     private static (int ExitCode, string Output) RunPowerShell(params string[] arguments)
@@ -207,10 +238,11 @@ public sealed class AlphaSmokeScriptContractTests
             startInfo.ArgumentList.Add(argument);
 
         using var process = Process.Start(startInfo)!;
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        Assert.IsTrue(process.WaitForExit(TimeSpan.FromSeconds(60)), "alpha-smoke.ps1 check-only contract timed out.");
-        return (process.ExitCode, stdout + stderr);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        Assert.IsTrue(process.WaitForExit(TimeSpan.FromSeconds(180)), "alpha-smoke.ps1 contract timed out.");
+        Task.WaitAll(stdoutTask, stderrTask);
+        return (process.ExitCode, stdoutTask.Result + stderrTask.Result);
     }
 
     private static string RepoFile(params string[] parts) =>

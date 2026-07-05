@@ -4,14 +4,17 @@ param(
     [string]$Ticket = "validate-book",
     [ValidateSet("Deterministic", "Live")]
     [string]$ModelMode = "Deterministic",
-    [ValidateSet("CheckOnly", "Readiness", "Gate", "Report")]
+    [ValidateSet("CheckOnly", "Readiness", "Gate", "Report", "Applied")]
     [string]$RunUntil,
     [string]$ApiBaseUrl = "http://localhost:5118",
     [string]$OutputDirectory,
     [switch]$Json,
     [switch]$Markdown,
     [string]$ExistingTicketId,
-    [string]$ExistingRunId
+    [string]$ExistingRunId,
+    [switch]$RequireExistingAcceptedApproval,
+    [switch]$RecordHumanApproval,
+    [string]$ApprovalPhrase
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,7 +53,23 @@ $script:KnownReasonCodes = @(
     "CriticPackageMissing",
     "CriticReviewFailed",
     "CriticReviewRequestNotAutomated",
+    "CriticReviewRecorded",
     "GateStateUnexpected",
+    "AcceptedApprovalRequired",
+    "AcceptedApprovalRecorded",
+    "ApprovalPhraseMissing",
+    "ApprovalPhraseMismatch",
+    "ApprovalTargetHashMismatch",
+    "ContinuationRefused",
+    "ContinuationUnblocked",
+    "ContinuationRequiresCriticReview",
+    "ContinuationRequiresFindingDisposition",
+    "ApplyRefused",
+    "Applied",
+    "ApplyRequiresContinuation",
+    "ApplyTargetMismatch",
+    "ApplyReceiptMissing",
+    "FinalReportMissing",
     "ReportMissing",
     "ReceiptWriteFailed",
     "ProjectImportNotAutomated",
@@ -62,6 +81,8 @@ $script:KnownReasonCodes = @(
     "TestsFailed",
     "CriticReviewReturnedFindings",
     "ReportHasNamedGaps",
+    "SourceRootDirty",
+    "SourceRootMutationDetected",
     "SourceRepoDirtyBeforeRun",
     "SourceRepoChangedUnexpectedly"
 )
@@ -392,10 +413,35 @@ if ($Project -ne "BookSeller") {
     Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
 }
 
-$repoStatus = git -C $repoRoot status --porcelain
-if (-not [string]::IsNullOrWhiteSpace($repoStatus)) {
-    Add-Stage "RepoCheck" "Blocked" "SourceRepoDirtyBeforeRun" "The source repository has uncommitted changes. Commit/stash them before running mutation-shaped smoke."
-    Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+if ($RunUntil -eq "Applied") {
+    if ($RequireExistingAcceptedApproval) {
+        Add-Stage "ApprovalCheck" "Blocked" "AcceptedApprovalRequired" "REL-2 service-level deterministic smoke cannot consume an existing persisted approval. Use -RecordHumanApproval with the exact approval phrase template, or wait for REL-3 SQL/API persistence."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+
+    if (-not $RecordHumanApproval) {
+        Add-Stage "ApprovalCheck" "Blocked" "AcceptedApprovalRequired" "Applied mode requires explicit -RecordHumanApproval. The smoke never creates approval by default."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+
+    if ([string]::IsNullOrWhiteSpace($ApprovalPhrase)) {
+        Add-Stage "ApprovalCheck" "Blocked" "ApprovalPhraseMissing" "Applied mode requires -ApprovalPhrase `"I approve continuation for run <runId> package <hash>`"."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+
+    $expectedApprovalPhraseTemplate = "I approve continuation for run <runId> package <hash>"
+    if ($ApprovalPhrase -ne $expectedApprovalPhraseTemplate) {
+        Add-Stage "ApprovalCheck" "Blocked" "ApprovalPhraseMismatch" "Approval phrase must exactly match the documented template so the smoke can bind it to the generated run id and package hash."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+}
+
+if ($RunUntil -in @("Gate", "Report", "Applied")) {
+    $repoStatus = git -C $repoRoot status --porcelain
+    if (-not [string]::IsNullOrWhiteSpace($repoStatus)) {
+        Add-Stage "RepoCheck" "Blocked" "SourceRepoDirtyBeforeRun" "The source repository has uncommitted changes. Commit/stash them before running mutation-shaped smoke."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
@@ -444,10 +490,24 @@ if ($RunUntil -eq "Readiness") {
 
 Add-Stage "TicketPersist" "Skipped" "ProjectImportNotAutomated" "The deterministic smoke resolves the fixture ticket inside the service-level harness; API ticket persistence is a named gap."
 
+$testFilter = if ($RunUntil -eq "Applied") {
+    "FullyQualifiedName~AlphaLoopSmokeTests.AlphaSmoke_OneTicket_ReachesApplied_WithDeterministicApproval"
+}
+else {
+    "FullyQualifiedName~AlphaLoopSmokeTests.AlphaSmoke_OneTicket_ReachesHumanGate_WithADeterministicBuilder"
+}
+
+if ($RunUntil -eq "Applied") {
+    $env:ALPHA_SMOKE_APPROVAL_PHRASE = $ApprovalPhrase
+}
+else {
+    Remove-Item Env:ALPHA_SMOKE_APPROVAL_PHRASE -ErrorAction SilentlyContinue
+}
+
 if (-not (Invoke-CheckedCommand "SkeletonRunStart" "SkeletonRunStartFailed" {
     dotnet test IronDev.IntegrationTests/IronDev.IntegrationTests.csproj `
         --no-build `
-        --filter "FullyQualifiedName~AlphaLoopSmokeTests" `
+        --filter $testFilter `
         --logger "console;verbosity=minimal" `
         --logger "trx;LogFileName=alpha-smoke.trx" `
         --results-directory $script:OutputRoot
@@ -470,8 +530,18 @@ if ([string]::IsNullOrWhiteSpace($runReceipt.criticPackageSha256)) {
 }
 Add-Stage "CriticPackageFetch" "Passed" "CriticPackageFetched" "Critic package hash is present." @{ criticPackageSha256 = $runReceipt.criticPackageSha256 }
 
-Add-Stage "CriticReviewRequest" "Skipped" "CriticReviewRequestNotAutomated" "D-2a prepares the critic package but does not simulate or request the independent critic review."
-Add-Gap "Independent critic review request remains a later product/API proof."
+if ($RunUntil -eq "Applied") {
+    if (-not $runReceipt.criticReviewRecorded) {
+        Add-Stage "CriticReviewRequest" "Failed" "CriticReviewFailed" "Applied mode expected a deterministic critic review record, but the receipt did not name one."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+
+    Add-Stage "CriticReviewRequest" "Passed" "CriticReviewRecorded" "Deterministic smoke recorded a clean critic review before continuation. This is service-level smoke evidence, not approval."
+}
+else {
+    Add-Stage "CriticReviewRequest" "Skipped" "CriticReviewRequestNotAutomated" "D-2a prepares the critic package but does not simulate or request the independent critic review."
+    Add-Gap "Independent critic review request remains a later product/API proof."
+}
 
 if ($runReceipt.gateState -ne "PausedForApproval") {
     Add-Stage "GateStateVerify" "Failed" "GateStateUnexpected" "Expected PausedForApproval but got '$($runReceipt.gateState)'."
@@ -479,8 +549,45 @@ if ($runReceipt.gateState -ne "PausedForApproval") {
 }
 Add-Stage "GateStateVerify" "Passed" "GateStateVerified" "Run halted at the human approval gate." @{ gateState = $runReceipt.gateState }
 
+if ($RunUntil -eq "Applied") {
+    if (-not $runReceipt.acceptedApprovalRecorded) {
+        Add-Stage "ApprovalCheck" "Failed" "AcceptedApprovalRequired" "Applied mode expected a recorded accepted approval bound to the critic package."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+
+    if ($runReceipt.approvalTargetHash -ne $runReceipt.criticPackageSha256) {
+        Add-Stage "ApprovalCheck" "Failed" "ApprovalTargetHashMismatch" "Approval target hash did not match the critic package hash."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+
+    Add-Stage "ApprovalCheck" "Passed" "AcceptedApprovalRecorded" "Hash-bound accepted approval was recorded explicitly for this deterministic smoke run." @{ acceptedApprovalId = $runReceipt.acceptedApprovalId }
+
+    if (-not $runReceipt.continuationRequested) {
+        Add-Stage "ContinuationRequest" "Failed" "ContinuationRefused" "Continuation was not unblocked after accepted approval."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+
+    Add-Stage "ContinuationRequest" "Passed" "ContinuationUnblocked" "Continuation consumed the accepted approval. Continuation is not apply permission."
+
+    if (-not $runReceipt.applyRequested -or $runReceipt.finalState -ne "Applied") {
+        Add-Stage "ApplyRequest" "Failed" "ApplyRefused" "Controlled apply did not reach Applied."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+
+    if ([string]::IsNullOrWhiteSpace($runReceipt.applyReceiptPath) -or -not (Test-Path -LiteralPath $runReceipt.applyReceiptPath)) {
+        Add-Stage "ApplyRequest" "Failed" "ApplyReceiptMissing" "Applied mode did not leave the apply-copy receipt on disk."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+
+    Add-Stage "ApplyRequest" "Passed" "Applied" "Controlled copy-only apply reached Applied and left an apply receipt." @{ applyReceiptPath = $runReceipt.applyReceiptPath; applyReceiptSha256 = $runReceipt.applyReceiptSha256 }
+}
+
 if (-not $runReceipt.reportReconstructable) {
     Add-Stage "ReportFetch" "Failed" "ReportMissing" "The run report could not be reconstructed."
+    Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+}
+if ($RunUntil -eq "Applied" -and -not $runReceipt.loopComplete) {
+    Add-Stage "ReportFetch" "Failed" "FinalReportMissing" "The final report did not reconstruct a complete applied loop."
     Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
 }
 Add-Stage "ReportFetch" "Passed" "ReportFetched" "Run report was reconstructed by the smoke test."

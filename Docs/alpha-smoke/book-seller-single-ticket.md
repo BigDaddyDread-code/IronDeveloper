@@ -1,8 +1,8 @@
 # BookSeller Single-Ticket Smoke
 
-This page documents the current D-2a deterministic single-ticket path.
+This page documents the current deterministic single-ticket path.
 
-## Command
+## Gate Command
 
 ```powershell
 Scripts/smoke/alpha-smoke.ps1 `
@@ -11,6 +11,20 @@ Scripts/smoke/alpha-smoke.ps1 `
   -ModelMode Deterministic `
   -RunUntil Gate
 ```
+
+## Applied Command
+
+```powershell
+Scripts/smoke/alpha-smoke.ps1 `
+  -Project BookSeller `
+  -Ticket validate-book `
+  -ModelMode Deterministic `
+  -RunUntil Applied `
+  -RecordHumanApproval `
+  -ApprovalPhrase "I approve continuation for run <runId> package <hash>"
+```
+
+The placeholder phrase is intentional. The smoke binds `<runId>` and `<hash>` to the generated run ID and critic package hash after the gate produces them. Without `-RecordHumanApproval`, applied mode blocks with `AcceptedApprovalRequired`.
 
 ## Expected Stages
 
@@ -31,10 +45,15 @@ The script reports named stages:
 - `CriticPackageFetch`
 - `CriticReviewRequest`
 - `GateStateVerify`
+- `ApprovalCheck` for applied mode
+- `ContinuationRequest` for applied mode
+- `ApplyRequest` for applied mode
 - `ReportFetch`
 - `ReceiptWrite`
 
-Some stages are intentionally `Skipped` in D-2a. In particular, API, SQL, ticket persistence, and critic review request are named gaps because this slice proves service-level deterministic plumbing to the gate.
+Some stages are intentionally `Skipped` in gate mode. In particular, API, SQL, ticket persistence, and critic review request are named gaps because gate mode proves service-level deterministic plumbing to the halt.
+
+Applied mode still names API, SQL, and ticket persistence as gaps. It records deterministic critic-review and human-approval evidence inside the service-level smoke only.
 
 ## Expected Gate State
 
@@ -43,6 +62,14 @@ The run must halt at:
 ```text
 PausedForApproval
 ```
+
+Applied mode must finish at:
+
+```text
+Applied
+```
+
+That final state is allowed only after the smoke records critic review evidence, records a hash-bound accepted approval, requests continuation, and then requests the controlled copy-only apply spine.
 
 The script must not create accepted approval, request continuation, or apply source.
 
@@ -68,9 +95,22 @@ approvalTargetHash
 
 Those values should match because any later human approval must bind to the critic package hash.
 
+## Finding The Apply Receipt
+
+After an applied run, open `run-receipt.json` and read:
+
+```text
+applyReceiptPath
+applyReceiptSha256
+acceptedApprovalId
+loopComplete
+```
+
+The `apply-copy.json` receipt is part of the workspace evidence chain. It is not commit, push, release, or deployment authority.
+
 ## Verifying Source Was Not Mutated
 
-The smoke blocks if the source worktree is dirty before gate mode starts.
+The smoke blocks if the IronDev source worktree is dirty before mutation-shaped mode starts.
 
 The smoke also checks the source worktree after the gate run and fails with `SourceRepoChangedUnexpectedly` if the repository changed during smoke execution.
 
@@ -84,4 +124,6 @@ The smoke output directory should be outside the repository. No source-root arti
 
 ## Boundary
 
-The deterministic model may fake model words. It must not fake approval, policy satisfaction, run completion, source apply, release, deployment, or workflow continuation.
+The deterministic model may fake model words. It must not fake approval, policy satisfaction, release, deployment, commit, or push.
+
+Applied mode records a deterministic human approval only when explicitly requested. Approval is continuation input; apply remains a separate governed act.

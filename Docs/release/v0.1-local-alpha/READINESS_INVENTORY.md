@@ -15,6 +15,8 @@ This inventory assumes the repository baseline includes:
 - D-1.1: SkeletonRun CI lane.
 - D-2a: repeatable deterministic BookSeller smoke command to the human approval gate.
 - Block J local developer reliability scripts and safety contracts through J10.
+- REL-1: release-facing root-safety gate vocabulary for required local roots.
+- REL-2: deterministic service-level BookSeller path to `Applied` with explicit phrase-bound approval.
 
 ## Classification Vocabulary
 
@@ -32,8 +34,8 @@ Current state:
 
 ```text
 Core governed loop: alive.
-Deterministic single-ticket smoke: repeatable to human gate.
-Release path to Applied: blocked.
+Deterministic single-ticket smoke: repeatable to human gate and service-level Applied.
+Release path to Applied: partially proven, not SQL/API-persisted yet.
 Fresh developer repeatability: partially proven, not dogfood-proven.
 External alpha: blocked.
 ```
@@ -58,13 +60,13 @@ The next useful work is not more abstract governance. The next useful work is cl
 | workspace execution | Proven | D-series smoke uses disposable workspace execution with real `dotnet build` and `dotnet test` against copied BookSeller source. | Controlled apply to the real target source path remains separate. |
 | build/test evidence | Proven | D-series smoke and SkeletonRun lane execute build/test evidence paths. | Release path must still carry this evidence through persistent reports and receipts. |
 | critic package | Proven | D-2a receipt includes critic package hash and approval target hash; gate smoke verifies package presence. | Package existence is not a critic review. |
-| critic review | Partially proven | Critic-review contracts and hard-stop receipts exist; continuation/apply require critic review in later P3 work. | D-2a does not automate or persist an independent critic review request/record in the release journey. |
+| critic review | Partially proven | Critic-review contracts and hard-stop receipts exist; REL-2 records deterministic clean critic review evidence before continuation. | REL-2 critic review evidence is service-level deterministic smoke evidence, not an external critic service or SQL/API persisted review. |
 | finding disposition | Not proven | Finding disposition models/traces exist. | Release path does not prove required findings are dispositioned before continuation/apply. |
-| accepted approval | Partially proven | Approval records/evaluators exist; D-2a correctly does not create accepted approval. | Release path has not proven live user approval recording and hash-matched consumption through the product path. |
-| continuation | Partially proven | Workflow continuation contracts exist and hard-stop receipts require critic review/approval. | D-2a stops at the human gate; continuation is not requested in the repeatable smoke. |
-| controlled apply | Partially proven | Source apply and controlled apply contracts/executors exist. | Release path does not prove a ticket with hash-matched accepted human approval evidence reaches `Applied` without hidden authority. |
-| report reconstruction | Partially proven | D-2a verifies report reconstruction before smoke success. | Product SQL/API final report after continuation/apply is not proven. |
-| receipt writing | Proven | D-2a writes `run-receipt.json`, `alpha-smoke-result.json`, and `alpha-smoke-summary.md`; CI receipts exist. | Final release receipt tying setup, approval, continuation, apply, and report is not proven. |
+| accepted approval | Partially proven | Approval records/evaluators exist; REL-2 requires an explicit phrase-bound approval before recording in-memory accepted approval evidence. | Live user approval recording through SQL/API/product UI is not proven. |
+| continuation | Partially proven | REL-2 requests continuation only after critic review evidence and hash-matched accepted approval exist. | SQL/API persisted continuation and restart-safe report reconstruction are not proven. |
+| controlled apply | Partially proven | REL-2 reaches `Applied` through the governed copy-only apply spine and records the apply receipt path/hash. | SQL/API persisted source-apply receipt and product-path apply are not proven. |
+| report reconstruction | Partially proven | REL-2 reconstructs the final applied report after continuation/apply. | Product SQL/API final report after restart is not proven. |
+| receipt writing | Proven | D-2a writes `run-receipt.json`, `alpha-smoke-result.json`, and `alpha-smoke-summary.md`; REL-2 adds approval/apply receipt references; CI receipts exist. | Final release receipt tying setup, SQL/API state, approval, continuation, apply, and report is not proven. |
 | live model | Blocked | D-2a explicitly blocks `-ModelMode Live` with `LiveModelModeNotImplemented`. | Live model path must either reach gate safely or the release must be explicitly scoped as deterministic-only preview. |
 | CI lanes | Proven | The visible CI lanes include governance-boundary, fast-unit, SQL integration, full SQL integration, frontend contract, and SkeletonRun. | CI is evidence only; it does not prove a fresh local user journey. |
 | fresh dogfood docs | Not proven | Alpha-smoke docs exist for D-2a and Block J receipts exist. | No `DOGFOOD-ALPHA-LOCAL-001` transcript from fresh checkout exists yet. |
@@ -74,8 +76,8 @@ The next useful work is not more abstract governance. The next useful work is cl
 The following are release blockers unless explicitly descoped in a later release decision:
 
 1. Root safety must become an invoked release gate, not only a present contract and local smoke preflight.
-2. A deterministic single-ticket path must reach `Applied` through continuation and controlled apply without hidden approval.
-3. SQL/API persistence must prove ticket, run, receipt, and report state across the product path.
+2. SQL/API persistence must prove the deterministic single-ticket path reaches `Applied` across ticket, run, approval, receipt, and report state.
+3. The product path must prove the same gate order REL-2 proves at service level: critic review evidence, accepted approval, continuation, then apply.
 4. Live model mode must either reach the gate safely or be explicitly scoped out as a deterministic-only preview.
 5. Chat must propose work, a human must confirm the ticket, and only the confirmed ticket may become governed work.
 6. Fresh-machine setup and doctor flow must produce named next safe actions without author-only knowledge.
@@ -91,6 +93,7 @@ Scripts/local/weaviate-local.ps1 -CheckOnly
 Scripts/local/doctor-local.ps1 -Markdown
 Scripts/smoke/alpha-smoke.ps1 -CheckOnly
 Scripts/smoke/alpha-smoke.ps1 -Project BookSeller -Ticket validate-book -ModelMode Deterministic -RunUntil Gate
+Scripts/smoke/alpha-smoke.ps1 -Project BookSeller -Ticket validate-book -ModelMode Deterministic -RunUntil Applied -RecordHumanApproval -ApprovalPhrase "I approve continuation for run <runId> package <hash>"
 ```
 
 These commands help a developer understand the current local state. They do not create approval, policy satisfaction, source apply authority, release approval, deployment readiness, or product success.
@@ -119,8 +122,8 @@ These commands help a developer understand the current local state. They do not 
 
 ## Next Intended PR
 
-REL-1: J10 root safety release gate.
+REL-3: SQL/API persisted alpha smoke.
 
-Review line: A safe root is a precondition for evidence. It is not evidence, approval, or execution authority.
+Review line: Persistence proves the trail survives the product path. It does not grant approval or authority.
 
-Killjoy: If IronDev cannot prove where it is writing, it does not get to write.
+Killjoy: A smoke that only works in memory is a rehearsal, not a release path.

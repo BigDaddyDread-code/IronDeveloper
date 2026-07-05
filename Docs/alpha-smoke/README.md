@@ -2,9 +2,9 @@
 
 The alpha smoke path makes the D-series dogfood run repeatable from a fresh checkout.
 
-It proves a narrow thing: IronDev can run the BookSeller `validate-book` fixture through the governed skeleton path until the human approval gate using deterministic model output.
+It proves a narrow thing: IronDev can run the BookSeller `validate-book` fixture through the governed skeleton path using deterministic model output. Gate mode stops at the human approval gate. REL-2 applied mode records an explicit deterministic human approval phrase, requests continuation, and applies through the copy-only workspace spine.
 
-It does not prove alpha readiness, release readiness, deployment readiness, approval, policy satisfaction, workflow continuation, controlled source apply, live-model quality, or batch completion.
+It does not prove alpha readiness, release readiness, deployment readiness, policy satisfaction, live-model quality, SQL/API persistence, product UI approval recording, commit, push, release, deployment, or batch completion.
 
 ## Current Runnable Path
 
@@ -24,6 +24,18 @@ Scripts/smoke/alpha-smoke.ps1 `
   -RunUntil Gate
 ```
 
+Deterministic single-ticket applied smoke:
+
+```powershell
+Scripts/smoke/alpha-smoke.ps1 `
+  -Project BookSeller `
+  -Ticket validate-book `
+  -ModelMode Deterministic `
+  -RunUntil Applied `
+  -RecordHumanApproval `
+  -ApprovalPhrase "I approve continuation for run <runId> package <hash>"
+```
+
 Useful output switches:
 
 ```powershell
@@ -31,7 +43,7 @@ Scripts/smoke/alpha-smoke.ps1 -CheckOnly -Json
 Scripts/smoke/alpha-smoke.ps1 -CheckOnly -Markdown
 ```
 
-By default, gate-mode output is written outside the repository under the local app-data IronDev alpha-smoke folder.
+By default, mutation-shaped smoke output is written outside the repository under the local app-data IronDev alpha-smoke folder.
 
 ## Prerequisites
 
@@ -41,9 +53,9 @@ By default, gate-mode output is written outside the repository under the local a
 - Clean source worktree before running `-RunUntil Gate`.
 - No secrets required for deterministic mode.
 
-Node, SQL, API, UI, and Weaviate are not required by the current D-2a deterministic service-level smoke. That is an honest current gap, not a hidden pass.
+Node, SQL, API, UI, and Weaviate are not required by the current deterministic service-level smoke. That is an honest current gap, not a hidden pass.
 
-## What The Current Gate Smoke Does
+## What The Gate Smoke Does
 
 1. Verifies the repo, toolchain, BookSeller sample, and BookSeller fixture ticket.
 2. Builds the IronDev solution.
@@ -56,15 +68,26 @@ Node, SQL, API, UI, and Weaviate are not required by the current D-2a determinis
 9. Verifies the run halted at `PausedForApproval`.
 10. Writes `run-receipt.json`, `alpha-smoke-result.json`, and `alpha-smoke-summary.md`.
 
+## What The Applied Smoke Adds
+
+1. Records deterministic clean critic review evidence.
+2. Requires `-RecordHumanApproval` and the exact hash-bound approval phrase template.
+3. Records an accepted approval bound to the generated run ID and critic package hash.
+4. Requests continuation through `TicketSkeletonRunService.ContinueAsync`.
+5. Requests controlled apply through `TicketSkeletonRunService.ApplyAsync`.
+6. Verifies the final report reconstructs the applied loop.
+7. Verifies the apply-copy receipt exists on disk.
+
 ## What It Does Not Do
 
 - It does not start API or UI.
 - It does not write tickets through the API.
 - It does not connect to SQL.
-- It does not request or record a critic review.
-- It does not create accepted approval.
-- It does not request continuation.
-- It does not apply to source.
+- Gate mode does not request or record a critic review.
+- Gate mode does not record accepted approval.
+- Gate mode does not request continuation.
+- Gate mode does not apply to source.
+- Applied mode records deterministic smoke evidence only; it does not prove product UI/API approval recording.
 - It does not release or deploy.
 
 ## Expected Artifacts

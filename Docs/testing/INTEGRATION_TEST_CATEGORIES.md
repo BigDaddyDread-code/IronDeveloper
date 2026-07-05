@@ -16,8 +16,8 @@ A label does not make a slow test safe.
 
 - Source files scanned: 621
 - Test classes found: 615
-- Test methods found: 9797
-- Category names found: 232
+- Test methods found: 9798
+- Category names found: 233
 
 ## G13 Category Changes
 
@@ -155,6 +155,14 @@ A label does not make a slow test safe.
 - REL-1 does not add SQL connectivity checks, SQL bootstrap, SQL rebuild, Weaviate bootstrap/rebuild, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, or production runtime behavior.
 - A safe root is a precondition for evidence. It is not evidence, approval, execution authority, or permission to mutate source.
 
+## REL-2 Deterministic Applied Smoke
+
+- Added focused `AlphaSmoke` and `ReleaseReadiness` metadata to the deterministic alpha loop smoke test.
+- REL-2 keeps the smoke `LongRunning`; it exercises real build/test and the copy-only apply spine against a disposable BookSeller source copy.
+- REL-2 verifies deterministic gate, critic review evidence, explicit human approval phrase, continuation, controlled apply, apply receipt, and final report reconstruction.
+- REL-2 does not add SQL/API persistence, live model proof, UI approval recording, commit, push, release, deployment, or batch completion.
+- Applied is evidence of a governed copy-only source apply. It is not commit, push, release, deployment, or alpha readiness.
+
 ## J04 Local Bootstrap Script
 
 - Added focused `ConfigBoundary` and `LocalBootstrap` metadata to the J04 local bootstrap script regression test.
@@ -240,6 +248,7 @@ A label does not make a slow test safe.
 | `AcceptedApprovalSqlStore` | 1 | 15 | 0 | 1 |
 | `AgentHandoff` | 3 | 53 | 0 | 3 |
 | `AgentHandoffStore` | 1 | 8 | 0 | 1 |
+| `AlphaSmoke` | 1 | 2 | 0 | 1 |
 | `ApiCliContract` | 3 | 24 | 0 | 3 |
 | `ApiCliReleaseGate` | 1 | 10 | 0 | 1 |
 | `ApplyDryRunAuthorityBoundary` | 1 | 4 | 0 | 1 |
@@ -311,7 +320,7 @@ A label does not make a slow test safe.
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
 | `LocalBootstrap` | 2 | 30 | 0 | 2 |
 | `LocalSql` | 1 | 16 | 0 | 1 |
-| `LongRunning` | 40 | 420 | 0 | 40 |
+| `LongRunning` | 40 | 421 | 0 | 40 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
 | `MemoryPromotionRequestPackage` | 1 | 7 | 0 | 1 |
@@ -391,7 +400,7 @@ A label does not make a slow test safe.
 | `Redaction` | 1 | 8 | 0 | 1 |
 | `Receipt` | 20 | 407 | 0 | 20 |
 | `ReleaseGateNegativeCampaign` | 1 | 30 | 0 | 1 |
-| `ReleaseReadiness` | 1 | 15 | 0 | 1 |
+| `ReleaseReadiness` | 2 | 17 | 0 | 2 |
 | `ReleaseReadinessApiRegression` | 1 | 6 | 0 | 1 |
 | `ReleaseReadinessCliRegression` | 1 | 4 | 0 | 1 |
 | `ReleaseReadinessDecisionRecordReadApi` | 1 | 17 | 0 | 1 |
