@@ -269,6 +269,14 @@ A label does not make a slow test safe.
 - DEMO-2b keeps live chat ticket creation explicit through `-CreateLiveChatTicket`; default seeding still does not create the live chat ticket ahead of the demo.
 - Demo seed history is evidence. It is not approval, policy satisfaction, workflow continuation, apply permission, release readiness, or deployment readiness.
 
+## DEMO-3 / DEMO-4 UI Journey Proof
+
+- Added focused Playwright coverage in `IronDev.TauriShell/tests/skeleton-run-stages.spec.ts`.
+- DEMO-3 proves the UI can drive controlled apply to a final report, show receipts, and hydrate a seeded Applied ticket from linked run evidence without copied IDs.
+- DEMO-4 proves demo-path empty/blocked states name a reason and next safe action, and the shell displays model-mode honestly.
+- This is Tauri browser proof with mocked API responses; it does not change MSTest category counts in the inventory below.
+- UI evidence is not approval, continuation authority, apply permission, release readiness, or deployment readiness.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |

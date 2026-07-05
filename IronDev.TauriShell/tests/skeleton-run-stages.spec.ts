@@ -114,6 +114,96 @@ test('a refused apply is shown honestly and the loop stays incomplete', async ({
   expect(state.applyRequested).toBe(true);
 });
 
+test('successful controlled apply opens the final report and receipt chain', async ({ page }) => {
+  await mockTicketWorkspace(page);
+  const state = await mockSkeletonRun(page, { continuationUnblocked: true });
+
+  await openTicketStage(page);
+  await page.getByTestId('flow.ticket.startRun').click();
+  await page.getByTestId('flow.build.toReview').click();
+
+  await expect(page.getByTestId('flow.review.requestApply')).toBeEnabled();
+  await page.getByTestId('flow.review.requestApply').click();
+
+  expect(state.applyRequested).toBe(true);
+  await expect(page.getByTestId('flow.done.report')).toContainText('Applied');
+  await expect(page.getByTestId('flow.done.report')).toContainText('Loop complete');
+  await expect(page.getByTestId('flow.done.receipts')).toContainText('source-apply-receipt');
+  await expect(page.getByText('commit, push, and release remain separate governed steps')).toBeVisible();
+});
+
+test('opening a seeded applied ticket hydrates the linked final report without copied ids', async ({ page }) => {
+  await mockTicketWorkspace(page, { ticketStatus: 'Applied', latestRun: { status: 'passed' } });
+  await mockSkeletonRun(page, { continuationUnblocked: true, initialApplied: true });
+  await page.route('**/irondev-api/api/governance/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: { items: [], totalCount: 0 }, errors: [] })
+    });
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('flow.board.columns')).toContainText('Done');
+  await expect(page.getByText('Add book sorting to catalog')).toBeVisible();
+
+  await page.getByText('Add book sorting to catalog').click();
+
+  await expect(page.getByTestId('flow.done.report')).toContainText('Applied');
+  await expect(page.getByTestId('flow.done.receipts')).toContainText('source-apply-receipt');
+  await page.getByTestId('flow.done.openGovernance').click();
+  await expect(page.getByTestId('flow.governanceHost')).toBeVisible();
+});
+
+test('board does not treat Completed as Applied done state', async ({ page }) => {
+  await mockTicketWorkspace(page, {
+    tickets: [
+      {
+        id: 42,
+        tenantId: 3,
+        projectId: 7,
+        title: 'Applied BookSeller ticket',
+        status: 'Applied',
+        acceptanceCriteria: 'Applied path has a controlled apply receipt.'
+      },
+      {
+        id: 43,
+        tenantId: 3,
+        projectId: 7,
+        title: 'Completed run without apply',
+        status: 'Completed',
+        acceptanceCriteria: 'Completed run must still not read as applied.'
+      }
+    ]
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('flow.board.column.done')).toContainText('Applied BookSeller ticket');
+  await expect(page.getByTestId('flow.board.column.done')).not.toContainText('Completed run without apply');
+  await expect(page.getByTestId('flow.board.column.ticket')).toContainText('Completed run without apply');
+});
+
+test('blocked ticket and empty board states name the next safe action', async ({ page }) => {
+  await mockTicketWorkspace(page, {
+    readiness: { isReady: false, message: 'Project profile is missing.', blockingIssues: ['Project profile is missing.'] }
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('flow.modelMode')).toContainText('Model mode: Deterministic local alpha');
+  await expect(page.getByTestId('flow.board.empty.done')).toContainText('No applied tickets yet');
+  await expect(page.getByTestId('flow.board.empty.done')).toContainText('Next safe action');
+
+  await page.getByText('Add book sorting to catalog').click();
+
+  await expect(page.getByTestId('flow.ticket.readiness')).toContainText('Next safe action');
+  await expect(page.getByTestId('flow.ticket.linkedRun')).toContainText('No linked run evidence yet');
+  await expect(page.getByTestId('flow.ticket.startRun')).toBeDisabled();
+  await expect(page.getByTestId('flow.ticket.gate')).toContainText('backend explains the block');
+});
+
 async function openTicketStage(page: Page) {
   await page.goto('/');
   await page.getByText('Add book sorting to catalog').click();
@@ -123,6 +213,7 @@ async function openTicketStage(page: Page) {
 interface SkeletonMockState {
   continuationUnblocked: boolean;
   applyRefusedReason?: string;
+  applied: boolean;
   applyRequested: boolean;
   approvalRequestBody: Record<string, unknown>;
   criticReviews: unknown[];
@@ -137,6 +228,7 @@ async function mockSkeletonRun(
   options: {
     continuationUnblocked: boolean;
     applyRefusedReason?: string;
+    initialApplied?: boolean;
     withFinding?: boolean;
     uncovered?: boolean;
   }
@@ -144,6 +236,7 @@ async function mockSkeletonRun(
   const state: SkeletonMockState = {
     continuationUnblocked: options.continuationUnblocked,
     applyRefusedReason: options.applyRefusedReason,
+    applied: options.initialApplied ?? false,
     applyRequested: false,
     approvalRequestBody: {},
     criticReviews: options.withFinding
@@ -189,8 +282,8 @@ async function mockSkeletonRun(
         runId: RUN_ID,
         projectId: 7,
         ticketId: 42,
-        status: state.continuationUnblocked ? 'Completed' : 'PausedForApproval',
-        summary: 'Halted for approval.',
+        status: state.applied ? 'Applied' : state.continuationUnblocked ? 'Completed' : 'PausedForApproval',
+        summary: state.applied ? 'Applied through the governed workspace spine.' : 'Halted for approval.',
         timeline: [
           { timestampUtc: '2026-07-04T10:00:00Z', eventType: 'RunStarted', message: 'Skeleton run started for ticket 42.' },
           { timestampUtc: '2026-07-04T10:01:00Z', eventType: 'TestsAuthored', message: '1 test file(s) authored.' },
@@ -219,9 +312,24 @@ async function mockSkeletonRun(
         },
         criticReviews: state.criticReviews,
         findingDispositions: state.findingDispositions,
-        apply: null,
+        apply: state.applied
+          ? {
+              applied: true,
+              workspacePath: 'C:/IronDevTestWorkspaces/demo-run',
+              refusedReason: '',
+              stages: [
+                { stage: 'pre-state', succeeded: true, errors: '' },
+                { stage: 'copy-only-apply', succeeded: true, errors: '' },
+                { stage: 'post-state', succeeded: true, errors: '' }
+              ],
+              receipts: [
+                { name: 'source-apply-receipt', path: 'evidence/source-apply-receipt.json', existsOnDisk: true },
+                { name: 'post-state-receipt', path: 'evidence/post-state-receipt.json', existsOnDisk: true }
+              ]
+            }
+          : null,
         gaps: [],
-        loopComplete: false,
+        loopComplete: state.applied,
         boundary: 'A report is reconstruction from durable evidence.'
       })
     });
@@ -365,6 +473,10 @@ async function mockSkeletonRun(
 
   await page.route(`**/irondev-api/api/projects/7/tickets/42/skeleton-runs/${RUN_ID}/apply`, async (route) => {
     state.applyRequested = true;
+    if (!state.applyRefusedReason) {
+      state.applied = true;
+      state.continuationUnblocked = true;
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -379,7 +491,22 @@ async function mockSkeletonRun(
   return state;
 }
 
-async function mockTicketWorkspace(page: Page) {
+async function mockTicketWorkspace(
+  page: Page,
+  options: {
+    ticketStatus?: string;
+    tickets?: Array<{
+      id: number;
+      tenantId: number;
+      projectId: number;
+      title: string;
+      status: string;
+      acceptanceCriteria: string;
+    }>;
+    latestRun?: { status: string };
+    readiness?: { isReady: boolean; message: string; blockingIssues: string[] };
+  } = {}
+) {
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
     window.localStorage.setItem('irondev.tenantId', '3');
@@ -435,23 +562,59 @@ async function mockTicketWorkspace(page: Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([
-        {
-          id: 42,
-          tenantId: 3,
-          projectId: 7,
-          title: 'Add book sorting to catalog',
-          status: 'Draft',
-          acceptanceCriteria: 'Catalog sorts by title ascending'
-        }
-      ])
+      body: JSON.stringify(
+        options.tickets ?? [
+          {
+            id: 42,
+            tenantId: 3,
+            projectId: 7,
+            title: 'Add book sorting to catalog',
+            status: options.ticketStatus ?? 'Draft',
+            acceptanceCriteria: 'Catalog sorts by title ascending'
+          }
+        ]
+      )
     });
   });
   await page.route('**/irondev-api/api/projects/7/tickets/42/build-readiness', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ isReady: true, message: 'Ready to build.', blockingIssues: [] })
+      body: JSON.stringify(options.readiness ?? { isReady: true, message: 'Ready to build.', blockingIssues: [] })
+    });
+  });
+  await mockTicketEvidenceSummary(page, options.latestRun ?? null);
+}
+
+async function mockTicketEvidenceSummary(page: Page, latestRun: { status: string } | null) {
+  await page.route('**/irondev-api/api/projects/7/tickets/42/evidence-summary', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ticketId: 42,
+        status: 'loaded',
+        message: latestRun ? 'Execution evidence is available for this ticket.' : 'No linked execution evidence is available yet.',
+        latestRun: latestRun
+          ? {
+              runId: RUN_ID,
+              traceId: null,
+              title: 'Skeleton run started for ticket 42.',
+              status: latestRun.status,
+              recommendation: latestRun.status === 'needsHumanReview' ? 'Human review required.' : 'Review latest run.',
+              startedUtc: '2026-07-04T10:00:00Z',
+              completedUtc: '2026-07-04T10:05:00Z'
+            }
+          : null,
+        latestPromotionPackage: null,
+        linkedTraceCount: 0,
+        linkedDocumentCount: 0,
+        linkedDecisionCount: 0,
+        linkedRunCount: latestRun ? 1 : 0,
+        hasBlockingWarnings: !latestRun,
+        blockedActions: latestRun ? [] : ['No execution run is linked to this ticket yet.'],
+        nextSafeAction: latestRun ? 'Review latest run' : 'Start disposable run'
+      })
     });
   });
 }
