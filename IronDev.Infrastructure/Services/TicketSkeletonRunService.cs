@@ -206,6 +206,16 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             }))
             .ToList();
 
+        // The orchestrator owns the run lifecycle: it moves Created → Running as the
+        // build/test begins (the workspace no longer does this — see OwnsRunLifecycle),
+        // and will move Running → PausedForApproval once evidence is packaged.
+        await _runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = run.RunId,
+            State = RunLifecycleState.Running,
+            Summary = "Skeleton build and test running in a disposable workspace."
+        }, cancellationToken).ConfigureAwait(false);
+
         var workspaceResult = await _workspaces.RunAsync(new DisposableWorkspaceRunRequest
         {
             RunId = run.RunId,
@@ -215,6 +225,10 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             CleanWorkspaceOnSuccess = true,
             PreserveWorkspaceOnFailure = true,
             PreserveWorkspaceOnCancellation = true,
+            // The orchestrator owns this run's lifecycle — the workspace supplies
+            // evidence and a result, but must not drive the run to Completed while
+            // the orchestrator still intends to pause it at the human gate.
+            OwnsRunLifecycle = false,
             FileWrites = allWrites,
             Commands = DotNetCommandProfile.BuildAndTest(project.LocalPath, ReadTimeout("BuildTimeoutSeconds"), ReadTimeout("TestTimeoutSeconds"))
         }, cancellationToken).ConfigureAwait(false);

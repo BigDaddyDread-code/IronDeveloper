@@ -68,12 +68,13 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
         var usedGitWorktree = false;
         DisposableWorkspaceRunResult? result = null;
 
-        await _runs.TransitionAsync(new RunStateTransition
-        {
-            RunId = request.RunId,
-            State = RunLifecycleState.Running,
-            Summary = "Disposable workspace execution started."
-        }, cancellationToken).ConfigureAwait(false);
+        if (request.OwnsRunLifecycle)
+            await _runs.TransitionAsync(new RunStateTransition
+            {
+                RunId = request.RunId,
+                State = RunLifecycleState.Running,
+                Summary = "Disposable workspace execution started."
+            }, cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -100,16 +101,19 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
                     throw new InvalidOperationException($"Disposable command '{commandResult.DisplayName}' failed with exit code {commandResult.ExitCode}.");
             }
 
-            await _runs.TransitionAsync(new RunStateTransition
+            if (request.OwnsRunLifecycle)
             {
-                RunId = request.RunId,
-                State = RunLifecycleState.Completed,
-                Summary = "Disposable workspace execution completed."
-            }, cancellationToken).ConfigureAwait(false);
-            await PublishAsync(request.RunId, "RunCompleted", "Disposable workspace execution completed.", new Dictionary<string, string>
-            {
-                ["status"] = RunLifecycleState.Completed.ToString()
-            }, cancellationToken).ConfigureAwait(false);
+                await _runs.TransitionAsync(new RunStateTransition
+                {
+                    RunId = request.RunId,
+                    State = RunLifecycleState.Completed,
+                    Summary = "Disposable workspace execution completed."
+                }, cancellationToken).ConfigureAwait(false);
+                await PublishAsync(request.RunId, "RunCompleted", "Disposable workspace execution completed.", new Dictionary<string, string>
+                {
+                    ["status"] = RunLifecycleState.Completed.ToString()
+                }, cancellationToken).ConfigureAwait(false);
+            }
 
             result = new DisposableWorkspaceRunResult
             {
@@ -126,19 +130,22 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
         }
         catch (OperationCanceledException ex)
         {
-            await _runs.TransitionAsync(new RunStateTransition
+            if (request.OwnsRunLifecycle)
             {
-                RunId = request.RunId,
-                State = RunLifecycleState.Cancelled,
-                Summary = "Disposable workspace execution cancelled.",
-                FailureReason = ex.Message
-            }, CancellationToken.None).ConfigureAwait(false);
-            await PublishAsync(request.RunId, "RunCancelled", "Disposable workspace execution cancelled.", new Dictionary<string, string>
-            {
-                ["status"] = RunLifecycleState.Cancelled.ToString(),
-                ["workspacePath"] = workspacePath,
-                ["evidencePath"] = evidencePath
-            }, CancellationToken.None).ConfigureAwait(false);
+                await _runs.TransitionAsync(new RunStateTransition
+                {
+                    RunId = request.RunId,
+                    State = RunLifecycleState.Cancelled,
+                    Summary = "Disposable workspace execution cancelled.",
+                    FailureReason = ex.Message
+                }, CancellationToken.None).ConfigureAwait(false);
+                await PublishAsync(request.RunId, "RunCancelled", "Disposable workspace execution cancelled.", new Dictionary<string, string>
+                {
+                    ["status"] = RunLifecycleState.Cancelled.ToString(),
+                    ["workspacePath"] = workspacePath,
+                    ["evidencePath"] = evidencePath
+                }, CancellationToken.None).ConfigureAwait(false);
+            }
 
             result = new DisposableWorkspaceRunResult
             {
@@ -156,20 +163,23 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            await _runs.TransitionAsync(new RunStateTransition
+            if (request.OwnsRunLifecycle)
             {
-                RunId = request.RunId,
-                State = RunLifecycleState.Failed,
-                Summary = "Disposable workspace execution failed.",
-                FailureReason = ex.Message
-            }, cancellationToken).ConfigureAwait(false);
-            await PublishAsync(request.RunId, "RunFailed", ex.Message, new Dictionary<string, string>
-            {
-                ["status"] = RunLifecycleState.Failed.ToString(),
-                ["failureReason"] = ex.Message,
-                ["workspacePath"] = workspacePath,
-                ["evidencePath"] = evidencePath
-            }, cancellationToken).ConfigureAwait(false);
+                await _runs.TransitionAsync(new RunStateTransition
+                {
+                    RunId = request.RunId,
+                    State = RunLifecycleState.Failed,
+                    Summary = "Disposable workspace execution failed.",
+                    FailureReason = ex.Message
+                }, cancellationToken).ConfigureAwait(false);
+                await PublishAsync(request.RunId, "RunFailed", ex.Message, new Dictionary<string, string>
+                {
+                    ["status"] = RunLifecycleState.Failed.ToString(),
+                    ["failureReason"] = ex.Message,
+                    ["workspacePath"] = workspacePath,
+                    ["evidencePath"] = evidencePath
+                }, cancellationToken).ConfigureAwait(false);
+            }
 
             result = new DisposableWorkspaceRunResult
             {
