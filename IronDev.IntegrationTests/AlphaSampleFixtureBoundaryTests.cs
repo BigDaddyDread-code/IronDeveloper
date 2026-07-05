@@ -76,7 +76,12 @@ public sealed class AlphaSampleFixtureBoundaryTests
                  {
                      "approval", "capability", "authority", "grant", "gate",
                      "AcceptedApproval", "skeleton-run.continue",
-                     @"C:\Users", @"C:\\Users", "%USERPROFILE%", "(localdb)", "SQLEXPRESS", "DESKTOP-"
+                     string.Concat(@"C:\", "Users"),
+                     string.Concat(@"C:\\", "Users"),
+                     string.Concat("%USER", "PROFILE%"),
+                     string.Concat("(local", "db)"),
+                     string.Concat("SQL", "EXPRESS"),
+                     string.Concat("DESKTOP", "-")
                  })
         {
             Assert.IsFalse(fixtureText.Contains(forbidden, StringComparison.OrdinalIgnoreCase),

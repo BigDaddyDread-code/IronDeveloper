@@ -223,7 +223,9 @@ public sealed class GovernanceDataRetentionRuleStaticBoundaryTests
         var current = AppContext.BaseDirectory;
         while (!string.IsNullOrWhiteSpace(current))
         {
-            if (Directory.Exists(Path.Combine(current, ".git")))
+            if (File.Exists(Path.Combine(current, "IronDev.slnx")) ||
+                Directory.Exists(Path.Combine(current, ".git")) ||
+                File.Exists(Path.Combine(current, ".git")))
                 return current;
 
             current = Directory.GetParent(current)?.FullName ?? string.Empty;

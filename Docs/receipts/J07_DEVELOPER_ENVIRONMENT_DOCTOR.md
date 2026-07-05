@@ -182,7 +182,7 @@ The tests cover:
 - J04/J05/J06/J08 local-tool compatibility: passed, 100/100.
 - Integration category and slow/quarantine category contracts: passed, 17/17.
 - C11 secret scan: passed, 9/9.
-- Direct doctor JSON invocation in this checkout: completed with exit code 2 because the machine is diagnostically blocked by missing frontend dependencies and missing J10 root safety; this is a blocked diagnosis, not a script crash.
+- Direct doctor JSON invocation in the original J07 checkout: completed with exit code 2 because the machine was diagnostically blocked by missing frontend dependencies and missing J10 root safety; this is a blocked diagnosis, not a script crash.
 - `dotnet restore IronDev.slnx`: passed with existing package warnings.
 - `dotnet build IronDev.slnx --no-restore`: passed with 0 errors / 7 existing warnings.
 - `git diff --check`: passed; git reported line-ending normalization warnings for docs only.
@@ -198,7 +198,7 @@ J07 does not run smoke.
 
 J07 does not produce evidence.
 
-J07 does not validate real root safety until a J10 validator exists.
+J07 does not validate real root safety by itself. When a J10 validator exists, J07 reports contract presence but root safety remains a separate evaluation.
 
 J07 does not replace explicit J04/J05/J06 setup commands.
 

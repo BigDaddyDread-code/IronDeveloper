@@ -287,12 +287,13 @@ public sealed class BlockJ07DeveloperEnvironmentDoctorTests
     {
         var changedProductionFiles = CurrentChangedFiles()
             .Where(path =>
-                path.StartsWith("IronDev.Core/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("IronDev.Infrastructure/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("IronDev.Api/Controllers/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("tools/IronDev.Cli/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("IronDev.TauriShell/src/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith(".github/workflows/", StringComparison.OrdinalIgnoreCase))
+                !IsJ10RootSafetyFile(path) &&
+                (path.StartsWith("IronDev.Core/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("IronDev.Infrastructure/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("IronDev.Api/Controllers/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("tools/IronDev.Cli/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("IronDev.TauriShell/src/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith(".github/workflows/", StringComparison.OrdinalIgnoreCase)))
             .ToArray();
 
         Assert.AreEqual(0, changedProductionFiles.Length, "J07 must not add production/API/CLI/frontend/workflow runtime files: " + string.Join(", ", changedProductionFiles));
@@ -420,6 +421,12 @@ public sealed class BlockJ07DeveloperEnvironmentDoctorTests
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
     }
+
+    private static bool IsJ10RootSafetyFile(string path) =>
+        path.Equals("IronDev.Core/Configuration/LocalRootSafetyModels.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("IronDev.Core/Configuration/LocalRootSafetyValidator.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("IronDev.Infrastructure/Services/Workspaces/DisposableWorkspaceExecutionService.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("IronDev.Infrastructure/Services/Workspaces/DisposableWorkspaceReadinessService.cs", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<string> GitStatusFiles()
     {

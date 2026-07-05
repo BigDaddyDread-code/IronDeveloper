@@ -411,7 +411,7 @@ static EnvironmentInfoDto CreateEnvironmentInfo(WebApplicationBuilder builder)
         WeaviatePrefix = localTest["WeaviatePrefix"] ?? string.Empty,
         IsTestEnvironment =
             builder.Environment.IsEnvironment("LocalTest") ||
-            builder.Environment.IsEnvironment("Test"),
+            IsNonLocalTestTestEnvironment(environmentName),
         WorkspaceRoot = localTest["WorkspaceRoot"] ?? string.Empty,
         LogsRoot = localTest["LogsRoot"] ?? string.Empty,
         DangerRealRepoWritesEnabled = bool.TryParse(localTest["DangerRealRepoWritesEnabled"], out var enabled) && enabled
@@ -457,6 +457,12 @@ static void ValidateEnvironmentSafety(EnvironmentInfoDto environmentInfo)
         return;
     }
 
+    if (IsNonLocalTestTestEnvironment(environmentInfo.Environment))
+    {
+        ValidateNonLocalTestTestEnvironmentSafety(environmentInfo, StartupEnvironmentSafety.Current);
+        return;
+    }
+
     if (IsProductionLikeEnvironment(environmentInfo.Environment))
         ValidateProductionLikeEnvironmentSafety(environmentInfo, StartupEnvironmentSafety.Current);
 }
@@ -480,6 +486,34 @@ static void ValidateLocalTestEnvironmentSafety(EnvironmentInfoDto environmentInf
 
     if (environmentInfo.DangerRealRepoWritesEnabled)
         throw new InvalidOperationException("LocalTest cannot enable dangerous real repo writes.");
+}
+
+static void ValidateNonLocalTestTestEnvironmentSafety(
+    EnvironmentInfoDto environmentInfo,
+    StartupEnvironmentSafetyContext? safetyContext)
+{
+    safetyContext ??= StartupEnvironmentSafetyContext.Empty;
+
+    if (string.IsNullOrWhiteSpace(safetyContext.Database))
+        throw new InvalidOperationException("Non-LocalTest test environment must configure an isolated test database.");
+
+    if (!IsSafeNonLocalTestDatabaseName(safetyContext.Database))
+        throw new InvalidOperationException("Non-LocalTest test environment must use an isolated test database name.");
+
+    if (environmentInfo.DangerRealRepoWritesEnabled)
+        throw new InvalidOperationException("Non-LocalTest test environment cannot enable dangerous real repo writes.");
+
+    if (!IsSafeOptionalOrConfiguredTestRoot(safetyContext.LocalTestWorkspaceRoot))
+        throw new InvalidOperationException("Non-LocalTest test environment must use an isolated test workspace root.");
+
+    if (!IsSafeOptionalOrConfiguredTestRoot(safetyContext.LocalTestLogsRoot))
+        throw new InvalidOperationException("Non-LocalTest test environment must use an isolated test logs root.");
+
+    if (!IsSafeOptionalOrConfiguredTestRoot(safetyContext.DisposableWorkspaceRoot))
+        throw new InvalidOperationException("Non-LocalTest test environment must use an isolated disposable workspace root.");
+
+    if (!IsSafeOptionalOrConfiguredTestRoot(safetyContext.DisposableEvidenceRoot))
+        throw new InvalidOperationException("Non-LocalTest test environment must use an isolated disposable evidence root.");
 }
 
 static void ValidateProductionLikeEnvironmentSafety(
@@ -524,8 +558,16 @@ static void ValidateProductionLikeEnvironmentSafety(
 
 static bool IsProductionLikeEnvironment(string environmentName) =>
     !string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase) &&
-    !string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase) &&
-    !string.Equals(environmentName, "LocalTest", StringComparison.OrdinalIgnoreCase);
+    !string.Equals(environmentName, "LocalTest", StringComparison.OrdinalIgnoreCase) &&
+    !IsNonLocalTestTestEnvironment(environmentName);
+
+static bool IsNonLocalTestTestEnvironment(string environmentName) =>
+    string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(environmentName, "CI", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(environmentName, "IntegrationTest", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(environmentName, "E2E", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(environmentName, "AutomationTest", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(environmentName, "SmokeTest", StringComparison.OrdinalIgnoreCase);
 
 static (string Database, string DataSource, bool ContainsPassword) TryParseConnectionString(string connectionString)
 {
@@ -647,6 +689,58 @@ static bool IsSafeLocalTestDatabaseName(string database)
     return HasExplicitTestSegment(segments) && !HasProductionLikeSegment(segments);
 }
 
+static bool IsSafeNonLocalTestDatabaseName(string database)
+{
+    var segments = SplitLocalTestSafetySegments(database);
+    return segments.Length > 0 &&
+        HasExplicitTestEnvironmentSegment(segments) &&
+        !HasUnsafeNonLocalTestResourceSegment(segments);
+}
+
+static bool IsSafeOptionalOrConfiguredTestRoot(string root)
+{
+    if (string.IsNullOrWhiteSpace(root))
+        return true;
+
+    var normalized = root.Replace('\\', '/').Trim().TrimEnd('/');
+    if (string.IsNullOrWhiteSpace(normalized))
+        return false;
+
+    var lower = normalized.ToLowerInvariant();
+    var tempRoot = Path.GetTempPath().Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
+    var userRoot = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+        .Replace('\\', '/')
+        .TrimEnd('/')
+        .ToLowerInvariant();
+    var filesystemRoot = Path.GetPathRoot(root)?.Replace('\\', '/').TrimEnd('/').ToLowerInvariant() ?? string.Empty;
+
+    if (!string.IsNullOrWhiteSpace(filesystemRoot) &&
+        lower.Equals(filesystemRoot, StringComparison.Ordinal))
+    {
+        return false;
+    }
+
+    if (!string.IsNullOrWhiteSpace(tempRoot) &&
+        lower.Equals(tempRoot, StringComparison.Ordinal))
+    {
+        return false;
+    }
+
+    if (!string.IsNullOrWhiteSpace(userRoot) &&
+        lower.Equals(userRoot, StringComparison.Ordinal))
+    {
+        return false;
+    }
+
+    if (lower.Contains("/source/repos/", StringComparison.Ordinal))
+        return false;
+
+    var segments = SplitLocalTestSafetySegments(root);
+    return segments.Length > 0 &&
+        HasExplicitTestEnvironmentSegment(segments) &&
+        !HasUnsafeNonLocalTestRootSegment(segments);
+}
+
 static bool IsSafeLocalTestPath(string path, string expectedLabel)
 {
     var segments = SplitLocalTestSafetySegments(path);
@@ -670,12 +764,70 @@ static bool IsSafeLocalTestPath(string path, string expectedLabel)
 static bool HasExplicitTestSegment(IReadOnlyCollection<string> segments) =>
     segments.Any(segment => segment.Equals("Test", StringComparison.OrdinalIgnoreCase));
 
+static bool HasExplicitTestEnvironmentSegment(IReadOnlyCollection<string> segments) =>
+    segments.Any(segment =>
+        segment.Equals("Test", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("CI", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("IntegrationTest", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("E2E", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Automation", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("AutomationTest", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("SmokeTest", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("IronDevTestWorkspaces", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("IronDevTestLogs", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("IronDevTestEvidence", StringComparison.OrdinalIgnoreCase));
+
 static bool HasProductionLikeSegment(IReadOnlyCollection<string> segments) =>
     segments.Any(segment =>
         segment.Contains("Prod", StringComparison.OrdinalIgnoreCase) ||
         segment.Contains("Production", StringComparison.OrdinalIgnoreCase) ||
         segment.Contains("Live", StringComparison.OrdinalIgnoreCase) ||
         segment.Contains("Accept", StringComparison.OrdinalIgnoreCase));
+
+static bool HasUnsafeNonLocalTestResourceSegment(IReadOnlyCollection<string> segments) =>
+    segments.Any(segment =>
+        segment.Equals("Prod", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Production", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Live", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Accept", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Acceptance", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("UAT", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Stage", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Staging", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Demo", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Main", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Re" + "lease", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Shared", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Default", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Dev", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Development", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Local", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Contest", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Latest", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Testament", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("ProductionTestBackup", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("ProdTest", StringComparison.OrdinalIgnoreCase));
+
+static bool HasUnsafeNonLocalTestRootSegment(IReadOnlyCollection<string> segments) =>
+    segments.Any(segment =>
+        segment.Equals("Prod", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Production", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Live", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Accept", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Acceptance", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("UAT", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Stage", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Staging", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Demo", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Main", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Re" + "lease", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Shared", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Default", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Contest", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Latest", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("Testament", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("ProductionTestBackup", StringComparison.OrdinalIgnoreCase) ||
+        segment.Equals("ProdTest", StringComparison.OrdinalIgnoreCase));
 
 static string[] SplitLocalTestSafetySegments(string value) =>
     string.IsNullOrWhiteSpace(value)

@@ -45,11 +45,33 @@ J08 adds a Core-only redacted configuration summary contract. It reports source 
 
 Connection strings may be parsed into derived metadata such as database name, server kind, authentication mode, and whether a credential key exists. The raw connection string is never emitted. Sensitive keys such as API keys, JWT keys, tokens, authorization values, client secrets, private keys, and credential-shaped values are redacted.
 
-Root safety integration is intentionally read-only. Until J10 root-safety validation exists, configured roots are reported as `NotEvaluated`; J08 does not invent root safety or validate roots itself.
+Root safety integration is intentionally read-only. J10 supplies a dedicated root-safety validator; J08 does not invoke it or invent root safety. Configured roots are reported as `NotEvaluated` unless a caller supplies a validator result.
 
 J08 adds no endpoint, no startup logging, no bootstrap behavior, no SQL connectivity check, no Weaviate connectivity check, no schema change, and no source-apply, approval, critic, workflow, release, or deployment authority.
 
 Boundary: a config summary is diagnostic evidence for a human. It is not approval, authority, policy satisfaction, root safety proof, or permission to mutate anything.
+
+## J09 test environment isolation
+
+J09 adds startup validation for explicit non-`LocalTest` test-shaped API environments: `Test`, `CI`, `IntegrationTest`, `E2E`, `AutomationTest`, and `SmokeTest`.
+
+This closes the middle gap between C12 and C13: `LocalTest` keeps its C12 isolated-local checks, unknown/custom names remain production-like under C13, and test-shaped environments now require isolated test database names plus isolated configured workspace/log/evidence roots. `Development` is not made test-like.
+
+J09 also records that committed `Test` appsettings are not `LocalTest` appsettings. They use generic `IronDeveloper_Test` SQL shape and must not define LocalTest workspace/log roots or danger switches.
+
+J09 adds no endpoint, no startup logging, no bootstrap behavior, no SQL connectivity check, no Weaviate connectivity check, no schema change, no root creation, no evidence writing, and no source-apply, approval, critic, workflow, release, or deployment authority.
+
+## J10 logs/evidence/workspace root safety
+
+J10 adds a Core-only local root-safety validator for logs, evidence, workspace, disposable workspace, sandbox repository, canary measurement, and batch-map evidence roots.
+
+The validator rejects missing required roots, relative paths, traversal segments, filesystem roots, broad user/system roots, files, reparse points, source repository roots, paths under the source repository, unsafe sandbox repository overlap, and durable evidence/log roots inside disposable workspace roots.
+
+Disposable workspace execution now validates its workspace and evidence roots before it creates workspace directories, writes evidence directories, or runs workspace commands. When no evidence root is supplied, the default evidence root is a sibling of the workspace root rather than a child of the disposable workspace root.
+
+J10 adds no endpoint, no startup logging, no SQL connectivity check, no Weaviate connectivity check, no schema change, no bootstrap command, and no source-apply, approval, critic, workflow, release, or deployment authority.
+
+Boundary: A safe root is a precondition for evidence. It is not evidence, approval, execution authority, or permission to mutate source.
 
 ## J04 safe local bootstrap script
 
@@ -62,7 +84,7 @@ Default behavior is check-only:
 - report frontend package status
 - report ignored/untracked local override status
 - report whether the J08 redacted config summary Core contract is present
-- report J10 root safety as `NotEvaluated` unless a future root-safety contract is present
+- report J10 root-safety contract availability; root safety remains `NotEvaluated` unless an explicit validator result is supplied by another component
 - print next safe actions
 
 The default check-only path does not create files or directories, restore packages, install frontend packages, start the UI, call SQL, create or rebuild databases, start or rebuild Weaviate, write evidence, invoke source apply, invoke rollback, run release/deploy paths, or continue workflow.

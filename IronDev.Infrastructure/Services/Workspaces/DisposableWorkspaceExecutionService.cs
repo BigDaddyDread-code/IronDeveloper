@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using IronDev.Core.Configuration;
 using IronDev.Core.RunReports;
 using IronDev.Core.Runs;
 using IronDev.Core.Workspaces;
@@ -34,10 +35,35 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
         var sourcePath = Path.GetFullPath(request.SourcePath);
         if (!Directory.Exists(sourcePath))
             throw new DirectoryNotFoundException($"Disposable workspace source path not found: {sourcePath}");
+        var sourceRepositoryRoot = ResolveRepositoryRoot(sourcePath) ?? sourcePath;
 
         var workspaceRoot = Path.GetFullPath(request.WorkspaceRoot);
-        if (IsSameOrUnder(sourcePath, workspaceRoot))
-            throw new InvalidOperationException("Disposable workspace root must not be inside the source repository.");
+        var evidenceRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(request.EvidenceRoot)
+            ? DefaultEvidenceRoot(workspaceRoot)
+            : request.EvidenceRoot);
+
+        var rootSafety = LocalRootSafetyValidator.ValidateRootSet(
+        [
+            new LocalRootSafetyRequest(
+                LocalRootKind.DisposableWorkspaceRoot,
+                "DisposableBuild:WorkspaceRoot",
+                workspaceRoot,
+                sourceRepositoryRoot,
+                "Runtime",
+                MustExist: false),
+            new LocalRootSafetyRequest(
+                LocalRootKind.EvidenceRoot,
+                "DisposableBuild:EvidenceRoot",
+                evidenceRoot,
+                sourceRepositoryRoot,
+                "Runtime",
+                MustExist: false)
+        ]);
+        if (!rootSafety.IsSafe)
+        {
+            var first = rootSafety.UnsafeResults.First();
+            throw new InvalidOperationException($"Unsafe{first.Kind}: {first.ReasonCode}. {first.Message} {first.NextSafeAction}");
+        }
 
         foreach (var command in request.Commands)
             ValidateAllowedCommand(command);
@@ -47,15 +73,12 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
         workspacePath = Path.GetFullPath(workspacePath);
         if (!IsSameOrUnder(workspaceRoot, workspacePath) || string.Equals(workspaceRoot, workspacePath, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Disposable workspace path must stay under the configured workspace root.");
-        if (PathsOverlap(sourcePath, workspacePath))
+        if (PathsOverlap(sourceRepositoryRoot, workspacePath))
             throw new InvalidOperationException("Disposable workspace path must not overlap the source repository.");
 
         if (Directory.Exists(workspacePath))
             Directory.Delete(workspacePath, recursive: true);
 
-        var evidenceRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(request.EvidenceRoot)
-            ? Path.Combine(workspaceRoot, "_evidence")
-            : request.EvidenceRoot);
         Directory.CreateDirectory(evidenceRoot);
         var evidencePath = Path.Combine(evidenceRoot, request.RunId);
         evidencePath = Path.GetFullPath(evidencePath);
@@ -419,6 +442,12 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
         return string.IsNullOrWhiteSpace(safe) ? "command" : safe;
     }
 
+    private static string DefaultEvidenceRoot(string workspaceRoot)
+    {
+        var parent = Directory.GetParent(Path.GetFullPath(workspaceRoot));
+        return Path.Combine(parent?.FullName ?? Path.GetTempPath(), "irondev-evidence");
+    }
+
     private static bool IsSameOrUnder(string parent, string child)
     {
         var parentFull = Path.GetFullPath(parent).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -428,6 +457,21 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
 
     private static bool PathsOverlap(string first, string second) =>
         IsSameOrUnder(first, second) || IsSameOrUnder(second, first);
+
+    private static string? ResolveRepositoryRoot(string path)
+    {
+        var current = new DirectoryInfo(path);
+        while (current is not null)
+        {
+            var gitDirectory = Path.Combine(current.FullName, ".git");
+            if (Directory.Exists(gitDirectory) || File.Exists(gitDirectory))
+                return current.FullName;
+
+            current = current.Parent;
+        }
+
+        return null;
+    }
 
     private static async Task<bool> TryCreateGitWorktreeAsync(
         string sourcePath,

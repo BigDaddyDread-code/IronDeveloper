@@ -229,11 +229,19 @@ J08 adds a Core-only redacted configuration summary contract for local/developme
 
 The summary never prints raw connection strings, API keys, JWT keys, token values, authorization headers, local override contents, or full user-local paths. For example, user-profile roots such as a Windows `.irondev\workspaces` folder or a Linux `.irondev/evidence` folder are summarized with the user segment redacted.
 
-Because J10 root-safety validation is not in this slice, root entries report `NotEvaluated` unless a future root-safety validator result is supplied. The summary does not validate roots by itself.
+J10 supplies the root-safety validator, but the J08 summary does not invoke it by itself. Root entries report `NotEvaluated` unless a caller supplies an explicit root-safety validator result.
 
 Boundary: a config summary is diagnostic evidence for a human. It is not approval, authority, policy satisfaction, root safety proof, or permission to mutate anything.
 
 If redaction is uncertain, the value is redacted. Debug convenience loses to secret safety.
+
+## 3a. Root Safety
+
+J10 adds a reusable Core root-safety validator for local logs, evidence, workspace, disposable workspace, sandbox repository, canary measurement, and batch-map evidence roots.
+
+Disposable workspace execution validates workspace and evidence roots before it creates directories, writes evidence, or runs workspace commands. Evidence and logs must not live inside disposable workspace roots because disposable cleanup must not erase the evidence trail.
+
+A safe root is a precondition for evidence. It is not evidence, approval, execution authority, or permission to mutate source.
 
 ---
 

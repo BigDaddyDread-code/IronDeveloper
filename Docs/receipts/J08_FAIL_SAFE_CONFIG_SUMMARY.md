@@ -70,9 +70,9 @@ The summary can report the winning source name when a caller supplies effective 
 
 ## Root Safety Integration
 
-J10 root-safety validation is not implemented in this slice.
+J10 root-safety validation is implemented as a separate Core contract after J08.
 
-Therefore configured root entries are reported as `NotEvaluated` unless a future root-safety result is supplied by a validator.
+Configured root entries are reported as `NotEvaluated` unless a root-safety result is supplied by a validator.
 
 J08 does not reimplement root safety, create roots, check roots, clean roots, write evidence, or treat root existence as proof of safety.
 
@@ -96,7 +96,7 @@ Coverage includes:
 - user-local paths are redacted
 - local override presence is reported without contents
 - environment-variable precedence can be represented without printing values
-- root safety is `NotEvaluated` when J10 is absent
+- root safety is `NotEvaluated` when no validator result is supplied
 - supplied future root-safety results can be reported without revalidation
 - unknown sensitive keys fail closed
 - summary output avoids authority-shaped status language
