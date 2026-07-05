@@ -32,6 +32,17 @@ public sealed record DisposableWorkspaceRunRequest
     public bool PreserveWorkspaceOnCancellation { get; init; } = true;
     public IReadOnlyList<DisposableWorkspaceFileWrite> FileWrites { get; init; } = [];
     public IReadOnlyList<DisposableWorkspaceCommand> Commands { get; init; } = [];
+
+    /// <summary>
+    /// When true (the default, for standalone disposable runs) the executor owns the
+    /// run's lifecycle and drives it Running → Completed/Failed/Cancelled. When false,
+    /// a caller (e.g. the skeleton orchestrator) already owns the run's lifecycle and
+    /// only wants the workspace's evidence and result — the executor then publishes its
+    /// evidence events but does NOT transition run state, so the two never fight over
+    /// the same run (a successful build must not complete a run the orchestrator still
+    /// intends to pause at the human gate).
+    /// </summary>
+    public bool OwnsRunLifecycle { get; init; } = true;
 }
 
 public sealed record DisposableWorkspaceCommandResult
