@@ -21,23 +21,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace IronDev.IntegrationTests;
 
 /// <summary>
-/// D-2 — the alpha smoke: one ticket driven through the REAL governed loop, with
-/// only the model faked. This is not theatre:
-///  - the orchestrator is the real TicketSkeletonRunService;
-///  - the workspace is the real DisposableWorkspaceExecutionService — it copies
-///    the real Samples/BookSeller, applies the proposed change, and actually runs
-///    `dotnet build` and `dotnet test` against it;
-///  - the gate is real: continuation consumes a live, hash-matched approval only
-///    after an independent critic review is on record.
+/// D-2a deterministic alpha smoke: one BookSeller ticket driven through the real
+/// governed loop until the human gate, with only model words faked.
 ///
-/// The single deterministic substitution is the Builder's output — a fixed,
-/// correct implementation of the validate-book ticket stands in for a live model,
-/// so the plumbing is proven before any tokens are spent (D-3 swaps in a real
-/// model). The run is driven to Completed; the copy-only apply spine is D-2b.
-///
-/// It shells out to dotnet build/test, so it is LongRunning (registered in
-/// Docs/testing/SLOW_TEST_QUARANTINE_REGISTER.md) and runs on the SQL integration
-/// lane. Scripts/smoke/alpha-smoke.ps1 stands it up clean and surfaces its receipt.
+/// The smoke proves the real orchestrator, disposable workspace, build/test
+/// execution, critic-package creation, report reconstruction, and approval halt.
+/// It deliberately does not create approval, request continuation, apply source,
+/// release, deploy, or claim alpha readiness.
 /// </summary>
 [TestClass]
 [TestCategory("LongRunning")]
@@ -46,8 +36,6 @@ public sealed class AlphaLoopSmokeTests
     private const int ProjectId = 1;
     private const long TicketId = 101;
 
-    // The deterministic Builder output: a correct validate-book implementation that
-    // preserves the public surface (so the sample's existing tests keep passing).
     private const string ValidatedBook =
         """
         namespace BookSeller.Domain;
@@ -77,7 +65,7 @@ public sealed class AlphaLoopSmokeTests
         """;
 
     [TestMethod]
-    public async Task AlphaSmoke_OneTicket_ThroughTheRealLoop_WithADeterministicBuilder()
+    public async Task AlphaSmoke_OneTicket_ReachesHumanGate_WithADeterministicBuilder()
     {
         var workspaceParent = TempDir("irondev-alpha-ws");
         var evidenceRoot = TempDir("irondev-alpha-ev");
@@ -89,7 +77,6 @@ public sealed class AlphaLoopSmokeTests
 
             var runs = new InMemoryRunStore();
             var events = new InMemoryRunEventStore();
-            var approvals = new InMemoryApprovals();
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["DisposableBuild:EvidenceRoot"] = evidenceRoot,
@@ -112,74 +99,75 @@ public sealed class AlphaLoopSmokeTests
                 new DisposableWorkspaceExecutionService(runs, events),
                 runs,
                 events,
-                approvals,
+                new InMemoryApprovals(),
                 new ApprovalSatisfactionEvaluator(),
                 new WorkflowApprovalHaltEvaluator(),
                 new EmptyTestAuthoring(),
                 new SkeletonMutationLeaseService(configuration),
                 configuration);
 
-            // 1) Start: real proposal → real build+test of the sample → paused at the gate.
             var run = await service.StartAsync(ProjectId, TicketId);
             Assert.IsNotNull(run, "The run must start.");
             Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), run!.Status,
-                "A clean build/test halts the loop at the human gate — not before, not after.");
+                "D-2a must stop at the human gate.");
+            Assert.IsTrue(run.RequiresHumanApproval, "The returned DTO must name the human gate.");
 
             var runEvents = await events.GetEventsAsync(run.RunId);
             var packaged = runEvents.Single(e => e.EventType == "SkeletonEvidencePackaged");
             Assert.AreEqual("true", packaged.Payload["succeeded"],
-                "The real dotnet build + dotnet test of the sample must pass — a red workspace is not a demo.");
+                "The real dotnet build and dotnet test of the sample must pass.");
 
-            var packageHash = runEvents.Single(e => e.EventType == "CriticReviewPackageReady").Payload["packageSha256"];
+            var criticPackage = runEvents.Single(e => e.EventType == "CriticReviewPackageReady");
+            var packageHash = criticPackage.Payload["packageSha256"];
             Assert.IsFalse(string.IsNullOrWhiteSpace(packageHash), "The critic package must be hash-sealed.");
 
-            // 2) The independent critic review is on record (clean), and a live human
-            //    approval bound to exactly this package hash is seeded.
-            await events.PublishAsync(new RunEventDto
-            {
-                RunId = run.RunId,
-                EventType = "SkeletonCriticReviewRecorded",
-                Message = "Independent critic review recorded (clean).",
-                Payload = new Dictionary<string, string>
-                {
-                    ["reviewId"] = "alpha-critic-review",
-                    ["verdict"] = "Approve",
-                    ["findingCount"] = "0",
-                    ["findingIds"] = ""
-                }
-            });
-            approvals.Seed(ApprovalFor(run.RunId, packageHash));
+            var halt = runEvents.Single(e => e.EventType == "ApprovalRequiredHalt");
+            Assert.AreEqual(packageHash, halt.Payload["approvalTargetHash"],
+                "Any later human approval must bind to the exact critic-package hash.");
+            Assert.IsFalse(runEvents.Any(e => e.EventType == "SkeletonCriticReviewRecorded"),
+                "D-2a prepares the critic package; it does not simulate the independent critic review.");
+            Assert.IsFalse(runEvents.Any(e => e.EventType == "SkeletonContinuationUnblocked"),
+                "D-2a must not continue past the human gate.");
 
-            // 3) Continue: the gate consumes the live, hash-matched approval.
-            var continued = await service.ContinueAsync(ProjectId, TicketId, run.RunId);
-            Assert.AreEqual(RunLifecycleState.Completed.ToString(), continued!.Status,
-                "With a clean review and a matching live approval, the gate lets the run complete.");
-
-            // 4) Receipt — hash-bearing proof of what actually ran.
             var report = await service.GetRunReportAsync(ProjectId, TicketId, run.RunId);
+            Assert.IsNotNull(report, "The run report must reconstruct the halted chain.");
+            Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), report!.Status);
+            Assert.IsNotNull(report.CriticPackage);
+            Assert.IsNotNull(report.Approval);
+            Assert.IsTrue(report.Approval!.HaltObserved);
+            Assert.IsFalse(report.Approval.ContinuationUnblocked);
+
             WriteReceipt(new AlphaSmokeReceipt(
                 Ticket: "validate-book",
                 Project: "BookSeller",
+                ModelMode: "Deterministic",
+                RunUntil: "Gate",
                 RunId: run.RunId,
-                FinalState: continued.Status,
+                GateState: run.Status,
                 BuildAndTestSucceeded: true,
                 CriticPackageSha256: packageHash,
+                ApprovalTargetHash: halt.Payload["approvalTargetHash"],
                 BuilderModel: "deterministic-fake",
-                Proves: new[]
-                {
+                AcceptedApprovalCreated: false,
+                ContinuationRequested: false,
+                ApplyRequested: false,
+                ReportReconstructable: true,
+                Proves:
+                [
                     "real orchestrator wiring end to end",
-                    "real dotnet build + dotnet test of the real sample against the proposed change",
+                    "real dotnet build and dotnet test of the sample against the proposed change",
                     "hash-sealed critic package",
-                    "gate consumes a live, hash-matched approval only after an independent critic review"
-                },
-                DoesNotProveYet: new[]
-                {
-                    "a live model (D-3)",
+                    "halt at the human approval gate without creating approval or continuation"
+                ],
+                DoesNotProveYet:
+                [
+                    "a live model",
                     "SQL/API persistence (in-memory stores here)",
-                    "the copy-only apply spine to Applied (D-2b)"
-                }));
-
-            Assert.IsNotNull(report, "The run report (the receipt's source) must be reconstructable.");
+                    "independent critic review execution",
+                    "human approval recording",
+                    "workflow continuation",
+                    "controlled source apply"
+                ]));
         }
         finally
         {
@@ -189,23 +177,33 @@ public sealed class AlphaLoopSmokeTests
         }
     }
 
-    // ── receipt ────────────────────────────────────────────────────────────
-
     private sealed record AlphaSmokeReceipt(
-        string Ticket, string Project, string RunId, string FinalState, bool BuildAndTestSucceeded,
-        string CriticPackageSha256, string BuilderModel, string[] Proves, string[] DoesNotProveYet);
+        string Ticket,
+        string Project,
+        string ModelMode,
+        string RunUntil,
+        string RunId,
+        string GateState,
+        bool BuildAndTestSucceeded,
+        string CriticPackageSha256,
+        string ApprovalTargetHash,
+        string BuilderModel,
+        bool AcceptedApprovalCreated,
+        bool ContinuationRequested,
+        bool ApplyRequested,
+        bool ReportReconstructable,
+        string[] Proves,
+        string[] DoesNotProveYet);
 
     private static void WriteReceipt(AlphaSmokeReceipt receipt)
     {
         var path = Environment.GetEnvironmentVariable("ALPHA_SMOKE_RECEIPT");
         if (string.IsNullOrWhiteSpace(path))
-            path = Path.Combine(RepoRoot(), "artifacts", "alpha-smoke", "receipt.json");
+            path = Path.Combine(Path.GetTempPath(), "IronDev", "alpha-smoke", "receipt.json");
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, JsonSerializer.Serialize(receipt, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine($"ALPHA_SMOKE_RECEIPT_PATH::{path}");
     }
-
-    // ── deterministic agents ─────────────────────────────────────────────────
 
     private sealed class DeterministicBuilder : IBuilderProposalService
     {
@@ -268,50 +266,16 @@ public sealed class AlphaLoopSmokeTests
 
     private sealed class InMemoryApprovals : IAcceptedApprovalStore
     {
-        private readonly List<AcceptedApprovalRecord> _records = [];
-        public void Seed(AcceptedApprovalRecord record) => _records.Add(record);
-
-        public Task SaveAsync(AcceptedApprovalRecord record, CancellationToken ct = default)
-        {
-            _records.Add(record);
-            return Task.CompletedTask;
-        }
-
+        public Task SaveAsync(AcceptedApprovalRecord record, CancellationToken ct = default) => Task.CompletedTask;
         public Task<AcceptedApprovalRecord?> GetAsync(Guid projectId, Guid acceptedApprovalId, CancellationToken ct = default) =>
-            Task.FromResult(_records.FirstOrDefault(r => r.ProjectId == projectId && r.AcceptedApprovalId == acceptedApprovalId));
-
+            Task.FromResult<AcceptedApprovalRecord?>(null);
         public Task<IReadOnlyList<AcceptedApprovalRecord>> ListByTargetAsync(Guid projectId, string targetKind, string targetId, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>(_records
-                .Where(r => r.ProjectId == projectId && r.ApprovalTargetKind == targetKind && r.ApprovalTargetId == targetId).ToList());
-
+            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>([]);
         public Task<IReadOnlyList<AcceptedApprovalRecord>> ListByCorrelationAsync(string correlationId, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>(_records.Where(r => r.CorrelationId == correlationId).ToList());
-
+            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>([]);
         public Task<IReadOnlyList<AcceptedApprovalRecord>> ListByProjectAndCorrelationAsync(Guid projectId, string correlationId, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>(_records
-                .Where(r => r.ProjectId == projectId && r.CorrelationId == correlationId).ToList());
+            Task.FromResult<IReadOnlyList<AcceptedApprovalRecord>>([]);
     }
-
-    private static AcceptedApprovalRecord ApprovalFor(string runId, string targetHash) =>
-        new()
-        {
-            AcceptedApprovalId = Guid.NewGuid(),
-            ProjectId = TicketSkeletonRunService.ApprovalProjectGuid(ProjectId),
-            ApprovalTargetKind = TicketSkeletonRunService.ApprovalTargetKind,
-            ApprovalTargetId = runId,
-            ApprovalTargetHash = targetHash,
-            CapabilityCode = TicketSkeletonRunService.ContinueCapabilityCode,
-            ApprovalPurpose = AcceptedApprovalPurposes.WorkflowContinuationInput,
-            ApprovedByActorId = "alpha-smoke-human-gate",
-            AcceptedAtUtc = DateTimeOffset.UtcNow,
-            ExpiresAtUtc = null,
-            CorrelationId = $"corr-{runId}",
-            CausationId = $"cause-{runId}",
-            EvidenceReferences = [$"critic-pkg-{runId}"],
-            BoundaryMaxims = ["Approval evidence is not apply permission."]
-        };
-
-    // ── file/git helpers ─────────────────────────────────────────────────────
 
     private static string SampleRoot() => Path.Combine(RepoRoot(), "Samples", "BookSeller");
 
@@ -319,12 +283,15 @@ public sealed class AlphaLoopSmokeTests
     {
         foreach (var dir in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
         {
-            if (IsIgnored(dir)) continue;
+            if (IsIgnored(dir))
+                continue;
             Directory.CreateDirectory(dir.Replace(source, destination));
         }
+
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
-            if (IsIgnored(file)) continue;
+            if (IsIgnored(file))
+                continue;
             var target = file.Replace(source, destination);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(file, target, overwrite: true);
@@ -367,8 +334,15 @@ public sealed class AlphaLoopSmokeTests
 
     private static void TryDelete(string path)
     {
-        try { if (Directory.Exists(path)) Directory.Delete(path, recursive: true); }
-        catch { /* best effort */ }
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch
+        {
+            // Best effort cleanup for local smoke temp folders.
+        }
     }
 
     private static string RepoRoot()
@@ -380,6 +354,7 @@ public sealed class AlphaLoopSmokeTests
                 return current.FullName;
             current = current.Parent;
         }
+
         throw new DirectoryNotFoundException("Could not locate the repository root.");
     }
 }
