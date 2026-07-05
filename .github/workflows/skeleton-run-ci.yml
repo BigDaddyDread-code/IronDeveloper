@@ -1,0 +1,49 @@
+name: skeleton-run-ci
+
+on:
+  pull_request:
+    branches:
+      - main
+      - governance/block-f-rollup-to-main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skeleton-run-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  skeleton-run-ci:
+    name: SkeletonRun governed-loop lane
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: SkeletonRun lane
+        shell: pwsh
+        run: ./Scripts/ci/run-skeleton-run-ci.ps1
+
+      - name: Verify skeleton-run evidence artifacts are sanitized
+        if: always()
+        id: artifact-safety
+        shell: pwsh
+        run: ./Scripts/ci/test-ci-evidence-artifact-safety.ps1 -ArtifactDirectory artifacts/ci/skeleton-run
+
+      - name: Upload skeleton-run evidence
+        if: ${{ always() && steps.artifact-safety.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-run-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/skeleton-run
+          retention-days: 14
+          if-no-files-found: error
