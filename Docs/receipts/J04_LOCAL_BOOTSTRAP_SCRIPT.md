@@ -122,9 +122,9 @@ J04 must not fake a config summary.
 
 ## Interaction With J10 Root Safety
 
-J10 root-safety validation is not implemented in this slice.
+J10 root-safety validation is implemented as a separate Core contract.
 
-J04 reports root safety as `NotEvaluated` unless a future root-safety contract is present. It does not inspect, create, clean, validate, or bless roots.
+J04 reports root-safety contract availability and keeps root safety as `NotEvaluated` unless an explicit validator result is supplied elsewhere. It does not inspect, create, clean, validate, or bless roots.
 
 J04 must not fake root safety.
 

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 
+using IronDev.Core.Configuration;
 using IronDev.Core.Workspaces;
 
 namespace IronDev.Infrastructure.Services.Workspaces;
@@ -30,6 +31,13 @@ public sealed class DisposableWorkspaceReadinessService : IDisposableWorkspaceRe
         var workspaceRootUnderGitDirectory = IsSameOrInside(Path.Combine(sourceRepo, ".git"), workspaceRoot);
         var workspacePathEscapedWorkspaceRoot = !IsSameOrInside(workspaceRoot, workspacePath) || PathsEqual(workspaceRoot, workspacePath);
         var isInsideSourceRepo = sourceRepoExists && IsSameOrInside(sourceRepo, workspacePath);
+        var workspaceRootSafety = LocalRootSafetyValidator.Validate(new LocalRootSafetyRequest(
+            LocalRootKind.DisposableWorkspaceRoot,
+            "DisposableBuild:WorkspaceRoot",
+            workspaceRoot,
+            sourceRepo,
+            "Runtime",
+            MustExist: true));
 
         AddCheck(
             checks,
@@ -48,6 +56,15 @@ public sealed class DisposableWorkspaceReadinessService : IDisposableWorkspaceRe
             "Workspace root exists.",
             $"Workspace root does not exist: {workspaceRoot}",
             "failed");
+
+        AddCheck(
+            checks,
+            errors,
+            "workspace_root_safety",
+            workspaceRootSafety.IsSafe,
+            "Workspace root passed local root-safety validation.",
+            $"Workspace root failed local root-safety validation: {workspaceRootSafety.ReasonCode}",
+            "blocked");
 
         AddCheck(
             checks,
@@ -159,6 +176,7 @@ public sealed class DisposableWorkspaceReadinessService : IDisposableWorkspaceRe
 
         var canCreateWorkspaceDirectory = false;
         if (workspaceRootExists &&
+            workspaceRootSafety.IsSafe &&
             !workspaceRootSameAsSourceRepo &&
             !workspaceRootUnderGitDirectory &&
             !workspacePathEscapedWorkspaceRoot &&

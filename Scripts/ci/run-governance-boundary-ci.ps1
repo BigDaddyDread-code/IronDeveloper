@@ -144,14 +144,16 @@ $securityBoundaryFilter = @(
     "FullyQualifiedName~BlockC13ProductionEnvironmentSafetyRegressionTests",
     "FullyQualifiedName~BlockC14SensitiveApiRateLimitAuthBoundaryTests",
     "FullyQualifiedName~BlockC15SecurityAuditLogBoundaryTests",
-    "FullyQualifiedName~BlockC16CiArtifactRetentionBoundaryTests"
+    "FullyQualifiedName~BlockC16CiArtifactRetentionBoundaryTests",
+    "FullyQualifiedName~BlockJ09TestEnvironmentIsolationTests"
 ) -join "|"
 
 $apiBoundaryFilter = @(
     "FullyQualifiedName~BlockOOperationalReadinessApiSurfaceTests",
     "FullyQualifiedName~OperationalDebuggingApiContractTests",
     "FullyQualifiedName~RunsEndpointContractTests",
-    "FullyQualifiedName~WorkflowContinuationApiRegressionTests"
+    "FullyQualifiedName~WorkflowContinuationApiRegressionTests",
+    "FullyQualifiedName~TestEnvironmentIsolationSafetyTests"
 ) -join "|"
 
 $cliBoundaryFilter = @(

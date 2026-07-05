@@ -91,11 +91,11 @@ public sealed class LocalTestEnvironmentSafetyTests
     }
 
     [TestMethod]
-    public async Task NonLocalTestEnvironment_DoesNotApplyLocalTestOnlySafetyRules()
+    public async Task Development_DoesNotApplyLocalTestOnlySafetyRules()
     {
         using var jwtKey = TemporaryEnvironmentVariable.Set("IRONDEV_JWT_KEY", TestJwtKey);
         using var factory = BuildFactory(
-            environmentName: "Test",
+            environmentName: "Development",
             databaseName: "IronDeveloper",
             workspaceRoot: Path.Combine(Path.GetTempPath(), "IronDevWorkspaces"),
             logsRoot: Path.Combine(Path.GetTempPath(), "IronDevLogs"),

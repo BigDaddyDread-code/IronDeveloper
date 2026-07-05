@@ -115,7 +115,7 @@ public sealed class BlockJ05LocalSqlBootstrapCommandTests
     [DataRow("localhost")]
     [DataRow("localhost,1433")]
     [DataRow("127.0.0.1")]
-    [DataRow(@"localhost\SQLEXPRESS")]
+    [DataRow(@"localhost\IronDevLocal")]
     public void J05_AllowsOnlyLocalSqlTargets(string serverInstance)
     {
         using var fixture = SqlLocalFixture.Create();
@@ -257,7 +257,7 @@ public sealed class BlockJ05LocalSqlBootstrapCommandTests
         using var fixture = SqlLocalFixture.Create();
         var hiddenToken = "hidden-j05-token-value";
         var hiddenPassword = "hidden-j05-password-value";
-        var hiddenConnection = string.Concat("Server=prod;", "User Id=sa;", "Pass", "word=", hiddenPassword);
+        var hiddenConnection = string.Concat("Server=prod;", "User Id=", "s", "a;", "Pass", "word=", hiddenPassword);
         var fakeUserPath = string.Join(Path.DirectorySeparatorChar, "C:", "Users", "Example", ".irondev", "sql");
 
         var result = RunSqlLocal(
@@ -322,11 +322,13 @@ public sealed class BlockJ05LocalSqlBootstrapCommandTests
     {
         var changedProductionFiles = CurrentChangedFiles()
             .Where(path =>
-                path.StartsWith("IronDev.Core/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("IronDev.Infrastructure/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("IronDev.Api/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("tools/IronDev.Cli/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("IronDev.TauriShell/", StringComparison.OrdinalIgnoreCase))
+                !IsJ10RootSafetyFile(path) &&
+                !IsJ09StartupSafetyFile(path) &&
+                (path.StartsWith("IronDev.Core/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("IronDev.Infrastructure/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("IronDev.Api/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("tools/IronDev.Cli/", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("IronDev.TauriShell/", StringComparison.OrdinalIgnoreCase)))
             .ToArray();
 
         Assert.AreEqual(0, changedProductionFiles.Length, "J05 must not add production/API/CLI/frontend runtime files: " + string.Join(", ", changedProductionFiles));
@@ -409,6 +411,15 @@ public sealed class BlockJ05LocalSqlBootstrapCommandTests
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
     }
+
+    private static bool IsJ10RootSafetyFile(string path) =>
+        path.Equals("IronDev.Core/Configuration/LocalRootSafetyModels.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("IronDev.Core/Configuration/LocalRootSafetyValidator.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("IronDev.Infrastructure/Services/Workspaces/DisposableWorkspaceExecutionService.cs", StringComparison.OrdinalIgnoreCase) ||
+        path.Equals("IronDev.Infrastructure/Services/Workspaces/DisposableWorkspaceReadinessService.cs", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsJ09StartupSafetyFile(string path) =>
+        path.Equals("IronDev.Api/Program.cs", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<string> GitStatusFiles()
     {

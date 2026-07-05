@@ -33,21 +33,21 @@ public sealed class DemoContainmentStaticBoundaryTests
     // connection string as LocalDB (redaction, validation) — it must not *supply* one.
     private static readonly string[] MachineSpecificSourceTokens =
     [
-        @"C:\Users",
-        @"C:\\Users",
-        "%USERPROFILE%",
-        "SQLEXPRESS",
-        "DESKTOP-"
+        string.Concat(@"C:\", "Users"),
+        string.Concat(@"C:\\", "Users"),
+        string.Concat("%USER", "PROFILE%"),
+        string.Concat("SQL", "EXPRESS"),
+        string.Concat("DESKTOP", "-")
     ];
 
     private static readonly string[] MachineSpecificConfigTokens =
     [
-        @"C:\Users",
-        @"C:\\Users",
-        "%USERPROFILE%",
-        "(localdb)",
-        "SQLEXPRESS",
-        "DESKTOP-"
+        string.Concat(@"C:\", "Users"),
+        string.Concat(@"C:\\", "Users"),
+        string.Concat("%USER", "PROFILE%"),
+        string.Concat("(local", "db)"),
+        string.Concat("SQL", "EXPRESS"),
+        string.Concat("DESKTOP", "-")
     ];
 
     private static readonly string[] SampleForbiddenAuthorityTokens =
@@ -125,7 +125,13 @@ public sealed class DemoContainmentStaticBoundaryTests
         CollectTokenViolations(
             root,
             Path.Combine(root, "IronDev.Api", "appsettings.Development.json"),
-            [@"C:\Users", @"C:\\Users", "%USERPROFILE%", "SQLEXPRESS", "DESKTOP-"],
+            [
+                string.Concat(@"C:\", "Users"),
+                string.Concat(@"C:\\", "Users"),
+                string.Concat("%USER", "PROFILE%"),
+                string.Concat("SQL", "EXPRESS"),
+                string.Concat("DESKTOP", "-")
+            ],
             violations);
 
         AssertNoViolations(

@@ -178,14 +178,12 @@ public sealed class ProductionEnvironmentSafetyTests
         StringAssert.Contains(exception.ToString(), "dangerous real repo writes");
     }
 
-    [DataTestMethod]
-    [DataRow("Development")]
-    [DataRow("Test")]
-    public async Task NonProductionLike_DoesNotInheritProductionOnlyRules(string environmentName)
+    [TestMethod]
+    public async Task Development_DoesNotInheritProductionOnlyRules()
     {
         using var jwtKey = TemporaryEnvironmentVariable.Set("IRONDEV_JWT_KEY", TestJwtKey);
         using var factory = BuildFactory(
-            environmentName: environmentName,
+            environmentName: "Development",
             connectionString: "Server=localhost;Database=IronDeveloper_Test;Integrated Security=True;Encrypt=True;",
             localTestWorkspaceRoot: Path.Combine(Path.GetTempPath(), "IronDevTestWorkspaces"),
             localTestLogsRoot: Path.Combine(Path.GetTempPath(), "IronDevTestLogs"),

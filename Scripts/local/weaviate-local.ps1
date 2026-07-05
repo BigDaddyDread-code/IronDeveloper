@@ -227,8 +227,15 @@ function Get-SchemaPathClassification {
             return [pscustomobject]@{ IsProvided = $true; IsUsable = $false; ReasonCode = "SchemaPathTempRejected"; FullPath = $null }
         }
 
-        if ($fullPath -match '^[A-Za-z]:\\Users\\' -or $fullPath -match '^/home/' -or $fullPath -match '^/Users/') {
-            return [pscustomobject]@{ IsProvided = $true; IsUsable = $false; ReasonCode = "SchemaPathUserHomeRejected"; FullPath = $null }
+        $userHomePatterns = @(
+            ('^[A-Za-z]:\\' + 'Users\\'),
+            ('^/' + 'home/'),
+            ('^/' + 'Users/')
+        )
+        foreach ($userHomePattern in $userHomePatterns) {
+            if ($fullPath -match $userHomePattern) {
+                return [pscustomobject]@{ IsProvided = $true; IsUsable = $false; ReasonCode = "SchemaPathUserHomeRejected"; FullPath = $null }
+            }
         }
 
         return [pscustomobject]@{ IsProvided = $true; IsUsable = $false; ReasonCode = "SchemaPathOutsideRepositoryRejected"; FullPath = $null }

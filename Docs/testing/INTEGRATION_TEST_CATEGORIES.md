@@ -14,9 +14,9 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 618
-- Test classes found: 612
-- Test methods found: 9767
+- Source files scanned: 621
+- Test classes found: 615
+- Test methods found: 9797
 - Category names found: 231
 
 ## G13 Category Changes
@@ -127,9 +127,26 @@ A label does not make a slow test safe.
 
 - Added focused `ConfigBoundary` metadata to the J08 redacted config summary regression test.
 - J08 does not add `RequiresRealDatabase` or `LongRunning`; the test constructs in-memory config summary inputs and reads Core source, docs, and receipt metadata only.
-- J08 verifies raw connection strings are never emitted, sensitive keys are redacted, user-local paths are redacted, local override presence is reported without contents, environment-variable precedence can be represented without values, root safety is `NotEvaluated` without J10, and no bootstrap/mutation surface is added.
+- J08 verifies raw connection strings are never emitted, sensitive keys are redacted, user-local paths are redacted, local override presence is reported without contents, environment-variable precedence can be represented without values, root safety is `NotEvaluated` when no validator result is supplied, and no bootstrap/mutation surface is added.
 - J08 does not add SQL connectivity checks, SQL bootstrap, SQL rebuild, Weaviate bootstrap/rebuild, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, or production runtime behavior.
 - Config summaries help humans debug setup. They do not bless the setup.
+
+## J09 Test Environment Isolation Outside LocalTest
+
+- Added focused `ConfigBoundary`, `Boundary`, `Contract`, and `StaticBoundary` metadata to the J09 static regression test.
+- Added API startup coverage for `TestEnvironmentIsolationSafetyTests`; the governance boundary script selects both the static proof and API startup proof.
+- J09 does not add `RequiresRealDatabase` or `LongRunning`; the tests use API startup validation and static source/receipt checks without real SQL execution.
+- J09 verifies non-LocalTest test-shaped environments route through J09 startup validation, keep `LocalTest` under C12, keep unknown/custom names under C13, do not treat `Development` as test-shaped, reject unsafe database/root shapes, and block dangerous real repo writes.
+- J09 does not add SQL bootstrap, SQL rebuild, Weaviate bootstrap/rebuild, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, root creation, or production runtime behavior.
+- Test environment isolation is a startup guard. It is not evidence, approval, release readiness, or permission to mutate source.
+
+## J10 Logs Evidence Workspace Root Safety
+
+- Added focused `ConfigBoundary`, `Boundary`, and `Contract` metadata to the J10 root-safety regression test.
+- J10 does not add `RequiresRealDatabase` or `LongRunning`; the test validates Core root-safety rules and disposable workspace preflight behavior with temporary local folders only.
+- J10 verifies repository-root, broad-root, relative/traversal/file/reparse-shaped, workspace/evidence overlap, and sandbox-repository hazards fail closed before disposable workspace execution writes workspace or evidence output.
+- J10 does not add SQL connectivity checks, SQL bootstrap, SQL rebuild, Weaviate bootstrap/rebuild, schema changes, API/CLI/UI behavior, workflow/source-apply/rollback/release/deployment authority, startup logging, or production runtime behavior.
+- A safe root is a precondition for evidence. It is not evidence, approval, execution authority, or permission to mutate source.
 
 ## J04 Local Bootstrap Script
 
@@ -240,12 +257,12 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 20 | 193 | 0 | 20 |
+| `Boundary` | 23 | 223 | 0 | 23 |
 | `Builder` | 1 | 9 | 0 | 1 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
-| `ConfigBoundary` | 8 | 94 | 0 | 8 |
-| `Contract` | 22 | 209 | 0 | 22 |
+| `ConfigBoundary` | 11 | 124 | 0 | 11 |
+| `Contract` | 25 | 239 | 0 | 25 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -402,7 +419,7 @@ A label does not make a slow test safe.
 | `SqlInventory` | 1 | 8 | 0 | 1 |
 | `Spike` | 1 | 6 | 0 | 1 |
 | `StaleAuthorityDetection` | 1 | 31 | 0 | 1 |
-| `StaticBoundary` | 39 | 294 | 0 | 39 |
+| `StaticBoundary` | 40 | 303 | 0 | 40 |
 | `SkeletonRun` | 1 | 9 | 0 | 1 |
 | `StorageReview` | 4 | 28 | 0 | 4 |
 | `Store` | 12 | 130 | 0 | 12 |
