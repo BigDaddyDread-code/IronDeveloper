@@ -8,7 +8,8 @@ public enum LocalRootKind
     DisposableWorkspaceRoot = 3,
     SandboxRepositoryPath = 4,
     CanaryMeasurementRoot = 5,
-    BatchMapEvidenceRoot = 6
+    BatchMapEvidenceRoot = 6,
+    SmokeArtifactRoot = 7
 }
 
 public sealed record LocalRootSafetyRequest(

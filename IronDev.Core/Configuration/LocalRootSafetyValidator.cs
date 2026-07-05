@@ -139,7 +139,7 @@ public static class LocalRootSafetyValidator
         kind is LocalRootKind.WorkspaceRoot or LocalRootKind.DisposableWorkspaceRoot;
 
     private static bool IsDurableOutputKind(LocalRootKind kind) =>
-        kind is LocalRootKind.EvidenceRoot or LocalRootKind.LogsRoot or LocalRootKind.CanaryMeasurementRoot or LocalRootKind.BatchMapEvidenceRoot;
+        kind is LocalRootKind.EvidenceRoot or LocalRootKind.LogsRoot or LocalRootKind.CanaryMeasurementRoot or LocalRootKind.BatchMapEvidenceRoot or LocalRootKind.SmokeArtifactRoot;
 
     private static LocalRootSafetyResult Safe(LocalRootKind kind, string configKey, string? normalizedPath, string? reasonCode, string message) =>
         new(kind, configKey, true, normalizedPath, reasonCode, message, "No root-safety action required.");

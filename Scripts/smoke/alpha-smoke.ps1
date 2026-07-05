@@ -40,6 +40,7 @@ $script:KnownReasonCodes = @(
     "LocalOverrideMissing",
     "RootSafetyNotEvaluated",
     "UnsafeRoot",
+    "RootSafetyBlocked",
     "DeterministicModelNotConfigured",
     "LiveModelNotConfigured",
     "LiveModelModeNotImplemented",
@@ -403,7 +404,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 $outputFull = [System.IO.Path]::GetFullPath($OutputDirectory)
 $unsafeReason = Test-SafeOutputRoot -RepoRoot $repoRoot -Path $outputFull
 if ($unsafeReason) {
-    Add-Stage "RootSafetyCheck" "Blocked" "UnsafeRoot" "Smoke output root is unsafe: $unsafeReason." @{ outputDirectory = $outputFull; unsafeReason = $unsafeReason }
+    Add-Stage "RootSafetyCheck" "Blocked" "RootSafetyBlocked" "Smoke output root is unsafe: $unsafeReason." @{ outputDirectory = $outputFull; unsafeReason = $unsafeReason; legacyReasonCode = "UnsafeRoot" }
     Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
 }
 

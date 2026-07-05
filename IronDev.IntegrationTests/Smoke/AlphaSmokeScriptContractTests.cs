@@ -96,6 +96,7 @@ public sealed class AlphaSmokeScriptContractTests
                      "LocalOverrideMissing",
                      "RootSafetyNotEvaluated",
                      "UnsafeRoot",
+                     "RootSafetyBlocked",
                      "DeterministicModelNotConfigured",
                      "LiveModelNotConfigured",
                      "LiveModelModeNotImplemented",

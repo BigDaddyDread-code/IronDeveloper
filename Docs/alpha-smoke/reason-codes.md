@@ -18,7 +18,8 @@ Reason codes are part of the smoke contract. A blocked or failed stage should be
 | `SqlUnavailable` | SQL was not used or not reachable. | D-2a currently uses in-memory stores. | Treat as named gap until SQL/API smoke lands. | Pretend in-memory is durable proof. |
 | `LocalOverrideMissing` | Local override config was not found. | Fresh checkout has no local override. | Follow Block J local config docs when API/SQL smoke needs it. | Commit machine-specific config. |
 | `RootSafetyNotEvaluated` | Check-only mode did not evaluate writable roots. | No artifacts are written in check-only mode. | Run `-RunUntil Gate` to evaluate output root safety. | Treat check-only as execution proof. |
-| `UnsafeRoot` | Smoke output root is unsafe. | Output under repo/root/home/temp root or reparse-point ancestor. | Choose a safe output directory outside source. | Write artifacts under source. |
+| `RootSafetyBlocked` | Smoke output root is unsafe. | Output under repo/root/home/temp root or reparse-point ancestor. | Choose a safe output directory outside source. | Write artifacts under source. |
+| `UnsafeRoot` | Legacy detail value for unsafe smoke output roots. | The release-facing stage reason is `RootSafetyBlocked`. | Use `RootSafetyBlocked` for new checks. | Treat legacy detail as permission to write. |
 | `DeterministicModelNotConfigured` | Deterministic model mode lacks explicit configuration. | Future config-driven deterministic smoke was requested without fixture setup. | Configure deterministic smoke explicitly. | Fall back to arbitrary fake output. |
 | `LiveModelModeNotImplemented` | Live mode is intentionally absent in D-2a. | `-ModelMode Live` was requested. | Implement D-2b explicitly. | Fall back to deterministic silently. |
 | `LiveModelNotConfigured` | Future live mode lacks provider config. | Model provider/key/alias missing. | Configure live provider safely. | Log secrets or fake live mode. |
