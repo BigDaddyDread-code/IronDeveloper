@@ -260,11 +260,12 @@ A label does not make a slow test safe.
 - M02 does not add API endpoints, UI, message services, Ask IronDev behavior, reactions, sockets, notifications, workflow commands, approval from chat, release/deployment from chat, memory promotion from chat, or existing ProjectChatSessions migration.
 - Channel schema stores collaboration state only.
 
-## DEMO-1 / DEMO-2 Demo Seed and Chat Ticket Proof
+## DEMO-1a / DEMO-2a Demo Seed Proof Harness
 
 - Added focused `DemoSeed`, `AlphaSmoke`, and `ReleaseReadiness` metadata to the demo seed script/API proof tests.
 - The API proof adds `RequiresRealDatabase` and `LongRunning` metadata because it drives authenticated API routes against SQL-backed stores and shells out to build/test a disposable BookSeller source copy.
 - The script contract proof adds broad `Contract` and `Boundary` metadata; it validates check-only behavior, root-safety blocking, no direct SQL final-state inserts, receipt redaction, report reconstruction markers, and the existing flow-shell controls.
+- This is integration-host proof, not the DEMO-1b long-lived local API/SQL seed that makes the running UI read seeded state.
 - Demo seed history is evidence. It is not approval, policy satisfaction, workflow continuation, apply permission, release readiness, or deployment readiness.
 
 ## Inventory

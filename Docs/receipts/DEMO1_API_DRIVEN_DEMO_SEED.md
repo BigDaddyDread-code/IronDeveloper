@@ -1,10 +1,12 @@
-# DEMO-1 / DEMO-2 Receipt - API-Driven Demo Seed and Chat Ticket Proof
+# DEMO-1a / DEMO-2a Receipt - API-Driven Proof Harness
 
 ## Slice
 
-DEMO-1 creates the local alpha demo seed command and API-backed proof for the BookSeller baseline.
+DEMO-1a creates the local alpha demo seed command and API-backed proof harness for the BookSeller baseline.
 
-DEMO-2 is included only as the visible/startable chat-to-ticket proof because the same product path is needed to keep the demo honest.
+DEMO-2a is included only as the visible/startable chat-to-ticket proof because the same product path is needed to keep the demo honest.
+
+This is real backend/API/SQL evidence through the integration host. It is not yet the long-lived local API/SQL seed that makes the running product UI come alive.
 
 ## Files Changed
 
@@ -32,7 +34,7 @@ Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic
 - The PausedForApproval ticket does not create accepted approval, continuation, or apply evidence.
 - Reports are reconstructed from SQL-backed API state.
 - The live chat ticket is not seeded ahead of the demo.
-- DEMO-2 proves chat session/message, draft generation, draft confirmation, ticket list visibility, ticket detail, and start-governed-run to the human gate.
+- DEMO-2a proves chat session/message, draft generation, draft confirmation, ticket list visibility, ticket detail, and start-governed-run to the human gate.
 
 ## Boundary
 
@@ -68,8 +70,9 @@ The receipt must not print raw secrets, tokens, connection strings, API keys, or
 
 ## Known Limits
 
-- DEMO-1 runs through the API integration host, not a separately launched long-lived API process.
-- DEMO-2 proves API-visible/startable behavior and the existing flow-shell controls; full browser click-through belongs to DEMO-3/DEMO-4.
+- DEMO-1a runs through the API integration host, not a separately launched long-lived API process.
+- DEMO-1b must seed a long-lived local API/SQL environment that the UI can open.
+- DEMO-2a proves API-visible/startable behavior and the existing flow-shell controls; full browser click-through belongs to DEMO-3/DEMO-4.
 - The seed remains deterministic-only. Live model demo posture is a later explicit decision.
 - This is not release readiness, merge readiness, deployment readiness, or alpha release approval.
 
