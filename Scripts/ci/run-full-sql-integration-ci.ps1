@@ -74,6 +74,7 @@ function Invoke-TestLane {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$Filter,
+        [string]$Project = $script:Project,
         [bool]$AllowRetry = $false,
         [int]$Attempts = 1,
         [int]$DelaySeconds = 2
@@ -92,7 +93,7 @@ function Invoke-TestLane {
             Write-Host "Readiness attempt $attempt of $Attempts"
         }
 
-        dotnet test $script:Project `
+        dotnet test $Project `
             --no-restore `
             --no-build `
             --logger "console;verbosity=minimal" `
@@ -215,22 +216,28 @@ function Invoke-SelectionLane {
 function Set-TestOutputConnectionString {
     param([Parameter(Mandatory = $true)][string]$ConnectionString)
 
-    $outputSettingsPath = Join-Path $PSScriptRoot "..\..\IronDev.IntegrationTests\bin\Debug\net10.0\appsettings.Test.json"
-    $resolvedPath = [System.IO.Path]::GetFullPath($outputSettingsPath)
-    $outputDirectory = Split-Path -Parent $resolvedPath
-    if (-not (Test-Path $outputDirectory)) {
-        throw "Test output directory does not exist. Build the solution before running SQL CI: $outputDirectory"
-    }
-
     $settings = @{
         ConnectionStrings = @{
             IronDeveloperDb = $ConnectionString
         }
     }
 
-    $settings |
-        ConvertTo-Json -Depth 4 |
-        Set-Content -LiteralPath $resolvedPath -Encoding UTF8
+    $outputSettingsPaths = @(
+        Join-Path $PSScriptRoot "..\..\IronDev.IntegrationTests\bin\Debug\net10.0\appsettings.Test.json"
+        Join-Path $PSScriptRoot "..\..\IronDev.IntegrationTests.Api\bin\Debug\net10.0\appsettings.Test.json"
+    )
+
+    foreach ($outputSettingsPath in $outputSettingsPaths) {
+        $resolvedPath = [System.IO.Path]::GetFullPath($outputSettingsPath)
+        $outputDirectory = Split-Path -Parent $resolvedPath
+        if (-not (Test-Path $outputDirectory)) {
+            throw "Test output directory does not exist. Build the solution before running SQL CI: $outputDirectory"
+        }
+
+        $settings |
+            ConvertTo-Json -Depth 4 |
+            Set-Content -LiteralPath $resolvedPath -Encoding UTF8
+    }
 }
 
 function New-CiConnectionString {
@@ -331,6 +338,7 @@ $script:ArtifactRoot = Join-Path $script:RepoRoot "artifacts\ci\full-sql-integra
 $script:TestResultsRoot = Join-Path $script:ArtifactRoot "test-results"
 $script:SelectionRoot = Join-Path $script:ArtifactRoot "selection"
 $script:Project = "IronDev.IntegrationTests/IronDev.IntegrationTests.csproj"
+$script:ApiProject = "IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj"
 $script:TimingRecords = New-Object System.Collections.ArrayList
 $script:LaneRecords = New-Object System.Collections.ArrayList
 $script:SelectionRecords = New-Object System.Collections.ArrayList
@@ -407,6 +415,11 @@ try {
     ) -join "|"
 
     Invoke-TestLane -Name "Real database smoke expansion" -Filter $realDatabaseSmokeFilter
+
+    Invoke-TestLane `
+        -Name "REL-3 SQL API alpha smoke" `
+        -Project $script:ApiProject `
+        -Filter "FullyQualifiedName~AlphaSmokeApiPersistenceTests.Rel3_OneTicket_ReachesApplied_ThroughSqlBackedApi"
 
     $categoryContractFilter = @(
         "FullyQualifiedName~IntegrationTestCategoryContractTests",

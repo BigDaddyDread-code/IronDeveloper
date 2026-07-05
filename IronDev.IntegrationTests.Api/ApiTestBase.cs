@@ -5,10 +5,15 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Dapper;
+using IronDev.Core;
+using IronDev.Core.Agents.Concrete;
+using IronDev.Infrastructure.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Api;
@@ -73,8 +78,19 @@ public abstract class ApiTestBase
 
                         cfg.AddInMemoryCollection(new Dictionary<string, string?>
                         {
+                            ["Ai:Provider"] = "fake",
+                            ["AgentProfiles:Root"] = Path.Combine(Path.GetTempPath(), $"irondev-api-test-agent-profiles-{Guid.NewGuid():N}"),
+                            ["ConnectionStrings:IronDeveloperDb"] = TestConnectionString(),
                             ["Jwt:Key"] = TestJwtKey
                         });
+                    });
+
+                    builder.ConfigureServices(services =>
+                    {
+                        services.RemoveAll<ILLMService>();
+                        services.AddScoped<ILLMService, FakeLlmService>();
+                        services.RemoveAll<IStoredManualIndependentCriticAgentService>();
+                        services.AddScoped<IStoredManualIndependentCriticAgentService, StartupOnlyStoredCriticService>();
                     });
                 });
 
@@ -643,5 +659,29 @@ public abstract class ApiTestBase
         return string.IsNullOrWhiteSpace(overrideValue)
             ? DefaultTestConnectionString
             : overrideValue;
+    }
+
+    private sealed class StartupOnlyStoredCriticService : IStoredManualIndependentCriticAgentService
+    {
+        public StoredManualAgentExecutionResult<CriticReviewResult> ExecuteAndStore(
+            ManualCriticReviewRequest request,
+            ManualAgentExecutionSpecialisationSelection specialisation,
+            DateTimeOffset executedAtUtc) =>
+            new()
+            {
+                Status = StoredManualAgentExecutionStatus.Rejected,
+                AgentRunId = "api-test-startup-only-stub",
+                AgentId = "independent-critic",
+                SpecialisationId = specialisation.SpecialisationId,
+                Issues =
+                [
+                    new StoredManualAgentExecutionIssue
+                    {
+                        Code = "API_TEST_STARTUP_ONLY",
+                        Severity = "Info",
+                        Message = "API integration tests replace stored critic execution unless a test registers a dedicated implementation."
+                    }
+                ]
+            };
     }
 }

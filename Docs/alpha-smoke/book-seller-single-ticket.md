@@ -26,6 +26,19 @@ Scripts/smoke/alpha-smoke.ps1 `
 
 The placeholder phrase is intentional. The smoke binds `<runId>` and `<hash>` to the generated run ID and critic package hash after the gate produces them. Without `-RecordHumanApproval`, applied mode blocks with `AcceptedApprovalRequired`.
 
+## SQL/API Persisted Applied Command
+
+```powershell
+Scripts/smoke/alpha-smoke.ps1 `
+  -Project BookSeller `
+  -Ticket validate-book `
+  -ModelMode Deterministic `
+  -RunUntil Applied `
+  -RequireExistingAcceptedApproval
+```
+
+This REL-3 mode uses the authenticated API test host and SQL-backed stores. The switch name is historical from the smoke contract: the path proves an accepted approval exists in SQL before continuation is consumed, but the test creates that approval through the governed accepted-approval API inside the deterministic smoke run.
+
 ## Expected Stages
 
 The script reports named stages:
@@ -53,7 +66,9 @@ The script reports named stages:
 
 Some stages are intentionally `Skipped` in gate mode. In particular, API, SQL, ticket persistence, and critic review request are named gaps because gate mode proves service-level deterministic plumbing to the halt.
 
-Applied mode still names API, SQL, and ticket persistence as gaps. It records deterministic critic-review and human-approval evidence inside the service-level smoke only.
+REL-2 applied mode still names API, SQL, and ticket persistence as gaps. It records deterministic critic-review and human-approval evidence inside the service-level smoke only.
+
+REL-3 persisted mode expects `SqlCheck`, `ApiCheck`, `TicketPersist`, and `ApprovalCheck` to pass with SQL/API-specific reason codes. It records deterministic critic-review evidence, creates accepted approval through the API, consumes that approval through continuation, applies through the API, and verifies SQL rows.
 
 ## Expected Gate State
 
@@ -71,7 +86,7 @@ Applied
 
 That final state is allowed only after the smoke records critic review evidence, records a hash-bound accepted approval, requests continuation, and then requests the controlled copy-only apply spine.
 
-The script must not create accepted approval, request continuation, or apply source.
+Gate mode must not create accepted approval, request continuation, or apply source. REL-2 applied mode creates accepted approval only when `-RecordHumanApproval` and the exact approval phrase are supplied. REL-3 persisted mode creates accepted approval only through the accepted-approval API while `-RequireExistingAcceptedApproval` is explicitly supplied.
 
 ## Finding The Run ID
 
