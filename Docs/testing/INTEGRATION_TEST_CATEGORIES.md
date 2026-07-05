@@ -16,7 +16,7 @@ A label does not make a slow test safe.
 
 - Source files scanned: 623
 - Test classes found: 617
-- Test methods found: 9807
+- Test methods found: 9810
 - Category names found: 234
 
 ## G13 Category Changes
@@ -260,12 +260,13 @@ A label does not make a slow test safe.
 - M02 does not add API endpoints, UI, message services, Ask IronDev behavior, reactions, sockets, notifications, workflow commands, approval from chat, release/deployment from chat, memory promotion from chat, or existing ProjectChatSessions migration.
 - Channel schema stores collaboration state only.
 
-## DEMO-1a / DEMO-2a Demo Seed Proof Harness
+## DEMO-1a / DEMO-2a Proof Harness and DEMO-1b / DEMO-2b Running API Seed
 
 - Added focused `DemoSeed`, `AlphaSmoke`, and `ReleaseReadiness` metadata to the demo seed script/API proof tests.
 - The API proof adds `RequiresRealDatabase` and `LongRunning` metadata because it drives authenticated API routes against SQL-backed stores and shells out to build/test a disposable BookSeller source copy.
-- The script contract proof adds broad `Contract` and `Boundary` metadata; it validates check-only behavior, root-safety blocking, no direct SQL final-state inserts, receipt redaction, report reconstruction markers, and the existing flow-shell controls.
-- This is integration-host proof, not the DEMO-1b long-lived local API/SQL seed that makes the running UI read seeded state.
+- The script contract proof adds broad `Contract` and `Boundary` metadata; it validates check-only behavior, root-safety blocking, running-API endpoint usage, explicit proof-harness mode, no direct SQL final-state inserts, receipt redaction, report reconstruction markers, and the existing flow-shell controls.
+- DEMO-1b makes default `-Seed` target a long-lived running local API/SQL environment that the UI can read.
+- DEMO-2b keeps live chat ticket creation explicit through `-CreateLiveChatTicket`; default seeding still does not create the live chat ticket ahead of the demo.
 - Demo seed history is evidence. It is not approval, policy satisfaction, workflow continuation, apply permission, release readiness, or deployment readiness.
 
 ## Inventory
@@ -282,7 +283,7 @@ A label does not make a slow test safe.
 | `AcceptedApprovalSqlStore` | 1 | 15 | 0 | 1 |
 | `AgentHandoff` | 3 | 53 | 0 | 3 |
 | `AgentHandoffStore` | 1 | 8 | 0 | 1 |
-| `AlphaSmoke` | 5 | 22 | 0 | 5 |
+| `AlphaSmoke` | 5 | 25 | 0 | 5 |
 | `ApiCliContract` | 3 | 24 | 0 | 3 |
 | `ApiCliReleaseGate` | 1 | 10 | 0 | 1 |
 | `ApplyDryRunAuthorityBoundary` | 1 | 4 | 0 | 1 |
@@ -307,12 +308,12 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 24 | 232 | 0 | 24 |
+| `Boundary` | 24 | 235 | 0 | 24 |
 | `Builder` | 1 | 9 | 0 | 1 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `ConfigBoundary` | 11 | 124 | 0 | 11 |
-| `Contract` | 26 | 248 | 0 | 26 |
+| `Contract` | 26 | 251 | 0 | 26 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -320,7 +321,7 @@ A label does not make a slow test safe.
 | `DatabaseMigrationReceipt` | 1 | 7 | 0 | 1 |
 | `DatabaseMigration` | 2 | 12 | 0 | 2 |
 | `Decision` | 2 | 12 | 0 | 2 |
-| `DemoSeed` | 2 | 11 | 0 | 2 |
+| `DemoSeed` | 2 | 14 | 0 | 2 |
 | `DisposableWorkspaceDryRunBoundaryReceipt` | 1 | 20 | 0 | 1 |
 | `DisposableWorkspaceDryRunExecutor` | 1 | 20 | 0 | 1 |
 | `DogfoodReceiptStore` | 1 | 8 | 0 | 1 |
@@ -435,7 +436,7 @@ A label does not make a slow test safe.
 | `Redaction` | 1 | 8 | 0 | 1 |
 | `Receipt` | 20 | 407 | 0 | 20 |
 | `ReleaseGateNegativeCampaign` | 1 | 30 | 0 | 1 |
-| `ReleaseReadiness` | 6 | 37 | 0 | 6 |
+| `ReleaseReadiness` | 6 | 40 | 0 | 6 |
 | `ReleaseReadinessApiRegression` | 1 | 6 | 0 | 1 |
 | `ReleaseReadinessCliRegression` | 1 | 4 | 0 | 1 |
 | `ReleaseReadinessDecisionRecordReadApi` | 1 | 17 | 0 | 1 |
