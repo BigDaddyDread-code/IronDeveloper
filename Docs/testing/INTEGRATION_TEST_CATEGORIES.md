@@ -33,11 +33,11 @@ A label does not make a slow test safe.
 - new categories added: `RequiresRealDatabase`, `LongRunning`, `ManualLocal`.
 - categories not added: `Slow`, `Quarantined`, `RequiresExternalDependency`, `RequiresLocalTooling`.
 - counts by category:
-  - `RequiresRealDatabase`: 41 test classes, 428 test methods, 41 files.
-  - `LongRunning`: 41 test classes, 429 test methods, 41 files.
+  - `RequiresRealDatabase`: 42 test classes, 430 test methods, 42 files.
+  - `LongRunning`: 42 test classes, 431 test methods, 42 files.
   - `ManualLocal`: 1 test class, 1 test method, 1 file.
 - test classes affected: 41 store/real-database-shaped integration classes plus 1 manual local legacy class.
-- test methods affected if source-countable: 428 `RequiresRealDatabase` methods, 429 `LongRunning` methods, and 1 `ManualLocal` method.
+- test methods affected if source-countable: 430 `RequiresRealDatabase` methods, 431 `LongRunning` methods, and 1 `ManualLocal` method.
 - tests moved into explicit slow/quarantine visibility: store and real-database-shaped classes are now explicitly visible through `RequiresRealDatabase` and `LongRunning`; the existing manual local ignored task is visible through `ManualLocal`.
 - tests remain in default lanes: no CI filters were changed, no tests were deleted, and no default lane exclusion was added.
 - selection-only pending execution proof: most `RequiresRealDatabase`/`LongRunning` rows remain `SelectionOnlyPendingExecution` until a slow/SQL lane executes them.
@@ -260,6 +260,14 @@ A label does not make a slow test safe.
 - M02 does not add API endpoints, UI, message services, Ask IronDev behavior, reactions, sockets, notifications, workflow commands, approval from chat, release/deployment from chat, memory promotion from chat, or existing ProjectChatSessions migration.
 - Channel schema stores collaboration state only.
 
+## DEMO-1a / DEMO-2a Demo Seed Proof Harness
+
+- Added focused `DemoSeed`, `AlphaSmoke`, and `ReleaseReadiness` metadata to the demo seed script/API proof tests.
+- The API proof adds `RequiresRealDatabase` and `LongRunning` metadata because it drives authenticated API routes against SQL-backed stores and shells out to build/test a disposable BookSeller source copy.
+- The script contract proof adds broad `Contract` and `Boundary` metadata; it validates check-only behavior, root-safety blocking, no direct SQL final-state inserts, receipt redaction, report reconstruction markers, and the existing flow-shell controls.
+- This is integration-host proof, not the DEMO-1b long-lived local API/SQL seed that makes the running UI read seeded state.
+- Demo seed history is evidence. It is not approval, policy satisfaction, workflow continuation, apply permission, release readiness, or deployment readiness.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -274,7 +282,7 @@ A label does not make a slow test safe.
 | `AcceptedApprovalSqlStore` | 1 | 15 | 0 | 1 |
 | `AgentHandoff` | 3 | 53 | 0 | 3 |
 | `AgentHandoffStore` | 1 | 8 | 0 | 1 |
-| `AlphaSmoke` | 3 | 11 | 0 | 3 |
+| `AlphaSmoke` | 5 | 22 | 0 | 5 |
 | `ApiCliContract` | 3 | 24 | 0 | 3 |
 | `ApiCliReleaseGate` | 1 | 10 | 0 | 1 |
 | `ApplyDryRunAuthorityBoundary` | 1 | 4 | 0 | 1 |
@@ -299,12 +307,12 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 23 | 223 | 0 | 23 |
+| `Boundary` | 24 | 232 | 0 | 24 |
 | `Builder` | 1 | 9 | 0 | 1 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `ConfigBoundary` | 11 | 124 | 0 | 11 |
-| `Contract` | 25 | 239 | 0 | 25 |
+| `Contract` | 26 | 248 | 0 | 26 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -312,6 +320,7 @@ A label does not make a slow test safe.
 | `DatabaseMigrationReceipt` | 1 | 7 | 0 | 1 |
 | `DatabaseMigration` | 2 | 12 | 0 | 2 |
 | `Decision` | 2 | 12 | 0 | 2 |
+| `DemoSeed` | 2 | 11 | 0 | 2 |
 | `DisposableWorkspaceDryRunBoundaryReceipt` | 1 | 20 | 0 | 1 |
 | `DisposableWorkspaceDryRunExecutor` | 1 | 20 | 0 | 1 |
 | `DogfoodReceiptStore` | 1 | 8 | 0 | 1 |
@@ -346,7 +355,7 @@ A label does not make a slow test safe.
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
 | `LocalBootstrap` | 2 | 30 | 0 | 2 |
 | `LocalSql` | 1 | 16 | 0 | 1 |
-| `LongRunning` | 41 | 429 | 0 | 41 |
+| `LongRunning` | 42 | 431 | 0 | 42 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
 | `MemoryPromotionRequestPackage` | 1 | 7 | 0 | 1 |
@@ -426,7 +435,7 @@ A label does not make a slow test safe.
 | `Redaction` | 1 | 8 | 0 | 1 |
 | `Receipt` | 20 | 407 | 0 | 20 |
 | `ReleaseGateNegativeCampaign` | 1 | 30 | 0 | 1 |
-| `ReleaseReadiness` | 4 | 26 | 0 | 4 |
+| `ReleaseReadiness` | 6 | 37 | 0 | 6 |
 | `ReleaseReadinessApiRegression` | 1 | 6 | 0 | 1 |
 | `ReleaseReadinessCliRegression` | 1 | 4 | 0 | 1 |
 | `ReleaseReadinessDecisionRecordReadApi` | 1 | 17 | 0 | 1 |
@@ -435,7 +444,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
 | `RequiresExternalDependency` | 1 | 1 | 0 | 1 |
-| `RequiresRealDatabase` | 41 | 428 | 0 | 41 |
+| `RequiresRealDatabase` | 42 | 430 | 0 | 42 |
 | `Retention` | 2 | 16 | 0 | 2 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |
