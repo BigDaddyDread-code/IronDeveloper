@@ -30,6 +30,7 @@ public sealed class TicketsController : ControllerBase
     private readonly ITicketEvidenceSummaryService _evidenceSummary;
     private readonly ITicketRunReviewService _runReview;
     private readonly IBuilderProposalService _proposals;
+    private readonly IChatHistoryService _chatHistory;
 
     public TicketsController(
         ITicketService tickets,
@@ -47,7 +48,8 @@ public sealed class TicketsController : ControllerBase
         IBuilderReadinessService readiness,
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
-        IBuilderProposalService proposals)
+        IBuilderProposalService proposals,
+        IChatHistoryService chatHistory)
     {
         _tickets = tickets;
         _drafts = drafts;
@@ -65,6 +67,7 @@ public sealed class TicketsController : ControllerBase
         _evidenceSummary = evidenceSummary;
         _runReview = runReview;
         _proposals = proposals;
+        _chatHistory = chatHistory;
     }
 
     [HttpGet("api/projects/{projectId:int}/tickets")]
@@ -192,8 +195,49 @@ public sealed class TicketsController : ControllerBase
     }
 
     [HttpPost("api/projects/{projectId:int}/tickets/draft")]
-    public Task<DraftTicket> GenerateDraft(int projectId, DraftTicketRequest request, CancellationToken ct) =>
-        _drafts.GenerateDraftAsync(projectId, request.ProjectName, request.ProposedTitle, request.MessageText, request.LinkedFilePaths, request.LinkedSymbols, request.SessionId, ct);
+    public async Task<DraftTicket> GenerateDraft(int projectId, DraftTicketRequest request, CancellationToken ct)
+    {
+        var draft = await _drafts.GenerateDraftAsync(
+            projectId,
+            request.ProjectName,
+            request.ProposedTitle,
+            request.MessageText,
+            request.LinkedFilePaths,
+            request.LinkedSymbols,
+            request.SessionId,
+            ct);
+
+        if (request.SessionId is > 0)
+            draft.SourceChatSessionId = request.SessionId.Value;
+        if (request.MessageId is > 0)
+            draft.SourceMessageId = request.MessageId.Value;
+        if (!string.IsNullOrWhiteSpace(request.MessageText))
+            draft.SourceMessageText = request.MessageText;
+
+        return draft;
+    }
+
+    [HttpPost("api/projects/{projectId:int}/tickets/draft/confirm")]
+    public async Task<ActionResult<ProjectTicket>> ConfirmDraft(int projectId, DraftTicket current, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(current.Title))
+            return BadRequest(new { error = "Draft ticket title is required." });
+
+        var provenance = await ValidateDraftChatProvenanceAsync(projectId, current, ct);
+        if (!provenance.IsValid)
+        {
+            return BadRequest(new
+            {
+                error = provenance.Error,
+                reasonCode = provenance.ReasonCode,
+                boundary = "Draft confirmation requires server-verified chat provenance before persisting chat source references."
+            });
+        }
+
+        var ticket = MapDraftTicket(projectId, current, provenance.Provenance);
+        ticket.Id = await _tickets.SaveTicketAsync(ticket, ct);
+        return Ok(ticket);
+    }
 
     [HttpPost("api/projects/{projectId:int}/tickets/draft/plan")]
     public Task<DraftTicket> GeneratePlan(int projectId, DraftTicket current, CancellationToken ct) =>
@@ -574,7 +618,7 @@ public sealed class TicketsController : ControllerBase
     public Task<BuildReadinessResult> ValidateArchitecture(BuilderProposal proposal, CancellationToken ct) =>
         _readiness.ValidateProposalArchitectureAsync(proposal, ct);
 
-    public sealed record DraftTicketRequest(string ProjectName, string ProposedTitle, string MessageText, string? LinkedFilePaths, string? LinkedSymbols, long? SessionId);
+    public sealed record DraftTicketRequest(string ProjectName, string ProposedTitle, string MessageText, string? LinkedFilePaths, string? LinkedSymbols, long? SessionId, long? MessageId = null);
     public sealed record ProposalRequest(string Request);
 
     private static ProjectTicket MapCreateRequest(int projectId, CreateProjectTicketRequest request)
@@ -601,8 +645,153 @@ public sealed class TicketsController : ControllerBase
         };
     }
 
+    private async Task<ChatProvenanceValidation> ValidateDraftChatProvenanceAsync(
+        int projectId,
+        DraftTicket draft,
+        CancellationToken ct)
+    {
+        var hasSession = draft.SourceChatSessionId > 0;
+        var hasMessage = draft.SourceMessageId > 0;
+        if (!hasSession && !hasMessage)
+            return ChatProvenanceValidation.Valid(null);
+
+        if (!hasSession || !hasMessage)
+        {
+            return ChatProvenanceValidation.Invalid(
+                "ChatProvenanceIncomplete",
+                "Both SourceChatSessionId and SourceMessageId are required when confirming chat provenance.");
+        }
+
+        var sessionId = draft.SourceChatSessionId;
+        var messageId = draft.SourceMessageId;
+
+        var session = await _chatHistory.GetSessionByIdAsync(sessionId, ct);
+        if (session is null)
+        {
+            return ChatProvenanceValidation.Invalid(
+                "ChatSessionMissing",
+                "The supplied source chat session was not found for the current tenant.");
+        }
+
+        if (session.ProjectId != projectId)
+        {
+            return ChatProvenanceValidation.Invalid(
+                "ChatSessionProjectMismatch",
+                "The supplied source chat session does not belong to this project.");
+        }
+
+        var message = await _chatHistory.GetMessageByIdAsync(messageId, projectId, ct);
+        if (message is null)
+        {
+            return ChatProvenanceValidation.Invalid(
+                "ChatMessageMissing",
+                "The supplied source chat message was not found for this project.");
+        }
+
+        if (message.ChatSessionId != sessionId)
+        {
+            return ChatProvenanceValidation.Invalid(
+                "ChatMessageSessionMismatch",
+                "The supplied source chat message does not belong to the supplied source chat session.");
+        }
+
+        return ChatProvenanceValidation.Valid(new VerifiedChatProvenance(sessionId, messageId, message.Message));
+    }
+
+    private static ProjectTicket MapDraftTicket(int projectId, DraftTicket draft, VerifiedChatProvenance? provenance)
+    {
+        var technicalNotes = BuildDraftTechnicalNotes(draft);
+        var generationNote = string.IsNullOrWhiteSpace(draft.GenerationNote)
+            ? "Confirmed from draft ticket. Confirmation persists the ticket only; it does not start or approve a governed run."
+            : draft.GenerationNote.Trim();
+        var sourceMessageText = provenance?.MessageText ?? draft.SourceMessageText;
+
+        return new ProjectTicket
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            Title = draft.Title.Trim(),
+            TicketType = Normalize(draft.TicketType, "Task"),
+            Priority = Normalize(draft.Priority, "Medium"),
+            Summary = TrimToNull(draft.Summary),
+            Background = TrimToNull(draft.Background),
+            AcceptanceCriteria = TrimToNull(draft.AcceptanceCriteria),
+            TechnicalNotes = technicalNotes,
+            Status = "Draft",
+            Content = BuildDraftContent(draft, technicalNotes, generationNote, sourceMessageText),
+            LinkedFilePaths = TrimToNull(draft.LinkedFilePaths),
+            LinkedSymbols = TrimToNull(draft.LinkedSymbols),
+            UnitTests = TrimToNull(draft.UnitTests),
+            IntegrationTests = TrimToNull(draft.IntegrationTests),
+            ManualTests = TrimToNull(draft.ManualTests),
+            RegressionTests = TrimToNull(draft.RegressionTests),
+            BuildValidation = TrimToNull(draft.BuildValidation),
+            ContextSummary = TrimToNull(sourceMessageText),
+            IsGenerated = draft.IsGenerated,
+            GenerationNote = generationNote,
+            SourceChatSessionId = provenance?.SessionId,
+            SourceChatMessageId = provenance?.MessageId
+        };
+    }
+
     private static string Normalize(string? value, string fallback) =>
         string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static string? TrimToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? BuildDraftTechnicalNotes(DraftTicket draft)
+    {
+        var sections = new List<string>();
+        AddSection(sections, "Implementation plan", draft.ImplementationPlan);
+        AddSection(sections, "Unit tests", draft.UnitTests);
+        AddSection(sections, "Integration tests", draft.IntegrationTests);
+        AddSection(sections, "Manual tests", draft.ManualTests);
+        AddSection(sections, "Regression tests", draft.RegressionTests);
+        AddSection(sections, "Build validation", draft.BuildValidation);
+
+        return sections.Count == 0 ? null : string.Join($"{Environment.NewLine}{Environment.NewLine}", sections);
+    }
+
+    private static string BuildDraftContent(
+        DraftTicket draft,
+        string? technicalNotes,
+        string? generationNote,
+        string? sourceMessageText)
+    {
+        var sections = new List<string> { $"# {draft.Title.Trim()}" };
+        AddSection(sections, "Summary", draft.Summary);
+        AddSection(sections, "Background", draft.Background);
+        AddSection(sections, "Acceptance criteria", draft.AcceptanceCriteria);
+        if (!string.IsNullOrWhiteSpace(technicalNotes))
+            sections.Add(technicalNotes);
+        if (!string.IsNullOrWhiteSpace(generationNote))
+            sections.Add($"## Provenance{Environment.NewLine}{generationNote}");
+        AddSection(sections, "Source chat excerpt", sourceMessageText);
+
+        return string.Join($"{Environment.NewLine}{Environment.NewLine}", sections);
+    }
+
+    private sealed record VerifiedChatProvenance(long SessionId, long MessageId, string MessageText);
+
+    private sealed record ChatProvenanceValidation(
+        bool IsValid,
+        VerifiedChatProvenance? Provenance,
+        string? ReasonCode,
+        string? Error)
+    {
+        public static ChatProvenanceValidation Valid(VerifiedChatProvenance? provenance) =>
+            new(true, provenance, null, null);
+
+        public static ChatProvenanceValidation Invalid(string reasonCode, string error) =>
+            new(false, null, reasonCode, error);
+    }
+
+    private static void AddSection(ICollection<string> sections, string heading, string? body)
+    {
+        if (!string.IsNullOrWhiteSpace(body))
+            sections.Add($"## {heading}{Environment.NewLine}{body.Trim()}");
+    }
 
     private static string? FormatAcceptanceCriteria(IReadOnlyList<string> acceptanceCriteria)
     {

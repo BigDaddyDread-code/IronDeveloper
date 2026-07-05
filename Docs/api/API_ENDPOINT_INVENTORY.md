@@ -75,6 +75,7 @@ Intended consumers:
 | POST | `/api/projects/{projectId}/tickets/generate-from-discussion` | `TicketsController.GenerateFromDiscussion` | Generate ticket from discussion. | Implemented | Legacy WPF, TauriShell | Missing product CLI command. |
 | DELETE | `/api/tickets/{ticketId}` | `TicketsController.ArchiveTicket` | Archive ticket. | Implemented | Legacy WPF, TauriShell | Missing product CLI command. |
 | POST | `/api/projects/{projectId}/tickets/draft` | `TicketsController.GenerateDraft` | Generate draft ticket. | Implemented | Legacy WPF, TauriShell | Product workflow route. |
+| POST | `/api/projects/{projectId}/tickets/draft/confirm` | `TicketsController.ConfirmDraft` | Persist a confirmed draft ticket with server-verified chat provenance when source refs are supplied. | Implemented | TauriShell, API smoke | Persists ticket only; does not start a run or grant approval. |
 | POST | `/api/projects/{projectId}/tickets/draft/plan` | `TicketsController.GeneratePlan` | Generate/update draft plan. | Implemented | Legacy WPF, TauriShell | Product workflow route. |
 | POST | `/api/projects/{projectId}/tickets/draft/tests` | `TicketsController.RegenerateTests` | Generate/update draft tests. | Implemented | Legacy WPF, TauriShell | Product workflow route. |
 | POST | `/api/projects/{projectId}/tickets/generate-from-codebase` | `TicketsController.GenerateTicketsFromCodebase` | Generate tickets from codebase. | Implemented | Product CLI, Legacy WPF, Dogfood Runner | Product CLI command is planned, not present. |

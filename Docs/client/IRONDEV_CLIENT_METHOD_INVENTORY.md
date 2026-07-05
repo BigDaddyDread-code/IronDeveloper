@@ -99,6 +99,7 @@ HTTP-backed typed operation count, excluding the overlapping product facade: **8
 | `ArchiveTicketAsync` | DELETE | `/api/tickets/{ticketId}` | None | `bool` | Retired WPF history | Implemented |
 | `GenerateTicketsAsync` | POST | `/api/projects/{projectId}/tickets/generate-from-codebase` | None | `CodebaseTicketGenerationResult` | Retired WPF history / dogfood | Implemented |
 | `GenerateDraftAsync` | POST | `/api/projects/{projectId}/tickets/draft` | `DraftTicketRequest` | `DraftTicket` | Retired WPF history | Implemented |
+| `ConfirmDraftAsync` | POST | `/api/projects/{projectId}/tickets/draft/confirm` | `DraftTicket` | `ProjectTicket` | API/OpenAPI route; typed C# client method not added | Implemented route only |
 | `GeneratePlanAsync` | POST | `/api/projects/{projectId}/tickets/draft/plan` | `DraftTicket` | `DraftTicket` | Retired WPF history | Implemented |
 | `RegenerateTestsAsync` | POST | `/api/projects/{projectId}/tickets/draft/tests` | `DraftTicket` | `DraftTicket` | Retired WPF history | Implemented |
 | `CreateBuildPreviewAsync` | POST | `/api/projects/{projectId}/tickets/{ticketId}/build-preview` | None | `TicketBuildPreview` | Retired WPF history | Implemented |

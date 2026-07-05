@@ -29,10 +29,13 @@ public sealed class AlphaSmokeScriptContractTests
     public void AlphaSmokeScript_LiveModeBlocksWithNamedReason_AndDoesNotFallbackToDeterministic()
     {
         var result = RunPowerShell("-ModelMode", "Live", "-RunUntil", "Gate", "-Json");
+        var source = File.ReadAllText(RepoFile("Scripts", "smoke", "alpha-smoke.ps1"));
 
-        Assert.AreNotEqual(0, result.ExitCode, "Live mode is not implemented in D-2a and must block.");
-        StringAssert.Contains(result.Output, "LiveModelModeNotImplemented");
-        StringAssert.Contains(result.Output, "must never fall back to deterministic");
+        Assert.AreNotEqual(0, result.ExitCode, "Live mode beyond TicketDraft is not supported and must block.");
+        StringAssert.Contains(result.Output, "LiveModelRunUntilUnsupported");
+        using var document = JsonDocument.Parse(result.Output);
+        Assert.AreEqual("Live", document.RootElement.GetProperty("modelMode").GetString());
+        StringAssert.Contains(source, "must never fall back to deterministic mode");
     }
 
     [TestMethod]
@@ -101,6 +104,7 @@ public sealed class AlphaSmokeScriptContractTests
                      "RootSafetyBlocked",
                      "DeterministicModelNotConfigured",
                      "LiveModelNotConfigured",
+                     "LiveModelRunUntilUnsupported",
                      "LiveModelModeNotImplemented",
                      "TicketPersistFailed",
                      "TicketPersisted",

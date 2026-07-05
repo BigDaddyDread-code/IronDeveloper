@@ -4,8 +4,9 @@ param(
     [string]$Ticket = "validate-book",
     [ValidateSet("Deterministic", "Live")]
     [string]$ModelMode = "Deterministic",
-    [ValidateSet("CheckOnly", "Readiness", "Gate", "Report", "Applied")]
+    [ValidateSet("CheckOnly", "Readiness", "TicketDraft", "Gate", "Report", "Applied")]
     [string]$RunUntil,
+    [switch]$StartFromChat,
     [string]$ApiBaseUrl = "http://localhost:5118",
     [string]$OutputDirectory,
     [switch]$Json,
@@ -48,9 +49,14 @@ $script:KnownReasonCodes = @(
     "RootSafetyBlocked",
     "DeterministicModelNotConfigured",
     "LiveModelNotConfigured",
+    "LiveModelOptInMissing",
+    "LiveModelRunUntilUnsupported",
     "LiveModelModeNotImplemented",
+    "ChatTicketRunUntilUnsupported",
     "TicketPersistFailed",
     "TicketPersisted",
+    "TicketDraftNotPersisted",
+    "TicketDraftGenerated",
     "ReadinessBlocked",
     "SkeletonRunStartFailed",
     "CriticPackageMissing",
@@ -407,8 +413,38 @@ if ($RunUntil -eq "CheckOnly") {
 }
 
 if ($ModelMode -eq "Live") {
-    Add-Stage "ReadinessCheck" "Blocked" "LiveModelModeNotImplemented" "Live model alpha smoke is intentionally not implemented in this D-2a command."
-    Add-Gap "Live-model mode must be added as a later explicit slice and must never fall back to deterministic."
+    if ($RunUntil -ne "TicketDraft") {
+        Add-Stage "ReadinessCheck" "Blocked" "LiveModelRunUntilUnsupported" "REL-4 live model smoke is limited to -RunUntil TicketDraft."
+        Add-Gap "Live model smoke produces a bounded ticket-draft receipt only; it does not persist tickets, start runs, approve, continue, or apply."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+
+    if ($env:IRONDEV_ALPHA_SMOKE_LIVE_MODEL -ne "1") {
+        Add-Stage "ReadinessCheck" "Blocked" "LiveModelOptInMissing" "Live model alpha smoke requires explicit IRONDEV_ALPHA_SMOKE_LIVE_MODEL=1 opt-in."
+        Add-Gap "Live model smoke is external-dependency evidence and must never fall back to deterministic mode."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+
+    $liveProvider = $env:IRONDEV_ALPHA_SMOKE_LIVE_PROVIDER
+    $liveModel = $env:IRONDEV_ALPHA_SMOKE_LIVE_MODEL_NAME
+    $liveBaseUrl = $env:IRONDEV_ALPHA_SMOKE_LIVE_BASE_URL
+    $liveApiKey = if ([string]::IsNullOrWhiteSpace($env:IRONDEV_ALPHA_SMOKE_LIVE_API_KEY)) { $env:OPENAI_API_KEY } else { $env:IRONDEV_ALPHA_SMOKE_LIVE_API_KEY }
+    $providerRequiresKey = $liveProvider -in @("OpenAI", "LocalOpenAI", "Custom")
+    $providerRequiresBaseUrl = $liveProvider -in @("LocalOpenAI", "Custom", "Ollama")
+
+    if ([string]::IsNullOrWhiteSpace($liveProvider) -or
+        [string]::IsNullOrWhiteSpace($liveModel) -or
+        ($providerRequiresKey -and [string]::IsNullOrWhiteSpace($liveApiKey)) -or
+        ($providerRequiresBaseUrl -and [string]::IsNullOrWhiteSpace($liveBaseUrl))) {
+        Add-Stage "ReadinessCheck" "Blocked" "LiveModelNotConfigured" "Live model smoke requires provider, model name, and provider-specific key/base URL configuration."
+        Add-Gap "Set IRONDEV_ALPHA_SMOKE_LIVE_PROVIDER and IRONDEV_ALPHA_SMOKE_LIVE_MODEL_NAME, plus OPENAI_API_KEY or IRONDEV_ALPHA_SMOKE_LIVE_API_KEY when required. Do not commit secrets."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+}
+
+if ($StartFromChat -and ($RunUntil -ne "Gate" -or $ModelMode -ne "Deterministic")) {
+    Add-Stage "TicketPersist" "Blocked" "ChatTicketRunUntilUnsupported" "REL-5 chat-to-ticket smoke requires -ModelMode Deterministic -RunUntil Gate -StartFromChat."
+    Add-Gap "Chat-confirmed ticket smoke stops at the existing approval gate and does not create approval, continue, or apply."
     Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
 }
 
@@ -472,6 +508,10 @@ if ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
     Add-Stage "SqlCheck" "Passed" "SqlAvailable" "REL-3 persisted mode uses the API test host with SQL-backed stores."
     Add-Stage "ApiCheck" "Passed" "ApiAvailable" "REL-3 persisted mode drives the authenticated API routes in-process."
 }
+elseif ($StartFromChat -and $RunUntil -eq "Gate") {
+    Add-Stage "SqlCheck" "Passed" "SqlAvailable" "REL-5 uses the API test host with SQL-backed chat, ticket, run, and event stores."
+    Add-Stage "ApiCheck" "Passed" "ApiAvailable" "REL-5 drives authenticated chat, draft-confirm, skeleton-run, and report routes in-process."
+}
 else {
     Add-Stage "SqlCheck" "Skipped" "SqlUnavailable" "D-2a/REL-2 deterministic command uses the service-level in-memory smoke path, not SQL."
     Add-Stage "ApiCheck" "Skipped" "ApiUnavailable" "D-2a/REL-2 deterministic command does not start or call the API."
@@ -498,14 +538,26 @@ if ($RunUntil -eq "Readiness") {
     Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Passed" -ExitCode 0
 }
 
-if ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
+if ($RunUntil -eq "TicketDraft" -and $ModelMode -eq "Live") {
+    Add-Stage "TicketPersist" "Skipped" "TicketDraftNotPersisted" "REL-4 live model smoke produces a bounded draft receipt only; it does not persist a ticket."
+}
+elseif ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
     Add-Stage "TicketPersist" "Passed" "TicketPersisted" "REL-3 creates the BookSeller project and ticket through the authenticated API backed by SQL."
+}
+elseif ($StartFromChat -and $RunUntil -eq "Gate") {
+    Add-Stage "TicketPersist" "Passed" "TicketPersisted" "REL-5 persists chat, a draft-confirmed ticket, and server-verified chat provenance through the authenticated API backed by SQL."
 }
 else {
     Add-Stage "TicketPersist" "Skipped" "ProjectImportNotAutomated" "The deterministic smoke resolves the fixture ticket inside the service-level harness; API ticket persistence is a named gap."
 }
 
-$testFilter = if ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
+$testFilter = if ($RunUntil -eq "TicketDraft" -and $ModelMode -eq "Live") {
+    "FullyQualifiedName~AlphaSmokeLiveModelTests.Rel4_LiveModel_SingleTicketDraft_ProducesBoundedDraftEvidence"
+}
+elseif ($StartFromChat -and $RunUntil -eq "Gate") {
+    "FullyQualifiedName~AlphaSmokeApiPersistenceTests.Rel5_ChatConfirmedTicket_StartsGovernedRun_ThroughSqlBackedApi"
+}
+elseif ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
     "FullyQualifiedName~AlphaSmokeApiPersistenceTests.Rel3_OneTicket_ReachesApplied_ThroughSqlBackedApi"
 }
 elseif ($RunUntil -eq "Applied") {
@@ -523,7 +575,7 @@ else {
 }
 
 if (-not (Invoke-CheckedCommand "SkeletonRunStart" "SkeletonRunStartFailed" {
-    $projectUnderTest = if ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
+    $projectUnderTest = if (($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) -or ($StartFromChat -and $RunUntil -eq "Gate")) {
         "IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj"
     }
     else {
@@ -539,7 +591,12 @@ if (-not (Invoke-CheckedCommand "SkeletonRunStart" "SkeletonRunStartFailed" {
 })) {
     Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
 }
-Add-Stage "SkeletonRunStart" "Passed" "SkeletonRunStarted" "Alpha smoke test ran the governed loop to the human gate."
+if ($RunUntil -eq "TicketDraft" -and $ModelMode -eq "Live") {
+    Add-Stage "SkeletonRunStart" "Skipped" "SkeletonRunNotRequested" "REL-4 live model smoke generated a bounded ticket draft and did not start a skeleton run."
+}
+else {
+    Add-Stage "SkeletonRunStart" "Passed" "SkeletonRunStarted" "Alpha smoke test ran the governed loop to the human gate."
+}
 
 if (-not (Test-Path -LiteralPath $script:ReceiptPath)) {
     Add-Stage "ReceiptWrite" "Failed" "ReceiptWriteFailed" "The alpha smoke test passed but did not write its receipt."
@@ -548,6 +605,21 @@ if (-not (Test-Path -LiteralPath $script:ReceiptPath)) {
 
 $runReceipt = Get-Content -LiteralPath $script:ReceiptPath -Raw | ConvertFrom-Json
 Add-Stage "RunEvidenceRefresh" "Passed" "RunEvidenceRefreshed" "Run evidence receipt was written by the smoke test." @{ runId = $runReceipt.runId }
+
+if ($RunUntil -eq "TicketDraft" -and $ModelMode -eq "Live") {
+    if (-not $runReceipt.ticketDraftGenerated) {
+        Add-Stage "RunEvidenceRefresh" "Failed" "TicketPersistFailed" "REL-4 expected a generated ticket-draft receipt."
+        Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+
+    Add-Stage "CriticPackageFetch" "Skipped" "CriticPackageNotRequested" "REL-4 stops before critic package creation."
+    Add-Stage "CriticReviewRequest" "Skipped" "CriticReviewRequestNotAutomated" "REL-4 stops before critic review."
+    Add-Stage "GateStateVerify" "Skipped" "GateStateNotRequested" "REL-4 stops before the human gate."
+    Add-Stage "ReportFetch" "Skipped" "ReportNotRequested" "REL-4 stops before report reconstruction."
+    Add-Stage "ReceiptWrite" "Passed" "TicketDraftGenerated" "Live model ticket-draft receipt and summary were written under the safe output root."
+    Add-Gap "REL-4 does not prove persistence, critic review, approval, continuation, controlled apply, or SQL/API state."
+    Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Passed" -ExitCode 0
+}
 
 if ([string]::IsNullOrWhiteSpace($runReceipt.criticPackageSha256)) {
     Add-Stage "CriticPackageFetch" "Failed" "CriticPackageMissing" "The run receipt did not include a critic package hash."

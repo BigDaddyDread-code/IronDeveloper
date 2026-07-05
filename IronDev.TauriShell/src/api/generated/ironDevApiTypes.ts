@@ -2683,6 +2683,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/tickets/draft/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DraftTicket"];
+                    "text/json": components["schemas"]["DraftTicket"];
+                    "application/*+json": components["schemas"]["DraftTicket"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectTicket"];
+                        "application/json": components["schemas"]["ProjectTicket"];
+                        "text/json": components["schemas"]["ProjectTicket"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/tickets/draft/plan": {
         parameters: {
             query?: never;
@@ -3375,6 +3420,8 @@ export interface components {
             linkedSymbols?: string | null;
             /** Format: int64 */
             sessionId?: number | null;
+            /** Format: int64 */
+            messageId?: number | null;
         };
         ExternalReferenceDto: {
             provider?: string | null;
