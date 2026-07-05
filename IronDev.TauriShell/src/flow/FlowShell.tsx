@@ -52,6 +52,9 @@ export function FlowShell() {
   const projectName =
     project.selectedProjectName ??
     (project.selectedProjectId !== null ? `Project ${project.selectedProjectId}` : 'No project selected');
+  const modelMode = session.environmentInfo?.isTestEnvironment
+    ? 'Deterministic local alpha; live only when backend run evidence says so'
+    : 'Backend-reported per run';
 
   const openWorkItem = (ticket: ProjectTicket | null) => {
     setActiveTicket(ticket);
@@ -104,6 +107,7 @@ export function FlowShell() {
           </button>
         </nav>
         <div className="fl-userbit">
+          <span data-testid="flow.modelMode">Model mode: {modelMode}</span>
           <span>{session.apiStatus.status === 'connected' ? 'API connected' : `API ${session.apiStatus.status}`}</span>
           <span className="fl-avatar">{initials(project.userProfile?.displayName)}</span>
         </div>
@@ -117,6 +121,10 @@ export function FlowShell() {
             ticket={activeTicket}
             onTicketCreated={setActiveTicket}
             onBackToBoard={() => setSurface('board')}
+            onOpenGovernanceLibrary={() => {
+              setLibrarySection('governance');
+              setSurface('library');
+            }}
           />
         ) : null}
         {surface === 'library' ? (

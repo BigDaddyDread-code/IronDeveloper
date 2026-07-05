@@ -11,10 +11,10 @@ interface BoardScreenProps {
 
 function stageForTicket(ticket: ProjectTicket): WorkItemStage {
   const status = (ticket.status ?? '').toLowerCase();
-  if (status.includes('done') || status.includes('closed') || status.includes('complete')) {
+  if (status.includes('applied') || status.includes('done') || status.includes('closed') || status.includes('complete')) {
     return 'done';
   }
-  if (status.includes('review')) {
+  if (status.includes('approval') || status.includes('review')) {
     return 'review';
   }
   if (status.includes('build') || status.includes('progress')) {
@@ -24,6 +24,22 @@ function stageForTicket(ticket: ProjectTicket): WorkItemStage {
     return 'shape';
   }
   return 'ticket';
+}
+
+function emptyColumnMessage(stage: WorkItemStage): string {
+  if (stage === 'shape') {
+    return 'No draft work items. Next safe action: create a new work item from chat or the New work item button.';
+  }
+  if (stage === 'ticket') {
+    return 'No ready tickets. Next safe action: confirm acceptance criteria on a draft ticket.';
+  }
+  if (stage === 'build') {
+    return 'No active builds. Next safe action: open a ready ticket and start a governed run.';
+  }
+  if (stage === 'review') {
+    return 'No human-gate runs. Next safe action: start a governed run and wait for the backend halt.';
+  }
+  return 'No applied tickets yet. Next safe action: complete continuation and controlled apply through the backend.';
 }
 
 function tagForTicket(ticket: ProjectTicket): { label: string; cls: string } {
@@ -102,9 +118,13 @@ export function BoardScreen({ onOpenWorkItem, onOpenBatch }: BoardScreenProps) {
                 {stageLabels[stage]} <span>{columnTickets.length}</span>
               </div>
               {loadState === 'loading' ? (
-                <p className="fl-empty">Loading…</p>
+                <p className="fl-empty" data-testid={`flow.board.loading.${stage}`}>
+                  Loading {stageLabels[stage].toLowerCase()} work items from the API...
+                </p>
               ) : columnTickets.length === 0 ? (
-                <p className="fl-empty">—</p>
+                <p className="fl-empty" data-testid={`flow.board.empty.${stage}`}>
+                  {emptyColumnMessage(stage)}
+                </p>
               ) : (
                 columnTickets.map((ticket) => {
                   const tag = tagForTicket(ticket);

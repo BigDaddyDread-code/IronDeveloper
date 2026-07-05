@@ -6,6 +6,7 @@ import type {
   SkeletonCriticPackage,
   SkeletonCriticReviewOutcome,
   SkeletonRunReport,
+  TicketEvidenceSummary,
   TicketBuildRunDto
 } from '../../api/types';
 import { IronDevApiError } from '../../api/ironDevApi';
@@ -22,6 +23,7 @@ interface WorkItemScreenProps {
   ticket: ProjectTicket | null;
   onTicketCreated: (ticket: ProjectTicket) => void;
   onBackToBoard: () => void;
+  onOpenGovernanceLibrary: () => void;
 }
 
 interface DiscussionEntry {
@@ -59,7 +61,40 @@ function draftFromTicket(ticket: ProjectTicket): ShapeDraft {
   };
 }
 
-export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkItemScreenProps) {
+function runFromReport(report: SkeletonRunReport): TicketBuildRunDto {
+  return {
+    runId: report.runId,
+    projectId: report.projectId,
+    ticketId: report.ticketId,
+    status: report.status,
+    currentNode: 'SkeletonRun',
+    requiresHumanApproval: report.status === 'PausedForApproval',
+    message: report.summary
+  };
+}
+
+function stageFromReport(report: SkeletonRunReport): WorkItemStage {
+  const status = report.status.toLowerCase();
+  if (report.loopComplete || status.includes('applied')) {
+    return 'done';
+  }
+  if (report.approval || report.criticPackage || report.criticReviews.length > 0 || status.includes('approval')) {
+    return 'review';
+  }
+  return 'build';
+}
+
+function stageFromLinkedRun(status: string): WorkItemStage {
+  if (status === 'needsHumanReview') {
+    return 'review';
+  }
+  if (status === 'passed') {
+    return 'build';
+  }
+  return 'ticket';
+}
+
+export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenGovernanceLibrary }: WorkItemScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
 
@@ -70,6 +105,9 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
   const [isThinking, setIsThinking] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
   const [readiness, setReadiness] = useState<BuildReadinessResult | null>(null);
+  const [evidenceSummary, setEvidenceSummary] = useState<TicketEvidenceSummary | null>(null);
+  const [evidenceLoadState, setEvidenceLoadState] = useState<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle');
+  const [evidenceErrorMessage, setEvidenceErrorMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [run, setRun] = useState<TicketBuildRunDto | null>(null);
   const [report, setReport] = useState<SkeletonRunReport | null>(null);
@@ -78,6 +116,21 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [gateNotice, setGateNotice] = useState<string | null>(null);
   const [criticOutcome, setCriticOutcome] = useState<SkeletonCriticReviewOutcome | null>(null);
+
+  useEffect(() => {
+    setStage(ticket ? 'ticket' : 'shape');
+    setDraft(ticket ? draftFromTicket(ticket) : emptyShapeDraft());
+    setReadiness(null);
+    setEvidenceSummary(null);
+    setEvidenceLoadState(ticket ? 'loading' : 'idle');
+    setEvidenceErrorMessage(null);
+    setErrorMessage(null);
+    setRun(null);
+    setReport(null);
+    setCriticPackage(null);
+    setCriticOutcome(null);
+    setGateNotice(null);
+  }, [ticket?.id]);
 
   const hasUndispositionedFindings = useMemo(() => {
     const reviews = report?.criticReviews ?? [];
@@ -98,6 +151,91 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
           setReadiness(null);
         }
       });
+    return () => controller.abort();
+  }, [session.client, project.selectedProjectId, ticket]);
+
+  useEffect(() => {
+    const selectedProjectId = project.selectedProjectId;
+    const selectedTicketId = ticket?.id;
+
+    if (!ticket || selectedProjectId === null || selectedTicketId === undefined) {
+      return;
+    }
+
+    const projectId: number = selectedProjectId;
+    const ticketId: number = selectedTicketId;
+    const controller = new AbortController();
+    setEvidenceLoadState('loading');
+    setEvidenceErrorMessage(null);
+
+    async function hydrateLinkedRun() {
+      try {
+        const summary = await session.client.getTicketEvidenceSummary(projectId, ticketId, controller.signal);
+        if (controller.signal.aborted) {
+          return;
+        }
+        setEvidenceSummary(summary);
+
+        const latestRun = summary.latestRun;
+        if (!latestRun?.runId) {
+          setEvidenceLoadState('empty');
+          return;
+        }
+
+        setRun({
+          runId: latestRun.runId,
+          projectId,
+          ticketId,
+          status: latestRun.status,
+          currentNode: 'LinkedRunEvidence',
+          requiresHumanApproval: latestRun.status === 'needsHumanReview',
+          message: latestRun.recommendation ?? summary.message
+        });
+        setStage(stageFromLinkedRun(latestRun.status));
+
+        try {
+          const nextReport = await session.client.getSkeletonRunReport(projectId, ticketId, latestRun.runId, controller.signal);
+          if (!controller.signal.aborted) {
+            setReport(nextReport);
+            setRun(runFromReport(nextReport));
+            setStage(stageFromReport(nextReport));
+          }
+        } catch {
+          if (!controller.signal.aborted) {
+            setReport(null);
+          }
+        }
+
+        try {
+          const nextPackage = await session.client.getSkeletonCriticPackage(
+            projectId,
+            ticketId,
+            latestRun.runId,
+            controller.signal
+          );
+          if (!controller.signal.aborted) {
+            setCriticPackage(nextPackage);
+          }
+        } catch {
+          if (!controller.signal.aborted) {
+            setCriticPackage(null);
+          }
+        }
+
+        if (!controller.signal.aborted) {
+          setEvidenceLoadState('ready');
+        }
+      } catch (error: unknown) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setEvidenceSummary(null);
+        setEvidenceErrorMessage(error instanceof Error ? error.message : 'Linked run evidence could not be loaded.');
+        setEvidenceLoadState('error');
+      }
+    }
+
+    void hydrateLinkedRun();
     return () => controller.abort();
   }, [session.client, project.selectedProjectId, ticket]);
 
@@ -434,12 +572,15 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
             />
           ) : stage === 'done' ? (
             <>
-              <p className="fl-plabel">Loop record</p>
+              <p className="fl-plabel">Final report</p>
               {report === null ? (
-                <p className="fl-empty">Report not loaded.</p>
+                <p className="fl-empty" data-testid="flow.done.reportMissing">
+                  Final report not loaded. Next safe action: refresh from the backend run report endpoint or open Governance
+                  Library for the recorded evidence.
+                </p>
               ) : (
                 <>
-                  <p style={{ fontSize: 13.5, marginTop: 0 }} data-testid="flow.done.loop">
+                  <p style={{ fontSize: 13.5, marginTop: 0 }} data-testid="flow.done.report">
                     <span style={{ color: statusTone(report.status), fontWeight: 600 }}>{report.status}</span>
                     {' · '}
                     {report.loopComplete
@@ -456,18 +597,23 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
                       <p className="fl-plabel" style={{ marginTop: 14 }}>
                         Receipts — the evidence chain
                       </p>
-                      {report.apply.receipts.map((receipt) => (
-                        <div className="fl-qbox" key={receipt.name}>
-                          <span>
-                            {receipt.name} · {receipt.existsOnDisk ? 'on disk' : 'MISSING'}
-                          </span>
-                        </div>
-                      ))}
+                      <div data-testid="flow.done.receipts">
+                        {report.apply.receipts.map((receipt) => (
+                          <div className="fl-qbox" key={receipt.name}>
+                            <span>
+                              {receipt.name} · {receipt.existsOnDisk ? 'on disk' : 'MISSING'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </>
                   ) : null}
                   <p style={{ fontSize: 12, color: 'var(--fl-ink2)' }}>
                     Copy-only: commit, push, and release remain separate governed steps this loop does not have.
                   </p>
+                  <button className="fl-btn" onClick={onOpenGovernanceLibrary} data-testid="flow.done.openGovernance">
+                    Open Governance Library
+                  </button>
                 </>
               )}
             </>
@@ -524,18 +670,46 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
                 Build readiness
               </p>
               {readiness === null ? (
-                <p className="fl-empty">Readiness not loaded.</p>
+                <p className="fl-empty" data-testid="flow.ticket.readiness">
+                  Readiness not loaded yet. Next safe action: wait for the backend readiness check or refresh the ticket.
+                </p>
               ) : readiness.isReady ? (
-                <p style={{ fontSize: 13.5, color: 'var(--fl-acc-ink)' }}>Ready to build. {readiness.message ?? ''}</p>
+                <p style={{ fontSize: 13.5, color: 'var(--fl-acc-ink)' }} data-testid="flow.ticket.readiness">
+                  Ready to build. {readiness.message ?? ''}
+                </p>
               ) : (
                 <>
-                  <p style={{ fontSize: 13.5, color: 'var(--fl-gate-ink)' }}>{readiness.message ?? 'Blocked.'}</p>
+                  <p style={{ fontSize: 13.5, color: 'var(--fl-gate-ink)' }} data-testid="flow.ticket.readiness">
+                    {readiness.message ?? 'Blocked.'} Next safe action: resolve the backend readiness blockers below.
+                  </p>
                   {(readiness.blockingIssues ?? []).map((issue) => (
                     <div className="fl-qbox" key={issue}>
                       <span>{issue}</span>
                     </div>
                   ))}
                 </>
+              )}
+              <p className="fl-plabel" style={{ marginTop: 14 }}>
+                Linked run evidence
+              </p>
+              {evidenceLoadState === 'loading' ? (
+                <p className="fl-empty" data-testid="flow.ticket.linkedRun">
+                  Loading linked run evidence from the backend...
+                </p>
+              ) : evidenceLoadState === 'error' ? (
+                <p className="fl-empty" data-testid="flow.ticket.linkedRun">
+                  Linked run evidence unavailable: {evidenceErrorMessage ?? 'unknown error'}. Next safe action: refresh
+                  the ticket or open the Governance Library.
+                </p>
+              ) : evidenceSummary?.latestRun ? (
+                <p style={{ fontSize: 13.5, color: 'var(--fl-ink2)' }} data-testid="flow.ticket.linkedRun">
+                  Latest run {evidenceSummary.latestRun.runId} · {evidenceSummary.latestRun.status}. The UI hydrates
+                  reports from backend evidence; it does not infer apply or approval.
+                </p>
+              ) : (
+                <p className="fl-empty" data-testid="flow.ticket.linkedRun">
+                  No linked run evidence yet. Next safe action: start a governed run when readiness is satisfied.
+                </p>
               )}
             </>
           )}
@@ -589,7 +763,7 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard }: WorkI
           </>
         ) : stage === 'ticket' ? (
           <>
-            <span className={readiness?.isReady ? 'fl-gatemsg fl-okmsg' : 'fl-gatemsg'}>
+            <span className={readiness?.isReady ? 'fl-gatemsg fl-okmsg' : 'fl-gatemsg'} data-testid="flow.ticket.gate">
               {readiness?.isReady
                 ? 'Readiness gate: satisfied. Starting a run builds and tests in a disposable workspace — it approves nothing.'
                 : 'Readiness gate: blocked. The backend explains the block above — the UI never invents one.'}
