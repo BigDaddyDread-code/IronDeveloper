@@ -22,6 +22,8 @@ public sealed class DemoSeedScriptContractTests
         var root = document.RootElement;
 
         Assert.AreEqual("CheckOnly", root.GetProperty("mode").GetString());
+        Assert.AreEqual("RunningApi", root.GetProperty("seedTarget").GetString());
+        Assert.IsFalse(root.GetProperty("createLiveChatTicket").GetBoolean());
         Assert.AreEqual("Passed", root.GetProperty("status").GetString());
         Assert.AreEqual(JsonValueKind.Null, root.GetProperty("outputDirectory").ValueKind);
         Assert.AreEqual(JsonValueKind.Null, root.GetProperty("receiptPath").ValueKind);
@@ -44,12 +46,45 @@ public sealed class DemoSeedScriptContractTests
     {
         var source = ScriptSource();
 
-        StringAssert.Contains(source, "IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj");
-        StringAssert.Contains(source, "DemoSeedApiDrivenTests.DemoSeed_BaselineHistory_IsApiDrivenAndSqlPersisted");
-        StringAssert.Contains(source, "DEMO-1 uses the API integration test host with SQL-backed stores.");
-        StringAssert.Contains(source, "DEMO-1 drives authenticated API routes in-process.");
+        StringAssert.Contains(source, "[string]$SeedTarget = \"RunningApi\"");
+        StringAssert.Contains(source, "Invoke-DemoApi");
+        StringAssert.Contains(source, "/api/auth/login");
+        StringAssert.Contains(source, "/api/tenants/select");
+        StringAssert.Contains(source, "/api/projects");
+        StringAssert.Contains(source, "/skeleton-runs");
+        StringAssert.Contains(source, "/critic-review");
+        StringAssert.Contains(source, "/accepted-approvals");
+        StringAssert.Contains(source, "/continue");
+        StringAssert.Contains(source, "/apply");
+        StringAssert.Contains(source, "/report");
+        StringAssert.Contains(source, "Running API health endpoint responded.");
         Assert.IsFalse(source.Contains("TestFixtures\\frontend", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(source.Contains("IronDev.TauriShell", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void DemoSeed_ProofHarnessModeRemainsExplicitForCiEvidence()
+    {
+        var source = ScriptSource();
+
+        StringAssert.Contains(source, "SeedTarget -eq \"ProofHarness\"");
+        StringAssert.Contains(source, "IronDev.IntegrationTests.Api/IronDev.IntegrationTests.Api.csproj");
+        StringAssert.Contains(source, "DemoSeedApiDrivenTests.DemoSeed_BaselineHistory_IsApiDrivenAndSqlPersisted");
+        StringAssert.Contains(source, "DEMO-1a uses the API integration test host with SQL-backed stores.");
+        StringAssert.Contains(source, "DEMO-1a drives authenticated API routes in-process.");
+    }
+
+    [TestMethod]
+    public void DemoSeed_RunningApiSeedIsIdempotentAndDoesNotOverwriteDemoSource()
+    {
+        var source = ScriptSource();
+
+        StringAssert.Contains(source, "Get-ExistingRunningApiReceipt");
+        StringAssert.Contains(source, "Existing DEMO-1b receipt was verified against the running API.");
+        StringAssert.Contains(source, "BookSeller demo source copy already exists without a verified seed receipt.");
+        StringAssert.Contains(source, "DemoIdempotencyConflict");
+        StringAssert.Contains(source, "Resolve-DemoProject");
+        StringAssert.Contains(source, "Resolve-DemoTicket");
     }
 
     [TestMethod]
@@ -118,6 +153,7 @@ public sealed class DemoSeedScriptContractTests
     {
         var apiProof = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "Demo", "DemoSeedApiDrivenTests.cs"));
         var flowScreen = File.ReadAllText(RepoFile("IronDev.TauriShell", "src", "flow", "workitem", "WorkItemScreen.tsx"));
+        var source = ScriptSource();
 
         StringAssert.Contains(apiProof, "Demo2_ChatConfirmedTicket_IsVisibleAndStartableThroughApi");
         StringAssert.Contains(apiProof, "/chat/sessions");
@@ -131,6 +167,11 @@ public sealed class DemoSeedScriptContractTests
         StringAssert.Contains(flowScreen, "flow.ticket.startRun");
         StringAssert.Contains(flowScreen, "Readiness gate: satisfied. Promotion creates the ticket");
         StringAssert.Contains(flowScreen, "Starting a run builds and tests in a disposable workspace");
+
+        StringAssert.Contains(source, "[switch]$CreateLiveChatTicket");
+        StringAssert.Contains(source, "Invoke-LiveChatTicketProof");
+        StringAssert.Contains(source, "DEMO-2b created a live chat-confirmed ticket and started it to PausedForApproval.");
+        StringAssert.Contains(source, "unless explicitly requested");
     }
 
     [TestMethod]
@@ -143,6 +184,20 @@ public sealed class DemoSeedScriptContractTests
         StringAssert.Contains(receipt, "No live chat ticket is seeded ahead of the demo");
         StringAssert.Contains(receipt, "Evidence is not approval");
         StringAssert.Contains(receipt, "DEMO-2");
+    }
+
+    [TestMethod]
+    public void DemoSeed_LongLivedReceiptDocumentsUiReadableSeedBoundary()
+    {
+        var receipt = File.ReadAllText(RepoFile("Docs", "receipts", "DEMO1B_LONG_LIVED_DEMO_SEED.md"));
+
+        StringAssert.Contains(receipt, "DEMO-1b");
+        StringAssert.Contains(receipt, "long-lived local API");
+        StringAssert.Contains(receipt, "UI can read");
+        StringAssert.Contains(receipt, "No direct SQL final-state insert");
+        StringAssert.Contains(receipt, "No frontend fixtures");
+        StringAssert.Contains(receipt, "DEMO-2b");
+        StringAssert.Contains(receipt, "CreateLiveChatTicket");
     }
 
     private static (int ExitCode, string Output) RunPowerShell(params string[] arguments)
