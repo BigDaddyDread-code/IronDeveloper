@@ -23,6 +23,10 @@ public interface IChatHistoryService
 
     // Messages
     Task<long> SaveMessageAsync(ChatMessage message, CancellationToken cancellationToken = default);
+    Task<ChatMessage?> GetMessageByIdAsync(
+        long messageId,
+        int projectId,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ChatMessage>> GetRecentMessagesAsync(
         int projectId,
         long sessionId,
@@ -329,6 +333,28 @@ public sealed class ChatHistoryService : IChatHistoryService
             transaction.Rollback();
             throw;
         }
+    }
+
+    public async Task<ChatMessage?> GetMessageByIdAsync(
+        long messageId,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT
+                Id, TenantId, ProjectId, ChatSessionId, Role, Message, Tags, ContextSummary, LinkedFilePaths, LinkedSymbols, CreatedDate
+            FROM dbo.ChatMessages
+            WHERE TenantId = @TenantId
+              AND ProjectId = @ProjectId
+              AND Id = @MessageId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+
+        return await connection.QuerySingleOrDefaultAsync<ChatMessage>(new CommandDefinition(
+            sql,
+            new { TenantId = _tenant.TenantId, ProjectId = projectId, MessageId = messageId },
+            cancellationToken: cancellationToken));
     }
 
     public async Task<IReadOnlyList<ChatMessage>> GetRecentMessagesAsync(

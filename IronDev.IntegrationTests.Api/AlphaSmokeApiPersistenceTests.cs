@@ -420,6 +420,146 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         }
     }
 
+    [TestMethod]
+    public async Task ConfirmDraft_WithValidChatProvenance_PersistsReferences()
+    {
+        using var client = Factory.CreateClient();
+        await AuthenticateAsync(client);
+
+        var project = await CreateProjectAsync(
+            client,
+            Path.GetTempPath(),
+            "REL-5 valid draft provenance",
+            "Focused draft-confirm provenance regression fixture.");
+        var provenance = await CreateChatProvenanceAsync(client, project.Id);
+        var draft = CreateRel5Draft(provenance.SessionId, provenance.MessageId);
+
+        var ticket = await PostJsonAsync<ProjectTicket>(
+            client,
+            $"/api/projects/{project.Id}/tickets/draft/confirm",
+            draft);
+
+        Assert.AreEqual("Draft", ticket.Status);
+        Assert.AreEqual(provenance.SessionId, ticket.SourceChatSessionId);
+        Assert.AreEqual(provenance.MessageId, ticket.SourceChatMessageId);
+        StringAssert.Contains(ticket.Content, provenance.MessageText);
+        await AssertConfirmedTicketReferencesAsync(project.Id, ticket.Id, provenance.SessionId, provenance.MessageId);
+    }
+
+    [TestMethod]
+    public async Task ConfirmDraft_IgnoresOrRejectsAuthorityShapedClientStatus()
+    {
+        using var client = Factory.CreateClient();
+        await AuthenticateAsync(client);
+
+        var project = await CreateProjectAsync(
+            client,
+            Path.GetTempPath(),
+            "REL-5 status trust boundary",
+            "Focused draft-confirm status regression fixture.");
+        var provenance = await CreateChatProvenanceAsync(client, project.Id);
+        var draft = CreateRel5Draft(provenance.SessionId, provenance.MessageId);
+        draft.Status = "Applied";
+
+        var ticket = await PostJsonAsync<ProjectTicket>(
+            client,
+            $"/api/projects/{project.Id}/tickets/draft/confirm",
+            draft);
+
+        Assert.AreEqual("Draft", ticket.Status, "Draft confirmation must use a backend-owned non-authority status.");
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var persistedStatus = await connection.ExecuteScalarAsync<string>(
+            "SELECT Status FROM dbo.ProjectTickets WHERE Id = @TicketId AND ProjectId = @ProjectId",
+            new { TicketId = ticket.Id, ProjectId = project.Id });
+        Assert.AreEqual("Draft", persistedStatus);
+    }
+
+    [TestMethod]
+    public async Task ConfirmDraft_WithMissingChatSession_Fails()
+    {
+        using var client = Factory.CreateClient();
+        await AuthenticateAsync(client);
+
+        var project = await CreateProjectAsync(
+            client,
+            Path.GetTempPath(),
+            "REL-5 missing chat session",
+            "Focused draft-confirm missing-session regression fixture.");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/tickets/draft/confirm",
+            CreateRel5Draft(987654321, 987654322));
+
+        await AssertDraftConfirmFailedAsync(response, "ChatSessionMissing");
+    }
+
+    [TestMethod]
+    public async Task ConfirmDraft_WithMissingChatMessage_Fails()
+    {
+        using var client = Factory.CreateClient();
+        await AuthenticateAsync(client);
+
+        var project = await CreateProjectAsync(
+            client,
+            Path.GetTempPath(),
+            "REL-5 missing chat message",
+            "Focused draft-confirm missing-message regression fixture.");
+        var provenance = await CreateChatProvenanceAsync(client, project.Id);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/tickets/draft/confirm",
+            CreateRel5Draft(provenance.SessionId, 987654323));
+
+        await AssertDraftConfirmFailedAsync(response, "ChatMessageMissing");
+    }
+
+    [TestMethod]
+    public async Task ConfirmDraft_WithMessageFromDifferentSession_Fails()
+    {
+        using var client = Factory.CreateClient();
+        await AuthenticateAsync(client);
+
+        var project = await CreateProjectAsync(
+            client,
+            Path.GetTempPath(),
+            "REL-5 chat session mismatch",
+            "Focused draft-confirm session mismatch regression fixture.");
+        var first = await CreateChatProvenanceAsync(client, project.Id, "First chat turn.");
+        var second = await CreateChatProvenanceAsync(client, project.Id, "Second chat turn.");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/tickets/draft/confirm",
+            CreateRel5Draft(first.SessionId, second.MessageId));
+
+        await AssertDraftConfirmFailedAsync(response, "ChatMessageSessionMismatch");
+    }
+
+    [TestMethod]
+    public async Task ConfirmDraft_WithChatFromDifferentProject_Fails()
+    {
+        using var client = Factory.CreateClient();
+        await AuthenticateAsync(client);
+
+        var project = await CreateProjectAsync(
+            client,
+            Path.GetTempPath(),
+            "REL-5 owner project",
+            "Focused draft-confirm owner project regression fixture.");
+        var otherProject = await CreateProjectAsync(
+            client,
+            Path.GetTempPath(),
+            "REL-5 other project",
+            "Focused draft-confirm wrong project regression fixture.");
+        var otherProvenance = await CreateChatProvenanceAsync(client, otherProject.Id);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/tickets/draft/confirm",
+            CreateRel5Draft(otherProvenance.SessionId, otherProvenance.MessageId));
+
+        await AssertDraftConfirmFailedAsync(response, "ChatSessionProjectMismatch");
+    }
+
     private static async Task<Project> CreateProjectAsync(
         HttpClient client,
         string localPath,
@@ -461,6 +601,65 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         });
 
         return await ReadSuccessAsync<ProjectTicket>(response);
+    }
+
+    private static async Task<ChatProvenance> CreateChatProvenanceAsync(
+        HttpClient client,
+        int projectId,
+        string messageText = "Turn this into a ticket: validate the Book constructor inputs.")
+    {
+        var sessionId = await PostJsonAsync<long>(
+            client,
+            $"/api/projects/{projectId}/chat/sessions",
+            new ProjectChatSession
+            {
+                ProjectId = projectId,
+                Title = "REL-5 draft-confirm provenance regression"
+            });
+
+        var messageId = await PostJsonAsync<long>(
+            client,
+            $"/api/projects/{projectId}/chat/sessions/{sessionId}/messages",
+            new ChatMessage
+            {
+                ProjectId = projectId,
+                ChatSessionId = sessionId,
+                Role = "user",
+                Message = messageText,
+                LinkedFilePaths = "src/BookSeller.Domain/Book.cs",
+                LinkedSymbols = "Book"
+            });
+
+        return new ChatProvenance(sessionId, messageId, messageText);
+    }
+
+    private static DraftTicket CreateRel5Draft(long sessionId, long messageId) =>
+        new()
+        {
+            SourceChatSessionId = sessionId,
+            SourceMessageId = messageId,
+            SourceMessageText = "client-supplied source text must not replace verified chat message text",
+            Title = "Reject invalid books at the door",
+            TicketType = "Task",
+            Priority = "High",
+            Status = "Draft",
+            Summary = "Validate a Book at construction before it enters the domain model.",
+            Background = "The chat turn asks IronDev to turn Book constructor validation into ticket-shaped work.",
+            AcceptanceCriteria = "- Empty ISBN is rejected.",
+            LinkedFilePaths = "src/BookSeller.Domain/Book.cs",
+            LinkedSymbols = "Book",
+            ImplementationPlan = "Update the Book constructor guard clauses.",
+            UnitTests = "Add Book constructor validation tests.",
+            BuildValidation = "dotnet test BookSeller.slnx",
+            IsGenerated = true,
+            GenerationNote = "Generated from a persisted chat message. Not approval."
+        };
+
+    private static async Task AssertDraftConfirmFailedAsync(HttpResponseMessage response, string expectedReasonCode)
+    {
+        var text = await response.Content.ReadAsStringAsync();
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode, text);
+        StringAssert.Contains(text, expectedReasonCode);
     }
 
     private static async Task<T> PostJsonAsync<T>(HttpClient client, string path, object? content)
@@ -594,6 +793,45 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         Assert.AreEqual(1, approvalCount, "Accepted approval must be persisted and bound to the run/package hash.");
     }
 
+    private static async Task AssertConfirmedTicketReferencesAsync(
+        int projectId,
+        long ticketId,
+        long chatSessionId,
+        long chatMessageId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        var ticket = await connection.QuerySingleAsync<PersistedTicketProvenanceRow>(
+            """
+            SELECT SourceChatSessionId, SourceChatMessageId, IsGenerated, Status
+            FROM dbo.ProjectTickets
+            WHERE Id = @TicketId
+              AND ProjectId = @ProjectId;
+            """,
+            new { TicketId = ticketId, ProjectId = projectId });
+        Assert.AreEqual(chatSessionId, ticket.SourceChatSessionId);
+        Assert.AreEqual(chatMessageId, ticket.SourceChatMessageId);
+        Assert.AreEqual("Draft", ticket.Status);
+
+        var references = (await connection.QueryAsync<ArtifactReferenceRow>(
+            """
+            SELECT SourceType, SourceId
+            FROM dbo.ArtifactSourceReferences
+            WHERE ProjectId = @ProjectId
+              AND ArtifactType = 'Ticket'
+              AND ArtifactId = @TicketId;
+            """,
+            new { ProjectId = projectId, TicketId = ticketId })).ToArray();
+
+        Assert.IsTrue(
+            references.Any(reference => reference.SourceType == "ChatSession" && reference.SourceId == chatSessionId),
+            "Ticket source references must include the verified chat session.");
+        Assert.IsTrue(
+            references.Any(reference => reference.SourceType == "ChatMessage" && reference.SourceId == chatMessageId),
+            "Ticket source references must include the verified chat message.");
+    }
+
     private static async Task AssertRel5SqlPersistenceAsync(
         string runId,
         int projectId,
@@ -606,7 +844,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
 
         var ticket = await connection.QuerySingleAsync<PersistedTicketProvenanceRow>(
             """
-            SELECT SourceChatSessionId, SourceChatMessageId, IsGenerated
+            SELECT SourceChatSessionId, SourceChatMessageId, IsGenerated, Status
             FROM dbo.ProjectTickets
             WHERE Id = @TicketId
               AND ProjectId = @ProjectId;
@@ -615,6 +853,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         Assert.AreEqual(chatSessionId, ticket.SourceChatSessionId);
         Assert.AreEqual(chatMessageId, ticket.SourceChatMessageId);
         Assert.IsTrue(ticket.IsGenerated);
+        Assert.AreEqual("Draft", ticket.Status);
 
         var chatMessageCount = await connection.ExecuteScalarAsync<int>(
             """
@@ -1003,7 +1242,9 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
     }
 
     private sealed record PersistedRunRow(string RunId, int ProjectId, long TicketId, string State);
-    private sealed record PersistedTicketProvenanceRow(long? SourceChatSessionId, long? SourceChatMessageId, bool IsGenerated);
+    private sealed record ChatProvenance(long SessionId, long MessageId, string MessageText);
+    private sealed record ArtifactReferenceRow(string SourceType, long SourceId);
+    private sealed record PersistedTicketProvenanceRow(long? SourceChatSessionId, long? SourceChatMessageId, bool IsGenerated, string Status);
 
     private sealed record Rel3AlphaSmokeReceipt(
         string Ticket,

@@ -545,7 +545,7 @@ elseif ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
     Add-Stage "TicketPersist" "Passed" "TicketPersisted" "REL-3 creates the BookSeller project and ticket through the authenticated API backed by SQL."
 }
 elseif ($StartFromChat -and $RunUntil -eq "Gate") {
-    Add-Stage "TicketPersist" "Passed" "TicketPersisted" "REL-5 persists chat, draft-confirmed ticket, and chat provenance through the authenticated API backed by SQL."
+    Add-Stage "TicketPersist" "Passed" "TicketPersisted" "REL-5 persists chat, a draft-confirmed ticket, and server-verified chat provenance through the authenticated API backed by SQL."
 }
 else {
     Add-Stage "TicketPersist" "Skipped" "ProjectImportNotAutomated" "The deterministic smoke resolves the fixture ticket inside the service-level harness; API ticket persistence is a named gap."

@@ -11,7 +11,7 @@ REL-5 covers:
 - formalization response with ticket creation available
 - draft ticket creation from the chat turn
 - explicit draft confirmation into a persisted ticket
-- chat provenance persisted on the ticket
+- server-verified chat provenance persisted on the ticket
 - skeleton run started from the confirmed ticket
 - run halted at `PausedForApproval`
 - run report reconstructs the critic package and approval halt
@@ -29,7 +29,7 @@ The command uses the SQL/API in-process test host. It does not use the live mode
 
 Chat formalization is not approval.
 
-Draft confirmation persists a ticket only. It does not start a run by itself, approve the run, continue workflow, apply source, commit, push, merge, release, or deploy.
+Draft confirmation persists a ticket only. It uses a backend-owned draft status and verifies chat session/message ownership before writing source references. It does not start a run by itself, approve the run, continue workflow, apply source, commit, push, merge, release, or deploy.
 
 The governed run still halts at the existing human approval gate.
 

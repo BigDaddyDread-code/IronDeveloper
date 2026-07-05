@@ -141,8 +141,8 @@ REL-5 chat-confirmed gate mode:
 
 1. Persists an authenticated chat session and user message through the API.
 2. Uses chat completion to classify the turn as formalization.
-3. Generates a draft ticket with source chat provenance.
-4. Confirms the draft into a persisted ticket.
+3. Generates a draft ticket with source chat refs.
+4. Confirms the draft into a persisted ticket only after the API verifies the chat session/message/project relationship.
 5. Starts the existing skeleton run from that confirmed ticket.
 6. Verifies the report reconstructs the critic package and approval halt.
 7. Verifies SQL contains chat, ticket provenance, run, and event evidence.
@@ -170,7 +170,7 @@ Gate mode writes:
 - `alpha-smoke-summary.md`
 - `alpha-smoke.trx`
 
-The receipt records model mode, run-until target, run ID, gate state, critic package hash, approval target hash, named gaps, and boundary language. REL-3 receipts also record API/SQL persistence, project/ticket IDs, accepted approval ID, apply receipt path/hash, and the final reconstructed state. REL-4 receipts record live provider/model metadata and bounded draft evidence only. REL-5 receipts record chat session/message IDs, draft confirmation, source-message linkage, SQL/API persistence, and the approval halt state.
+The receipt records model mode, run-until target, run ID, gate state, critic package hash, approval target hash, named gaps, and boundary language. REL-3 receipts also record API/SQL persistence, project/ticket IDs, accepted approval ID, apply receipt path/hash, and the final reconstructed state. REL-4 receipts record live provider/model metadata and bounded draft evidence only. REL-5 receipts record verified chat session/message IDs, draft confirmation, source-message linkage, SQL/API persistence, and the approval halt state.
 
 Readiness mode writes only `alpha-smoke-result.json` and `alpha-smoke-summary.md`; it does not advertise a `run-receipt.json` because no skeleton run has executed yet.
 

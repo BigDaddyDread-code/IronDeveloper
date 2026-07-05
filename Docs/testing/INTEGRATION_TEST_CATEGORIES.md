@@ -16,7 +16,7 @@ A label does not make a slow test safe.
 
 - Source files scanned: 623
 - Test classes found: 617
-- Test methods found: 9801
+- Test methods found: 9807
 - Category names found: 234
 
 ## G13 Category Changes
@@ -33,11 +33,11 @@ A label does not make a slow test safe.
 - new categories added: `RequiresRealDatabase`, `LongRunning`, `ManualLocal`.
 - categories not added: `Slow`, `Quarantined`, `RequiresExternalDependency`, `RequiresLocalTooling`.
 - counts by category:
-  - `RequiresRealDatabase`: 41 test classes, 422 test methods, 41 files.
-  - `LongRunning`: 41 test classes, 423 test methods, 41 files.
+  - `RequiresRealDatabase`: 41 test classes, 428 test methods, 41 files.
+  - `LongRunning`: 41 test classes, 429 test methods, 41 files.
   - `ManualLocal`: 1 test class, 1 test method, 1 file.
 - test classes affected: 41 store/real-database-shaped integration classes plus 1 manual local legacy class.
-- test methods affected if source-countable: 422 `RequiresRealDatabase` methods, 423 `LongRunning` methods, and 1 `ManualLocal` method.
+- test methods affected if source-countable: 428 `RequiresRealDatabase` methods, 429 `LongRunning` methods, and 1 `ManualLocal` method.
 - tests moved into explicit slow/quarantine visibility: store and real-database-shaped classes are now explicitly visible through `RequiresRealDatabase` and `LongRunning`; the existing manual local ignored task is visible through `ManualLocal`.
 - tests remain in default lanes: no CI filters were changed, no tests were deleted, and no default lane exclusion was added.
 - selection-only pending execution proof: most `RequiresRealDatabase`/`LongRunning` rows remain `SelectionOnlyPendingExecution` until a slow/SQL lane executes them.
@@ -182,9 +182,9 @@ A label does not make a slow test safe.
 
 ## REL-5 Chat Confirmed Ticket Governed Run
 
-- Added one SQL/API `AlphaSmoke` and `ReleaseReadiness` method to `AlphaSmokeApiPersistenceTests`.
+- Added SQL/API `AlphaSmoke` and `ReleaseReadiness` methods to `AlphaSmokeApiPersistenceTests`.
 - REL-5 keeps `RequiresRealDatabase` and `LongRunning` metadata because it drives authenticated chat, draft-confirm, skeleton-run, report, and SQL verification through the API test host.
-- REL-5 verifies chat session/message persistence, formalization response, draft confirmation with chat provenance, skeleton-run start, report reconstruction, and SQL chat/ticket/run/event evidence.
+- REL-5 verifies chat session/message persistence, formalization response, draft confirmation with server-verified chat provenance, skeleton-run start, report reconstruction, and SQL chat/ticket/run/event evidence.
 - REL-5 is executed by the explicit full-SQL CI lane filter `AlphaSmokeApiPersistenceTests.Rel5_ChatConfirmedTicket_StartsGovernedRun_ThroughSqlBackedApi`.
 - REL-5 does not create or consume accepted approval, continue workflow, apply source, commit, push, release, deploy, or prove product UI behavior.
 - A chat-confirmed ticket may enter the governed run. It cannot skip the approval gate.
@@ -274,7 +274,7 @@ A label does not make a slow test safe.
 | `AcceptedApprovalSqlStore` | 1 | 15 | 0 | 1 |
 | `AgentHandoff` | 3 | 53 | 0 | 3 |
 | `AgentHandoffStore` | 1 | 8 | 0 | 1 |
-| `AlphaSmoke` | 3 | 5 | 0 | 3 |
+| `AlphaSmoke` | 3 | 11 | 0 | 3 |
 | `ApiCliContract` | 3 | 24 | 0 | 3 |
 | `ApiCliReleaseGate` | 1 | 10 | 0 | 1 |
 | `ApplyDryRunAuthorityBoundary` | 1 | 4 | 0 | 1 |
@@ -346,7 +346,7 @@ A label does not make a slow test safe.
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
 | `LocalBootstrap` | 2 | 30 | 0 | 2 |
 | `LocalSql` | 1 | 16 | 0 | 1 |
-| `LongRunning` | 41 | 423 | 0 | 41 |
+| `LongRunning` | 41 | 429 | 0 | 41 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
 | `MemoryPromotionRequestPackage` | 1 | 7 | 0 | 1 |
@@ -426,7 +426,7 @@ A label does not make a slow test safe.
 | `Redaction` | 1 | 8 | 0 | 1 |
 | `Receipt` | 20 | 407 | 0 | 20 |
 | `ReleaseGateNegativeCampaign` | 1 | 30 | 0 | 1 |
-| `ReleaseReadiness` | 4 | 20 | 0 | 4 |
+| `ReleaseReadiness` | 4 | 26 | 0 | 4 |
 | `ReleaseReadinessApiRegression` | 1 | 6 | 0 | 1 |
 | `ReleaseReadinessCliRegression` | 1 | 4 | 0 | 1 |
 | `ReleaseReadinessDecisionRecordReadApi` | 1 | 17 | 0 | 1 |
@@ -435,7 +435,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
 | `RequiresExternalDependency` | 1 | 1 | 0 | 1 |
-| `RequiresRealDatabase` | 41 | 422 | 0 | 41 |
+| `RequiresRealDatabase` | 41 | 428 | 0 | 41 |
 | `Retention` | 2 | 16 | 0 | 2 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |

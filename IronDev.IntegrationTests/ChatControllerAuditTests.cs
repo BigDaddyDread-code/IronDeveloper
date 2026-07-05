@@ -184,6 +184,12 @@ public sealed class ChatControllerAuditTests
         public Task<long> SaveMessageAsync(ChatMessage message, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<ChatMessage?> GetMessageByIdAsync(
+            long messageId,
+            int projectId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<ChatMessage>> GetRecentMessagesAsync(
             int projectId,
             long sessionId,
