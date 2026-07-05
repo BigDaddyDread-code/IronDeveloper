@@ -156,6 +156,35 @@ test('opening a seeded applied ticket hydrates the linked final report without c
   await expect(page.getByTestId('flow.governanceHost')).toBeVisible();
 });
 
+test('board does not treat Completed as Applied done state', async ({ page }) => {
+  await mockTicketWorkspace(page, {
+    tickets: [
+      {
+        id: 42,
+        tenantId: 3,
+        projectId: 7,
+        title: 'Applied BookSeller ticket',
+        status: 'Applied',
+        acceptanceCriteria: 'Applied path has a controlled apply receipt.'
+      },
+      {
+        id: 43,
+        tenantId: 3,
+        projectId: 7,
+        title: 'Completed run without apply',
+        status: 'Completed',
+        acceptanceCriteria: 'Completed run must still not read as applied.'
+      }
+    ]
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByTestId('flow.board.column.done')).toContainText('Applied BookSeller ticket');
+  await expect(page.getByTestId('flow.board.column.done')).not.toContainText('Completed run without apply');
+  await expect(page.getByTestId('flow.board.column.ticket')).toContainText('Completed run without apply');
+});
+
 test('blocked ticket and empty board states name the next safe action', async ({ page }) => {
   await mockTicketWorkspace(page, {
     readiness: { isReady: false, message: 'Project profile is missing.', blockingIssues: ['Project profile is missing.'] }
@@ -466,6 +495,14 @@ async function mockTicketWorkspace(
   page: Page,
   options: {
     ticketStatus?: string;
+    tickets?: Array<{
+      id: number;
+      tenantId: number;
+      projectId: number;
+      title: string;
+      status: string;
+      acceptanceCriteria: string;
+    }>;
     latestRun?: { status: string };
     readiness?: { isReady: boolean; message: string; blockingIssues: string[] };
   } = {}
@@ -525,16 +562,18 @@ async function mockTicketWorkspace(
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([
-        {
-          id: 42,
-          tenantId: 3,
-          projectId: 7,
-          title: 'Add book sorting to catalog',
-          status: options.ticketStatus ?? 'Draft',
-          acceptanceCriteria: 'Catalog sorts by title ascending'
-        }
-      ])
+      body: JSON.stringify(
+        options.tickets ?? [
+          {
+            id: 42,
+            tenantId: 3,
+            projectId: 7,
+            title: 'Add book sorting to catalog',
+            status: options.ticketStatus ?? 'Draft',
+            acceptanceCriteria: 'Catalog sorts by title ascending'
+          }
+        ]
+      )
     });
   });
   await page.route('**/irondev-api/api/projects/7/tickets/42/build-readiness', async (route) => {

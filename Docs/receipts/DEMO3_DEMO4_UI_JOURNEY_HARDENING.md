@@ -51,9 +51,9 @@ DEMO-4 hardens the visible route states that were most likely to stall the demo:
 
 ## Validation
 
-- Tauri focused browser proof: `npm test -- tests/skeleton-run-stages.spec.ts` passed, 9/9.
+- Tauri focused browser proof: `npm test -- tests/skeleton-run-stages.spec.ts` passed, 10/10.
 - Tauri build/typecheck: `npm run build` passed; Vite reported the existing large bundle warning.
-- C11 secret scan: `dotnet test IronDev.IntegrationTests/IronDev.IntegrationTests.csproj --filter FullyQualifiedName~BlockC11SecretScanningRegressionTests --no-restore --nologo --verbosity minimal` passed, 9/9; existing NU1510 warnings.
+- C11 secret scan: `dotnet test IronDev.IntegrationTests/IronDev.IntegrationTests.csproj --filter FullyQualifiedName~BlockC11SecretScanningRegressionTests --no-build --nologo --verbosity minimal` passed, 9/9.
 - `git diff --check`: passed.
 
 ## Review Line

@@ -11,7 +11,7 @@ interface BoardScreenProps {
 
 function stageForTicket(ticket: ProjectTicket): WorkItemStage {
   const status = (ticket.status ?? '').toLowerCase();
-  if (status.includes('applied') || status.includes('done') || status.includes('closed') || status.includes('complete')) {
+  if (status.includes('applied') || status.includes('done') || status.includes('closed')) {
     return 'done';
   }
   if (status.includes('approval') || status.includes('review')) {
@@ -113,7 +113,7 @@ export function BoardScreen({ onOpenWorkItem, onOpenBatch }: BoardScreenProps) {
         {stageOrder.map((stage) => {
           const columnTickets = tickets.filter((ticket) => stageForTicket(ticket) === stage);
           return (
-            <div className="fl-col" key={stage}>
+            <div className="fl-col" key={stage} data-testid={`flow.board.column.${stage}`}>
               <div className="fl-colh">
                 {stageLabels[stage]} <span>{columnTickets.length}</span>
               </div>
