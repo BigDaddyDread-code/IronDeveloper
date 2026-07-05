@@ -644,6 +644,23 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             await _runs.TransitionAsync(new RunStateTransition
             {
                 RunId = runId,
+                State = RunLifecycleState.Promoted,
+                Summary = $"Apply spine succeeded under accepted approval {satisfied.AcceptedApprovalId:D}. The run is promoted to the canonical apply boundary.",
+                WorkspacePath = spineResult.WorkspacePath
+            }, cancellationToken).ConfigureAwait(false);
+
+            await PublishAsync(runId, "SkeletonApplyPromoted",
+                "Apply spine succeeded and the run was promoted to the canonical apply boundary. Promotion is not commit, push, release, or deployment authority.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
+                    ["workspacePath"] = spineResult.WorkspacePath,
+                    ["currentNode"] = "SkeletonApply"
+                }, cancellationToken).ConfigureAwait(false);
+
+            await _runs.TransitionAsync(new RunStateTransition
+            {
+                RunId = runId,
                 State = RunLifecycleState.Applied,
                 Summary = $"Applied through the governed workspace spine under accepted approval {satisfied.AcceptedApprovalId:D}. Copy-only: commit, push, and release remain separate governed steps.",
                 WorkspacePath = spineResult.WorkspacePath
