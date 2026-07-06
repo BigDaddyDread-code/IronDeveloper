@@ -296,8 +296,16 @@ function Start-ManagedProcess {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$Command,
-        [Parameter(Mandatory = $true)][string]$WorkingDirectory
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string]$LogDirectory
     )
+
+    # DEMO-REHEARSAL-001 finding: a hidden process with no captured output makes
+    # "inspect the process output" impossible to follow. Every managed process
+    # logs to files the blocked stage can point at.
+    New-Item -ItemType Directory -Force -Path $LogDirectory | Out-Null
+    $stdoutPath = Join-Path $LogDirectory "$Name.out.log"
+    $stderrPath = Join-Path $LogDirectory "$Name.err.log"
 
     $shell = Resolve-PowerShell
     $process = Start-Process `
@@ -305,12 +313,16 @@ function Start-ManagedProcess {
         -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $Command) `
         -WorkingDirectory $WorkingDirectory `
         -WindowStyle Hidden `
+        -RedirectStandardOutput $stdoutPath `
+        -RedirectStandardError $stderrPath `
         -PassThru
 
     $script:StartedProcesses.Add([pscustomobject]@{
         name = $Name
         processId = $process.Id
         workingDirectory = Redact-UserPath $WorkingDirectory
+        stdoutLog = Redact-UserPath $stdoutPath
+        stderrLog = Redact-UserPath $stderrPath
     }) | Out-Null
 }
 
@@ -558,16 +570,37 @@ elseif ($CheckOnly -or $NoStart) {
     Add-Stage "ApiCheck" "Blocked" "DemoStartupApiUnavailable" "API health endpoint is not reachable and start mode is disabled." "Run Scripts/demo/start-v0.1-demo.ps1 without -CheckOnly/-NoStart, or start the API with: dotnet run --project IronDev.Api/IronDev.Api.csproj --urls $ApiBaseUrl"
 }
 else {
+    # DEMO-REHEARSAL-001 finding: the API refuses to start without a JWT signing
+    # key, and the demo previously hid that death. A demo session gets an
+    # ephemeral, session-local key unless the operator configured their own —
+    # stated openly, never committed, never reused as authority.
+    if ([string]::IsNullOrWhiteSpace($env:IRONDEV_JWT_KEY) -and [string]::IsNullOrWhiteSpace($env:Jwt__Key)) {
+        $env:IRONDEV_JWT_KEY = [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }))
+        Add-Stage "JwtKeyCheck" "Passed" "DemoStartupPassed" "Generated a session-local JWT signing key for this demo process tree only. It is not persisted and grants nothing beyond local demo auth." ""
+    }
+    else {
+        Add-Stage "JwtKeyCheck" "Passed" "DemoStartupPassed" "Using the operator-configured JWT signing key from the environment." ""
+    }
+
+    # DEMO-REHEARSAL-001 finding: without an explicit override the API reads
+    # appsettings.Development.json and points at the REAL IronDeveloper catalog
+    # while the demo advertises -DatabaseName. Pin the demo API to the demo
+    # database explicitly — the connection chooses the database, always.
+    $env:ConnectionStrings__IronDeveloperDb = "Server=$SqlServer;Database=$DatabaseName;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;"
+    Add-Stage "ApiDatabasePin" "Passed" "DemoStartupPassed" "Demo API pinned to the demo database target." "" @{
+        databaseName = $DatabaseName
+    }
+
     $apiProject = Join-Path $repoRoot "IronDev.Api\IronDev.Api.csproj"
     $apiCommand = "& dotnet run --project `"$apiProject`" --urls `"$ApiBaseUrl`""
-    Start-ManagedProcess -Name "IronDev.Api" -Command $apiCommand -WorkingDirectory $repoRoot
+    Start-ManagedProcess -Name "IronDev.Api" -Command $apiCommand -WorkingDirectory $repoRoot -LogDirectory $outputFull
     if (Wait-ForEndpoint -Url $apiHealthUrl -TimeoutSeconds $StartTimeoutSeconds) {
         Add-Stage "ApiCheck" "Passed" "DemoStartupApiStarted" "Started API and verified the health endpoint." "" @{
             apiBaseUrl = Redact-UserPath $ApiBaseUrl
         }
     }
     else {
-        Add-Stage "ApiCheck" "Blocked" "DemoStartupApiUnavailable" "API did not become reachable before the startup timeout." "Inspect the IronDev.Api process output, fix its first blocker, then rerun the demo startup script."
+        Add-Stage "ApiCheck" "Blocked" "DemoStartupApiUnavailable" "API did not become reachable before the startup timeout." "Read $(Redact-UserPath (Join-Path $outputFull 'IronDev.Api.err.log')) and $(Redact-UserPath (Join-Path $outputFull 'IronDev.Api.out.log')), fix the first reported blocker, then rerun the demo startup script."
     }
 }
 
@@ -585,14 +618,14 @@ elseif ($CheckOnly -or $NoStart) {
 else {
     $uiRoot = Join-Path $repoRoot "IronDev.TauriShell"
     $uiCommand = "`$env:VITE_IRONDEV_API_BASE_URL = `"$ApiBaseUrl`"; npm run dev -- --host 127.0.0.1"
-    Start-ManagedProcess -Name "IronDev.TauriShell" -Command $uiCommand -WorkingDirectory $uiRoot
+    Start-ManagedProcess -Name "IronDev.TauriShell" -Command $uiCommand -WorkingDirectory $uiRoot -LogDirectory $outputFull
     if (Wait-ForEndpoint -Url $UiBaseUrl -TimeoutSeconds $StartTimeoutSeconds) {
         Add-Stage "UiCheck" "Passed" "DemoStartupUiStarted" "Started UI dev server and verified the app URL." "" @{
             uiBaseUrl = Redact-UserPath $UiBaseUrl
         }
     }
     else {
-        Add-Stage "UiCheck" "Blocked" "DemoStartupUiUnavailable" "UI dev server did not become reachable before the startup timeout." "Inspect the Vite process output, fix its first blocker, then rerun the demo startup script."
+        Add-Stage "UiCheck" "Blocked" "DemoStartupUiUnavailable" "UI dev server did not become reachable before the startup timeout." "Read $(Redact-UserPath (Join-Path $outputFull 'IronDev.TauriShell.err.log')) and $(Redact-UserPath (Join-Path $outputFull 'IronDev.TauriShell.out.log')), fix the first reported blocker, then rerun the demo startup script."
     }
 }
 
