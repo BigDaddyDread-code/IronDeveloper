@@ -56,7 +56,7 @@ Evidence is not authority. A transcript is not a release gate unless it records 
 
 ## Validation
 
-- DEMO-7/8/9 dogfood artifact contract tests: 25/25 passed.
+- DEMO-7/8/9 dogfood artifact contract tests: 26/26 passed.
 - Integration category contract tests: 7/7 passed.
 - C11 secret scan: 9/9 passed.
 - `dotnet restore IronDev.slnx --nologo --verbosity minimal`: passed with existing warnings.

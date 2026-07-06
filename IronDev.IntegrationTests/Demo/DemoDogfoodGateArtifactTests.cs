@@ -144,6 +144,7 @@ public sealed class DemoDogfoodGateArtifactTests
                      "gateId",
                      "commitSha",
                      "branch",
+                     "artifactCreatedAtUtc",
                      "startedAtUtc",
                      "completedAtUtc",
                      "verdict",
@@ -164,6 +165,20 @@ public sealed class DemoDogfoodGateArtifactTests
         Assert.AreEqual("DOGFOOD-ALPHA-LOCAL-001", root.GetProperty("gateId").GetString());
         Assert.AreEqual(40, root.GetProperty("commitSha").GetString()!.Length);
         Assert.AreEqual("EvidenceIncomplete", root.GetProperty("verdict").GetString());
+        Assert.IsTrue(
+            DateTimeOffset.TryParse(root.GetProperty("artifactCreatedAtUtc").GetString(), out _),
+            "Artifact creation timestamp should describe when the incomplete artifact was recorded.");
+    }
+
+    [TestMethod]
+    public void DogfoodAlphaLocal001_EvidenceIncompleteGateDoesNotCarryRunTimestamps()
+    {
+        using var document = ReadJson("Docs", "release", "v0.1-local-alpha", "DOGFOOD-ALPHA-LOCAL-001.json");
+        var root = document.RootElement;
+
+        Assert.AreEqual("EvidenceIncomplete", root.GetProperty("verdict").GetString());
+        Assert.AreEqual(JsonValueKind.Null, root.GetProperty("startedAtUtc").ValueKind);
+        Assert.AreEqual(JsonValueKind.Null, root.GetProperty("completedAtUtc").ValueKind);
     }
 
     [TestMethod]

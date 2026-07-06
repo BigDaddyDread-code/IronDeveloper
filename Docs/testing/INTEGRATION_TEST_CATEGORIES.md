@@ -16,7 +16,7 @@ A label does not make a slow test safe.
 
 - Source files scanned: 625
 - Test classes found: 619
-- Test methods found: 9848
+- Test methods found: 9849
 - Category names found: 238
 
 ## G13 Category Changes
@@ -308,7 +308,7 @@ A label does not make a slow test safe.
 | `AcceptedApprovalSqlStore` | 1 | 15 | 0 | 1 |
 | `AgentHandoff` | 3 | 53 | 0 | 3 |
 | `AgentHandoffStore` | 1 | 8 | 0 | 1 |
-| `AlphaSmoke` | 7 | 63 | 0 | 7 |
+| `AlphaSmoke` | 7 | 64 | 0 | 7 |
 | `ApiCliContract` | 3 | 24 | 0 | 3 |
 | `ApiCliReleaseGate` | 1 | 10 | 0 | 1 |
 | `ApplyDryRunAuthorityBoundary` | 1 | 4 | 0 | 1 |
@@ -333,13 +333,13 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `BookSellerBatch` | 1 | 25 | 0 | 1 |
-| `Boundary` | 26 | 273 | 0 | 26 |
+| `BookSellerBatch` | 1 | 26 | 0 | 1 |
+| `Boundary` | 26 | 274 | 0 | 26 |
 | `Builder` | 1 | 9 | 0 | 1 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `ConfigBoundary` | 11 | 124 | 0 | 11 |
-| `Contract` | 28 | 289 | 0 | 28 |
+| `Contract` | 28 | 290 | 0 | 28 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -348,12 +348,12 @@ A label does not make a slow test safe.
 | `DatabaseMigration` | 2 | 12 | 0 | 2 |
 | `Decision` | 2 | 12 | 0 | 2 |
 | `DemoSeed` | 2 | 14 | 0 | 2 |
-| `DemoRehearsal` | 1 | 25 | 0 | 1 |
+| `DemoRehearsal` | 1 | 26 | 0 | 1 |
 | `DemoStartup` | 1 | 13 | 0 | 1 |
 | `DisposableWorkspaceDryRunBoundaryReceipt` | 1 | 20 | 0 | 1 |
 | `DisposableWorkspaceDryRunExecutor` | 1 | 20 | 0 | 1 |
 | `DogfoodReceiptStore` | 1 | 8 | 0 | 1 |
-| `DogfoodGate` | 1 | 25 | 0 | 1 |
+| `DogfoodGate` | 1 | 26 | 0 | 1 |
 | `DryRunExecutionAuditContract` | 1 | 22 | 0 | 1 |
 | `DryRunFailureRegression` | 1 | 24 | 0 | 1 |
 | `DryRunReceiptStore` | 1 | 21 | 0 | 1 |
@@ -465,7 +465,7 @@ A label does not make a slow test safe.
 | `Redaction` | 1 | 8 | 0 | 1 |
 | `Receipt` | 20 | 407 | 0 | 20 |
 | `ReleaseGateNegativeCampaign` | 1 | 30 | 0 | 1 |
-| `ReleaseReadiness` | 8 | 78 | 0 | 8 |
+| `ReleaseReadiness` | 8 | 79 | 0 | 8 |
 | `ReleaseReadinessApiRegression` | 1 | 6 | 0 | 1 |
 | `ReleaseReadinessCliRegression` | 1 | 4 | 0 | 1 |
 | `ReleaseReadinessDecisionRecordReadApi` | 1 | 17 | 0 | 1 |
