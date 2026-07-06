@@ -11,6 +11,7 @@ param(
     [string]$DemoUserPassword = $env:IRONDEV_DEMO_USER_PASSWORD,
     [int]$DemoTenantId = 1,
     [switch]$CreateLiveChatTicket,
+    [switch]$ProveUsable,
     [string]$OutputDirectory,
     [switch]$Json,
     [switch]$Markdown
@@ -36,6 +37,8 @@ $KnownReasonCodes = @(
     "DemoRootSafetyNotEvaluated",
     "DemoRootSafetyBlocked",
     "DemoSqlPersistenceUnavailable",
+    "DemoApiBaseUrlLocal",
+    "DemoApiBaseUrlNotLocal",
     "DemoApiUnavailable",
     "DemoProjectResolveFailed",
     "DemoKnowledgeSeedFailed",
@@ -45,6 +48,8 @@ $KnownReasonCodes = @(
     "DemoApprovalPhraseMismatch",
     "DemoContinuationFailed",
     "DemoApplyFailed",
+    "DemoUsabilityProbePassed",
+    "DemoUsabilityProbeFailed",
     "DemoReportMissing",
     "DemoIdempotencyConflict",
     "DemoReceiptWriteSkipped",
@@ -217,6 +222,7 @@ function Get-ResultObject {
         seedTarget = $SeedTarget
         apiBaseUrl = if ($SeedTarget -eq "RunningApi") { Redact-UserPath $ApiBaseUrl } else { "in-process proof harness" }
         createLiveChatTicket = [bool]$CreateLiveChatTicket
+        proveUsable = [bool]$ProveUsable
         mode = if ($Seed) { "Seed" } else { "CheckOnly" }
         outputDirectory = if ($script:OutputRoot) { Redact-UserPath $script:OutputRoot } else { $null }
         receiptPath = if ($script:ReceiptPath) { Redact-UserPath $script:ReceiptPath } else { $null }
@@ -224,7 +230,7 @@ function Get-ResultObject {
         knownReasonCodes = $KnownReasonCodes
         stages = $script:Stages
         gaps = $script:Gaps
-        boundary = "The demo seed drives product APIs and governed backend paths. It is evidence only: it does not approve, satisfy policy, continue workflow, apply source by itself, claim release readiness, or create the live chat ticket ahead of the demo unless explicitly requested."
+        boundary = "The demo seed drives product APIs and governed backend paths. It is evidence only: it seeds baseline history and proves the environment stays usable for new governed work to the human gate, but it does not approve, satisfy policy, continue workflow, apply source by itself, claim release readiness, or create the live chat ticket ahead of the demo unless explicitly requested."
         status = $OverallStatus
     }
 }
@@ -300,6 +306,22 @@ function Join-ApiPath {
     )
 
     return $BaseUrl.TrimEnd('/') + "/" + $Path.TrimStart('/')
+}
+
+function Test-LocalApiBaseUrl {
+    param([Parameter(Mandatory = $true)][string]$BaseUrl)
+
+    $uri = $null
+    if (-not [System.Uri]::TryCreate($BaseUrl, [System.UriKind]::Absolute, [ref]$uri)) {
+        return $false
+    }
+
+    if ($uri.Scheme -notin @("http", "https")) {
+        return $false
+    }
+
+    # Uri.IsLoopback accepts localhost, the 127.0.0.0/8 IPv4 loopback range, and [::1].
+    return $uri.IsLoopback
 }
 
 function Invoke-DemoApi {
@@ -776,6 +798,63 @@ function Invoke-LiveChatTicketProof {
     }
 }
 
+function Invoke-UsabilityProbe {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Headers,
+        [Parameter(Mandatory = $true)]$Project
+    )
+
+    if (-not $ProveUsable) {
+        return $null
+    }
+
+    try {
+        $ticket = Invoke-DemoApi -Method "POST" -Path "/api/projects/$($Project.id)/tickets" -Headers $Headers -Body @{
+            title = "Demo usability probe - pricing rule"
+            type = "Task"
+            priority = "Low"
+            summary = "Post-seed usability probe: prove a fresh ticket still runs to the human gate."
+            problem = "Confirm the seeded environment remains usable for new governed work."
+            proposedChange = "Exercise a real disposable build/test run to the human gate."
+            acceptanceCriteria = @("A governed run reaches the human approval gate with real build and test evidence.")
+            provenance = @{
+                source = "demo-seed:usability-probe"
+                notes = "Usability probe ticket. It proves the environment is usable and grants no authority."
+            }
+        }
+
+        $started = Start-DemoRun -Headers $Headers -ProjectId ([int]$Project.id) -TicketId ([long]$ticket.id)
+        if ($started.status -ne "PausedForApproval" -or $started.requiresHumanApproval -ne $true) {
+            throw "Fresh post-seed ticket did not run to the human gate."
+        }
+
+        $report = Get-RunReport -Headers $Headers -ProjectId ([int]$Project.id) -TicketId ([long]$ticket.id) -RunId $started.runId
+        if ($report.status -ne "PausedForApproval" -or
+            $null -eq $report.criticPackage -or
+            $report.criticPackage.hashVerified -ne $true -or
+            $null -ne $report.apply) {
+            throw "Usability probe report did not carry verified build/test evidence at the gate."
+        }
+
+        Add-Stage "UsabilityProbe" "Passed" "DemoUsabilityProbePassed" "A fresh post-seed ticket reached the human gate on real build/test evidence, with no approval, continuation, or apply." @{
+            ticketId = [long]$ticket.id
+            runId = [string]$started.runId
+        }
+        return [pscustomobject]@{
+            ticketId = [long]$ticket.id
+            runId = [string]$started.runId
+            state = "PausedForApproval"
+            criticPackageHash = [string]$report.criticPackage.sha256OnDisk
+            buildTestEvidenceVerified = $true
+            finalReportReference = "api/projects/$($Project.id)/tickets/$($ticket.id)/skeleton-runs/$($started.runId)/report"
+        }
+    }
+    catch {
+        Add-Stage "UsabilityProbe" "Failed" "DemoUsabilityProbeFailed" "Post-seed usability probe did not reach the gate cleanly." @{ error = $_.Exception.Message }
+        Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+}
+
 function Write-RunningApiReceipt {
     param(
         [Parameter(Mandatory = $true)]$Project,
@@ -783,6 +862,7 @@ function Write-RunningApiReceipt {
         [Parameter(Mandatory = $true)]$AppliedTicket,
         [Parameter(Mandatory = $true)]$PausedTicket,
         $ChatTicket = $null,
+        $UsabilityProbe = $null,
         [string]$IdempotencyResult = "Created or resolved through product APIs."
     )
 
@@ -801,11 +881,14 @@ function Write-RunningApiReceipt {
         pausedTicket = $PausedTicket
         chatTicket = $ChatTicket
         liveChatTicketSeeded = [bool]($null -ne $ChatTicket)
+        usabilityProbe = $UsabilityProbe
+        usabilityProved = [bool]($null -ne $UsabilityProbe)
         idempotencyResult = $IdempotencyResult
         redactionConfirmation = "Secret, token, connection-string, and user-local path values are not emitted raw."
         knownGaps = @(
             "DEMO-1b requires a running local API configured for deterministic alpha smoke behavior.",
             "DEMO-2b creates a live chat-confirmed ticket only when -CreateLiveChatTicket is explicitly supplied.",
+            "Post-seed usability against the running API is a single live probe, proven only when -ProveUsable is supplied; the DEMO-1a proof harness proves two probe runs on every run.",
             "The seed writes no frontend fixtures; the UI reads the same SQL/API state."
         )
         boundaryStatement = "The seed may replay governed baseline history; it does not invent approval, satisfy policy, continue workflow by itself, or grant release/deployment authority."
@@ -919,6 +1002,19 @@ if ($ModelMode -ne "Deterministic") {
 }
 Add-Stage "ModelCheck" "Passed" "DemoModelModeDeterministic" "Deterministic model fixture selected."
 
+if ($SeedTarget -eq "RunningApi") {
+    # The seed authenticates and mutates product state (tickets, runs, approvals,
+    # continuation, apply, usability probes). A local demo seed that can mutate a
+    # remote API is not local — refuse anything that is not explicitly loopback.
+    if (Test-LocalApiBaseUrl -BaseUrl $ApiBaseUrl) {
+        Add-Stage "ApiBaseUrlCheck" "Passed" "DemoApiBaseUrlLocal" "Demo API base URL is loopback-local." @{ apiBaseUrl = Redact-UserPath $ApiBaseUrl }
+    }
+    else {
+        Add-Stage "ApiBaseUrlCheck" "Blocked" "DemoApiBaseUrlNotLocal" "The demo seed mutates product state and may only target a loopback-local API (localhost, 127.0.0.1, or ::1)." @{ apiBaseUrl = Redact-UserPath $ApiBaseUrl }
+        Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+}
+
 if ($CheckOnly) {
     Add-Stage "RootSafetyCheck" "Skipped" "DemoRootSafetyNotEvaluated" "Check-only mode writes no demo artifacts and does not connect to SQL/API."
     Add-Stage "SqlCheck" "Skipped" "DemoSqlPersistenceUnavailable" "Check-only mode does not connect to SQL."
@@ -974,15 +1070,23 @@ else {
     $existingSeed = Get-ExistingRunningApiReceipt -Headers $headers
     if ($null -ne $existingSeed) {
         $existingReceipt = $existingSeed.receipt
-        if ($CreateLiveChatTicket -and $null -eq $existingReceipt.chatTicket) {
-            $chatTicket = Invoke-LiveChatTicketProof -Headers $headers -Project $existingSeed.project
+        $addChatTicket = $CreateLiveChatTicket -and $null -eq $existingReceipt.chatTicket
+        if ($addChatTicket -or $ProveUsable) {
+            $chatTicket = if ($addChatTicket) {
+                Invoke-LiveChatTicketProof -Headers $headers -Project $existingSeed.project
+            }
+            else {
+                $existingReceipt.chatTicket
+            }
+            $usabilityProbe = Invoke-UsabilityProbe -Headers $headers -Project $existingSeed.project
             Write-RunningApiReceipt `
                 -Project $existingSeed.project `
                 -SourcePath ([string]$existingReceipt.projectLocalPath) `
                 -AppliedTicket $existingReceipt.appliedTicket `
                 -PausedTicket $existingReceipt.pausedTicket `
                 -ChatTicket $chatTicket `
-                -IdempotencyResult "Reused verified DEMO-1b baseline and added explicit DEMO-2b chat ticket proof."
+                -UsabilityProbe $usabilityProbe `
+                -IdempotencyResult "Reused verified DEMO-1b baseline and added explicitly requested chat/usability proof."
         }
         Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Passed" -ExitCode 0
     }
@@ -995,13 +1099,15 @@ else {
     $appliedTicket = Drive-AppliedTicket -Headers $headers -Project $projectRecord -Ticket $validateTicket
     $pausedTicket = Drive-PausedTicket -Headers $headers -Project $projectRecord -Ticket $searchTicket
     $chatTicket = Invoke-LiveChatTicketProof -Headers $headers -Project $projectRecord
+    $usabilityProbe = Invoke-UsabilityProbe -Headers $headers -Project $projectRecord
 
     Write-RunningApiReceipt `
         -Project $projectRecord `
         -SourcePath $sourceCopy `
         -AppliedTicket $appliedTicket `
         -PausedTicket $pausedTicket `
-        -ChatTicket $chatTicket
+        -ChatTicket $chatTicket `
+        -UsabilityProbe $usabilityProbe
 }
 
 if (-not (Test-Path -LiteralPath $script:ReceiptPath)) {

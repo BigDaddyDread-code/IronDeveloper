@@ -34,9 +34,16 @@ Explicit DEMO-2b live chat ticket path:
 Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic -CreateLiveChatTicket
 ```
 
+Explicit live post-seed usability proof:
+
+```powershell
+Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic -ProveUsable
+```
+
 ## Files Changed
 
 - `Scripts/demo/demo-seed.ps1`
+- `IronDev.IntegrationTests.Api/Demo/DemoSeedApiDrivenTests.cs`
 - `IronDev.IntegrationTests/Demo/DemoSeedScriptContractTests.cs`
 - `Docs/receipts/DEMO1B_LONG_LIVED_DEMO_SEED.md`
 - `Docs/testing/INTEGRATION_TEST_CATEGORIES.md`
@@ -57,10 +64,20 @@ Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic -C
 - The confirmed chat ticket is expected to stop at `PausedForApproval`.
 - Default DEMO-1b still records `liveChatTicketSeeded = false`.
 
+## What The Usability Proof Adds
+
+- The DEMO-1a proof harness now proves, on every run, that after baseline seeding the environment stays usable: two fresh tickets are created through the product API and each is driven to `PausedForApproval` on real disposable build/test evidence.
+- Real, unfabricated evidence is asserted: only a green `dotnet build`/`dotnet test` reaches the gate, the critic package exists on disk, and its hash re-verifies at report time (`SkeletonEvidencePackaged` + `CriticPackage.HashVerified`).
+- Repeatability is asserted: the two governed runs are genuinely distinct (distinct run ids and distinct evidence-package hashes).
+- The probe stops at the human gate: no accepted approval, no continuation, no apply — and the seeded baseline (`Applied` + `PausedForApproval`) is re-checked to confirm the probe did not disturb it.
+- The running-API script offers a **single** live usability probe (one fresh ticket/run to the gate) behind `-ProveUsable`; default off so the demo baseline stays clean. The two-run repeatability proof lives in the DEMO-1a proof harness.
+
 ## Boundaries
 
 - No direct SQL final-state insert.
 - No frontend fixtures.
+- The usability probe stops at the human gate; it never approves, continues, or applies.
+- The running-API seed refuses any non-loopback `-ApiBaseUrl` (`DemoApiBaseUrlNotLocal`): a local demo seed that can mutate a remote API is not local.
 - No fake approval.
 - No fake continuation.
 - No fake apply receipt.
@@ -77,12 +94,10 @@ Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic -C
 
 ## Validation
 
-- `demo-seed.ps1 -CheckOnly -Json`: passed.
-- Focused DEMO script contract tests: 12/12 passed.
-- Integration category contract tests: 7/7 passed.
-- C11 secret scan: 9/9 passed.
-- `dotnet build IronDev.slnx --no-restore --nologo --verbosity minimal`: 0 errors / 4 warnings.
-- `git diff --check`: passed.
+- `dotnet build IronDev.IntegrationTests.Api`: build succeeded, 0 errors.
+- `dotnet build IronDev.IntegrationTests`: build succeeded, 0 errors.
+- Focused DEMO script contract tests (`DemoSeedScriptContractTests`): 16/16 passed, including `DemoSeed_ProvesEnvironmentRemainsUsableForNewTicketsAndRepeatedRuns`, the `-CheckOnly` / root-safety script-execution contracts, and the loopback guard trio (`DemoSeed_BlocksRemoteApiBaseUrl`, `DemoSeed_AllowsLocalhostApiBaseUrl`, `DemoSeed_AllowsLoopbackApiBaseUrl`) — the remote-block test executes the script against a non-loopback URL and observes the refusal.
+- Not run in this session (requires a real SQL database; `RequiresRealDatabase` + `LongRunning`): `DemoSeedApiDrivenTests.DemoSeed_BaselineHistory_IsApiDrivenAndSqlPersisted`, which now also drives the two-run post-seed usability probe. Must be run on a SQL-backed host before this is treated as proven end to end.
 
 ## Review Line
 

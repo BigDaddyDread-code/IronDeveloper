@@ -36,6 +36,12 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
     private const string SearchByAuthorKey = "search-by-author";
     private const string BulkDiscountKey = "bulk-discount";
 
+    private static readonly string[] UsabilityProbeTitles =
+    [
+        "Demo usability probe — pricing rule 1",
+        "Demo usability probe — pricing rule 2"
+    ];
+
     private const string ValidatedBook =
         """
         namespace BookSeller.Domain;
@@ -179,6 +185,14 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                 new { ProjectId = project.Id });
             Assert.AreEqual(0, liveChatMessageCount, "DEMO-1 must not seed the live chat ticket ahead of the demo.");
 
+            // Seeding baseline history is not enough: the environment must remain USABLE.
+            // Prove a viewer can still create a fresh ticket, start a governed run, see real
+            // build/test evidence, and reach the human gate — repeatably — after seeding.
+            var usabilityProbe = await ProveRemainsUsableAsync(client, project.Id, ticketKinds);
+
+            // The probe must not disturb the seeded baseline it ran alongside.
+            await AssertBaselineUnchangedAsync(project.Id, validateTicket.Id, applied.RunId, searchTicket.Id, paused.RunId);
+
             WriteDemoReceipt(new DemoSeedReceipt(
                 Command: "Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic",
                 CommitSha: CurrentCommitSha(),
@@ -214,12 +228,14 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                     ApplyReceiptSha256: string.Empty,
                     FinalReportReference: $"api/projects/{project.Id}/tickets/{searchTicket.Id}/skeleton-runs/{paused.RunId}/report"),
                 LiveChatTicketSeeded: false,
+                UsabilityProbe: usabilityProbe,
                 IdempotencyResult: "Fixture keys resolve to one intended baseline ticket each in this proof run.",
                 RedactionConfirmation: "Secret, token, connection-string, and user-local path values are not emitted raw.",
                 KnownGaps:
                 [
                     "DEMO-1 proves API/SQL baseline history through the integration host, not a long-lived already-running API process.",
-                    "DEMO-2 UI click-path proof is covered by the flow-shell contract and a separate API visible/startable test."
+                    "DEMO-2 UI click-path proof is covered by the flow-shell contract and a separate API visible/startable test.",
+                    "The usability probe proves the environment stays governable for new work; it stops at the human gate and never approves, continues, or applies."
                 ],
                 BoundaryStatement: "The seed may replay governed baseline history; it does not create the live chat ticket, invent approval, satisfy policy, continue workflow by itself, or grant release/deployment authority."));
         }
@@ -441,6 +457,139 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
         Assert.IsNull(report.Apply);
 
         return new DemoPausedRun(started.RunId, report.Approval.TargetHash);
+    }
+
+    private static async Task<DemoUsabilityProbeReceipt> ProveRemainsUsableAsync(
+        HttpClient client,
+        int projectId,
+        ConcurrentDictionary<long, string> ticketKinds)
+    {
+        // Repeatability is the claim under test: after baseline history exists, a viewer
+        // must still be able to create a NEW ticket and drive it to the human gate on real
+        // build/test evidence. We do that twice, through the product API, and stop at the
+        // gate every time — the seed proves the environment is usable, it does not spend
+        // the human's approval on the viewer's behalf.
+        var runs = new List<DemoUsabilityRunReceipt>();
+        foreach (var title in UsabilityProbeTitles)
+        {
+            var ticket = await CreateProbeTicketAsync(client, projectId, title);
+            ticketKinds[ticket.Id] = BulkDiscountKey;
+
+            var started = await PostJsonAsync<TicketBuildRunDto>(
+                client,
+                $"/api/projects/{projectId}/tickets/{ticket.Id}/skeleton-runs",
+                content: null);
+            Assert.AreEqual("PausedForApproval", started.Status, "A fresh post-seed ticket must run to the human gate.");
+            Assert.IsTrue(started.RequiresHumanApproval);
+
+            var report = await GetJsonAsync<SkeletonRunReport>(
+                client,
+                $"/api/projects/{projectId}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/report");
+            Assert.AreEqual("PausedForApproval", report.Status);
+
+            // Real build/test evidence — not fabricated: only a green dotnet build+test in
+            // the disposable workspace reaches PausedForApproval, the critic package exists
+            // on disk, and its hash re-verifies at report time.
+            Assert.IsNotNull(report.CriticPackage, "A usable run must produce a critic package from real build/test evidence.");
+            Assert.IsTrue(report.CriticPackage!.ExistsOnDisk, "Critic package must exist on disk.");
+            Assert.IsTrue(report.CriticPackage.HashVerified, "Critic package hash must re-verify — proving real, unfabricated evidence.");
+            Assert.IsTrue(report.Timeline.Any(entry => entry.EventType == "SkeletonEvidencePackaged"),
+                "The run timeline must show real disposable build/test evidence was packaged.");
+
+            // The probe reaches the gate and stops. It does not approve, continue, or apply.
+            Assert.IsFalse(report.LoopComplete);
+            Assert.IsNotNull(report.Approval);
+            Assert.IsFalse(report.Approval!.ContinuationUnblocked, "The probe must not continue past the gate.");
+            Assert.IsNull(report.Apply, "The probe must not apply.");
+
+            await AssertUsabilityProbeSqlAsync(projectId, ticket.Id, started.RunId);
+
+            runs.Add(new DemoUsabilityRunReceipt(
+                TicketId: ticket.Id,
+                RunId: started.RunId,
+                State: "PausedForApproval",
+                CriticPackageHash: report.CriticPackage.Sha256OnDisk,
+                BuildTestEvidenceVerified: true));
+        }
+
+        Assert.AreEqual(runs.Count, runs.Select(run => run.RunId).Distinct().Count(),
+            "Repeated governed runs must be genuinely distinct runs.");
+        Assert.AreEqual(runs.Count, runs.Select(run => run.CriticPackageHash).Distinct().Count(),
+            "Each governed run must produce its own independent evidence package.");
+
+        return new DemoUsabilityProbeReceipt(
+            Proved: true,
+            Runs: runs.ToArray(),
+            Note: "After baseline seeding, fresh tickets remain creatable and governable to the human gate with real build/test evidence. No probe was approved, continued, or applied.");
+    }
+
+    private static async Task<ProjectTicket> CreateProbeTicketAsync(HttpClient client, int projectId, string title)
+    {
+        var response = await client.PostAsJsonAsync($"/api/projects/{projectId}/tickets", new CreateProjectTicketRequest
+        {
+            Title = title,
+            Type = "Task",
+            Priority = "Low",
+            Summary = "Post-seed usability probe: prove a fresh ticket still runs to the human gate.",
+            Problem = "Confirm the seeded environment remains usable for new governed work.",
+            ProposedChange = "Exercise the bulk discount pricing path through a real disposable build/test run.",
+            AcceptanceCriteria = ["A governed run reaches the human approval gate with real build and test evidence."],
+            Provenance = new TicketProvenanceDto
+            {
+                Source = "demo-seed:usability-probe",
+                Notes = "Usability probe ticket. It proves the environment is usable and grants no authority."
+            }
+        });
+
+        var ticket = await ReadSuccessAsync<ProjectTicket>(response);
+        Assert.AreEqual("Draft", ticket.Status);
+        return ticket;
+    }
+
+    private static async Task AssertUsabilityProbeSqlAsync(int projectId, long ticketId, string runId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        var state = await connection.ExecuteScalarAsync<string>(
+            "SELECT State FROM dbo.Runs WHERE RunId = @RunId AND ProjectId = @ProjectId AND TicketId = @TicketId",
+            new { RunId = runId, ProjectId = projectId, TicketId = ticketId });
+        Assert.AreEqual("PausedForApproval", state);
+
+        var events = (await connection.QueryAsync<string>(
+            "SELECT EventType FROM dbo.RunEvents WHERE RunId = @RunId ORDER BY TimestampUtc, Id",
+            new { RunId = runId })).ToArray();
+        CollectionAssert.Contains(events, "SkeletonEvidencePackaged");
+        CollectionAssert.Contains(events, "CriticReviewPackageReady");
+        CollectionAssert.Contains(events, "ApprovalRequiredHalt");
+        CollectionAssert.DoesNotContain(events, "SkeletonContinuationUnblocked");
+        CollectionAssert.DoesNotContain(events, "SkeletonApplied");
+
+        var approvalCount = await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM governance.AcceptedApproval WHERE ApprovalTargetId = @RunId",
+            new { RunId = runId });
+        Assert.AreEqual(0, approvalCount, "The usability probe must not create accepted approval.");
+    }
+
+    private static async Task AssertBaselineUnchangedAsync(
+        int projectId,
+        long appliedTicketId,
+        string appliedRunId,
+        long pausedTicketId,
+        string pausedRunId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        var appliedState = await connection.ExecuteScalarAsync<string>(
+            "SELECT State FROM dbo.Runs WHERE RunId = @RunId AND ProjectId = @ProjectId AND TicketId = @TicketId",
+            new { RunId = appliedRunId, ProjectId = projectId, TicketId = appliedTicketId });
+        Assert.AreEqual("Applied", appliedState, "The usability probe must not disturb applied baseline history.");
+
+        var pausedState = await connection.ExecuteScalarAsync<string>(
+            "SELECT State FROM dbo.Runs WHERE RunId = @RunId AND ProjectId = @ProjectId AND TicketId = @TicketId",
+            new { RunId = pausedRunId, ProjectId = projectId, TicketId = pausedTicketId });
+        Assert.AreEqual("PausedForApproval", pausedState, "The usability probe must not disturb paused baseline history.");
     }
 
     private static async Task<Project> CreateProjectAsync(
@@ -1088,10 +1237,23 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
         DemoTicketReceipt AppliedTicket,
         DemoTicketReceipt PausedTicket,
         bool LiveChatTicketSeeded,
+        DemoUsabilityProbeReceipt UsabilityProbe,
         string IdempotencyResult,
         string RedactionConfirmation,
         string[] KnownGaps,
         string BoundaryStatement);
+
+    private sealed record DemoUsabilityProbeReceipt(
+        bool Proved,
+        DemoUsabilityRunReceipt[] Runs,
+        string Note);
+
+    private sealed record DemoUsabilityRunReceipt(
+        long TicketId,
+        string RunId,
+        string State,
+        string CriticPackageHash,
+        bool BuildTestEvidenceVerified);
 
     private sealed record DemoTicketReceipt(
         string Key,

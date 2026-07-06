@@ -42,6 +42,47 @@ public sealed class DemoSeedScriptContractTests
     }
 
     [TestMethod]
+    public void DemoSeed_BlocksRemoteApiBaseUrl()
+    {
+        var result = RunPowerShell("-Seed", "-ApiBaseUrl", "http://demo-api.example.com:5118", "-Json");
+
+        Assert.AreNotEqual(0, result.ExitCode, "The demo seed mutates product state and must refuse a non-loopback API base URL.");
+        StringAssert.Contains(result.Output, "\"ApiBaseUrlCheck\"");
+        StringAssert.Contains(result.Output, "may only target a loopback-local API");
+        AssertApiBaseUrlCheck(result.Output, "Blocked", "DemoApiBaseUrlNotLocal");
+    }
+
+    [TestMethod]
+    public void DemoSeed_AllowsLocalhostApiBaseUrl()
+    {
+        var result = RunPowerShell("-CheckOnly", "-ApiBaseUrl", "http://localhost:5118", "-Json");
+
+        Assert.AreEqual(0, result.ExitCode, result.Output);
+        AssertApiBaseUrlCheck(result.Output, "Passed", "DemoApiBaseUrlLocal");
+    }
+
+    [TestMethod]
+    public void DemoSeed_AllowsLoopbackApiBaseUrl()
+    {
+        foreach (var baseUrl in new[] { "http://127.0.0.1:5118", "http://[::1]:5118" })
+        {
+            var result = RunPowerShell("-CheckOnly", "-ApiBaseUrl", baseUrl, "-Json");
+
+            Assert.AreEqual(0, result.ExitCode, $"{baseUrl}: {result.Output}");
+            AssertApiBaseUrlCheck(result.Output, "Passed", "DemoApiBaseUrlLocal");
+        }
+    }
+
+    private static void AssertApiBaseUrlCheck(string output, string expectedStatus, string expectedReasonCode)
+    {
+        using var document = JsonDocument.Parse(output);
+        var stage = document.RootElement.GetProperty("stages").EnumerateArray()
+            .Single(item => item.GetProperty("stage").GetString() == "ApiBaseUrlCheck");
+        Assert.AreEqual(expectedStatus, stage.GetProperty("status").GetString());
+        Assert.AreEqual(expectedReasonCode, stage.GetProperty("reasonCode").GetString());
+    }
+
+    [TestMethod]
     public void DemoSeed_UsesProductApisForGovernedActions()
     {
         var source = ScriptSource();
@@ -120,6 +161,30 @@ public sealed class DemoSeedScriptContractTests
         StringAssert.Contains(apiProof, "Assert.AreEqual(\"PausedForApproval\", pausedState)");
         StringAssert.Contains(apiProof, "DEMO-1 must not seed the live chat ticket ahead of the demo.");
         StringAssert.Contains(apiProof, "LiveChatTicketSeeded: false");
+    }
+
+    [TestMethod]
+    public void DemoSeed_ProvesEnvironmentRemainsUsableForNewTicketsAndRepeatedRuns()
+    {
+        var apiProof = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "Demo", "DemoSeedApiDrivenTests.cs"));
+        var source = ScriptSource();
+
+        // The proof harness proves usability on every run: a fresh ticket, a repeated
+        // governed run, real build/test evidence, the human gate, and no silent approval.
+        StringAssert.Contains(apiProof, "ProveRemainsUsableAsync");
+        StringAssert.Contains(apiProof, "A fresh post-seed ticket must run to the human gate.");
+        StringAssert.Contains(apiProof, "Repeated governed runs must be genuinely distinct runs.");
+        StringAssert.Contains(apiProof, "SkeletonEvidencePackaged");
+        StringAssert.Contains(apiProof, "report.CriticPackage.HashVerified");
+        StringAssert.Contains(apiProof, "The probe must not apply.");
+        StringAssert.Contains(apiProof, "AssertBaselineUnchangedAsync");
+        StringAssert.Contains(apiProof, "The usability probe must not create accepted approval.");
+
+        // The running-API script offers the same proof live behind an explicit switch.
+        StringAssert.Contains(source, "[switch]$ProveUsable");
+        StringAssert.Contains(source, "Invoke-UsabilityProbe");
+        StringAssert.Contains(source, "DemoUsabilityProbePassed");
+        StringAssert.Contains(source, "reached the human gate on real build/test evidence");
     }
 
     [TestMethod]
