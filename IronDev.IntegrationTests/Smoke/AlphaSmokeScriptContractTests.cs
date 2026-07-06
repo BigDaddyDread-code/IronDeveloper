@@ -31,11 +31,36 @@ public sealed class AlphaSmokeScriptContractTests
         var result = RunPowerShell("-ModelMode", "Live", "-RunUntil", "Gate", "-Json");
         var source = File.ReadAllText(RepoFile("Scripts", "smoke", "alpha-smoke.ps1"));
 
-        Assert.AreNotEqual(0, result.ExitCode, "Live mode beyond TicketDraft is not supported and must block.");
+        Assert.AreNotEqual(0, result.ExitCode, "Live mode supports TicketDraft and Applied only; other targets must block.");
         StringAssert.Contains(result.Output, "LiveModelRunUntilUnsupported");
         using var document = JsonDocument.Parse(result.Output);
         Assert.AreEqual("Live", document.RootElement.GetProperty("modelMode").GetString());
         StringAssert.Contains(source, "must never fall back to deterministic mode");
+    }
+
+    [TestMethod]
+    public void AlphaSmokeScript_LiveApplied_WiresTheSelfRepairingHeroWalk()
+    {
+        var source = File.ReadAllText(RepoFile("Scripts", "smoke", "alpha-smoke.ps1"));
+
+        // REL-4b: -ModelMode Live -RunUntil Applied maps to the self-repairing live
+        // hero walk — real builder/tester/critic, bounded repair armed, same gate.
+        StringAssert.Contains(source, "LiveModelHeroWalkTests.Hero2_LiveModel_BulkDiscount_WalksRealLoopToApplied");
+        StringAssert.Contains(source, "SelfRepairCheck");
+        StringAssert.Contains(source, "LiveSelfRepairOccurred");
+        StringAssert.Contains(source, "LiveFirstAttemptClean");
+        StringAssert.Contains(source, "Self-repair is proposal-shaped work, never authority");
+
+        // The smoke never creates approval by default: live Applied demands the
+        // explicit -RequireExistingAcceptedApproval mode, before any env checks.
+        var missingApproval = RunPowerShell("-ModelMode", "Live", "-RunUntil", "Applied", "-Ticket", "bulk-discount", "-Json");
+        Assert.AreNotEqual(0, missingApproval.ExitCode);
+        StringAssert.Contains(missingApproval.Output, "AcceptedApprovalRequired");
+
+        // The live Applied walk is the bulk-discount hero walk only — no silent ticket swap.
+        var wrongTicket = RunPowerShell("-ModelMode", "Live", "-RunUntil", "Applied", "-Ticket", "validate-book", "-RequireExistingAcceptedApproval", "-Json");
+        Assert.AreNotEqual(0, wrongTicket.ExitCode);
+        StringAssert.Contains(wrongTicket.Output, "LiveModelTicketUnsupported");
     }
 
     [TestMethod]
