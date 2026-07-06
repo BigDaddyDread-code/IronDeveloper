@@ -427,8 +427,25 @@ public abstract class ApiTestBase
     private static async Task ApplySqlFileAsync(SqlConnection connection, params string[] pathParts)
     {
         var sql = await File.ReadAllTextAsync(Path.Combine(RepositoryRoot(), Path.Combine(pathParts)));
+        AssertNoCatalogHijack(sql, pathParts[^1]);
         foreach (var batch in SplitSqlBatches(sql))
             await connection.ExecuteAsync(batch);
+    }
+
+    /// <summary>
+    /// A migration must never choose its own catalog: the CONNECTION decides the
+    /// database. A `USE` statement silently rides the provisioning connection onto
+    /// another database — this is exactly how test provisioning once escaped to the
+    /// real IronDeveloper catalog and how CI broke on a nonexistent one.
+    /// </summary>
+    internal static void AssertNoCatalogHijack(string sql, string fileName)
+    {
+        if (System.Text.RegularExpressions.Regex.IsMatch(sql, @"(?im)^\s*USE\s"))
+        {
+            throw new InvalidOperationException(
+                $"Refusing to apply migration '{fileName}': it contains a USE statement. " +
+                "Migrations applied by the test host must be catalog-agnostic — the connection chooses the database, never the script.");
+        }
     }
 
     private static IReadOnlyList<string> SplitSqlBatches(string sql) =>

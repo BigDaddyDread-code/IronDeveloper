@@ -52,34 +52,40 @@ profile/index/critic-audit path. Added. Additionally, the hero walk provisions t
 critic audit table through the app's OWN `IDbConnectionFactory`, so the runtime
 database is provisioned no matter how configuration resolves.
 
-### 3. Destructive test provisioning targeted the REAL database (safety bug — FIXED)
+### 3. A migration hijacked the provisioning connection onto the REAL database (safety bug — ROOT-CAUSED AND FIXED)
 
-The test-base resolved its destructive provisioning/reset connection from the composed
-app configuration, which was observed resolving to the REAL `IronDeveloper` database —
-meaning `DropGovernanceSql` and domain-data resets could run against real data.
-Fixed: the destructive connection is pinned to the explicit test connection string and
-hard-guarded to a catalog name ending in `_Test` (refusal otherwise). Pinned by
-contract test.
+Initially this looked like a configuration-precedence flip. The true root cause,
+found when the guard broke CI: **`migrate_projects_indexing_fields.sql` began with
+`USE [IronDeveloper];`**. When the test host applied it, the statement silently rode
+the provisioning connection onto the real `IronDeveloper` catalog — every migration
+applied after it (including the critic audit-envelope table) landed in the real
+database, while the test database stayed unprovisioned. In CI the same line failed
+hard (`Database 'IronDeveloper' does not exist`), which is what exposed it.
+The earlier "composed configuration resolved to IronDeveloper" observation was this
+hijack, mid-flight — the configuration was never wrong. The open question is resolved.
 
-**OWNER-ACTION-001 — assess real IronDeveloper DB governance-table loss risk.**
-The real `IronDeveloper` database currently has NO governance tables, consistent
-with historical test runs having dropped them (`DropGovernanceSql` drops without
-re-creating when a later step fails or targets another catalog). Owner must
-explicitly assess whether governance records of value were lost, and record the
-verdict (nothing-of-value / restored-from-backup / accepted-loss) before this
-action is closed. Not a merge blocker if this is a disposable local dev DB — but
-it is a named action, not a buried note.
+Fixes, three layers deep:
 
-Guard scope (review-hardened): destructive provisioning targets only explicitly
-test-shaped catalogs — `*_Test` locally, `IronDev_CI_*` ephemeral in CI. Real
-(`IronDeveloper`), local developer (`IronDeveloper_Local`), and empty catalogs are
-refused. Contract coverage: `ApiTestBaseCatalogGuardContractTests` (4 tests),
-executed by name in the full SQL lane.
+- The `USE` line is removed — migrations are catalog-agnostic; the CONNECTION
+  chooses the database, never the script.
+- `ApplySqlFileAsync` now refuses ANY migration containing a `USE` statement
+  (`AssertNoCatalogHijack`), so no future file can re-plant the landmine. Fourteen
+  other legacy `Database/*.sql` files still carry `USE [IronDeveloper]` — none are
+  applied by the test host; sweeping them is named follow-up work.
+- The destructive connection remains pinned to the explicit test connection string
+  and hard-guarded to test-shaped catalogs only — `*_Test` locally, `IronDev_CI_*`
+  ephemeral in CI; `IronDeveloper`, `IronDeveloper_Local`, and empty names refused.
+  Contract coverage: `ApiTestBaseCatalogGuardContractTests` (5 tests), executed by
+  name in the full SQL lane.
 
-**Open question (named, not solved):** why the composed configuration resolved to the
-Development connection inside the base test factory in some sessions and the Test
-connection in others was not fully root-caused; the pin makes the answer irrelevant
-for safety, but the config-precedence behavior deserves its own investigation.
+**OWNER-ACTION-001 — assess real IronDeveloper DB writes (downgraded, still owner's call).**
+Good news from the root cause: `DropGovernanceSql` and domain resets always ran
+BEFORE the hijack point, so they hit the test catalog — the real database's missing
+governance tables reflect migrations never applied there, not test-run destruction.
+The real `IronDeveloper` DB did receive ADDITIVE writes from this branch's local
+runs: `dbo.Projects` indexing columns and an empty `agent.AgentRunAuditEnvelope`
+table. Owner should verify nothing else is unexpected and may drop the stray empty
+audit table; record the verdict to close this action.
 
 ### 4. Prose TechnicalNotes silently defeat context hints (product gap — RECORDED)
 

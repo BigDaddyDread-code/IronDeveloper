@@ -290,12 +290,18 @@ public sealed class DemoSeedScriptContractTests
         StringAssert.Contains(apiTestBase, "StartsWith(\"IronDev_CI_\"");
         StringAssert.Contains(apiTestBase, "Refusing to provision/reset database");
 
+        // Root cause of the catalog escape: a migration with a USE statement rode
+        // the provisioning connection onto another database. The test host now
+        // refuses catalog-choosing migrations outright.
+        StringAssert.Contains(apiTestBase, "AssertNoCatalogHijack");
+
         // The guard's own contract tests exist AND execute in the full SQL lane.
         var guardTests = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "ApiTestBaseCatalogGuardContractTests.cs"));
         StringAssert.Contains(guardTests, "ApiTestBase_AllowsLocalTestCatalog");
         StringAssert.Contains(guardTests, "ApiTestBase_AllowsCiEphemeralCatalog");
         StringAssert.Contains(guardTests, "ApiTestBase_RejectsProductionCatalog");
         StringAssert.Contains(guardTests, "ApiTestBase_RejectsLocalDeveloperCatalog");
+        StringAssert.Contains(guardTests, "ApiTestBase_RefusesMigrationsThatChooseTheirOwnCatalog");
         var ciScript = File.ReadAllText(RepoFile("Scripts", "ci", "run-full-sql-integration-ci.ps1"));
         StringAssert.Contains(ciScript, "ApiTestBaseCatalogGuardContractTests");
     }
