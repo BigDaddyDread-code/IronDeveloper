@@ -425,6 +425,9 @@ public sealed class AlphaLoopSmokeTests
         public Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default) =>
             GenerateProposalAsync(TicketId, ct);
 
+        public Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default) =>
+            GenerateProposalAsync(ticketId, ct);
+
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotSupportedException("The skeleton loop applies through its own governed spine, not the builder.");
     }

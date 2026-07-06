@@ -307,6 +307,37 @@ public sealed class DemoSeedScriptContractTests
     }
 
     [TestMethod]
+    public void BoundedRepair_IsOffByDefaultBoundedAndExecutedInCi()
+    {
+        var orchestrator = File.ReadAllText(RepoFile("IronDev.Infrastructure", "Services", "TicketSkeletonRunService.cs"));
+
+        // REPAIR-1 invariants: off unless explicitly configured, hard-clamped so no
+        // configuration becomes an unbounded retry loop, terminal named failure when
+        // the budget is exhausted, and attempt-scoped paths so history is never erased.
+        StringAssert.Contains(orchestrator, "SkeletonRepair:MaxAttempts");
+        StringAssert.Contains(orchestrator, "Math.Clamp(configured, 0, 3)");
+        StringAssert.Contains(orchestrator, "Default 0: repair is off unless explicitly");
+        StringAssert.Contains(orchestrator, "RepairBudgetExhausted");
+        StringAssert.Contains(orchestrator, "SkeletonRepairAttemptStarted");
+        StringAssert.Contains(orchestrator, "AttemptLabel = attemptNumber == 1 ? string.Empty : $\"repair-{attemptNumber}\"");
+
+        // A repair attempt is proposal-shaped work, never authority.
+        StringAssert.Contains(orchestrator, "A repair attempt is a new proposal, not authority");
+
+        var proofs = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "Smoke", "BoundedRepairApiDrivenTests.cs"));
+        StringAssert.Contains(proofs, "Repair_FirstAttemptFails_RepairReachesGate_HistoryPreserved");
+        StringAssert.Contains(proofs, "Repair_BudgetExhausted_RunFailsWithNamedReason");
+        StringAssert.Contains(proofs, "Repair_DisabledByDefault_FailureIsTerminalAndNamed");
+        StringAssert.Contains(proofs, "repair earns nothing more");
+
+        // Selection is not execution: the repair proofs run by exact name in the full SQL lane.
+        var ciScript = File.ReadAllText(RepoFile("Scripts", "ci", "run-full-sql-integration-ci.ps1"));
+        StringAssert.Contains(ciScript, "BoundedRepairApiDrivenTests.Repair_FirstAttemptFails_RepairReachesGate_HistoryPreserved");
+        StringAssert.Contains(ciScript, "BoundedRepairApiDrivenTests.Repair_BudgetExhausted_RunFailsWithNamedReason");
+        StringAssert.Contains(ciScript, "BoundedRepairApiDrivenTests.Repair_DisabledByDefault_FailureIsTerminalAndNamed");
+    }
+
+    [TestMethod]
     public void DemoSeed_ReceiptDocumentsBoundary()
     {
         var receipt = File.ReadAllText(RepoFile("Docs", "receipts", "DEMO1_API_DRIVEN_DEMO_SEED.md"));

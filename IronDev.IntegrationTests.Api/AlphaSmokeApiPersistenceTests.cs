@@ -932,6 +932,9 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         public Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default) =>
             GenerateProposalAsync(0, ct);
 
+        public Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default) =>
+            GenerateProposalAsync(ticketId, ct);
+
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotSupportedException("REL-3 applies through the skeleton-run API, not direct builder writes.");
     }

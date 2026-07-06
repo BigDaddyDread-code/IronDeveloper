@@ -169,6 +169,22 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             sb.AppendLine($"  Implementation Notes: {ctx.TicketImplementationNotes}");
         sb.AppendLine();
 
+        // REPAIR-1: populated only on a bounded repair attempt — the previous
+        // proposal failed to build or pass tests, and the failure evidence is the
+        // most important context in the prompt.
+        if (ctx.PastBuildFailures.Count > 0)
+        {
+            sb.AppendLine("PREVIOUS ATTEMPT FAILED — THIS IS A REPAIR:");
+            sb.AppendLine("- Your previous proposal for this ticket failed. The failure evidence is below.");
+            sb.AppendLine("- Fix the failure while keeping the ticket's intent. Do not change unrelated code.");
+            sb.AppendLine("- The previous attempt's files are included under RELEVANT CODE CONTEXT; repair from them, do not start over.");
+            foreach (var failure in ctx.PastBuildFailures)
+            {
+                sb.AppendLine(failure);
+            }
+            sb.AppendLine();
+        }
+
         if (ctx.SourceDocumentVersionId.HasValue)
         {
             sb.AppendLine("SOURCE PROJECT DOCUMENT:");

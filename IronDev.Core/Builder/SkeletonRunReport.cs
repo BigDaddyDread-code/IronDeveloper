@@ -39,6 +39,12 @@ public sealed record SkeletonRunReport
     /// </summary>
     public IReadOnlyList<SkeletonRunFindingDispositionTrace> FindingDispositions { get; init; } = [];
 
+    /// <summary>
+    /// REPAIR-1: every bounded repair attempt this run made, in order, from durable
+    /// events. Attempt history is never erased — a run that needed repair says so.
+    /// </summary>
+    public IReadOnlyList<SkeletonRunRepairAttemptTrace> RepairAttempts { get; init; } = [];
+
     public SkeletonRunApplyTrace? Apply { get; init; }
 
     /// <summary>Every loop link the report could not verify, by name. Empty means every observed link verified.</summary>
@@ -153,6 +159,26 @@ public sealed record SkeletonRunCriticReviewTrace
     /// <summary>AG-2: which model reviewed — a catch-rate is meaningless without knowing which configured critic was measured.</summary>
     public string ModelProvider { get; init; } = string.Empty;
     public string ModelName { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// One bounded repair attempt, reconstructed from durable events (REPAIR-1).
+/// A repair attempt is proposal-shaped work, never authority — its presence in
+/// the report is honesty about the mess, not a mark against the run.
+/// </summary>
+public sealed record SkeletonRunRepairAttemptTrace
+{
+    /// <summary>The attempt this repair produced (2 = first repair).</summary>
+    public int AttemptNumber { get; init; }
+
+    /// <summary>What the previous attempt failed on.</summary>
+    public string FailureKind { get; init; } = string.Empty;
+    public string FailedCommand { get; init; } = string.Empty;
+
+    public string RepairProposalId { get; init; } = string.Empty;
+    public string ModelProvider { get; init; } = string.Empty;
+    public string ModelName { get; init; } = string.Empty;
+    public bool RepairProposalEvidenceExistsOnDisk { get; init; }
 }
 
 /// <summary>A human disposition recorded for a critic finding. A decision, not approval.</summary>

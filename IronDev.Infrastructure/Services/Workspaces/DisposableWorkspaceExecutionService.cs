@@ -68,8 +68,19 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
         foreach (var command in request.Commands)
             ValidateAllowedCommand(command);
 
+        // REPAIR-1: attempt-scoped paths. A repair rerun of the same run must never
+        // overwrite (or delete, below) a previous attempt's preserved workspace or
+        // evidence — attempt history is never erased.
+        if (!string.IsNullOrWhiteSpace(request.AttemptLabel) &&
+            request.AttemptLabel.Any(character => !char.IsLetterOrDigit(character) && character != '-'))
+        {
+            throw new InvalidOperationException("AttemptLabel may only contain letters, digits, and dashes.");
+        }
+
+        var attemptSuffix = string.IsNullOrWhiteSpace(request.AttemptLabel) ? string.Empty : $"-{request.AttemptLabel}";
+
         Directory.CreateDirectory(workspaceRoot);
-        var workspacePath = Path.Combine(workspaceRoot, request.RunId);
+        var workspacePath = Path.Combine(workspaceRoot, request.RunId + attemptSuffix);
         workspacePath = Path.GetFullPath(workspacePath);
         if (!IsSameOrUnder(workspaceRoot, workspacePath) || string.Equals(workspaceRoot, workspacePath, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Disposable workspace path must stay under the configured workspace root.");
@@ -80,7 +91,7 @@ public sealed class DisposableWorkspaceExecutionService : IDisposableWorkspaceEx
             Directory.Delete(workspacePath, recursive: true);
 
         Directory.CreateDirectory(evidenceRoot);
-        var evidencePath = Path.Combine(evidenceRoot, request.RunId);
+        var evidencePath = Path.Combine(evidenceRoot, request.RunId + attemptSuffix);
         evidencePath = Path.GetFullPath(evidencePath);
         if (!IsSameOrUnder(evidenceRoot, evidencePath) || string.Equals(evidenceRoot, evidencePath, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Disposable evidence path must stay under the configured evidence root.");

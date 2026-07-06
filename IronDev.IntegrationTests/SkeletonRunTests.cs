@@ -1396,6 +1396,8 @@ public sealed class SkeletonRunTests
             Task.FromResult(behavior());
         public Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default) =>
             throw new NotImplementedException();
+        public Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default) =>
+            Task.FromResult(behavior());
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotImplementedException();
     }

@@ -198,14 +198,6 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 }, cancellationToken).ConfigureAwait(false);
         }
 
-        var allWrites = fileWrites
-            .Concat(authoredTests.Select(test => new DisposableWorkspaceFileWrite
-            {
-                RelativePath = test.RelativePath,
-                Content = test.Content
-            }))
-            .ToList();
-
         // The orchestrator owns the run lifecycle: it moves Created → Running as the
         // build/test begins (the workspace no longer does this — see OwnsRunLifecycle),
         // and will move Running → PausedForApproval once evidence is packaged.
@@ -216,33 +208,130 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             Summary = "Skeleton build and test running in a disposable workspace."
         }, cancellationToken).ConfigureAwait(false);
 
-        var workspaceResult = await _workspaces.RunAsync(new DisposableWorkspaceRunRequest
+        // REPAIR-1: bounded repair. A failed build/test is evidence; with an explicit
+        // attempt budget (SkeletonRepair:MaxAttempts, default 0 = off) the orchestrator
+        // directs the Builder to repair its proposal — new proposal, fresh attempt-scoped
+        // workspace, failure evidence in context. A repair attempt is proposal-shaped
+        // work, never authority: the gate, approval, continuation, and apply are
+        // unchanged, and every attempt's evidence and events are preserved.
+        var maxRepairAttempts = ReadMaxRepairAttempts();
+        var attemptNumber = 1;
+        DisposableWorkspaceRunResult workspaceResult;
+        while (true)
         {
-            RunId = run.RunId,
-            SourcePath = project.LocalPath,
-            WorkspaceRoot = ResolveWorkspaceRoot(),
-            EvidenceRoot = evidenceRoot,
-            CleanWorkspaceOnSuccess = true,
-            PreserveWorkspaceOnFailure = true,
-            PreserveWorkspaceOnCancellation = true,
-            // The orchestrator owns this run's lifecycle — the workspace supplies
-            // evidence and a result, but must not drive the run to Completed while
-            // the orchestrator still intends to pause it at the human gate.
-            OwnsRunLifecycle = false,
-            FileWrites = allWrites,
-            Commands = DotNetCommandProfile.BuildAndTest(project.LocalPath, ReadTimeout("BuildTimeoutSeconds"), ReadTimeout("TestTimeoutSeconds"))
-        }, cancellationToken).ConfigureAwait(false);
+            var allWrites = fileWrites
+                .Concat(authoredTests.Select(test => new DisposableWorkspaceFileWrite
+                {
+                    RelativePath = test.RelativePath,
+                    Content = test.Content
+                }))
+                .ToList();
 
-        await PublishAsync(run.RunId, "SkeletonEvidencePackaged",
-            "Evidence packaged. This run grants nothing: critic review, human approval, and any apply remain separate governed steps.",
-            projectId, ticketId, new Dictionary<string, string>
+            workspaceResult = await _workspaces.RunAsync(new DisposableWorkspaceRunRequest
             {
-                ["proposalId"] = proposalId,
-                ["succeeded"] = workspaceResult.Succeeded.ToString().ToLowerInvariant(),
-                ["evidencePath"] = workspaceResult.EvidencePath,
-                ["commandCount"] = workspaceResult.Commands.Count.ToString(),
-                ["currentNode"] = "SkeletonRun"
+                RunId = run.RunId,
+                SourcePath = project.LocalPath,
+                WorkspaceRoot = ResolveWorkspaceRoot(),
+                EvidenceRoot = evidenceRoot,
+                CleanWorkspaceOnSuccess = true,
+                PreserveWorkspaceOnFailure = true,
+                PreserveWorkspaceOnCancellation = true,
+                // The orchestrator owns this run's lifecycle — the workspace supplies
+                // evidence and a result, but must not drive the run to Completed while
+                // the orchestrator still intends to pause it at the human gate.
+                OwnsRunLifecycle = false,
+                // Attempt-scoped paths: a repair rerun never erases a previous attempt.
+                AttemptLabel = attemptNumber == 1 ? string.Empty : $"repair-{attemptNumber}",
+                FileWrites = allWrites,
+                Commands = DotNetCommandProfile.BuildAndTest(project.LocalPath, ReadTimeout("BuildTimeoutSeconds"), ReadTimeout("TestTimeoutSeconds"))
             }, cancellationToken).ConfigureAwait(false);
+
+            await PublishAsync(run.RunId, "SkeletonEvidencePackaged",
+                "Evidence packaged. This run grants nothing: critic review, human approval, and any apply remain separate governed steps.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["proposalId"] = proposalId,
+                    ["attemptNumber"] = attemptNumber.ToString(),
+                    ["succeeded"] = workspaceResult.Succeeded.ToString().ToLowerInvariant(),
+                    ["evidencePath"] = workspaceResult.EvidencePath,
+                    ["commandCount"] = workspaceResult.Commands.Count.ToString(),
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+
+            if (workspaceResult.Succeeded)
+                break;
+
+            var classification = SkeletonBuildFailureClassifier.Classify(workspaceResult.Commands);
+
+            if (attemptNumber > maxRepairAttempts)
+            {
+                // Terminal, named, and honest — a run that cannot build is Failed,
+                // never left silently Running. A failed run grants nothing and there
+                // is nothing at the gate to approve.
+                return await BlockAsync(run.RunId, projectId, ticketId,
+                    maxRepairAttempts == 0 ? classification.Kind.ToString() : "RepairBudgetExhausted",
+                    $"{classification.Kind} on '{classification.FailedCommand}' after {attemptNumber} attempt(s) " +
+                    $"(repair budget: {maxRepairAttempts}). The failed attempt's workspace and evidence are preserved.",
+                    "Read the preserved failure evidence, refine the ticket or the repair budget, then start a new skeleton run.",
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            attemptNumber++;
+
+            await PublishAsync(run.RunId, "SkeletonRepairAttemptStarted",
+                $"Repair attempt {attemptNumber} of {maxRepairAttempts + 1} total attempts: {classification.Kind} on '{classification.FailedCommand}'. " +
+                "A repair attempt is a new proposal, not authority — the human gate, approval, continuation, and apply are unchanged, and every attempt's evidence is preserved.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["attemptNumber"] = attemptNumber.ToString(),
+                    ["maxRepairAttempts"] = maxRepairAttempts.ToString(),
+                    ["failureKind"] = classification.Kind.ToString(),
+                    ["failedCommand"] = classification.FailedCommand,
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                proposal = await _proposals.GenerateRepairProposalAsync(ticketId, new SkeletonRepairContext
+                {
+                    AttemptNumber = attemptNumber,
+                    Classification = classification,
+                    PreviousProposal = proposal
+                }, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                return await BlockAsync(run.RunId, projectId, ticketId,
+                    "RepairProposalGenerationFailed",
+                    exception.Message,
+                    "This is a service failure, not a ticket problem. Check the proposal service and model provider, then start a new skeleton run.",
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            fileWrites = MapFileWrites(proposal);
+            if (fileWrites.Count == 0)
+            {
+                return await BlockAsync(run.RunId, projectId, ticketId,
+                    "RepairProposalEmpty",
+                    "The repair proposal produced no valid file changes to exercise.",
+                    "Read the preserved failure evidence and refine the ticket, then start a new skeleton run.",
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            proposalId = await PersistProposalEvidenceAsync(run.RunId, evidenceRoot, proposal, cancellationToken, $"repair-{attemptNumber}").ConfigureAwait(false);
+
+            await PublishAsync(run.RunId, "SkeletonRepairProposalGenerated",
+                $"Repair proposal {proposalId} generated with {fileWrites.Count} file change(s). A proposal is review material, not approval.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["attemptNumber"] = attemptNumber.ToString(),
+                    ["proposalId"] = proposalId,
+                    ["fileChangeCount"] = fileWrites.Count.ToString(),
+                    ["modelProvider"] = proposal.ModelProvider ?? string.Empty,
+                    ["modelName"] = proposal.ModelName ?? string.Empty,
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+        }
 
         // P0-2: prepare the critic's review package at full fidelity. The package is
         // review material only — the run does not create, request, or simulate the
@@ -822,6 +911,31 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             };
         }
 
+        // REPAIR-1: bounded repair attempts, in order, from durable events. History,
+        // not judgment — a run that needed repair says so.
+        var repairAttempts = events
+            .Where(runEvent => runEvent.EventType == "SkeletonRepairAttemptStarted")
+            .Select(startEvent =>
+            {
+                var attemptNumber = int.TryParse(Payload(startEvent, "attemptNumber"), out var number) ? number : 0;
+                var generatedEvent = events.FirstOrDefault(runEvent =>
+                    runEvent.EventType == "SkeletonRepairProposalGenerated" &&
+                    Payload(runEvent, "attemptNumber") == attemptNumber.ToString());
+                var repairProposalPath = Path.Combine(evidenceRoot, runId, "evidence", $"proposal-repair-{attemptNumber}.json");
+                return new SkeletonRunRepairAttemptTrace
+                {
+                    AttemptNumber = attemptNumber,
+                    FailureKind = Payload(startEvent, "failureKind"),
+                    FailedCommand = Payload(startEvent, "failedCommand"),
+                    RepairProposalId = generatedEvent is null ? string.Empty : Payload(generatedEvent, "proposalId"),
+                    ModelProvider = generatedEvent is null ? string.Empty : Payload(generatedEvent, "modelProvider"),
+                    ModelName = generatedEvent is null ? string.Empty : Payload(generatedEvent, "modelName"),
+                    RepairProposalEvidenceExistsOnDisk = File.Exists(repairProposalPath)
+                };
+            })
+            .OrderBy(trace => trace.AttemptNumber)
+            .ToList();
+
         // Critic package link — the hash is recomputed from disk, never just recited.
         SkeletonRunCriticPackageTrace? packageTrace = null;
         var packageEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "CriticReviewPackageReady");
@@ -1005,6 +1119,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             Approval = approvalTrace,
             CriticReviews = criticReviews,
             FindingDispositions = findingDispositions,
+            RepairAttempts = repairAttempts,
             Apply = applyTrace,
             Gaps = gaps,
             LoopComplete = loopComplete
@@ -1158,16 +1273,31 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             package.CriterionCoverage.Count(coverage => !coverage.Covered));
     }
 
+    /// <summary>
+    /// SkeletonRepair:MaxAttempts — how many bounded repair attempts a failed
+    /// build/test may trigger. Default 0: repair is off unless explicitly
+    /// configured, and a failure is a terminal named state. Clamped to 3 so no
+    /// configuration can turn bounded repair into an unbounded retry loop.
+    /// </summary>
+    private int ReadMaxRepairAttempts() =>
+        int.TryParse(_configuration["SkeletonRepair:MaxAttempts"], out var configured)
+            ? Math.Clamp(configured, 0, 3)
+            : 0;
+
     private static async Task<string> PersistProposalEvidenceAsync(
         string runId,
         string evidenceRoot,
         BuilderProposal proposal,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string attemptLabel = "")
     {
-        var proposalId = $"prop-{runId}";
+        // Attempt-suffixed evidence: a repair proposal never overwrites the
+        // original attempt's proposal.json — attempt history is never erased.
+        var suffix = string.IsNullOrWhiteSpace(attemptLabel) ? string.Empty : $"-{attemptLabel}";
+        var proposalId = $"prop-{runId}{suffix}";
         var runEvidenceRoot = Path.Combine(evidenceRoot, runId, "evidence");
         Directory.CreateDirectory(runEvidenceRoot);
-        var proposalPath = Path.Combine(runEvidenceRoot, "proposal.json");
+        var proposalPath = Path.Combine(runEvidenceRoot, $"proposal{suffix}.json");
 
         await File.WriteAllTextAsync(proposalPath, JsonSerializer.Serialize(new
         {
