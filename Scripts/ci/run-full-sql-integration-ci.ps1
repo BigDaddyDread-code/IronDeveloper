@@ -446,6 +446,13 @@ try {
         "FullyQualifiedName~SlowQuarantineCategoryContractTests"
     ) -join "|"
     Invoke-TestLane -Name "Category safety contracts" -Filter $categoryContractFilter
+
+    # Selection is not execution: the destructive-catalog guard contract must run
+    # here, in the lane whose ephemeral IronDev_CI_* database it exists to allow.
+    Invoke-TestLane `
+        -Name "Destructive catalog guard contract" `
+        -Project $script:ApiProject `
+        -Filter "FullyQualifiedName~ApiTestBaseCatalogGuardContractTests"
     Invoke-TestLane -Name "C11 secret scan compatibility" -Filter "FullyQualifiedName~BlockC11SecretScanningRegressionTests"
 
     $status = "Passed"

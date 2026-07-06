@@ -244,6 +244,9 @@ builder.Services.AddScoped<IAgentRunAuditEnvelopeReadRepository, SqlAgentRunAudi
 builder.Services.AddScoped<IAgentRunAuditQueryService, AgentRunAuditQueryService>();
 builder.Services.AddScoped<IManualMemoryImprovementAgentService, ManualMemoryImprovementAgentService>();
 builder.Services.AddScoped<ManualAgentExecutionStoreValidator>();
+// HERO-2: this registration was missing, so the stored critic executor could never
+// resolve in a real host — the live critic route had never actually been callable.
+builder.Services.AddScoped<IManualIndependentCriticAgentService, ManualIndependentCriticAgentService>();
 builder.Services.AddScoped<IStoredManualIndependentCriticAgentService, StoredManualIndependentCriticAgentService>();
 builder.Services.AddScoped<IStoredManualMemoryImprovementAgentService, StoredManualMemoryImprovementAgentService>();
 builder.Services.AddSingleton<AgentToolRequestValidator>();

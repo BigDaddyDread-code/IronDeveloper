@@ -1,5 +1,6 @@
-USE [IronDeveloper];
-GO
+-- Catalog-agnostic by design: the CONNECTION chooses the database, never the
+-- migration. A USE statement here once hijacked test-host provisioning onto the
+-- real IronDeveloper catalog (see Docs/receipts/HERO2_LIVE_MODEL_REAL_LOOP.md).
 
 IF NOT EXISTS (
     SELECT * FROM sys.columns 
