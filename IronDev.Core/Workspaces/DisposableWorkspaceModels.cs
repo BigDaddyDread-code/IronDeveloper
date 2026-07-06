@@ -43,6 +43,15 @@ public sealed record DisposableWorkspaceRunRequest
     /// intends to pause at the human gate).
     /// </summary>
     public bool OwnsRunLifecycle { get; init; } = true;
+
+    /// <summary>
+    /// REPAIR-1: attempt-scopes the workspace and evidence directories (e.g.
+    /// "repair-2") so a bounded repair rerun of the same run NEVER overwrites a
+    /// previous attempt's preserved workspace or evidence. Empty (the default)
+    /// keeps the original attempt's paths — attempt history is never erased.
+    /// Events still publish under the run's own id.
+    /// </summary>
+    public string AttemptLabel { get; init; } = string.Empty;
 }
 
 public sealed record DisposableWorkspaceCommandResult

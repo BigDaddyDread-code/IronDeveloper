@@ -20,7 +20,19 @@ public sealed record SkeletonRunReport
     public string Status { get; init; } = string.Empty;
     public string Summary { get; init; } = string.Empty;
     public IReadOnlyList<SkeletonRunTimelineEntry> Timeline { get; init; } = [];
+
+    /// <summary>
+    /// The FINAL/CURRENT proposal — the one that produced the evidence at the gate
+    /// and that the critic package and approval hash bind to. After a successful
+    /// bounded repair this is the repaired proposal, never the failed original.
+    /// </summary>
     public SkeletonRunProposalTrace? Proposal { get; init; }
+
+    /// <summary>
+    /// REPAIR-1: the original failed proposal, populated ONLY when bounded repair
+    /// replaced it. Preserved history — it exists, and it is not the gate proposal.
+    /// </summary>
+    public SkeletonRunProposalTrace? InitialProposal { get; init; }
     public SkeletonRunTestAuthoringTrace? TestAuthoring { get; init; }
     public SkeletonRunCriticPackageTrace? CriticPackage { get; init; }
     public SkeletonRunApprovalTrace? Approval { get; init; }
@@ -38,6 +50,12 @@ public sealed record SkeletonRunReport
     /// veto, but it cannot be ignored.
     /// </summary>
     public IReadOnlyList<SkeletonRunFindingDispositionTrace> FindingDispositions { get; init; } = [];
+
+    /// <summary>
+    /// REPAIR-1: every bounded repair attempt this run made, in order, from durable
+    /// events. Attempt history is never erased — a run that needed repair says so.
+    /// </summary>
+    public IReadOnlyList<SkeletonRunRepairAttemptTrace> RepairAttempts { get; init; } = [];
 
     public SkeletonRunApplyTrace? Apply { get; init; }
 
@@ -153,6 +171,26 @@ public sealed record SkeletonRunCriticReviewTrace
     /// <summary>AG-2: which model reviewed — a catch-rate is meaningless without knowing which configured critic was measured.</summary>
     public string ModelProvider { get; init; } = string.Empty;
     public string ModelName { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// One bounded repair attempt, reconstructed from durable events (REPAIR-1).
+/// A repair attempt is proposal-shaped work, never authority — its presence in
+/// the report is honesty about the mess, not a mark against the run.
+/// </summary>
+public sealed record SkeletonRunRepairAttemptTrace
+{
+    /// <summary>The attempt this repair produced (2 = first repair).</summary>
+    public int AttemptNumber { get; init; }
+
+    /// <summary>What the previous attempt failed on.</summary>
+    public string FailureKind { get; init; } = string.Empty;
+    public string FailedCommand { get; init; } = string.Empty;
+
+    public string RepairProposalId { get; init; } = string.Empty;
+    public string ModelProvider { get; init; } = string.Empty;
+    public string ModelName { get; init; } = string.Empty;
+    public bool RepairProposalEvidenceExistsOnDisk { get; init; }
 }
 
 /// <summary>A human disposition recorded for a critic finding. A decision, not approval.</summary>

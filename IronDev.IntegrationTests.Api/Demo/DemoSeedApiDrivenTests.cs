@@ -1187,6 +1187,9 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
         public Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default) =>
             GenerateProposalAsync(0, ct);
 
+        public Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default) =>
+            GenerateProposalAsync(ticketId, ct);
+
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotSupportedException("DEMO seed applies through skeleton-run API endpoints, not direct builder writes.");
 

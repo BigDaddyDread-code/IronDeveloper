@@ -433,7 +433,8 @@ try {
     $demoSeedProofFilter = @(
         "FullyQualifiedName~DemoSeedApiDrivenTests.DemoSeed_BaselineHistory_IsApiDrivenAndSqlPersisted",
         "FullyQualifiedName~DemoSeedApiDrivenTests.Demo2_ChatConfirmedTicket_IsVisibleAndStartableThroughApi",
-        "FullyQualifiedName~DemoSeedApiDrivenTests.Hero_BulkDiscountAdvisoryFinding_RequiresDispositionBeforeApplied"
+        "FullyQualifiedName~DemoSeedApiDrivenTests.Hero_BulkDiscountAdvisoryFinding_RequiresDispositionBeforeApplied",
+        "FullyQualifiedName~BoundedRepairApiDrivenTests"
     ) -join "|"
 
     Invoke-TestLane `

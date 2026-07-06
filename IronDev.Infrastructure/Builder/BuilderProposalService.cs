@@ -146,6 +146,54 @@ public sealed class BuilderProposalService : IBuilderProposalService
         throw new NotImplementedException("Request-based proposal generation is not implemented yet.");
     }
 
+    /// <summary>
+    /// REPAIR-1: one bounded repair proposal. Reuses the full ticket context pipeline,
+    /// then injects the failure classification (PastBuildFailures) and the previous
+    /// attempt's files (RetrievedSnippets) so the Builder repairs the failed proposal
+    /// instead of starting over blind. Readiness is not re-evaluated: the run already
+    /// passed readiness this run; the failure is in the proposal, not the ticket.
+    /// The result is proposal-shaped work only — no authority, no apply.
+    /// </summary>
+    public async Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default)
+    {
+        var ticket = await _ticketService.GetTicketByIdAsync(ticketId, ct)
+            ?? throw new InvalidOperationException($"Ticket {ticketId} not found.");
+
+        var context = await _contextService.AssembleContextAsync(ticket.ProjectId, ticketId, ct);
+
+        context.PastBuildFailures =
+        [
+            $"Attempt {repair.AttemptNumber - 1} failed: {repair.Classification.Kind} on '{repair.Classification.FailedCommand}'.",
+            repair.Classification.Excerpt
+        ];
+        context.RetrievedSnippets = context.RetrievedSnippets
+            .Concat((repair.PreviousProposal.Changes ?? []).Select(change =>
+                $"--- PREVIOUS ATTEMPT (FAILED) FILE: {change.FilePath} ---\n{change.FullContentAfter}"))
+            .ToList();
+
+        var innerProposal = await _proposalService.GenerateProposalAsync(context, ct);
+        var proposal = MapToBuilderProposal(innerProposal, context);
+        ValidateProposal(proposal);
+
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.RepairProposal",
+            WorkspaceName = "Builder",
+            ProjectId = ticket.ProjectId,
+            TicketId = ticketId,
+            ActiveProjectName = context.ProjectName,
+            ActiveProjectPath = context.ProjectPath,
+            IsProposalOnly = true,
+            ProposedFileCount = proposal.Changes.Count,
+            ProposedFilesList = string.Join(", ", proposal.Changes.Select(change => change.FilePath)),
+            WasSuccessful = proposal.IsAllValid,
+            ParsedResponseSummary = $"Repair attempt {repair.AttemptNumber}: {(proposal.IsAllValid ? "Validation Passed" : "Validation Failed")}",
+            CreatedAt = DateTime.UtcNow
+        });
+
+        return proposal;
+    }
+
     public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default)
     {
         // Retired by P0-4: the direct file-write path mutated source without the

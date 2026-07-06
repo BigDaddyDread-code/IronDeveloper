@@ -96,6 +96,11 @@ public sealed class TicketsApiClient : IronDevApiClientBase, ITicketsApiClient
     public Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default) =>
         PostAsync<BuilderProposal>($"projects/{projectId}/proposal", new { request }, ct);
 
+    public Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default) =>
+        // REPAIR-1 runs inside the server-side skeleton orchestrator; there is no
+        // client-initiated repair route — a client cannot direct repair attempts.
+        throw new NotSupportedException("Repair proposals are orchestrated server-side inside bounded skeleton runs.");
+
     public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
         PostAsync<object>($"projects/{proposal.ProjectId}/proposal/apply", proposal, ct);
 

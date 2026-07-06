@@ -67,6 +67,13 @@ public interface IBuilderProposalService
     Task<BuilderProposal> GenerateProposalAsync(long ticketId, CancellationToken ct = default);
     Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default);
     Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default);
+
+    /// <summary>
+    /// REPAIR-1: generate a bounded repair proposal for a failed skeleton attempt.
+    /// The failure classification and the previous proposal enter the Builder's
+    /// context; the result is proposal-shaped work only — no authority, no apply.
+    /// </summary>
+    Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default);
 }
 
 /// <summary>
