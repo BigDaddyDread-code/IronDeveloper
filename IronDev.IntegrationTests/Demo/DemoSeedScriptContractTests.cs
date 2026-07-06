@@ -264,6 +264,31 @@ public sealed class DemoSeedScriptContractTests
     }
 
     [TestMethod]
+    public void Hero2_LiveRealLoop_HasNoFakesAndItsFixesStayPinned()
+    {
+        var liveWalk = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "Smoke", "LiveModelHeroWalkTests.cs"));
+
+        // The live walk runs real services on a live model and never falls back.
+        StringAssert.Contains(liveWalk, "Hero2_LiveModel_BulkDiscount_WalksRealLoopToApplied");
+        StringAssert.Contains(liveWalk, "It never falls back to deterministic mode.");
+        StringAssert.Contains(liveWalk, "restoring the REAL stored-critic");
+        StringAssert.Contains(liveWalk, "must run a real model — never the deterministic fake");
+        StringAssert.Contains(liveWalk, "every real finding gets a human-shaped disposition");
+
+        // HERO-2 product fix: the real critic executor's dependency stays registered —
+        // without it the live critic route can never resolve in a real host.
+        var program = File.ReadAllText(RepoFile("IronDev.Api", "Program.cs"));
+        StringAssert.Contains(program, "AddScoped<IManualIndependentCriticAgentService, ManualIndependentCriticAgentService>()");
+
+        // HERO-2 safety fix: the destructive test provisioning/reset connection is
+        // pinned to the explicit test connection string and hard-guarded to *_Test.
+        var apiTestBase = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "ApiTestBase.cs"));
+        StringAssert.Contains(apiTestBase, "ConnectionString = TestConnectionString();");
+        StringAssert.Contains(apiTestBase, "EndsWith(\"_Test\"");
+        StringAssert.Contains(apiTestBase, "Refusing to provision/reset database");
+    }
+
+    [TestMethod]
     public void DemoSeed_ReceiptDocumentsBoundary()
     {
         var receipt = File.ReadAllText(RepoFile("Docs", "receipts", "DEMO1_API_DRIVEN_DEMO_SEED.md"));

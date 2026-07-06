@@ -96,17 +96,20 @@ public abstract class ApiTestBase
 
             Client = Factory.CreateClient();
 
-            // Resolve connection string from the factory's configuration.
-            var config = Factory.Services.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration))
-                as Microsoft.Extensions.Configuration.IConfiguration;
-            
-            if (config == null)
+            // HERO-2 root-safety fix: NEVER resolve the destructive provisioning/reset
+            // connection from the composed app configuration. App-level sources were
+            // observed outranking the test overrides here, which pointed this connection
+            // at the REAL IronDeveloper database — running DropGovernanceSql and domain
+            // resets against real data. The destructive connection is pinned to the
+            // explicit test connection string and hard-guarded to a *_Test catalog.
+            ConnectionString = TestConnectionString();
+            var catalog = new SqlConnectionStringBuilder(ConnectionString).InitialCatalog;
+            if (!catalog.EndsWith("_Test", StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("Could not resolve IConfiguration from Test Host.");
+                throw new InvalidOperationException(
+                    $"Refusing to provision/reset database '{catalog}': API test provisioning is destructive " +
+                    "and may only target a catalog whose name ends with '_Test'.");
             }
-
-            ConnectionString = config.GetConnectionString("IronDeveloperDb") 
-                ?? throw new InvalidOperationException("Connection string 'IronDeveloperDb' not found in appsettings.Test.json");
 
             await SetupDatabaseAsync();
         }
@@ -263,6 +266,14 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workflow_checkpoint_store.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workflow_transition_record.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_release_readiness_decision_record.sql");
+
+        // HERO-2: the real (non-test-double) loop needs the tables the fakes never
+        // touched — project profiles, code indexing, and the agent-run audit store
+        // the real critic persists durable reviews into.
+        await ApplySqlFileAsync(conn, "Database", "migrate_project_profiles.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_code_indexing.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_projects_indexing_fields.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_agent_run_audit_envelope.sql");
     }
 
     private const string DropGovernanceSql = """
