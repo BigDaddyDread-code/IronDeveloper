@@ -123,6 +123,30 @@ public sealed class DemoSeedScriptContractTests
     }
 
     [TestMethod]
+    public void DemoSeed_ProvesEnvironmentRemainsUsableForNewTicketsAndRepeatedRuns()
+    {
+        var apiProof = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "Demo", "DemoSeedApiDrivenTests.cs"));
+        var source = ScriptSource();
+
+        // The proof harness proves usability on every run: a fresh ticket, a repeated
+        // governed run, real build/test evidence, the human gate, and no silent approval.
+        StringAssert.Contains(apiProof, "ProveRemainsUsableAsync");
+        StringAssert.Contains(apiProof, "A fresh post-seed ticket must run to the human gate.");
+        StringAssert.Contains(apiProof, "Repeated governed runs must be genuinely distinct runs.");
+        StringAssert.Contains(apiProof, "SkeletonEvidencePackaged");
+        StringAssert.Contains(apiProof, "report.CriticPackage.HashVerified");
+        StringAssert.Contains(apiProof, "The probe must not apply.");
+        StringAssert.Contains(apiProof, "AssertBaselineUnchangedAsync");
+        StringAssert.Contains(apiProof, "The usability probe must not create accepted approval.");
+
+        // The running-API script offers the same proof live behind an explicit switch.
+        StringAssert.Contains(source, "[switch]$ProveUsable");
+        StringAssert.Contains(source, "Invoke-UsabilityProbe");
+        StringAssert.Contains(source, "DemoUsabilityProbePassed");
+        StringAssert.Contains(source, "reached the human gate on real build/test evidence");
+    }
+
+    [TestMethod]
     public void DemoSeed_ReceiptRedactsSecretsAndUserPaths()
     {
         var script = ScriptSource();
