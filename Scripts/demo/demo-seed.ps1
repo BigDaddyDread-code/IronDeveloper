@@ -344,7 +344,11 @@ function Invoke-DemoApi {
         $params.ContentType = "application/json"
     }
 
-    return Invoke-RestMethod @params
+    # DEMO-REHEARSAL-001 finding: Windows PowerShell 5.1 returns a top-level
+    # JSON array response as ONE nested Object[] item, so list callers saw a
+    # single element containing every row once a second row existed. Piping
+    # enumerates the nested array into real items; scalar responses pass through.
+    return Invoke-RestMethod @params | ForEach-Object { $_ }
 }
 
 function Test-DemoApiHealth {
