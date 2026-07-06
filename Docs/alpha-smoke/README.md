@@ -61,6 +61,30 @@ Scripts/smoke/alpha-smoke.ps1 `
   -RunUntil TicketDraft
 ```
 
+REL-4b live self-repairing hero walk to Applied (real builder/tester/critic on
+the configured live model, bounded repair armed at budget 1, live critic
+findings dispositioned inside the proof, hash-bound approval recorded through
+the governed API, controlled apply):
+
+```powershell
+$env:IRONDEV_ALPHA_SMOKE_LIVE_MODEL = "1"
+$env:IRONDEV_ALPHA_SMOKE_LIVE_PROVIDER = "OpenAI"
+$env:IRONDEV_ALPHA_SMOKE_LIVE_MODEL_NAME = "<model>"
+$env:OPENAI_API_KEY = "<set outside repo>"
+Scripts/smoke/alpha-smoke.ps1 `
+  -Project BookSeller `
+  -Ticket bulk-discount `
+  -ModelMode Live `
+  -RunUntil Applied `
+  -RequireExistingAcceptedApproval
+```
+
+The `SelfRepairCheck` stage reports the run's repair story honestly:
+`LiveFirstAttemptClean` (budget armed, unused) or `LiveSelfRepairOccurred`
+(the walk repaired its own build failure and still answered to the same gate).
+A live smoke run is diagnostic evidence, not model reliability or release
+readiness.
+
 Chat to confirmed ticket to governed run smoke:
 
 ```powershell

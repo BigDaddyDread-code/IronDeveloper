@@ -51,7 +51,10 @@ $script:KnownReasonCodes = @(
     "LiveModelNotConfigured",
     "LiveModelOptInMissing",
     "LiveModelRunUntilUnsupported",
+    "LiveModelTicketUnsupported",
     "LiveModelModeNotImplemented",
+    "LiveSelfRepairOccurred",
+    "LiveFirstAttemptClean",
     "ChatTicketRunUntilUnsupported",
     "TicketPersistFailed",
     "TicketPersisted",
@@ -413,10 +416,25 @@ if ($RunUntil -eq "CheckOnly") {
 }
 
 if ($ModelMode -eq "Live") {
-    if ($RunUntil -ne "TicketDraft") {
-        Add-Stage "ReadinessCheck" "Blocked" "LiveModelRunUntilUnsupported" "REL-4 live model smoke is limited to -RunUntil TicketDraft."
-        Add-Gap "Live model smoke produces a bounded ticket-draft receipt only; it does not persist tickets, start runs, approve, continue, or apply."
+    if ($RunUntil -notin @("TicketDraft", "Applied")) {
+        Add-Stage "ReadinessCheck" "Blocked" "LiveModelRunUntilUnsupported" "Live model smoke supports -RunUntil TicketDraft (REL-4 bounded draft) or -RunUntil Applied (REL-4b live hero walk)."
+        Add-Gap "Live model smoke never falls back to deterministic mode; unsupported live targets block with a named reason."
         Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+
+    if ($RunUntil -eq "Applied") {
+        # REL-4b: the live walk to Applied is the HERO walk — real builder, real
+        # build/test, bounded self-repair (budget 1), live critic, dispositions,
+        # hash-bound approval recorded through the governed API inside the proof.
+        if (-not $RequireExistingAcceptedApproval) {
+            Add-Stage "ApprovalCheck" "Blocked" "AcceptedApprovalRequired" "Live Applied smoke requires explicit -RequireExistingAcceptedApproval: the proof owns the governed API approval request; the smoke never creates approval by default."
+            Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+        }
+
+        if ($Ticket -ne "bulk-discount") {
+            Add-Stage "TicketLoad" "Blocked" "LiveModelTicketUnsupported" "REL-4b live Applied smoke runs the bulk-discount hero walk only. Use -Ticket bulk-discount."
+            Complete-Smoke -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+        }
     }
 
     if ($env:IRONDEV_ALPHA_SMOKE_LIVE_MODEL -ne "1") {
@@ -505,8 +523,9 @@ else {
 }
 Add-Stage "RootSafetyCheck" "Passed" "RootSafetyPassed" "Smoke output root is outside the repository and not under a reparse-point ancestor." @{ outputDirectory = $script:OutputRoot }
 if ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
-    Add-Stage "SqlCheck" "Passed" "SqlAvailable" "REL-3 persisted mode uses the API test host with SQL-backed stores."
-    Add-Stage "ApiCheck" "Passed" "ApiAvailable" "REL-3 persisted mode drives the authenticated API routes in-process."
+    $appliedLabel = if ($ModelMode -eq "Live") { "REL-4b live hero walk" } else { "REL-3 persisted mode" }
+    Add-Stage "SqlCheck" "Passed" "SqlAvailable" "$appliedLabel uses the API test host with SQL-backed stores."
+    Add-Stage "ApiCheck" "Passed" "ApiAvailable" "$appliedLabel drives the authenticated API routes in-process."
 }
 elseif ($StartFromChat -and $RunUntil -eq "Gate") {
     Add-Stage "SqlCheck" "Passed" "SqlAvailable" "REL-5 uses the API test host with SQL-backed chat, ticket, run, and event stores."
@@ -542,7 +561,8 @@ if ($RunUntil -eq "TicketDraft" -and $ModelMode -eq "Live") {
     Add-Stage "TicketPersist" "Skipped" "TicketDraftNotPersisted" "REL-4 live model smoke produces a bounded draft receipt only; it does not persist a ticket."
 }
 elseif ($RunUntil -eq "Applied" -and $RequireExistingAcceptedApproval) {
-    Add-Stage "TicketPersist" "Passed" "TicketPersisted" "REL-3 creates the BookSeller project and ticket through the authenticated API backed by SQL."
+    $persistLabel = if ($ModelMode -eq "Live") { "REL-4b" } else { "REL-3" }
+    Add-Stage "TicketPersist" "Passed" "TicketPersisted" "$persistLabel creates the BookSeller project and ticket through the authenticated API backed by SQL."
 }
 elseif ($StartFromChat -and $RunUntil -eq "Gate") {
     Add-Stage "TicketPersist" "Passed" "TicketPersisted" "REL-5 persists chat, a draft-confirmed ticket, and server-verified chat provenance through the authenticated API backed by SQL."
@@ -551,7 +571,12 @@ else {
     Add-Stage "TicketPersist" "Skipped" "ProjectImportNotAutomated" "The deterministic smoke resolves the fixture ticket inside the service-level harness; API ticket persistence is a named gap."
 }
 
-$testFilter = if ($RunUntil -eq "TicketDraft" -and $ModelMode -eq "Live") {
+$testFilter = if ($RunUntil -eq "Applied" -and $ModelMode -eq "Live") {
+    # REL-4b: the self-repairing live hero walk — real builder/tester/critic on the
+    # configured live model, bounded repair armed, hash-bound approval, apply.
+    "FullyQualifiedName~LiveModelHeroWalkTests.Hero2_LiveModel_BulkDiscount_WalksRealLoopToApplied"
+}
+elseif ($RunUntil -eq "TicketDraft" -and $ModelMode -eq "Live") {
     "FullyQualifiedName~AlphaSmokeLiveModelTests.Rel4_LiveModel_SingleTicketDraft_ProducesBoundedDraftEvidence"
 }
 elseif ($StartFromChat -and $RunUntil -eq "Gate") {
@@ -692,6 +717,21 @@ if ($RunUntil -eq "Applied") {
     }
 
     Add-Stage "ApplyRequest" "Passed" "Applied" "Controlled copy-only apply reached Applied and left an apply receipt." @{ applyReceiptPath = $runReceipt.applyReceiptPath; applyReceiptSha256 = $runReceipt.applyReceiptSha256 }
+
+    if ($ModelMode -eq "Live") {
+        # REL-4b: report the self-repair story honestly, whichever way it went.
+        # Self-repair is proposal-shaped work, never authority — the gate was unchanged.
+        if ($runReceipt.selfRepairOccurred) {
+            Add-Stage "SelfRepairCheck" "Passed" "LiveSelfRepairOccurred" "The live walk repaired its own build failure within the bounded budget and still answered to the same human gate." @{
+                repairAttempts = ($runReceipt.repairAttempts | ConvertTo-Json -Compress -Depth 5)
+                initialProposalId = [string]$runReceipt.initialProposalId
+                gateProposalId = [string]$runReceipt.gateProposalId
+            }
+        }
+        else {
+            Add-Stage "SelfRepairCheck" "Passed" "LiveFirstAttemptClean" "The live model passed build/test on the first attempt; the bounded repair budget was armed but unused."
+        }
+    }
 }
 
 if (-not $runReceipt.reportReconstructable) {
