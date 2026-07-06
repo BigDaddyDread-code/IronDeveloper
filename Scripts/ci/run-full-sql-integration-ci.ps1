@@ -426,6 +426,21 @@ try {
         -Project $script:ApiProject `
         -Filter "FullyQualifiedName~AlphaSmokeApiPersistenceTests.Rel5_ChatConfirmedTicket_StartsGovernedRun_ThroughSqlBackedApi"
 
+    # Selection is not execution: the DEMO/HERO seed proofs were previously only
+    # SELECTED by the category lanes above, never executed. Execute them by exact
+    # name so the demo baseline, post-seed usability probe, chat-ticket proof, and
+    # advisory-finding disposition gate are proven on every full SQL run.
+    $demoSeedProofFilter = @(
+        "FullyQualifiedName~DemoSeedApiDrivenTests.DemoSeed_BaselineHistory_IsApiDrivenAndSqlPersisted",
+        "FullyQualifiedName~DemoSeedApiDrivenTests.Demo2_ChatConfirmedTicket_IsVisibleAndStartableThroughApi",
+        "FullyQualifiedName~DemoSeedApiDrivenTests.Hero_BulkDiscountAdvisoryFinding_RequiresDispositionBeforeApplied"
+    ) -join "|"
+
+    Invoke-TestLane `
+        -Name "DEMO seed and HERO disposition proofs" `
+        -Project $script:ApiProject `
+        -Filter $demoSeedProofFilter
+
     $categoryContractFilter = @(
         "FullyQualifiedName~IntegrationTestCategoryContractTests",
         "FullyQualifiedName~SlowQuarantineCategoryContractTests"
