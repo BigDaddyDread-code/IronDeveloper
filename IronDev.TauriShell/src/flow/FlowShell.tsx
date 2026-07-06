@@ -53,8 +53,8 @@ export function FlowShell() {
     project.selectedProjectName ??
     (project.selectedProjectId !== null ? `Project ${project.selectedProjectId}` : 'No project selected');
   const modelMode = session.environmentInfo?.isTestEnvironment
-    ? 'Deterministic local alpha; live only when backend run evidence says so'
-    : 'Backend-reported per run';
+    ? 'Deterministic-only local alpha preview; not a live model run'
+    : 'Backend-reported per run; deterministic fallback is never silent';
 
   const openWorkItem = (ticket: ProjectTicket | null) => {
     setActiveTicket(ticket);
