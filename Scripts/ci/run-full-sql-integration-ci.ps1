@@ -434,9 +434,7 @@ try {
         "FullyQualifiedName~DemoSeedApiDrivenTests.DemoSeed_BaselineHistory_IsApiDrivenAndSqlPersisted",
         "FullyQualifiedName~DemoSeedApiDrivenTests.Demo2_ChatConfirmedTicket_IsVisibleAndStartableThroughApi",
         "FullyQualifiedName~DemoSeedApiDrivenTests.Hero_BulkDiscountAdvisoryFinding_RequiresDispositionBeforeApplied",
-        "FullyQualifiedName~BoundedRepairApiDrivenTests.Repair_FirstAttemptFails_RepairReachesGate_HistoryPreserved",
-        "FullyQualifiedName~BoundedRepairApiDrivenTests.Repair_BudgetExhausted_RunFailsWithNamedReason",
-        "FullyQualifiedName~BoundedRepairApiDrivenTests.Repair_DisabledByDefault_FailureIsTerminalAndNamed"
+        "FullyQualifiedName~BoundedRepairApiDrivenTests"
     ) -join "|"
 
     Invoke-TestLane `

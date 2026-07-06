@@ -112,6 +112,82 @@ public sealed class BoundedRepairApiDrivenTests : ApiTestBase
     }
 
     [TestMethod]
+    public async Task Repair_CriticPackageReferencesRepairedProposalEvidence()
+    {
+        var builder = new TwoStageBuilder(repairSucceeds: true);
+        await using var fixture = await RepairFixture.CreateAsync(builder, maxRepairAttempts: 1);
+
+        var started = await fixture.StartRunAsync();
+        Assert.AreEqual("PausedForApproval", started.Status);
+
+        var report = await fixture.GetReportAsync(started.RunId);
+        var packageJson = await File.ReadAllTextAsync(report.CriticPackage!.PackagePath);
+        using var package = JsonDocument.Parse(packageJson);
+
+        // The package binds to the repaired proposal that actually built green.
+        StringAssert.Contains(packageJson, "proposal-repair-2.json",
+            "The critic package's evidence refs must reference the repaired proposal evidence.");
+        StringAssert.Contains(packageJson, $"prop-{started.RunId}-repair-2",
+            "The critic package's proposal id must be the repaired proposal's id.");
+        Assert.IsFalse(packageJson.Contains($"evidence\\\\proposal.json") || packageJson.Contains("evidence/proposal.json"),
+            "The package must not reference the original failed proposal.json as its proposal evidence.");
+    }
+
+    [TestMethod]
+    public async Task Repair_ReportFinalProposalIsRepairedProposal()
+    {
+        var builder = new TwoStageBuilder(repairSucceeds: true);
+        await using var fixture = await RepairFixture.CreateAsync(builder, maxRepairAttempts: 1);
+
+        var started = await fixture.StartRunAsync();
+        Assert.AreEqual("PausedForApproval", started.Status);
+
+        var report = await fixture.GetReportAsync(started.RunId);
+        Assert.IsNotNull(report.Proposal);
+        StringAssert.EndsWith(report.Proposal!.ProposalId, "-repair-2",
+            "The report's primary Proposal is the FINAL repaired proposal the gate binds to.");
+        StringAssert.EndsWith(report.Proposal.EvidenceRef, "proposal-repair-2.json");
+        Assert.IsTrue(report.Proposal.EvidenceExistsOnDisk);
+    }
+
+    [TestMethod]
+    public async Task Repair_OriginalProposalStillExistsButIsNotTheGateProposal()
+    {
+        var builder = new TwoStageBuilder(repairSucceeds: true);
+        await using var fixture = await RepairFixture.CreateAsync(builder, maxRepairAttempts: 1);
+
+        var started = await fixture.StartRunAsync();
+        var report = await fixture.GetReportAsync(started.RunId);
+
+        Assert.IsNotNull(report.InitialProposal, "The original failed proposal is preserved history.");
+        Assert.AreEqual($"prop-{started.RunId}", report.InitialProposal!.ProposalId);
+        StringAssert.EndsWith(report.InitialProposal.EvidenceRef, "proposal.json");
+        Assert.IsTrue(report.InitialProposal.EvidenceExistsOnDisk, "History is never erased.");
+        Assert.AreNotEqual(report.InitialProposal.ProposalId, report.Proposal!.ProposalId,
+            "The original exists — and it is not the gate proposal.");
+    }
+
+    [TestMethod]
+    public async Task Repair_ApprovalHashBindsPackageContainingRepairedProposal()
+    {
+        var builder = new TwoStageBuilder(repairSucceeds: true);
+        await using var fixture = await RepairFixture.CreateAsync(builder, maxRepairAttempts: 1);
+
+        var started = await fixture.StartRunAsync();
+        var report = await fixture.GetReportAsync(started.RunId);
+
+        // The approval requirement binds to the package hash, recomputed from disk —
+        // and that package references the repaired proposal. Approving this run is
+        // approving the repaired work, provably.
+        Assert.IsTrue(report.CriticPackage!.HashVerified);
+        Assert.AreEqual(report.CriticPackage.Sha256OnDisk, report.Approval!.TargetHash,
+            "The approval target hash is the hash of the package that contains the repaired proposal.");
+        var packageJson = await File.ReadAllTextAsync(report.CriticPackage.PackagePath);
+        StringAssert.Contains(packageJson, "proposal-repair-2",
+            "The hash-bound package demonstrably carries the repaired proposal reference.");
+    }
+
+    [TestMethod]
     public async Task Repair_BudgetExhausted_RunFailsWithNamedReason()
     {
         var builder = new TwoStageBuilder(repairSucceeds: false);

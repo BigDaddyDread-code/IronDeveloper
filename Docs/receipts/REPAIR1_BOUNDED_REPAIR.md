@@ -32,9 +32,17 @@ build/test fails
   exactly the gate — a repaired run earns nothing.
 - Bounded by explicit configuration: `SkeletonRepair:MaxAttempts`, default 0 (off).
   Hard-clamped to 3 so no configuration can create an unbounded retry loop.
-- Attempt history is never erased: every attempt's evidence, workspace, proposal
-  file, and events are preserved, and the run report carries a `RepairAttempts`
-  trace reconstructed from durable events. Trust comes from seeing the mess.
+- Attempt history is never erased: every attempt's evidence, proposal file, and
+  events are preserved, along with failed attempts' workspaces (successful
+  workspaces are cleaned as usual — `CleanWorkspaceOnSuccess`). The run report
+  carries a `RepairAttempts` trace reconstructed from durable events. Trust comes
+  from seeing the mess.
+- Evidence binding (review-hardened): after a successful repair, the repaired
+  proposal IS the proposal under review. The critic package's evidence refs and
+  proposal id, the report's primary `Proposal` trace, and therefore the approval
+  hash all bind to the FINAL proposal that built green; the original failed
+  proposal is preserved separately as `InitialProposal` — history, never the
+  gate proposal.
 - Failure without budget is terminal and named (`BuildFailed` / `RepairBudgetExhausted`),
   never a silently stuck run.
 

@@ -20,7 +20,19 @@ public sealed record SkeletonRunReport
     public string Status { get; init; } = string.Empty;
     public string Summary { get; init; } = string.Empty;
     public IReadOnlyList<SkeletonRunTimelineEntry> Timeline { get; init; } = [];
+
+    /// <summary>
+    /// The FINAL/CURRENT proposal — the one that produced the evidence at the gate
+    /// and that the critic package and approval hash bind to. After a successful
+    /// bounded repair this is the repaired proposal, never the failed original.
+    /// </summary>
     public SkeletonRunProposalTrace? Proposal { get; init; }
+
+    /// <summary>
+    /// REPAIR-1: the original failed proposal, populated ONLY when bounded repair
+    /// replaced it. Preserved history — it exists, and it is not the gate proposal.
+    /// </summary>
+    public SkeletonRunProposalTrace? InitialProposal { get; init; }
     public SkeletonRunTestAuthoringTrace? TestAuthoring { get; init; }
     public SkeletonRunCriticPackageTrace? CriticPackage { get; init; }
     public SkeletonRunApprovalTrace? Approval { get; init; }

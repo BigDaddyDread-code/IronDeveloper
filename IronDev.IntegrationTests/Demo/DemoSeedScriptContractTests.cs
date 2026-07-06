@@ -330,11 +330,17 @@ public sealed class DemoSeedScriptContractTests
         StringAssert.Contains(proofs, "Repair_DisabledByDefault_FailureIsTerminalAndNamed");
         StringAssert.Contains(proofs, "repair earns nothing more");
 
-        // Selection is not execution: the repair proofs run by exact name in the full SQL lane.
+        // Evidence binding (review-hardened): the gate/critic package/approval hash
+        // bind to the FINAL repaired proposal, and the original stays as history.
+        StringAssert.Contains(proofs, "Repair_CriticPackageReferencesRepairedProposalEvidence");
+        StringAssert.Contains(proofs, "Repair_ReportFinalProposalIsRepairedProposal");
+        StringAssert.Contains(proofs, "Repair_OriginalProposalStillExistsButIsNotTheGateProposal");
+        StringAssert.Contains(proofs, "Repair_ApprovalHashBindsPackageContainingRepairedProposal");
+        StringAssert.Contains(orchestrator, "proposalEvidenceFileName");
+
+        // Selection is not execution: the repair proof class executes in the full SQL lane.
         var ciScript = File.ReadAllText(RepoFile("Scripts", "ci", "run-full-sql-integration-ci.ps1"));
-        StringAssert.Contains(ciScript, "BoundedRepairApiDrivenTests.Repair_FirstAttemptFails_RepairReachesGate_HistoryPreserved");
-        StringAssert.Contains(ciScript, "BoundedRepairApiDrivenTests.Repair_BudgetExhausted_RunFailsWithNamedReason");
-        StringAssert.Contains(ciScript, "BoundedRepairApiDrivenTests.Repair_DisabledByDefault_FailureIsTerminalAndNamed");
+        StringAssert.Contains(ciScript, "FullyQualifiedName~BoundedRepairApiDrivenTests");
     }
 
     [TestMethod]

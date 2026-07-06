@@ -216,6 +216,10 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // unchanged, and every attempt's evidence and events are preserved.
         var maxRepairAttempts = ReadMaxRepairAttempts();
         var attemptNumber = 1;
+        // The CURRENT proposal's evidence file. When a repair succeeds, the repaired
+        // proposal IS the proposal under review — the critic package and the gate
+        // must bind to it, never to the original failed attempt with a side-note.
+        var proposalEvidenceFileName = "proposal.json";
         DisposableWorkspaceRunResult workspaceResult;
         while (true)
         {
@@ -319,6 +323,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             }
 
             proposalId = await PersistProposalEvidenceAsync(run.RunId, evidenceRoot, proposal, cancellationToken, $"repair-{attemptNumber}").ConfigureAwait(false);
+            proposalEvidenceFileName = $"proposal-repair-{attemptNumber}.json";
 
             await PublishAsync(run.RunId, "SkeletonRepairProposalGenerated",
                 $"Repair proposal {proposalId} generated with {fileWrites.Count} file change(s). A proposal is review material, not approval.",
@@ -337,7 +342,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // review material only — the run does not create, request, or simulate the
         // review itself; that belongs to the critic through its own governed surface.
         var (packagePath, criterionCount, uncoveredCriterionCount) = await PersistCriticPackageAsync(
-            run.RunId, evidenceRoot, proposalId, ticket, proposal, authoredTests, workspaceResult, cancellationToken).ConfigureAwait(false);
+            run.RunId, evidenceRoot, proposalId, proposalEvidenceFileName, ticket, proposal, authoredTests, workspaceResult, cancellationToken).ConfigureAwait(false);
 
         var packageHash = ComputeSha256(await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false));
 
@@ -352,6 +357,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 ["packagePath"] = packagePath,
                 ["packageSha256"] = packageHash,
                 ["proposalId"] = proposalId,
+                ["proposalEvidenceFile"] = proposalEvidenceFileName,
                 ["criterionCount"] = criterionCount.ToString(),
                 ["uncoveredCriterionCount"] = uncoveredCriterionCount.ToString(),
                 ["currentNode"] = "SkeletonRun"
@@ -868,25 +874,47 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         var gaps = new List<string>();
         var evidenceRoot = ResolveEvidenceRoot();
 
-        // Proposal link.
+        // Proposal link. `Proposal` is the FINAL/CURRENT proposal — the one the gate,
+        // critic package, and approval hash bind to. When bounded repair replaced the
+        // initial proposal, the original failed attempt is preserved separately as
+        // `InitialProposal`: history, never the gate proposal.
         SkeletonRunProposalTrace? proposalTrace = null;
-        var proposalEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "ProposalGenerated");
-        if (proposalEvent is not null)
+        SkeletonRunProposalTrace? initialProposalTrace = null;
+        var initialProposalEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "ProposalGenerated");
+        var lastRepairProposalEvent = events.LastOrDefault(runEvent => runEvent.EventType == "SkeletonRepairProposalGenerated");
+
+        SkeletonRunProposalTrace BuildProposalTrace(RunEventDto sourceEvent, string evidenceFileName)
         {
-            var proposalPath = Path.Combine(evidenceRoot, runId, "evidence", "proposal.json");
-            var proposalOnDisk = File.Exists(proposalPath);
-            proposalTrace = new SkeletonRunProposalTrace
+            var proposalPath = Path.Combine(evidenceRoot, runId, "evidence", evidenceFileName);
+            return new SkeletonRunProposalTrace
             {
-                ProposalId = Payload(proposalEvent, "proposalId"),
-                FileChangeCount = int.TryParse(Payload(proposalEvent, "fileChangeCount"), out var count) ? count : 0,
+                ProposalId = Payload(sourceEvent, "proposalId"),
+                FileChangeCount = int.TryParse(Payload(sourceEvent, "fileChangeCount"), out var count) ? count : 0,
                 EvidenceRef = proposalPath,
-                EvidenceExistsOnDisk = proposalOnDisk,
-                ModelProvider = Payload(proposalEvent, "modelProvider"),
-                ModelName = Payload(proposalEvent, "modelName")
+                EvidenceExistsOnDisk = File.Exists(proposalPath),
+                ModelProvider = Payload(sourceEvent, "modelProvider"),
+                ModelName = Payload(sourceEvent, "modelName")
             };
-            if (!proposalOnDisk)
-                gaps.Add("Proposal evidence file is missing from disk.");
         }
+
+        if (lastRepairProposalEvent is not null)
+        {
+            var repairAttemptNumber = Payload(lastRepairProposalEvent, "attemptNumber");
+            proposalTrace = BuildProposalTrace(lastRepairProposalEvent, $"proposal-repair-{repairAttemptNumber}.json");
+            if (initialProposalEvent is not null)
+            {
+                initialProposalTrace = BuildProposalTrace(initialProposalEvent, "proposal.json");
+                if (!initialProposalTrace.EvidenceExistsOnDisk)
+                    gaps.Add("Initial (pre-repair) proposal evidence file is missing from disk.");
+            }
+        }
+        else if (initialProposalEvent is not null)
+        {
+            proposalTrace = BuildProposalTrace(initialProposalEvent, "proposal.json");
+        }
+
+        if (proposalTrace is not null && !proposalTrace.EvidenceExistsOnDisk)
+            gaps.Add("Proposal evidence file is missing from disk.");
 
         // Test authoring link (P0-5) — an explicit skip is a recorded outcome, not a gap.
         SkeletonRunTestAuthoringTrace? testAuthoringTrace = null;
@@ -1114,6 +1142,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 })
                 .ToList(),
             Proposal = proposalTrace,
+            InitialProposal = initialProposalTrace,
             TestAuthoring = testAuthoringTrace,
             CriticPackage = packageTrace,
             Approval = approvalTrace,
@@ -1227,6 +1256,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         string runId,
         string evidenceRoot,
         string proposalId,
+        string proposalEvidenceFileName,
         IronDev.Data.Models.ProjectTicket ticket,
         BuilderProposal proposal,
         IReadOnlyList<SkeletonAuthoredTest> authoredTests,
@@ -1245,9 +1275,12 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             })
             .ToList();
 
+        // The package references the CURRENT proposal's evidence — after a repair,
+        // that is the repaired proposal that actually built green and reached the
+        // gate, never the original failed attempt by default.
         var evidenceRefs = new List<string>
         {
-            Path.Combine(evidenceRoot, runId, "evidence", "proposal.json"),
+            Path.Combine(evidenceRoot, runId, "evidence", proposalEvidenceFileName),
             workspaceResult.EvidencePath
         };
 
