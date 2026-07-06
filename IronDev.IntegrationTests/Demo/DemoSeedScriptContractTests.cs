@@ -275,6 +275,12 @@ public sealed class DemoSeedScriptContractTests
         StringAssert.Contains(liveWalk, "must run a real model — never the deterministic fake");
         StringAssert.Contains(liveWalk, "every real finding gets a human-shaped disposition");
 
+        // HERO-3: bounded repair stays ARMED in the live walk, and the receipt keeps
+        // recording the repair story honestly — including when no repair happened.
+        StringAssert.Contains(liveWalk, "builder.UseSetting(\"SkeletonRepair:MaxAttempts\", \"1\")");
+        StringAssert.Contains(liveWalk, "SelfRepairOccurred = finalReport.RepairAttempts.Count > 0");
+        StringAssert.Contains(liveWalk, "InitialProposalId = finalReport.InitialProposal?.ProposalId");
+
         // HERO-2 product fix: the real critic executor's dependency stays registered —
         // without it the live critic route can never resolve in a real host.
         var program = File.ReadAllText(RepoFile("IronDev.Api", "Program.cs"));
