@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$CheckOnly,
     [switch]$Seed,
     [string]$Project = "BookSeller",
@@ -451,7 +451,7 @@ function Initialize-BookSellerSourceCopy {
     }
 
     # DEMO-REHEARSAL-001 finding: native command output inside a PowerShell
-    # function joins the RETURN stream — the fresh-copy path returned restore
+    # function joins the RETURN stream â€” the fresh-copy path returned restore
     # noise instead of the path. Output is captured; it surfaces ONLY on
     # failure (as diagnosis), so -Json stdout stays parseable.
     Copy-Item -LiteralPath $sampleRoot -Destination $sourceCopy -Recurse
@@ -486,14 +486,17 @@ function Resolve-DemoProject {
     )
 
     $projects = @(Invoke-DemoApi -Method "GET" -Path "/api/projects" -Headers $Headers)
-    $matches = @($projects | Where-Object { $_.name -eq "BookSeller" })
-    if ($matches.Count -gt 1) {
+    # DEMO-REHEARSAL-001 finding: `$matches` is PowerShell's AUTOMATIC regex
+    # variable — using it as a plain variable returned ALL projects instead of
+    # the filtered one, corrupting the idempotency comparison. Never shadow it.
+    $bookSellerProjects = @($projects | Where-Object { $_.name -eq "BookSeller" })
+    if ($bookSellerProjects.Count -gt 1) {
         Add-Stage "ProjectResolve" "Blocked" "DemoIdempotencyConflict" "More than one BookSeller project exists in the selected tenant."
         Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
     }
 
-    if ($matches.Count -eq 1) {
-        $project = $matches[0]
+    if ($bookSellerProjects.Count -eq 1) {
+        $project = $bookSellerProjects[0]
         $existingPath = [string]$project.localPath
         # DEMO-REHEARSAL-001 finding: an uncomparable stored path crashed the
         # seed with a raw exception instead of a named block. Comparison
@@ -548,18 +551,19 @@ function Resolve-DemoTicket {
 
     $fixtureTicket = Read-FixtureTicket -Key $Key
     $tickets = @(Invoke-DemoApi -Method "GET" -Path "/api/projects/$($Project.id)/tickets" -Headers $Headers)
-    $matches = @($tickets | Where-Object { $_.title -eq $fixtureTicket.title })
-    if ($matches.Count -gt 1) {
+    # `$matches` is PowerShell's automatic regex variable — never shadow it.
+    $fixtureTickets = @($tickets | Where-Object { $_.title -eq $fixtureTicket.title })
+    if ($fixtureTickets.Count -gt 1) {
         Add-Stage "TicketResolve" "Blocked" "DemoIdempotencyConflict" "More than one ticket exists for fixture key '$Key'."
         Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
     }
 
-    if ($matches.Count -eq 1) {
+    if ($fixtureTickets.Count -eq 1) {
         Add-Stage "TicketResolve" "Passed" "DemoSeedPassed" "Resolved existing fixture ticket '$Key' through the product API." @{
-            ticketId = $matches[0].id
+            ticketId = $fixtureTickets[0].id
             key = $Key
         }
-        return $matches[0]
+        return $fixtureTickets[0]
     }
 
     try {
@@ -1028,7 +1032,7 @@ Add-Stage "ModelCheck" "Passed" "DemoModelModeDeterministic" "Deterministic mode
 if ($SeedTarget -eq "RunningApi") {
     # The seed authenticates and mutates product state (tickets, runs, approvals,
     # continuation, apply, usability probes). A local demo seed that can mutate a
-    # remote API is not local — refuse anything that is not explicitly loopback.
+    # remote API is not local â€” refuse anything that is not explicitly loopback.
     if (Test-LocalApiBaseUrl -BaseUrl $ApiBaseUrl) {
         Add-Stage "ApiBaseUrlCheck" "Passed" "DemoApiBaseUrlLocal" "Demo API base URL is loopback-local." @{ apiBaseUrl = Redact-UserPath $ApiBaseUrl }
     }
@@ -1168,3 +1172,4 @@ if (-not ($script:Stages | Where-Object { $_.stage -eq "ReceiptWrite" -and $_.st
 }
 
 Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Passed" -ExitCode 0
+
