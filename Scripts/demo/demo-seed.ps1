@@ -450,17 +450,22 @@ function Initialize-BookSellerSourceCopy {
         Complete-DemoSeed -RepoRoot $RepoRoot -OverallStatus "Blocked" -ExitCode 1
     }
 
+    # DEMO-REHEARSAL-001 finding: native command output inside a PowerShell
+    # function joins the RETURN stream — the fresh-copy path returned restore
+    # noise instead of the path. Output is captured; it surfaces ONLY on
+    # failure (as diagnosis), so -Json stdout stays parseable.
     Copy-Item -LiteralPath $sampleRoot -Destination $sourceCopy -Recurse
-    dotnet restore (Join-Path $sourceCopy "BookSeller.slnx") --nologo --verbosity minimal
+    $restoreOutput = dotnet restore (Join-Path $sourceCopy "BookSeller.slnx") --nologo --verbosity minimal 2>&1
     if ($LASTEXITCODE -ne 0) {
+        $restoreOutput | Select-Object -Last 10 | ForEach-Object { Write-Host ("  {0}" -f $_) }
         Add-Stage "SourceCopy" "Failed" "DemoKnowledgeSeedFailed" "BookSeller sample restore failed before registering the demo project."
         Complete-DemoSeed -RepoRoot $RepoRoot -OverallStatus "Failed" -ExitCode 1
     }
 
-    git -C $sourceCopy init -q
-    git -C $sourceCopy config user.email "demo-seed@irondev.local"
-    git -C $sourceCopy config user.name "IronDev Demo Seed"
-    git -C $sourceCopy add .
+    git -C $sourceCopy init -q | Out-Null
+    git -C $sourceCopy config user.email "demo-seed@irondev.local" | Out-Null
+    git -C $sourceCopy config user.name "IronDev Demo Seed" | Out-Null
+    git -C $sourceCopy add . | Out-Null
     git -C $sourceCopy commit -m "demo seed baseline" -q | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Add-Stage "SourceCopy" "Failed" "DemoKnowledgeSeedFailed" "BookSeller demo source git baseline could not be created."
