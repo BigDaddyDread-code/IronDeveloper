@@ -70,13 +70,14 @@ Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic -P
 - Real, unfabricated evidence is asserted: only a green `dotnet build`/`dotnet test` reaches the gate, the critic package exists on disk, and its hash re-verifies at report time (`SkeletonEvidencePackaged` + `CriticPackage.HashVerified`).
 - Repeatability is asserted: the two governed runs are genuinely distinct (distinct run ids and distinct evidence-package hashes).
 - The probe stops at the human gate: no accepted approval, no continuation, no apply — and the seeded baseline (`Applied` + `PausedForApproval`) is re-checked to confirm the probe did not disturb it.
-- The running-API script offers the same proof live behind `-ProveUsable`; default off so the demo baseline stays clean.
+- The running-API script offers a **single** live usability probe (one fresh ticket/run to the gate) behind `-ProveUsable`; default off so the demo baseline stays clean. The two-run repeatability proof lives in the DEMO-1a proof harness.
 
 ## Boundaries
 
 - No direct SQL final-state insert.
 - No frontend fixtures.
 - The usability probe stops at the human gate; it never approves, continues, or applies.
+- The running-API seed refuses any non-loopback `-ApiBaseUrl` (`DemoApiBaseUrlNotLocal`): a local demo seed that can mutate a remote API is not local.
 - No fake approval.
 - No fake continuation.
 - No fake apply receipt.
@@ -95,7 +96,7 @@ Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic -P
 
 - `dotnet build IronDev.IntegrationTests.Api`: build succeeded, 0 errors.
 - `dotnet build IronDev.IntegrationTests`: build succeeded, 0 errors.
-- Focused DEMO script contract tests (`DemoSeedScriptContractTests`): 13/13 passed, including the new `DemoSeed_ProvesEnvironmentRemainsUsableForNewTicketsAndRepeatedRuns` and the `-CheckOnly` / root-safety script-execution contracts.
+- Focused DEMO script contract tests (`DemoSeedScriptContractTests`): 16/16 passed, including `DemoSeed_ProvesEnvironmentRemainsUsableForNewTicketsAndRepeatedRuns`, the `-CheckOnly` / root-safety script-execution contracts, and the loopback guard trio (`DemoSeed_BlocksRemoteApiBaseUrl`, `DemoSeed_AllowsLocalhostApiBaseUrl`, `DemoSeed_AllowsLoopbackApiBaseUrl`) — the remote-block test executes the script against a non-loopback URL and observes the refusal.
 - Not run in this session (requires a real SQL database; `RequiresRealDatabase` + `LongRunning`): `DemoSeedApiDrivenTests.DemoSeed_BaselineHistory_IsApiDrivenAndSqlPersisted`, which now also drives the two-run post-seed usability probe. Must be run on a SQL-backed host before this is treated as proven end to end.
 
 ## Review Line

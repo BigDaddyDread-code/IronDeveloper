@@ -37,6 +37,8 @@ $KnownReasonCodes = @(
     "DemoRootSafetyNotEvaluated",
     "DemoRootSafetyBlocked",
     "DemoSqlPersistenceUnavailable",
+    "DemoApiBaseUrlLocal",
+    "DemoApiBaseUrlNotLocal",
     "DemoApiUnavailable",
     "DemoProjectResolveFailed",
     "DemoKnowledgeSeedFailed",
@@ -304,6 +306,22 @@ function Join-ApiPath {
     )
 
     return $BaseUrl.TrimEnd('/') + "/" + $Path.TrimStart('/')
+}
+
+function Test-LocalApiBaseUrl {
+    param([Parameter(Mandatory = $true)][string]$BaseUrl)
+
+    $uri = $null
+    if (-not [System.Uri]::TryCreate($BaseUrl, [System.UriKind]::Absolute, [ref]$uri)) {
+        return $false
+    }
+
+    if ($uri.Scheme -notin @("http", "https")) {
+        return $false
+    }
+
+    # Uri.IsLoopback accepts localhost, the 127.0.0.0/8 IPv4 loopback range, and [::1].
+    return $uri.IsLoopback
 }
 
 function Invoke-DemoApi {
@@ -870,7 +888,7 @@ function Write-RunningApiReceipt {
         knownGaps = @(
             "DEMO-1b requires a running local API configured for deterministic alpha smoke behavior.",
             "DEMO-2b creates a live chat-confirmed ticket only when -CreateLiveChatTicket is explicitly supplied.",
-            "Post-seed usability against the running API is proven live only when -ProveUsable is supplied; the DEMO-1a proof harness proves it on every run.",
+            "Post-seed usability against the running API is a single live probe, proven only when -ProveUsable is supplied; the DEMO-1a proof harness proves two probe runs on every run.",
             "The seed writes no frontend fixtures; the UI reads the same SQL/API state."
         )
         boundaryStatement = "The seed may replay governed baseline history; it does not invent approval, satisfy policy, continue workflow by itself, or grant release/deployment authority."
@@ -983,6 +1001,19 @@ if ($ModelMode -ne "Deterministic") {
     Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
 }
 Add-Stage "ModelCheck" "Passed" "DemoModelModeDeterministic" "Deterministic model fixture selected."
+
+if ($SeedTarget -eq "RunningApi") {
+    # The seed authenticates and mutates product state (tickets, runs, approvals,
+    # continuation, apply, usability probes). A local demo seed that can mutate a
+    # remote API is not local — refuse anything that is not explicitly loopback.
+    if (Test-LocalApiBaseUrl -BaseUrl $ApiBaseUrl) {
+        Add-Stage "ApiBaseUrlCheck" "Passed" "DemoApiBaseUrlLocal" "Demo API base URL is loopback-local." @{ apiBaseUrl = Redact-UserPath $ApiBaseUrl }
+    }
+    else {
+        Add-Stage "ApiBaseUrlCheck" "Blocked" "DemoApiBaseUrlNotLocal" "The demo seed mutates product state and may only target a loopback-local API (localhost, 127.0.0.1, or ::1)." @{ apiBaseUrl = Redact-UserPath $ApiBaseUrl }
+        Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+    }
+}
 
 if ($CheckOnly) {
     Add-Stage "RootSafetyCheck" "Skipped" "DemoRootSafetyNotEvaluated" "Check-only mode writes no demo artifacts and does not connect to SQL/API."
