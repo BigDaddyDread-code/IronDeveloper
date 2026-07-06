@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 623
-- Test classes found: 617
-- Test methods found: 9810
-- Category names found: 234
+- Source files scanned: 624
+- Test classes found: 618
+- Test methods found: 9817
+- Category names found: 235
 
 ## G13 Category Changes
 
@@ -277,6 +277,14 @@ A label does not make a slow test safe.
 - This is Tauri browser proof with mocked API responses; it does not change MSTest category counts in the inventory below.
 - UI evidence is not approval, continuation authority, apply permission, release readiness, or deployment readiness.
 
+## DEMO-5 / DEMO-6 Local Startup and Model-Mode Honesty
+
+- Added focused `DemoStartup`, `AlphaSmoke`, and `ReleaseReadiness` metadata to the one-command startup script contract tests.
+- Added broad `Contract` and `Boundary` metadata to the startup contract proof.
+- DEMO-5 verifies check-only behavior, root-safety blocking, SQL check-only delegation, API/UI start-or-verify markers, seed delegation, app URL reporting, and one next-safe-action output.
+- DEMO-6 verifies deterministic-only local alpha banner text, no silent live-to-deterministic fallback, visible flow-shell model mode, and blocked live-model requests.
+- Startup evidence is not approval, policy satisfaction, workflow continuation, source apply authority, live model proof, release readiness, or deployment readiness.
+
 ## Inventory
 
 | Category | Test classes | Test methods selected by class category | Explicit method category attributes | Files |
@@ -291,7 +299,7 @@ A label does not make a slow test safe.
 | `AcceptedApprovalSqlStore` | 1 | 15 | 0 | 1 |
 | `AgentHandoff` | 3 | 53 | 0 | 3 |
 | `AgentHandoffStore` | 1 | 8 | 0 | 1 |
-| `AlphaSmoke` | 5 | 25 | 0 | 5 |
+| `AlphaSmoke` | 6 | 32 | 0 | 6 |
 | `ApiCliContract` | 3 | 24 | 0 | 3 |
 | `ApiCliReleaseGate` | 1 | 10 | 0 | 1 |
 | `ApplyDryRunAuthorityBoundary` | 1 | 4 | 0 | 1 |
@@ -316,12 +324,12 @@ A label does not make a slow test safe.
 | `BlockNControlledApplyPreparation` | 3 | 11 | 0 | 3 |
 | `BlockP0AuthorityValidationBaseline` | 1 | 10 | 0 | 1 |
 | `BlockPThinUiReceipt` | 1 | 7 | 0 | 1 |
-| `Boundary` | 24 | 235 | 0 | 24 |
+| `Boundary` | 25 | 242 | 0 | 25 |
 | `Builder` | 1 | 9 | 0 | 1 |
 | `BoxedLangGraphRoutingAdapter` | 3 | 32 | 0 | 3 |
 | `CodeIndexFiles` | 1 | 4 | 0 | 1 |
 | `ConfigBoundary` | 11 | 124 | 0 | 11 |
-| `Contract` | 26 | 251 | 0 | 26 |
+| `Contract` | 27 | 258 | 0 | 27 |
 | `ControlledDryRunRequestContract` | 1 | 20 | 0 | 1 |
 | `ControlledRollbackExecutor` | 3 | 31 | 0 | 3 |
 | `CrossRunMemoryPatternDetection` | 1 | 14 | 0 | 1 |
@@ -330,6 +338,7 @@ A label does not make a slow test safe.
 | `DatabaseMigration` | 2 | 12 | 0 | 2 |
 | `Decision` | 2 | 12 | 0 | 2 |
 | `DemoSeed` | 2 | 14 | 0 | 2 |
+| `DemoStartup` | 1 | 7 | 0 | 1 |
 | `DisposableWorkspaceDryRunBoundaryReceipt` | 1 | 20 | 0 | 1 |
 | `DisposableWorkspaceDryRunExecutor` | 1 | 20 | 0 | 1 |
 | `DogfoodReceiptStore` | 1 | 8 | 0 | 1 |
@@ -444,7 +453,7 @@ A label does not make a slow test safe.
 | `Redaction` | 1 | 8 | 0 | 1 |
 | `Receipt` | 20 | 407 | 0 | 20 |
 | `ReleaseGateNegativeCampaign` | 1 | 30 | 0 | 1 |
-| `ReleaseReadiness` | 6 | 40 | 0 | 6 |
+| `ReleaseReadiness` | 7 | 47 | 0 | 7 |
 | `ReleaseReadinessApiRegression` | 1 | 6 | 0 | 1 |
 | `ReleaseReadinessCliRegression` | 1 | 4 | 0 | 1 |
 | `ReleaseReadinessDecisionRecordReadApi` | 1 | 17 | 0 | 1 |

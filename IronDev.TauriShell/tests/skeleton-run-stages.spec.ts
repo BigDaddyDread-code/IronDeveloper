@@ -192,7 +192,7 @@ test('blocked ticket and empty board states name the next safe action', async ({
 
   await page.goto('/');
 
-  await expect(page.getByTestId('flow.modelMode')).toContainText('Model mode: Deterministic local alpha');
+  await expect(page.getByTestId('flow.modelMode')).toContainText('Model mode: Deterministic-only local alpha preview');
   await expect(page.getByTestId('flow.board.empty.done')).toContainText('No applied tickets yet');
   await expect(page.getByTestId('flow.board.empty.done')).toContainText('Next safe action');
 
