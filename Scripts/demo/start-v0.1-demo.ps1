@@ -28,8 +28,10 @@ $KnownReasonCodes = @(
     "DemoStartupRootUnsafe",
     "DemoStartupToolMissing",
     "DemoStartupSqlUnavailable",
+    "DemoStartupApiBaseUrlNotLocal",
     "DemoStartupApiUnavailable",
     "DemoStartupApiStarted",
+    "DemoStartupUiBaseUrlNotLocal",
     "DemoStartupUiUnavailable",
     "DemoStartupUiStarted",
     "DemoStartupSeedUnavailable",
@@ -223,6 +225,31 @@ function Invoke-ChildScriptQuiet {
     }
 }
 
+function Test-LoopbackUrl {
+    param([Parameter(Mandatory = $true)][string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return "MissingUrl"
+    }
+
+    try {
+        $uri = [System.Uri]$Value
+    }
+    catch {
+        return "InvalidUrl"
+    }
+
+    if ($uri.Scheme -ne "http" -and $uri.Scheme -ne "https") {
+        return "UnsupportedScheme"
+    }
+
+    if ($uri.IsLoopback) {
+        return $null
+    }
+
+    return "NonLoopbackHost"
+}
+
 function Test-HttpGet {
     param(
         [Parameter(Mandatory = $true)][string]$Url,
@@ -285,6 +312,24 @@ function Start-ManagedProcess {
         processId = $process.Id
         workingDirectory = Redact-UserPath $WorkingDirectory
     }) | Out-Null
+}
+
+function Has-StartupBlocker {
+    return $null -ne ($script:Stages |
+        Where-Object { $_.status -eq "Blocked" -or $_.status -eq "Failed" } |
+        Select-Object -First 1)
+}
+
+function Get-FirstStartupBlockerNextSafeAction {
+    $candidate = $script:Stages |
+        Where-Object { ($_.status -eq "Blocked" -or $_.status -eq "Failed") -and -not [string]::IsNullOrWhiteSpace($_.nextSafeAction) } |
+        Select-Object -First 1
+
+    if ($candidate) {
+        return $candidate.nextSafeAction
+    }
+
+    return "Fix the first blocked startup stage, then rerun Scripts/demo/start-v0.1-demo.ps1 -CheckOnly."
 }
 
 function Get-PrimaryNextSafeAction {
@@ -447,6 +492,32 @@ else {
     Add-Stage "ModelModeCheck" "Passed" "DemoStartupPassed" $DeterministicBanner
 }
 
+$apiUrlIssue = Test-LoopbackUrl -Value $ApiBaseUrl
+if ($apiUrlIssue) {
+    Add-Stage "ApiUrlCheck" "Blocked" "DemoStartupApiBaseUrlNotLocal" "API base URL is not loopback-local: $apiUrlIssue." "Use a local API URL such as http://127.0.0.1:5000 or http://localhost:5000." @{
+        apiBaseUrl = Redact-UserPath $ApiBaseUrl
+        urlIssue = $apiUrlIssue
+    }
+}
+else {
+    Add-Stage "ApiUrlCheck" "Passed" "DemoStartupPassed" "API base URL is loopback-local." "" @{
+        apiBaseUrl = Redact-UserPath $ApiBaseUrl
+    }
+}
+
+$uiUrlIssue = Test-LoopbackUrl -Value $UiBaseUrl
+if ($uiUrlIssue) {
+    Add-Stage "UiUrlCheck" "Blocked" "DemoStartupUiBaseUrlNotLocal" "UI base URL is not loopback-local: $uiUrlIssue." "Use a local UI URL such as http://127.0.0.1:5173 or http://localhost:5173." @{
+        uiBaseUrl = Redact-UserPath $UiBaseUrl
+        urlIssue = $uiUrlIssue
+    }
+}
+else {
+    Add-Stage "UiUrlCheck" "Passed" "DemoStartupPassed" "UI base URL is loopback-local." "" @{
+        uiBaseUrl = Redact-UserPath $UiBaseUrl
+    }
+}
+
 $sqlScript = Join-Path $repoRoot "Scripts\local\sql-local.ps1"
 if (-not (Test-CommandAvailable "sqlcmd")) {
     Add-Stage "SqlCheck" "Blocked" "DemoStartupSqlUnavailable" "sqlcmd is not available for local SQL readiness checks." "Install SQL Server command-line tools, then rerun Scripts/demo/start-v0.1-demo.ps1 -CheckOnly."
@@ -475,7 +546,10 @@ else {
 }
 
 $apiHealthUrl = Join-Url -BaseUrl $ApiBaseUrl -Path "/health"
-if (Test-HttpGet -Url $apiHealthUrl) {
+if (Has-StartupBlocker) {
+    Add-Stage "ApiCheck" "Skipped" "DemoStartupApiUnavailable" "API start/check skipped because an earlier startup blocker exists." (Get-FirstStartupBlockerNextSafeAction)
+}
+elseif (Test-HttpGet -Url $apiHealthUrl) {
     Add-Stage "ApiCheck" "Passed" "DemoStartupPassed" "API health endpoint is already reachable." "" @{
         apiBaseUrl = Redact-UserPath $ApiBaseUrl
     }
@@ -497,7 +571,10 @@ else {
     }
 }
 
-if (Test-HttpGet -Url $UiBaseUrl) {
+if (Has-StartupBlocker) {
+    Add-Stage "UiCheck" "Skipped" "DemoStartupUiUnavailable" "UI start/check skipped because an earlier startup blocker exists." (Get-FirstStartupBlockerNextSafeAction)
+}
+elseif (Test-HttpGet -Url $UiBaseUrl) {
     Add-Stage "UiCheck" "Passed" "DemoStartupPassed" "UI dev server is already reachable." "" @{
         uiBaseUrl = Redact-UserPath $UiBaseUrl
     }
@@ -520,7 +597,10 @@ else {
 }
 
 $seedScript = Join-Path $repoRoot "Scripts\demo\demo-seed.ps1"
-if (-not (Test-Path -LiteralPath $seedScript)) {
+if (Has-StartupBlocker) {
+    Add-Stage "DemoSeedCheck" "Skipped" "DemoStartupSeedUnavailable" "Demo seed was skipped because an earlier startup blocker exists." (Get-FirstStartupBlockerNextSafeAction)
+}
+elseif (-not (Test-Path -LiteralPath $seedScript)) {
     Add-Stage "DemoSeedCheck" "Blocked" "DemoStartupSeedUnavailable" "Scripts/demo/demo-seed.ps1 is missing." "Restore the demo seed script before starting the local alpha demo."
 }
 elseif ($CheckOnly) {
@@ -534,7 +614,7 @@ elseif ($CheckOnly) {
         Add-Stage "DemoSeedCheck" "Blocked" "DemoStartupSeedUnavailable" "Demo seed check-only path failed." "Run Scripts/demo/demo-seed.ps1 -CheckOnly -Json and fix the first reported blocker."
     }
 }
-elseif (-not ($script:Stages | Where-Object { $_.status -eq "Blocked" -or $_.status -eq "Failed" } | Select-Object -First 1)) {
+else {
     $seedArguments = @(
         "-Seed",
         "-Project",
@@ -561,18 +641,15 @@ elseif (-not ($script:Stages | Where-Object { $_.status -eq "Blocked" -or $_.sta
         Add-Stage "DemoSeedCheck" "Blocked" "DemoStartupSeedUnavailable" "Demo seed failed or blocked." "Run Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic -ApiBaseUrl $ApiBaseUrl -OutputDirectory '$outputFull' -Json and fix the first reported blocker."
     }
 }
-else {
-    Add-Stage "DemoSeedCheck" "Skipped" "DemoStartupSeedUnavailable" "Demo seed was skipped because an earlier startup blocker exists." "Fix the first blocked startup stage, then rerun the demo startup script."
-}
 
-if ($OpenBrowser -and -not ($script:Stages | Where-Object { $_.status -eq "Blocked" -or $_.status -eq "Failed" } | Select-Object -First 1)) {
+if ($OpenBrowser -and -not (Has-StartupBlocker)) {
     Start-Process $UiBaseUrl | Out-Null
     Add-Stage "OpenApp" "Passed" "DemoStartupPassed" "Opened the demo app URL in the default browser." "" @{
         appUrl = Redact-UserPath $UiBaseUrl
     }
 }
 elseif ($OpenBrowser) {
-    Add-Stage "OpenApp" "Skipped" "DemoStartupOpenSkipped" "Browser open skipped because startup is blocked." "Fix the first blocked startup stage, then rerun with -OpenBrowser."
+    Add-Stage "OpenApp" "Skipped" "DemoStartupOpenSkipped" "Browser open skipped because startup is blocked." (Get-FirstStartupBlockerNextSafeAction)
 }
 else {
     Add-Stage "OpenApp" "Skipped" "DemoStartupOpenSkipped" "Browser open not requested; app URL printed for the operator." "" @{

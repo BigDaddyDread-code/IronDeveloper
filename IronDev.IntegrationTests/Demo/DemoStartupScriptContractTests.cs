@@ -37,6 +37,8 @@ public sealed class DemoStartupScriptContractTests
 
         AssertHasStage(root, "RootSafetyCheck");
         AssertHasStage(root, "SqlCheck");
+        AssertHasStage(root, "ApiUrlCheck");
+        AssertHasStage(root, "UiUrlCheck");
         AssertHasStage(root, "ApiCheck");
         AssertHasStage(root, "UiCheck");
         AssertHasStage(root, "DemoSeedCheck");
@@ -71,6 +73,80 @@ public sealed class DemoStartupScriptContractTests
     }
 
     [TestMethod]
+    public void DemoStartup_LiveModelUnsupportedPreventsProcessStart()
+    {
+        var result = RunPowerShell(
+            "-Json",
+            "-ModelMode",
+            "Live",
+            "-ApiBaseUrl",
+            "http://127.0.0.1:1",
+            "-UiBaseUrl",
+            "http://127.0.0.1:1",
+            "-StartTimeoutSeconds",
+            "1");
+
+        Assert.AreEqual(1, result.ExitCode, result.Output);
+        using var document = JsonDocument.Parse(result.Output);
+        var root = document.RootElement;
+
+        Assert.AreEqual("Blocked", root.GetProperty("status").GetString());
+        StringAssert.Contains(result.Output, "DemoStartupLiveModelUnsupported");
+        AssertStageStatus(root, "ApiCheck", "Skipped");
+        AssertStageStatus(root, "UiCheck", "Skipped");
+        AssertStageStatus(root, "DemoSeedCheck", "Skipped");
+        Assert.AreEqual(0, root.GetProperty("startedProcesses").GetArrayLength());
+    }
+
+    [TestMethod]
+    public void DemoStartup_BlocksRemoteApiBaseUrl()
+    {
+        var result = RunPowerShell(
+            "-CheckOnly",
+            "-NoStart",
+            "-Json",
+            "-ApiBaseUrl",
+            "https://example.com",
+            "-UiBaseUrl",
+            "http://127.0.0.1:1");
+
+        Assert.AreEqual(0, result.ExitCode, result.Output);
+        using var document = JsonDocument.Parse(result.Output);
+        var root = document.RootElement;
+
+        Assert.AreEqual("Blocked", root.GetProperty("status").GetString());
+        StringAssert.Contains(result.Output, "DemoStartupApiBaseUrlNotLocal");
+        StringAssert.Contains(result.Output, "NonLoopbackHost");
+        AssertStageStatus(root, "ApiCheck", "Skipped");
+        AssertStageStatus(root, "UiCheck", "Skipped");
+        Assert.AreEqual(0, root.GetProperty("startedProcesses").GetArrayLength());
+    }
+
+    [TestMethod]
+    public void DemoStartup_BlocksRemoteUiBaseUrl()
+    {
+        var result = RunPowerShell(
+            "-CheckOnly",
+            "-NoStart",
+            "-Json",
+            "-ApiBaseUrl",
+            "http://127.0.0.1:1",
+            "-UiBaseUrl",
+            "https://example.com");
+
+        Assert.AreEqual(0, result.ExitCode, result.Output);
+        using var document = JsonDocument.Parse(result.Output);
+        var root = document.RootElement;
+
+        Assert.AreEqual("Blocked", root.GetProperty("status").GetString());
+        StringAssert.Contains(result.Output, "DemoStartupUiBaseUrlNotLocal");
+        StringAssert.Contains(result.Output, "NonLoopbackHost");
+        AssertStageStatus(root, "ApiCheck", "Skipped");
+        AssertStageStatus(root, "UiCheck", "Skipped");
+        Assert.AreEqual(0, root.GetProperty("startedProcesses").GetArrayLength());
+    }
+
+    [TestMethod]
     public void DemoStartup_BlocksUnsafeOutputRootWithoutStartingProcesses()
     {
         var result = RunPowerShell(
@@ -88,6 +164,35 @@ public sealed class DemoStartupScriptContractTests
         StringAssert.Contains(result.Output, "DemoStartupRootUnsafe");
         StringAssert.Contains(result.Output, "UnderRepositoryRoot");
         Assert.AreEqual(0, root.GetProperty("startedProcesses").GetArrayLength());
+    }
+
+    [TestMethod]
+    public void DemoStartup_DoesNotStartApiWhenEarlierBlockerExists()
+    {
+        var source = ScriptSource();
+
+        StringAssert.Contains(source, "function Has-StartupBlocker");
+        StringAssert.Contains(source, "API start/check skipped because an earlier startup blocker exists.");
+        AssertBefore(source, "if (Has-StartupBlocker)", "Start-ManagedProcess -Name \"IronDev.Api\"");
+        AssertBefore(source, "API start/check skipped because an earlier startup blocker exists.", "Start-ManagedProcess -Name \"IronDev.Api\"");
+    }
+
+    [TestMethod]
+    public void DemoStartup_DoesNotStartUiWhenEarlierBlockerExists()
+    {
+        var source = ScriptSource();
+
+        StringAssert.Contains(source, "UI start/check skipped because an earlier startup blocker exists.");
+        AssertBefore(source, "UI start/check skipped because an earlier startup blocker exists.", "Start-ManagedProcess -Name \"IronDev.TauriShell\"");
+    }
+
+    [TestMethod]
+    public void DemoStartup_DoesNotDelegateSeedWhenEarlierBlockerExists()
+    {
+        var source = ScriptSource();
+
+        StringAssert.Contains(source, "Demo seed was skipped because an earlier startup blocker exists.");
+        AssertBefore(source, "Demo seed was skipped because an earlier startup blocker exists.", "Invoke-ChildScriptQuiet -ScriptPath $seedScript -WorkingDirectory $repoRoot -Arguments $seedArguments");
     }
 
     [TestMethod]
@@ -156,6 +261,26 @@ public sealed class DemoStartupScriptContractTests
             .Any(stage => stage.GetProperty("stage").GetString() == stageName);
 
         Assert.IsTrue(found, $"Expected stage '{stageName}' in script output.");
+    }
+
+    private static void AssertStageStatus(JsonElement root, string stageName, string expectedStatus)
+    {
+        var stage = root.GetProperty("stages")
+            .EnumerateArray()
+            .FirstOrDefault(candidate => candidate.GetProperty("stage").GetString() == stageName);
+
+        Assert.IsNotNull(stage.ValueKind == JsonValueKind.Undefined ? null : stage, $"Expected stage '{stageName}' in script output.");
+        Assert.AreEqual(expectedStatus, stage.GetProperty("status").GetString(), $"Unexpected status for stage '{stageName}'.");
+    }
+
+    private static void AssertBefore(string text, string earlier, string later)
+    {
+        var earlierIndex = text.IndexOf(earlier, StringComparison.Ordinal);
+        var laterIndex = text.IndexOf(later, StringComparison.Ordinal);
+
+        Assert.IsTrue(earlierIndex >= 0, $"Expected source to contain '{earlier}'.");
+        Assert.IsTrue(laterIndex >= 0, $"Expected source to contain '{later}'.");
+        Assert.IsTrue(earlierIndex < laterIndex, $"Expected '{earlier}' to appear before '{later}'.");
     }
 
     private static (int ExitCode, string Output) RunPowerShell(params string[] arguments)

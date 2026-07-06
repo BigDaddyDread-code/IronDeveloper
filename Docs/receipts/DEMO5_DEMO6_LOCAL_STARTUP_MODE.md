@@ -62,6 +62,7 @@ Scripts/demo/start-v0.1-demo.ps1 -ModelMode Live -CheckOnly -Json
 - finds the repository root
 - checks the planned demo output root
 - checks required local tools
+- rejects non-loopback API/UI URLs for the local demo path
 - checks local SQL readiness through `Scripts/local/sql-local.ps1 -CheckOnly`
 - verifies or starts `IronDev.Api`
 - verifies or starts the Tauri/Vite UI
@@ -71,6 +72,11 @@ Scripts/demo/start-v0.1-demo.ps1 -ModelMode Live -CheckOnly -Json
 - reports one primary next safe action when blocked
 
 The script starts services only outside `-CheckOnly` and `-NoStart`.
+
+If any earlier startup stage is `Blocked` or `Failed`, later API start/check,
+UI start/check, seed delegation, and browser-open stages are skipped with the
+first next safe action preserved. A blocked startup that still starts services
+is not blocked.
 
 ## DEMO-6 Behavior
 
@@ -92,6 +98,7 @@ The viewer always knows whether the run is deterministic or live.
 - No fake policy satisfaction.
 - No fake continuation.
 - No fake apply receipt.
+- No remote API/UI target for the local demo startup path.
 - No live model fallback.
 - No live model proof.
 - No release readiness.
@@ -116,7 +123,9 @@ A startup script is a coordinator. It is not authority.
 
 - `Scripts/demo/start-v0.1-demo.ps1 -CheckOnly -NoStart -Json -ApiBaseUrl http://127.0.0.1:1 -UiBaseUrl http://127.0.0.1:1`: passed and reported blocked API/UI with one next safe action.
 - `Scripts/demo/start-v0.1-demo.ps1 -CheckOnly -NoStart -Json -ModelMode Live -ApiBaseUrl http://127.0.0.1:1 -UiBaseUrl http://127.0.0.1:1`: passed and blocked live mode without fallback.
-- Focused DEMO-5/DEMO-6 startup contract tests: 7/7 passed.
+- `Scripts/demo/start-v0.1-demo.ps1 -CheckOnly -NoStart -Json -ApiBaseUrl https://example.com -UiBaseUrl http://127.0.0.1:1`: passed and blocked remote API URL with no process start.
+- `Scripts/demo/start-v0.1-demo.ps1 -CheckOnly -NoStart -Json -ApiBaseUrl http://127.0.0.1:1 -UiBaseUrl https://example.com`: passed and blocked remote UI URL with no process start.
+- Focused DEMO-5/DEMO-6 startup contract tests: 13/13 passed.
 - DEMO seed contract compatibility: 12/12 passed.
 - Integration category contract tests: 7/7 passed.
 - C11 secret scan: 9/9 passed.
