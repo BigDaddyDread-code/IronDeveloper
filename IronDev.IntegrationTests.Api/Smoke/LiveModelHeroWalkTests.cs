@@ -79,6 +79,11 @@ public sealed class LiveModelHeroWalkTests : ApiTestBase
                 builder.UseSetting("DisposableBuild:BuildTimeoutSeconds", "300");
                 builder.UseSetting("DisposableBuild:TestTimeoutSeconds", "300");
                 builder.UseSetting("SkeletonApply:Enabled", "true");
+                // HERO-3: arm bounded repair. A live model sometimes writes code
+                // that fails the real build (observed); with one repair attempt the
+                // walk survives its own bad day — the Builder repairs from the real
+                // compiler evidence, and the gate at the end is exactly the gate.
+                builder.UseSetting("SkeletonRepair:MaxAttempts", "1");
                 // ApiTestBase pins Ai:Provider=fake through an in-memory config
                 // source; this LATER source overrides it with the live model.
                 builder.ConfigureAppConfiguration((_, configuration) =>
@@ -270,6 +275,20 @@ public sealed class LiveModelHeroWalkTests : ApiTestBase
                 FinalState = "Applied",
                 LoopComplete = finalReport.LoopComplete,
                 ReportReconstructable = finalReport.Gaps.Count == 0,
+                // HERO-3: the honest repair record. Zero attempts = the model got it
+                // right first try; N attempts = the loop survived its own bad day,
+                // repaired from real compiler evidence, and STILL waited at the gate.
+                RepairBudget = 1,
+                SelfRepairOccurred = finalReport.RepairAttempts.Count > 0,
+                RepairAttempts = finalReport.RepairAttempts.Select(attempt => new
+                {
+                    attempt.AttemptNumber,
+                    attempt.FailureKind,
+                    attempt.FailedCommand,
+                    RepairModel = $"{attempt.ModelProvider}/{attempt.ModelName}"
+                }).ToArray(),
+                InitialProposalId = finalReport.InitialProposal?.ProposalId ?? string.Empty,
+                GateProposalId = finalReport.Proposal!.ProposalId,
                 Proves = new[]
                 {
                     "real profile detection, profile save, and code indexing through product routes",
@@ -277,7 +296,8 @@ public sealed class LiveModelHeroWalkTests : ApiTestBase
                     "real disposable workspace build/test produced the evidence that reached the gate",
                     "live critic reviewed the real package with ground-truth verification",
                     "every live finding was dispositioned through the product route before continuation",
-                    "hash-bound approval, continuation, and controlled apply reached Applied with a complete report"
+                    "hash-bound approval, continuation, and controlled apply reached Applied with a complete report",
+                    "bounded repair was ARMED (budget 1): a live build failure self-repairs from real evidence and still answers to the same human gate"
                 },
                 DoesNotProveYet = new[]
                 {
