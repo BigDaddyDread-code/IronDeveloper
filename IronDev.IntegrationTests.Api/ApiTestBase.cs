@@ -101,14 +101,14 @@ public abstract class ApiTestBase
             // observed outranking the test overrides here, which pointed this connection
             // at the REAL IronDeveloper database — running DropGovernanceSql and domain
             // resets against real data. The destructive connection is pinned to the
-            // explicit test connection string and hard-guarded to a *_Test catalog.
+            // explicit test connection string and hard-guarded to a test-shaped catalog.
             ConnectionString = TestConnectionString();
             var catalog = new SqlConnectionStringBuilder(ConnectionString).InitialCatalog;
-            if (!catalog.EndsWith("_Test", StringComparison.OrdinalIgnoreCase))
+            if (!IsTestShapedCatalog(catalog))
             {
                 throw new InvalidOperationException(
                     $"Refusing to provision/reset database '{catalog}': API test provisioning is destructive " +
-                    "and may only target a catalog whose name ends with '_Test'.");
+                    "and may only target an explicitly test-shaped catalog (name ending in '_Test' or starting with 'IronDev_CI_').");
             }
 
             await SetupDatabaseAsync();
@@ -671,6 +671,18 @@ public abstract class ApiTestBase
             ? DefaultTestConnectionString
             : overrideValue;
     }
+
+    /// <summary>
+    /// Destructive API test provisioning/resets may only target an explicitly
+    /// test-shaped catalog: local test databases ('*_Test') or ephemeral CI
+    /// databases ('IronDev_CI_*'). Real and local developer catalogs
+    /// (IronDeveloper, IronDeveloper_Local) and empty names are refused.
+    /// Strict and compatible: a safety guard that breaks CI gets bypassed.
+    /// </summary>
+    internal static bool IsTestShapedCatalog(string? catalog) =>
+        !string.IsNullOrWhiteSpace(catalog) &&
+        (catalog.EndsWith("_Test", StringComparison.OrdinalIgnoreCase) ||
+         catalog.StartsWith("IronDev_CI_", StringComparison.OrdinalIgnoreCase));
 
     private sealed class StartupOnlyStoredCriticService : IStoredManualIndependentCriticAgentService
     {

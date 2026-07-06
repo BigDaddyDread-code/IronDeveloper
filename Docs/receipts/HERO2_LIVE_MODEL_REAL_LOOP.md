@@ -61,9 +61,20 @@ Fixed: the destructive connection is pinned to the explicit test connection stri
 hard-guarded to a catalog name ending in `_Test` (refusal otherwise). Pinned by
 contract test.
 
-**Owner attention:** the real `IronDeveloper` database currently has NO governance
-tables, consistent with historical test runs having dropped them. Assess whether
-anything of value was lost there.
+**OWNER-ACTION-001 — assess real IronDeveloper DB governance-table loss risk.**
+The real `IronDeveloper` database currently has NO governance tables, consistent
+with historical test runs having dropped them (`DropGovernanceSql` drops without
+re-creating when a later step fails or targets another catalog). Owner must
+explicitly assess whether governance records of value were lost, and record the
+verdict (nothing-of-value / restored-from-backup / accepted-loss) before this
+action is closed. Not a merge blocker if this is a disposable local dev DB — but
+it is a named action, not a buried note.
+
+Guard scope (review-hardened): destructive provisioning targets only explicitly
+test-shaped catalogs — `*_Test` locally, `IronDev_CI_*` ephemeral in CI. Real
+(`IronDeveloper`), local developer (`IronDeveloper_Local`), and empty catalogs are
+refused. Contract coverage: `ApiTestBaseCatalogGuardContractTests` (4 tests),
+executed by name in the full SQL lane.
 
 **Open question (named, not solved):** why the composed configuration resolved to the
 Development connection inside the base test factory in some sessions and the Test

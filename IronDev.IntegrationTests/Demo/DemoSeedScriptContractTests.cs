@@ -281,11 +281,23 @@ public sealed class DemoSeedScriptContractTests
         StringAssert.Contains(program, "AddScoped<IManualIndependentCriticAgentService, ManualIndependentCriticAgentService>()");
 
         // HERO-2 safety fix: the destructive test provisioning/reset connection is
-        // pinned to the explicit test connection string and hard-guarded to *_Test.
+        // pinned to the explicit test connection string and hard-guarded to
+        // test-shaped catalogs only (*_Test locally, IronDev_CI_* ephemeral in CI).
         var apiTestBase = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "ApiTestBase.cs"));
         StringAssert.Contains(apiTestBase, "ConnectionString = TestConnectionString();");
+        StringAssert.Contains(apiTestBase, "IsTestShapedCatalog");
         StringAssert.Contains(apiTestBase, "EndsWith(\"_Test\"");
+        StringAssert.Contains(apiTestBase, "StartsWith(\"IronDev_CI_\"");
         StringAssert.Contains(apiTestBase, "Refusing to provision/reset database");
+
+        // The guard's own contract tests exist AND execute in the full SQL lane.
+        var guardTests = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "ApiTestBaseCatalogGuardContractTests.cs"));
+        StringAssert.Contains(guardTests, "ApiTestBase_AllowsLocalTestCatalog");
+        StringAssert.Contains(guardTests, "ApiTestBase_AllowsCiEphemeralCatalog");
+        StringAssert.Contains(guardTests, "ApiTestBase_RejectsProductionCatalog");
+        StringAssert.Contains(guardTests, "ApiTestBase_RejectsLocalDeveloperCatalog");
+        var ciScript = File.ReadAllText(RepoFile("Scripts", "ci", "run-full-sql-integration-ci.ps1"));
+        StringAssert.Contains(ciScript, "ApiTestBaseCatalogGuardContractTests");
     }
 
     [TestMethod]
