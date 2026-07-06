@@ -1,0 +1,41 @@
+{
+  "batchId": "DOGFOOD-BOOKSELLER-BATCH-001",
+  "dependsOnGateId": "DOGFOOD-ALPHA-LOCAL-001",
+  "entryCriteriaStatus": "BlockedUntilDogfoodAlphaLocal001HasExecutableVerdict",
+  "aggregateVerdict": "BatchEvidenceIncomplete",
+  "tickets": [
+    {
+      "ticketKey": "validate-book",
+      "ticketVerdict": "TicketDescoped",
+      "runId": null,
+      "approvalEvidenceRef": null,
+      "applyReceiptRef": null,
+      "reportRef": null,
+      "blocker": "DOGFOOD-ALPHA-LOCAL-001 is EvidenceIncomplete; optional batch is parked."
+    },
+    {
+      "ticketKey": "normalise-book-metadata",
+      "ticketVerdict": "TicketDescoped",
+      "runId": null,
+      "approvalEvidenceRef": null,
+      "applyReceiptRef": null,
+      "reportRef": null,
+      "blocker": "DOGFOOD-ALPHA-LOCAL-001 is EvidenceIncomplete; optional batch is parked."
+    },
+    {
+      "ticketKey": "reject-duplicate-isbn",
+      "ticketVerdict": "TicketDescoped",
+      "runId": null,
+      "approvalEvidenceRef": null,
+      "applyReceiptRef": null,
+      "reportRef": null,
+      "blocker": "DOGFOOD-ALPHA-LOCAL-001 is EvidenceIncomplete; optional batch is parked."
+    }
+  ],
+  "knownLimitations": [
+    "The single-ticket dogfood gate has not produced an executable go verdict.",
+    "No batch runs were started by this artifact.",
+    "No approvals, continuations, apply receipts, or final reports are invented for parked tickets."
+  ],
+  "boundary": "The batch artifact is optional confidence evidence only. It is not release readiness, approval, shared authority, workflow continuation, deployment readiness, or a replacement for DOGFOOD-ALPHA-LOCAL-001."
+}

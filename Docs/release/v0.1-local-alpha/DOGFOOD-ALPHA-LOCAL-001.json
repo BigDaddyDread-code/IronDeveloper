@@ -1,0 +1,32 @@
+{
+  "gateId": "DOGFOOD-ALPHA-LOCAL-001",
+  "commitSha": "e8885a544fd26f6a55382f15328b7807221713ae",
+  "branch": "main",
+  "artifactCreatedAtUtc": "2026-07-06T00:00:00Z",
+  "startedAtUtc": null,
+  "completedAtUtc": null,
+  "verdict": "EvidenceIncomplete",
+  "doctorStatus": "NotRunInThisArtifact",
+  "alphaSmokeStatus": "NotRunInThisArtifact",
+  "finalRunState": "NotEstablishedByThisArtifact",
+  "backendEvidenceRefs": [
+    "Docs/receipts/REL3_SQL_API_PERSISTED_ALPHA_SMOKE.md",
+    "Docs/receipts/REL5_CHAT_CONFIRMED_TICKET_GOVERNED_RUN.md",
+    "Docs/receipts/DEMO5_DEMO6_LOCAL_STARTUP_MODE.md"
+  ],
+  "receiptRefs": [
+    "Docs/receipts/DEMO7_9_DOGFOOD_GATE_AND_BATCH.md"
+  ],
+  "knownLimitations": [
+    "DEMO-7 non-author rehearsal has not been executed by an independent operator in this artifact.",
+    "DEMO-3/DEMO-4 UI journey evidence remains mocked API Playwright proof, not a fresh local UI run.",
+    "DOGFOOD-ALPHA-LOCAL-001 command sequence is specified here but not executed in this artifact."
+  ],
+  "gateBlockers": [
+    "NonAuthorRehearsalNotRun",
+    "DogfoodGateNotExecuted",
+    "UiJourneyNotFreshDogfoodProof"
+  ],
+  "nextSafeAction": "Assign a non-author operator, run Docs/dogfood/DEMO-REHEARSAL-001.md from a clean local checkout, then replace this EvidenceIncomplete gate with observed command and backend evidence.",
+  "boundary": "DOGFOOD-ALPHA-LOCAL-001 is release evidence only. It does not approve, release, deploy, tag, publish, merge, or grant authority."
+}

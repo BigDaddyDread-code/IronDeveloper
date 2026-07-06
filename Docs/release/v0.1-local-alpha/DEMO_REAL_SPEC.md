@@ -829,6 +829,8 @@ DEMO-4  Screen state/dead-end UX hardening across demo routes.
 DEMO-5  One-command demo-up.
 DEMO-6  Live model banner/path decision.
 DEMO-7  Non-author rehearsal transcript.
+DEMO-8  DOGFOOD-ALPHA-LOCAL-001 release gate artifact.
+DEMO-9  Optional BookSeller three-ticket batch artifact.
 ```
 
 Do not combine all implementation into one heroic PR.
@@ -1148,7 +1150,124 @@ Acceptance:
 One non-author can run the 12-minute demo path from fresh checkout or clearly records why not.
 ```
 
-## 24. Do-Not-Ship Demo List
+## 24. DEMO-8 - DOGFOOD-ALPHA-LOCAL-001 Gate Artifact
+
+Purpose:
+
+```text
+Record the first explicit local-alpha dogfood gate artifact without turning evidence into release authority.
+```
+
+Suggested title:
+
+```text
+demo(dogfood): add DOGFOOD-ALPHA-LOCAL-001 gate artifact
+```
+
+Required artifacts:
+
+```text
+Docs/release/v0.1-local-alpha/DOGFOOD-ALPHA-LOCAL-001.md
+Docs/release/v0.1-local-alpha/DOGFOOD-ALPHA-LOCAL-001.json
+```
+
+Allowed verdicts:
+
+```text
+GoForLocalAlphaPreview
+NoGoBlocked
+ConditionalGoWithNamedLimitations
+EvidenceIncomplete
+```
+
+Acceptance:
+
+```text
+The artifact records command order, doctor/smoke/final-state status, evidence refs, limitations, blockers, one next safe action, and a boundary statement.
+If the gate is not actually executed, the verdict must be EvidenceIncomplete and must not claim release readiness.
+```
+
+Review line:
+
+```text
+A dogfood gate is evidence with a verdict. It does not grant release authority by itself.
+```
+
+Killjoy:
+
+```text
+If the release gate cannot be repeated from the runbook, it is not a gate. It is a diary entry.
+```
+
+## 25. DEMO-9 - Optional BookSeller Three-Ticket Batch Artifact
+
+Purpose:
+
+```text
+Represent the optional three-ticket BookSeller batch only after the single-ticket dogfood gate is boring.
+```
+
+Suggested title:
+
+```text
+demo(dogfood): add optional BookSeller batch artifact
+```
+
+Required artifacts:
+
+```text
+Docs/release/v0.1-local-alpha/DOGFOOD-BOOKSELLER-BATCH-001.md
+Docs/release/v0.1-local-alpha/DOGFOOD-BOOKSELLER-BATCH-001.json
+```
+
+Required tickets:
+
+```text
+validate-book
+normalise-book-metadata
+reject-duplicate-isbn
+```
+
+Allowed per-ticket verdicts:
+
+```text
+TicketApplied
+TicketPausedForApproval
+TicketBlocked
+TicketFailed
+TicketDescoped
+```
+
+Allowed aggregate verdicts:
+
+```text
+BatchPassed
+BatchBlocked
+BatchFailed
+BatchPartiallyPassed
+BatchEvidenceIncomplete
+```
+
+Acceptance:
+
+```text
+The artifact names exactly three tickets, keeps their run/approval/apply/report evidence independent, and never lets aggregate success hide a ticket failure.
+If DEMO-8 is EvidenceIncomplete, DEMO-9 must stay BatchEvidenceIncomplete and must not invent run IDs, approvals, apply receipts, or final reports.
+```
+
+Review line:
+
+```text
+Batch proof is confidence evidence. It is not a substitute for a boring single-ticket release path.
+```
+
+Killjoy:
+
+```text
+Three tickets do not make the product mature. They only prove the first ticket was not a lucky accident.
+```
+
+## 26. Do-Not-Ship Demo List
 
 Do not claim demo-real if any of these are true:
 
