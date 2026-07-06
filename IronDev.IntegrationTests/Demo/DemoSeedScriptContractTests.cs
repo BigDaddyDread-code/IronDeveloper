@@ -350,6 +350,29 @@ public sealed class DemoSeedScriptContractTests
     }
 
     [TestMethod]
+    public void FlowUi_SurfacesRepairAttemptsHonestly()
+    {
+        // REPAIR-1 in the UI: a repaired run says so, the failed original is
+        // history (never the gate proposal), and the boundary is stated in place.
+        var types = File.ReadAllText(RepoFile("IronDev.TauriShell", "src", "api", "types.ts"));
+        StringAssert.Contains(types, "SkeletonRunRepairAttemptTrace");
+        StringAssert.Contains(types, "repairAttempts: SkeletonRunRepairAttemptTrace[]");
+        StringAssert.Contains(types, "initialProposal?: SkeletonRunProposalTrace | null");
+
+        var panel = File.ReadAllText(RepoFile("IronDev.TauriShell", "src", "flow", "workitem", "RepairAttemptsPanel.tsx"));
+        StringAssert.Contains(panel, "not authority — the human gate is unchanged");
+        StringAssert.Contains(panel, "failed and is preserved as history");
+        StringAssert.Contains(panel, "if (repairAttempts.length === 0)");
+
+        var buildStage = File.ReadAllText(RepoFile("IronDev.TauriShell", "src", "flow", "workitem", "BuildStage.tsx"));
+        StringAssert.Contains(buildStage, "Gate proposal (repaired)");
+        StringAssert.Contains(buildStage, "RepairAttemptsPanel");
+
+        var reviewStage = File.ReadAllText(RepoFile("IronDev.TauriShell", "src", "flow", "workitem", "ReviewStage.tsx"));
+        StringAssert.Contains(reviewStage, "the gate below is unchanged");
+    }
+
+    [TestMethod]
     public void DemoSeed_ReceiptDocumentsBoundary()
     {
         var receipt = File.ReadAllText(RepoFile("Docs", "receipts", "DEMO1_API_DRIVEN_DEMO_SEED.md"));

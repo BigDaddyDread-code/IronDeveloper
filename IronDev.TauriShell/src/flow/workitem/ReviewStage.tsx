@@ -51,8 +51,17 @@ export function ReviewStage({
     .flatMap((review) => review.findingIds)
     .some((findingId) => !dispositionedIds.has(findingId));
 
+  const repairAttempts = report?.repairAttempts ?? [];
+
   return (
     <>
+      {repairAttempts.length > 0 ? (
+        <p style={{ fontSize: 12.5, color: 'var(--fl-ink2)' }} data-testid="flow.review.repairedNote">
+          This run self-repaired {repairAttempts.length === 1 ? 'once' : `${repairAttempts.length} times`} before reaching
+          review — the critic reviewed the repaired proposal{report?.proposal ? ` (${report.proposal.proposalId})` : ''}, and
+          the gate below is unchanged.
+        </p>
+      ) : null}
       <CriticPackageViewer criticPackage={criticPackage} />
       <CriterionTestMatrix criticPackage={criticPackage} />
       <FindingsPanel

@@ -1,4 +1,5 @@
 import type { SkeletonRunReport, TicketBuildRunDto } from '../../api/types';
+import { RepairAttemptsPanel } from './RepairAttemptsPanel';
 
 // Build stage — the live view of a skeleton run, rendered entirely from the
 // run report (P0-6): durable evidence, re-verified server-side at read time.
@@ -36,10 +37,17 @@ export function BuildStage({ run, report, onRefreshReport }: BuildStageProps) {
         <>
           {report.proposal ? (
             <p style={{ fontSize: 13, color: 'var(--fl-ink2)' }} data-testid="flow.build.proposal">
-              Proposal {report.proposal.proposalId} · {report.proposal.fileChangeCount} file change(s)
+              {report.initialProposal ? 'Gate proposal (repaired)' : 'Proposal'} {report.proposal.proposalId} ·{' '}
+              {report.proposal.fileChangeCount} file change(s)
               {report.proposal.modelName ? ` · built by ${report.proposal.modelProvider}/${report.proposal.modelName}` : ''}
             </p>
           ) : null}
+
+          <RepairAttemptsPanel
+            repairAttempts={report.repairAttempts ?? []}
+            initialProposal={report.initialProposal}
+            gateProposal={report.proposal}
+          />
 
           {report.testAuthoring ? (
             <p style={{ fontSize: 13, color: 'var(--fl-ink2)' }} data-testid="flow.build.testAuthoring">

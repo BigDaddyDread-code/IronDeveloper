@@ -1150,6 +1150,19 @@ export interface SkeletonRunApplyTrace {
   receipts: SkeletonRunReceiptRef[];
 }
 
+// REPAIR-1: one bounded repair attempt, reconstructed from durable events.
+// A repair attempt is proposal-shaped work, never authority — its presence is
+// honesty about the mess, not a mark against the run.
+export interface SkeletonRunRepairAttemptTrace {
+  attemptNumber: number;
+  failureKind: string;
+  failedCommand: string;
+  repairProposalId: string;
+  modelProvider: string;
+  modelName: string;
+  repairProposalEvidenceExistsOnDisk: boolean;
+}
+
 export interface SkeletonRunReport {
   runId: string;
   projectId: number;
@@ -1157,12 +1170,23 @@ export interface SkeletonRunReport {
   status: string;
   summary: string;
   timeline: SkeletonRunTimelineEntry[];
+  /**
+   * The FINAL/CURRENT proposal — the one the gate, critic package, and approval
+   * hash bind to. After a successful bounded repair this is the repaired
+   * proposal, never the failed original.
+   */
   proposal?: SkeletonRunProposalTrace | null;
+  /**
+   * REPAIR-1: the original failed proposal, populated ONLY when bounded repair
+   * replaced it. Preserved history — it exists, and it is not the gate proposal.
+   */
+  initialProposal?: SkeletonRunProposalTrace | null;
   testAuthoring?: SkeletonRunTestAuthoringTrace | null;
   criticPackage?: SkeletonRunCriticPackageTrace | null;
   approval?: SkeletonRunApprovalTrace | null;
   criticReviews: SkeletonRunCriticReviewTrace[];
   findingDispositions: SkeletonRunFindingDispositionTrace[];
+  repairAttempts: SkeletonRunRepairAttemptTrace[];
   apply?: SkeletonRunApplyTrace | null;
   gaps: string[];
   loopComplete: boolean;

@@ -30,6 +30,47 @@ test('build stage renders the halted run and review renders the matrix and gate'
   await expect(page.getByTestId('flow.review.requestApply')).toBeDisabled();
 });
 
+test('a self-repaired run says so honestly in build and review, and the gate is unchanged', async ({ page }) => {
+  await mockTicketWorkspace(page);
+  await mockSkeletonRun(page, { continuationUnblocked: false, withRepair: true });
+
+  await openTicketStage(page);
+  await page.getByTestId('flow.ticket.startRun').click();
+
+  // Build stage: the gate proposal is explicitly the REPAIRED proposal, the
+  // attempt history is listed, the failed original is preserved as history,
+  // and the boundary is stated in place.
+  await expect(page.getByTestId('flow.build.proposal')).toContainText('Gate proposal (repaired)');
+  await expect(page.getByTestId('flow.build.proposal')).toContainText('-repair-2');
+  await expect(page.getByTestId('flow.build.repairAttempt.2')).toContainText('repaired after BuildFailed');
+  await expect(page.getByTestId('flow.build.repairAttempt.2')).toContainText("on 'dotnet build'");
+  await expect(page.getByTestId('flow.build.repairAttempt.2')).toContainText('OpenAI/gpt-4o-mini');
+  await expect(page.getByTestId('flow.build.initialProposal')).toContainText('failed and is preserved as history');
+  await expect(page.getByTestId('flow.build.repairBoundary')).toContainText('not authority');
+
+  // Review stage: the repaired-run note is present — and the human gate is
+  // exactly the gate, still locked.
+  await page.getByTestId('flow.build.toReview').click();
+  await expect(page.getByTestId('flow.review.repairedNote')).toContainText('self-repaired once');
+  await expect(page.getByTestId('flow.review.repairedNote')).toContainText('the gate below is unchanged');
+  await expect(page.getByTestId('flow.review.gate')).toContainText('Human gate: locked');
+  await expect(page.getByTestId('flow.review.requestApply')).toBeDisabled();
+});
+
+test('a run with no repair renders no repair chrome at all', async ({ page }) => {
+  await mockTicketWorkspace(page);
+  await mockSkeletonRun(page, { continuationUnblocked: false });
+
+  await openTicketStage(page);
+  await page.getByTestId('flow.ticket.startRun').click();
+
+  await expect(page.getByTestId('flow.build.proposal')).not.toContainText('repaired');
+  await expect(page.getByTestId('flow.build.repairAttempts')).toHaveCount(0);
+
+  await page.getByTestId('flow.build.toReview').click();
+  await expect(page.getByTestId('flow.review.repairedNote')).toHaveCount(0);
+});
+
 test('an uncovered criterion is rendered as UNCOVERED, not elided', async ({ page }) => {
   await mockTicketWorkspace(page);
   await mockSkeletonRun(page, { continuationUnblocked: false, uncovered: true });
@@ -231,6 +272,7 @@ async function mockSkeletonRun(
     initialApplied?: boolean;
     withFinding?: boolean;
     uncovered?: boolean;
+    withRepair?: boolean;
   }
 ): Promise<SkeletonMockState> {
   const state: SkeletonMockState = {
@@ -289,7 +331,32 @@ async function mockSkeletonRun(
           { timestampUtc: '2026-07-04T10:01:00Z', eventType: 'TestsAuthored', message: '1 test file(s) authored.' },
           { timestampUtc: '2026-07-04T10:02:00Z', eventType: 'ApprovalRequiredHalt', message: 'Halted for approval. Halt is not approval.' }
         ],
-        proposal: { proposalId: `prop-${RUN_ID}`, fileChangeCount: 1, evidenceRef: 'evidence/proposal.json', evidenceExistsOnDisk: true },
+        proposal: options.withRepair
+          ? {
+              proposalId: `prop-${RUN_ID}-repair-2`,
+              fileChangeCount: 1,
+              evidenceRef: 'evidence/proposal-repair-2.json',
+              evidenceExistsOnDisk: true,
+              modelProvider: 'OpenAI',
+              modelName: 'gpt-4o-mini'
+            }
+          : { proposalId: `prop-${RUN_ID}`, fileChangeCount: 1, evidenceRef: 'evidence/proposal.json', evidenceExistsOnDisk: true },
+        initialProposal: options.withRepair
+          ? { proposalId: `prop-${RUN_ID}`, fileChangeCount: 1, evidenceRef: 'evidence/proposal.json', evidenceExistsOnDisk: true }
+          : null,
+        repairAttempts: options.withRepair
+          ? [
+              {
+                attemptNumber: 2,
+                failureKind: 'BuildFailed',
+                failedCommand: 'dotnet build',
+                repairProposalId: `prop-${RUN_ID}-repair-2`,
+                modelProvider: 'OpenAI',
+                modelName: 'gpt-4o-mini',
+                repairProposalEvidenceExistsOnDisk: true
+              }
+            ]
+          : [],
         testAuthoring: { authored: true, authoredTestCount: 1, skippedReason: '' },
         criticPackage: {
           packageId: `critic-pkg-${RUN_ID}`,
