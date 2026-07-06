@@ -7,8 +7,11 @@
     [ValidateSet("RunningApi", "ProofHarness")]
     [string]$SeedTarget = "RunningApi",
     [string]$ApiBaseUrl = "http://localhost:5118",
-    [string]$DemoUserEmail = $env:IRONDEV_DEMO_USER_EMAIL,
-    [string]$DemoUserPassword = $env:IRONDEV_DEMO_USER_PASSWORD,
+    # Defaults are the documented local-dev seed user created by
+    # Database/local_dev_setup.sql (local-only, committed there already).
+    # Environment variables override for any non-default setup.
+    [string]$DemoUserEmail = $(if ([string]::IsNullOrWhiteSpace($env:IRONDEV_DEMO_USER_EMAIL)) { "bob@irondev.local" } else { $env:IRONDEV_DEMO_USER_EMAIL }),
+    [string]$DemoUserPassword = $(if ([string]::IsNullOrWhiteSpace($env:IRONDEV_DEMO_USER_PASSWORD)) { "change-me-local-only" } else { $env:IRONDEV_DEMO_USER_PASSWORD }),
     [int]$DemoTenantId = 1,
     [switch]$CreateLiveChatTicket,
     [switch]$ProveUsable,
@@ -597,6 +600,48 @@ function Resolve-DemoTicket {
     }
 }
 
+function Initialize-DemoProjectProfile {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Headers,
+        [Parameter(Mandatory = $true)]$Project,
+        [Parameter(Mandatory = $true)][string]$SourcePath
+    )
+
+    # DEMO-REHEARSAL-001 finding: the real Builder enforces readiness (profile,
+    # build/test commands, code index). The seed now performs the same first-run
+    # journey the product expects — through product routes, granting nothing.
+    try {
+        $detection = Invoke-DemoApi -Method "POST" -Path "/api/profile/detect" -Headers $Headers -Body @{
+            projectRoot = $SourcePath
+            projectId = [int]$Project.id
+        }
+
+        $profile = $detection.profile
+        $profile.projectId = [int]$Project.id
+        $profile.allowBuilderApply = $true
+        if ([string]::IsNullOrWhiteSpace([string]$profile.databaseEngine)) { $profile.databaseEngine = "None" }
+        if ([string]::IsNullOrWhiteSpace([string]$profile.dataAccessStyle)) { $profile.dataAccessStyle = "None" }
+        Invoke-DemoApi -Method "POST" -Path "/api/projects/$($Project.id)/profile" -Headers $Headers -Body $profile | Out-Null
+
+        $detection.buildCommand.projectId = [int]$Project.id
+        $detection.buildCommand.isDefault = $true
+        Invoke-DemoApi -Method "POST" -Path "/api/projects/$($Project.id)/profile/commands" -Headers $Headers -Body $detection.buildCommand | Out-Null
+        $detection.testCommand.projectId = [int]$Project.id
+        $detection.testCommand.isDefault = $true
+        Invoke-DemoApi -Method "POST" -Path "/api/projects/$($Project.id)/profile/commands" -Headers $Headers -Body $detection.testCommand | Out-Null
+
+        Invoke-DemoApi -Method "POST" -Path "/api/projects/$($Project.id)/code-index" -Headers $Headers -Body @{
+            directoryPath = $SourcePath
+        } | Out-Null
+
+        Add-Stage "ProjectProfile" "Passed" "DemoSeedPassed" "Project profile detected/saved and source indexed through product routes. A profile is readiness input, not authority."
+    }
+    catch {
+        Add-Stage "ProjectProfile" "Failed" "DemoProjectResolveFailed" "Project profile/index setup failed through the product routes." @{ error = $_.Exception.Message }
+        Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+}
+
 function Get-ApprovalProjectId {
     param([Parameter(Mandatory = $true)][int]$ProjectId)
 
@@ -1124,6 +1169,7 @@ else {
 
     $sourceCopy = Initialize-BookSellerSourceCopy -RepoRoot $repoRoot -OutputRoot $script:OutputRoot
     $projectRecord = Resolve-DemoProject -Headers $headers -SourcePath $sourceCopy
+    Initialize-DemoProjectProfile -Headers $headers -Project $projectRecord -SourcePath $sourceCopy
     $validateTicket = Resolve-DemoTicket -Headers $headers -Project $projectRecord -Key "validate-book"
     $searchTicket = Resolve-DemoTicket -Headers $headers -Project $projectRecord -Key "search-by-author"
 

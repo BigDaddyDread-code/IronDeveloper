@@ -591,6 +591,16 @@ else {
         databaseName = $DatabaseName
     }
 
+    # DEMO-REHEARSAL-001 finding: the API's agent model resolution fails closed
+    # without a provider. Deterministic demo mode arms the EXPLICIT deterministic
+    # alpha-smoke provider gate (design: default off, never silent) so the real
+    # builder/tester/critic services run with deterministic model words only.
+    if ($ModelMode -eq "Deterministic") {
+        $env:AlphaSmoke__Enabled = "true"
+        $env:AlphaSmoke__ModelMode = "Deterministic"
+        Add-Stage "DeterministicModelPin" "Passed" "DemoStartupPassed" "Demo API armed with the explicit deterministic alpha-smoke model provider. A live model is never used silently, and deterministic words are not live-model proof." ""
+    }
+
     $apiProject = Join-Path $repoRoot "IronDev.Api\IronDev.Api.csproj"
     $apiCommand = "& dotnet run --project `"$apiProject`" --urls `"$ApiBaseUrl`""
     Start-ManagedProcess -Name "IronDev.Api" -Command $apiCommand -WorkingDirectory $repoRoot -LogDirectory $outputFull
