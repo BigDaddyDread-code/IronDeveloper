@@ -495,9 +495,27 @@ function Resolve-DemoProject {
     if ($matches.Count -eq 1) {
         $project = $matches[0]
         $existingPath = [string]$project.localPath
-        if (-not [string]::IsNullOrWhiteSpace($existingPath) -and
-            -not ([System.IO.Path]::GetFullPath($existingPath).Equals([System.IO.Path]::GetFullPath($SourcePath), [System.StringComparison]::OrdinalIgnoreCase))) {
-            Add-Stage "ProjectResolve" "Blocked" "DemoIdempotencyConflict" "An existing BookSeller project points at a different local path."
+        # DEMO-REHEARSAL-001 finding: an uncomparable stored path crashed the
+        # seed with a raw exception instead of a named block. Comparison
+        # failures now block with the offending values named (redacted).
+        $pathsDiffer = $false
+        if (-not [string]::IsNullOrWhiteSpace($existingPath)) {
+            try {
+                $pathsDiffer = -not ([System.IO.Path]::GetFullPath($existingPath).Equals([System.IO.Path]::GetFullPath($SourcePath), [System.StringComparison]::OrdinalIgnoreCase))
+            }
+            catch {
+                Add-Stage "ProjectResolve" "Blocked" "DemoIdempotencyConflict" "The existing BookSeller project's local path could not be compared: $($_.Exception.Message)" @{
+                    existingPath = Redact-UserPath $existingPath
+                    sourcePath = Redact-UserPath ([string]$SourcePath)
+                }
+                Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+            }
+        }
+        if ($pathsDiffer) {
+            Add-Stage "ProjectResolve" "Blocked" "DemoIdempotencyConflict" "An existing BookSeller project points at a different local path." @{
+                existingPath = Redact-UserPath $existingPath
+                sourcePath = Redact-UserPath ([string]$SourcePath)
+            }
             Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
         }
 
