@@ -106,17 +106,37 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
         namespace BookSeller.Domain;
 
         /// <summary>
-        /// Prices an order line. Bulk orders receive a deterministic demo discount.
+        /// Prices an order line. Bulk orders of ten or more copies earn a ten percent
+        /// discount; smaller orders keep flat pricing exactly as before.
         /// </summary>
         public sealed class PricingService
         {
+            private const int BulkThreshold = 10;
+            private const decimal BulkDiscountRate = 0.10m;
+
             public decimal PriceFor(Book book, int quantity)
             {
-                var subtotal = book.Price * quantity;
-                return quantity >= 10 ? subtotal * 0.9m : subtotal;
+                if (quantity <= 0)
+                    throw new System.ArgumentOutOfRangeException(nameof(quantity), "Quantity must be positive.");
+
+                var flat = book.Price * quantity;
+                if (quantity < BulkThreshold)
+                    return flat;
+
+                var discounted = flat * (1m - BulkDiscountRate);
+                return System.Math.Round(discounted, 2, System.MidpointRounding.AwayFromZero);
             }
         }
         """;
+
+    /// <summary>
+    /// The hero finding is deliberately advisory and deliberately REAL: the golden
+    /// bulk-discount diff rounds the discounted branch to 2dp but leaves the flat
+    /// branch unrounded — a genuine design observation a human reviewer would raise,
+    /// yet correct per acceptance criterion 2 ("priced flat, exactly as before").
+    /// Dispositioning it requires understanding the ticket, not rubber-stamping.
+    /// </summary>
+    private const string HeroFindingId = "finding-bulk-rounding-asymmetry";
 
     [TestMethod]
     public async Task DemoSeed_BaselineHistory_IsApiDrivenAndSqlPersisted()
@@ -378,6 +398,170 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             TryDelete(workspaceParent);
             TryDelete(evidenceRoot);
         }
+    }
+
+    [TestMethod]
+    public async Task Hero_BulkDiscountAdvisoryFinding_RequiresDispositionBeforeApplied()
+    {
+        var workspaceParent = TempDir("irondev-hero1-ws");
+        var evidenceRoot = TempDir("irondev-hero1-ev");
+        var sampleCopy = TempDir("irondev-hero1-src");
+        var ticketKinds = new ConcurrentDictionary<long, string>();
+
+        try
+        {
+            using var noNodeReuse = DisableMsBuildNodeReuse();
+            CopySample(SampleRoot(), sampleCopy);
+            PrepareRestoredBookSellerSource(sampleCopy);
+            GitInit(sampleCopy);
+
+            using var factory = Factory.WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Test");
+                builder.UseSetting("DisposableBuild:EvidenceRoot", evidenceRoot);
+                builder.UseSetting("DisposableBuild:WorkspaceRoot", workspaceParent);
+                builder.UseSetting("DisposableBuild:BuildTimeoutSeconds", "300");
+                builder.UseSetting("DisposableBuild:TestTimeoutSeconds", "300");
+                builder.UseSetting("SkeletonApply:Enabled", "true");
+                builder.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<IBuilderProposalService>();
+                    services.AddScoped<IBuilderProposalService>(_ => new DemoSeedBuilder(ticketKinds));
+                    services.RemoveAll<ISkeletonTestAuthoringService>();
+                    services.AddScoped<ISkeletonTestAuthoringService, EmptyTestAuthoring>();
+                    services.RemoveAll<ISkeletonCriticReviewService>();
+                    services.AddScoped<ISkeletonCriticReviewService, DemoAdvisoryCriticReviewService>();
+                });
+            });
+
+            using var client = factory.CreateClient();
+            await AuthenticateAsync(client);
+
+            var project = await CreateProjectAsync(
+                client,
+                sampleCopy,
+                "BookSeller HERO-1",
+                "HERO-1 advisory finding disposition gate fixture.");
+            var ticket = await CreateFixtureTicketAsync(client, project.Id, BulkDiscountKey);
+            ticketKinds[ticket.Id] = BulkDiscountKey;
+
+            var started = await PostJsonAsync<TicketBuildRunDto>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs",
+                content: null);
+            Assert.AreEqual("PausedForApproval", started.Status);
+
+            var haltedReport = await GetJsonAsync<SkeletonRunReport>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/report");
+            var packageHash = haltedReport.Approval!.TargetHash;
+            Assert.AreEqual(packageHash, haltedReport.CriticPackage!.Sha256OnDisk);
+
+            // The critic reviews and reports exactly one ADVISORY finding.
+            var criticReview = await PostJsonAsync<SkeletonCriticReviewOutcome>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/critic-review",
+                content: null);
+            Assert.IsTrue(criticReview.Succeeded);
+            Assert.AreEqual(1, criticReview.Findings.Count);
+            Assert.AreEqual(HeroFindingId, criticReview.Findings[0].FindingId);
+            Assert.IsFalse(criticReview.Findings[0].BlocksMerge, "The hero finding is advisory, not a veto.");
+
+            // Approval exists BEFORE disposition — and continuation must still refuse:
+            // an accepted approval does not bypass an undispositioned finding.
+            var approvalProjectId = TicketSkeletonRunService.ApprovalProjectGuid(project.Id);
+            await CreateAcceptedApprovalAsync(client, approvalProjectId, started.RunId, packageHash);
+
+            var refusedContinue = await PostJsonAsync<TicketBuildRunDto>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/continue",
+                content: null);
+            Assert.AreEqual("PausedForApproval", refusedContinue.Status,
+                "Continuation must refuse while the finding is undispositioned, even with a live accepted approval.");
+
+            // A disposition without a reason is a dismissal, not a decision.
+            var noReason = await PostJsonAsync<SkeletonFindingDispositionOutcome>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/findings/{HeroFindingId}/disposition",
+                new TicketsController.FindingDispositionBody("AcceptRisk", ""));
+            Assert.IsFalse(noReason.Succeeded, "A disposition must carry a reason.");
+
+            // A disposition can only answer a finding the critic actually made.
+            var phantom = await PostJsonAsync<SkeletonFindingDispositionOutcome>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/findings/finding-does-not-exist/disposition",
+                new TicketsController.FindingDispositionBody("AcceptRisk", "This finding does not exist."));
+            Assert.IsFalse(phantom.Succeeded, "A disposition must answer a real finding.");
+
+            // The golden disposition: accepting the finding requires understanding the ticket.
+            var disposition = await PostJsonAsync<SkeletonFindingDispositionOutcome>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/findings/{HeroFindingId}/disposition",
+                new TicketsController.FindingDispositionBody(
+                    "AcceptRisk",
+                    "Flat path intentionally unrounded per acceptance criterion 2: fewer than 10 copies is priced flat, exactly as before."));
+            Assert.IsTrue(disposition.Succeeded, disposition.FailureReason);
+
+            var continued = await PostJsonAsync<TicketBuildRunDto>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/continue",
+                content: null);
+            Assert.AreEqual("Completed", continued.Status);
+
+            var applied = await PostJsonAsync<TicketBuildRunDto>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/apply",
+                content: null);
+            Assert.AreEqual("Applied", applied.Status);
+
+            var finalReport = await GetJsonAsync<SkeletonRunReport>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/report");
+            Assert.AreEqual("Applied", finalReport.Status);
+            Assert.IsTrue(finalReport.LoopComplete, $"Final report gaps: {string.Join(" | ", finalReport.Gaps)}");
+            Assert.AreEqual(1, finalReport.CriticReviews.Single().FindingCount);
+            Assert.AreEqual(0, finalReport.CriticReviews.Single().BlockingFindingCount);
+            var dispositionTrace = finalReport.FindingDispositions.Single();
+            Assert.AreEqual(HeroFindingId, dispositionTrace.FindingId);
+            Assert.AreEqual("AcceptRisk", dispositionTrace.Disposition);
+            StringAssert.Contains(dispositionTrace.Reason, "criterion 2");
+
+            await AssertHeroDispositionSqlAsync(project.Id, ticket.Id, started.RunId);
+        }
+        finally
+        {
+            TryDelete(sampleCopy);
+            TryDelete(workspaceParent);
+            TryDelete(evidenceRoot);
+        }
+    }
+
+    private static async Task AssertHeroDispositionSqlAsync(int projectId, long ticketId, string runId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        var state = await connection.ExecuteScalarAsync<string>(
+            "SELECT State FROM dbo.Runs WHERE RunId = @RunId AND ProjectId = @ProjectId AND TicketId = @TicketId",
+            new { RunId = runId, ProjectId = projectId, TicketId = ticketId });
+        Assert.AreEqual("Applied", state);
+
+        var events = (await connection.QueryAsync<string>(
+            "SELECT EventType FROM dbo.RunEvents WHERE RunId = @RunId ORDER BY TimestampUtc, Id",
+            new { RunId = runId })).ToList();
+
+        // The refusal happened after the review and before the disposition, from durable events.
+        var reviewIndex = events.IndexOf("SkeletonCriticReviewRecorded");
+        var refusedIndex = events.IndexOf("ContinuationRefused");
+        var dispositionIndex = events.IndexOf("SkeletonFindingDispositionRecorded");
+        var unblockedIndex = events.IndexOf("SkeletonContinuationUnblocked");
+        Assert.IsTrue(reviewIndex >= 0 && refusedIndex > reviewIndex,
+            "Continuation must have been refused after the critic review recorded the finding.");
+        Assert.IsTrue(dispositionIndex > refusedIndex,
+            "The disposition must have been recorded after the refusal.");
+        Assert.IsTrue(unblockedIndex > dispositionIndex,
+            "Continuation must have been unblocked only after the disposition.");
+        CollectionAssert.Contains(events, "SkeletonApplied");
     }
 
     private static async Task<DemoAppliedRun> DriveAppliedAsync(HttpClient client, int projectId, long ticketId)
@@ -1139,6 +1323,87 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                     ]
                 },
                 Findings = []
+            };
+        }
+    }
+
+    /// <summary>
+    /// The hero critic: deterministic review that records exactly one advisory
+    /// (non-blocking) finding — the first fixture critic to give the disposition
+    /// gate real work. A finding is not a veto; a review is not approval.
+    /// </summary>
+    private sealed class DemoAdvisoryCriticReviewService(IRunEventStore events) : ISkeletonCriticReviewService
+    {
+        public async Task<SkeletonCriticReviewOutcome?> ReviewAsync(SkeletonCriticReviewRequest request, CancellationToken cancellationToken = default)
+        {
+            var runEvents = await events.GetEventsAsync(request.RunId, cancellationToken);
+            var package = runEvents.LastOrDefault(e => e.EventType == "CriticReviewPackageReady");
+            if (package is null || !package.Payload.TryGetValue("packageSha256", out var packageHash))
+            {
+                return new SkeletonCriticReviewOutcome
+                {
+                    Succeeded = false,
+                    FailureReason = "Critic package evidence is missing."
+                };
+            }
+
+            var reviewId = $"hero-review-{request.RunId}";
+            await events.PublishAsync(new RunEventDto
+            {
+                RunId = request.RunId,
+                EventType = "SkeletonCriticReviewRecorded",
+                Message = "Deterministic HERO critic review recorded one advisory finding. A finding is not a veto, and a review is not approval — the finding must be dispositioned before continuation.",
+                Payload = new Dictionary<string, string>
+                {
+                    ["criticAgentRunId"] = $"hero-critic-{request.RunId}",
+                    ["reviewId"] = reviewId,
+                    ["verdict"] = "NoObjection",
+                    ["findingCount"] = "1",
+                    ["blockingFindingCount"] = "0",
+                    ["findingIds"] = HeroFindingId,
+                    ["packageSha256"] = packageHash,
+                    ["groundTruthCheckCount"] = "1",
+                    ["groundTruthMismatchCount"] = "0",
+                    ["modelProvider"] = "deterministic-fake",
+                    ["modelName"] = "hero-critic-advisory-fixed",
+                    ["requestedByUserId"] = request.RequestedByUserId
+                }
+            }, cancellationToken);
+
+            return new SkeletonCriticReviewOutcome
+            {
+                Succeeded = true,
+                CriticAgentRunId = $"hero-critic-{request.RunId}",
+                ReviewId = reviewId,
+                Verdict = "NoObjection",
+                GroundTruth = new SkeletonGroundTruthVerification
+                {
+                    Checks =
+                    [
+                        new SkeletonGroundTruthCheck
+                        {
+                            CheckName = SkeletonGroundTruthCheckNames.PackageHash,
+                            Passed = true,
+                            Expected = packageHash,
+                            Actual = packageHash,
+                            Detail = "Deterministic HERO review accepted the persisted package hash.",
+                            BlocksMerge = false
+                        }
+                    ]
+                },
+                Findings =
+                [
+                    new SkeletonCriticReviewFindingDto
+                    {
+                        FindingId = HeroFindingId,
+                        Severity = "Minor",
+                        Title = "Flat and discounted branches round inconsistently",
+                        Problem = "The discounted branch rounds to 2 decimal places away from zero; the flat branch returns book.Price * quantity unrounded. A price with more than 2 decimal places rounds inconsistently across the bulk threshold.",
+                        WhyItMatters = "Money paths that round differently by branch invite reconciliation drift exactly at the discount boundary a buyer will scrutinise.",
+                        RequiredFix = "None required if acceptance criterion 2 (fewer than 10 copies priced flat, exactly as before) intends the flat path unrounded; otherwise round both branches identically.",
+                        BlocksMerge = false
+                    }
+                ]
             };
         }
     }

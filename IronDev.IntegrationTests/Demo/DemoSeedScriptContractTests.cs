@@ -240,6 +240,30 @@ public sealed class DemoSeedScriptContractTests
     }
 
     [TestMethod]
+    public void Hero_AdvisoryFindingDispositionGate_IsProvenAndExecutedInCi()
+    {
+        var apiProof = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "Demo", "DemoSeedApiDrivenTests.cs"));
+
+        // The hero proof: one advisory finding, disposition-gated continuation.
+        StringAssert.Contains(apiProof, "Hero_BulkDiscountAdvisoryFinding_RequiresDispositionBeforeApplied");
+        StringAssert.Contains(apiProof, "finding-bulk-rounding-asymmetry");
+        StringAssert.Contains(apiProof, "The hero finding is advisory, not a veto.");
+        StringAssert.Contains(apiProof, "Continuation must refuse while the finding is undispositioned, even with a live accepted approval.");
+        StringAssert.Contains(apiProof, "/findings/{HeroFindingId}/disposition");
+        StringAssert.Contains(apiProof, "A disposition must carry a reason.");
+        StringAssert.Contains(apiProof, "A disposition must answer a real finding.");
+        StringAssert.Contains(apiProof, "Continuation must have been unblocked only after the disposition.");
+
+        // Selection is not execution: the full SQL lane must EXECUTE the DEMO/HERO
+        // proofs by exact name, not merely select their categories.
+        var ciScript = File.ReadAllText(RepoFile("Scripts", "ci", "run-full-sql-integration-ci.ps1"));
+        StringAssert.Contains(ciScript, "DemoSeedApiDrivenTests.DemoSeed_BaselineHistory_IsApiDrivenAndSqlPersisted");
+        StringAssert.Contains(ciScript, "DemoSeedApiDrivenTests.Demo2_ChatConfirmedTicket_IsVisibleAndStartableThroughApi");
+        StringAssert.Contains(ciScript, "DemoSeedApiDrivenTests.Hero_BulkDiscountAdvisoryFinding_RequiresDispositionBeforeApplied");
+        StringAssert.Contains(ciScript, "DEMO seed and HERO disposition proofs");
+    }
+
+    [TestMethod]
     public void DemoSeed_ReceiptDocumentsBoundary()
     {
         var receipt = File.ReadAllText(RepoFile("Docs", "receipts", "DEMO1_API_DRIVEN_DEMO_SEED.md"));
