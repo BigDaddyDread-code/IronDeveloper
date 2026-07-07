@@ -38,7 +38,12 @@ function New-ConnectionString {
     $builder["Data Source"] = $Server
     $builder["Initial Catalog"] = $Database
     $builder["Integrated Security"] = $true
-    $builder["Encrypt"] = $true
+    # DEMO-REHEARSAL-001 residual R2: legacy System.Data.SqlClient cannot open an
+    # Encrypt=true connection to LocalDB, so the default builder failed on every
+    # local run. Local runs stay unencrypted; passing -TrustServerCertificate opts
+    # into encryption with a trusted-anyway certificate (the self-signed remote
+    # case). Fully custom needs go through -ConnectionString.
+    $builder["Encrypt"] = [bool]$TrustServerCertificate
     $builder["TrustServerCertificate"] = [bool]$TrustServerCertificate
     return $builder.ConnectionString
 }

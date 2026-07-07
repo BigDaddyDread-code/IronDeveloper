@@ -122,7 +122,9 @@ public sealed class DemoSeedScriptContractTests
 
         StringAssert.Contains(source, "Get-ExistingRunningApiReceipt");
         StringAssert.Contains(source, "Existing DEMO-1b receipt was verified against the running API.");
-        StringAssert.Contains(source, "BookSeller demo source copy already exists without a verified seed receipt.");
+        StringAssert.Contains(source, "BookSeller demo source copy already exists without a verified seed receipt");
+        // Rehearsal residual R3: the deliberate refusal must NAME its remedy.
+        StringAssert.Contains(source, "delete that folder, then rerun the seed");
         StringAssert.Contains(source, "DemoIdempotencyConflict");
         StringAssert.Contains(source, "Resolve-DemoProject");
         StringAssert.Contains(source, "Resolve-DemoTicket");
