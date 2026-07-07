@@ -602,6 +602,14 @@ else {
         Add-Stage "DeterministicModelPin" "Passed" "DemoStartupPassed" "Demo API armed with the explicit deterministic alpha-smoke model provider and the BookSeller fixture response set. A live model is never used silently, and deterministic words are not live-model proof." ""
     }
 
+    # DEMO-REHEARSAL-001 finding: skeleton apply is off by default (correctly).
+    # The demo's apply target is the DISPOSABLE BookSeller source copy under the
+    # demo output root — the sandbox case the flag exists for. Arming it here
+    # grants nothing: apply still demands critic review, dispositions, and a
+    # hash-bound accepted approval through the governed spine.
+    $env:SkeletonApply__Enabled = "true"
+    Add-Stage "SkeletonApplyPin" "Passed" "DemoStartupPassed" "Skeleton apply enabled for the demo's disposable BookSeller copy only. Apply authority still lives behind the governed gate chain." ""
+
     $apiProject = Join-Path $repoRoot "IronDev.Api\IronDev.Api.csproj"
     $apiCommand = "& dotnet run --project `"$apiProject`" --urls `"$ApiBaseUrl`""
     Start-ManagedProcess -Name "IronDev.Api" -Command $apiCommand -WorkingDirectory $repoRoot -LogDirectory $outputFull
