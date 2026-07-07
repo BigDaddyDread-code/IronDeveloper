@@ -146,7 +146,9 @@ export function FindingsPanel({
       </div>
       <p style={{ fontSize: 12, color: 'var(--fl-ink2)' }}>
         Findings are advisory — a finding is not a veto. A disposition is a human decision about a finding; it is not
-        approval, and continuation still requires its own live accepted approval.
+        approval, and continuation still requires its own live accepted approval. A fourth disposition —
+        AddressedByRevision — exists but is recorded only by the governed revision path when a directed revision builds
+        green and replaces the gate package; it cannot be claimed by hand.
       </p>
     </>
   );

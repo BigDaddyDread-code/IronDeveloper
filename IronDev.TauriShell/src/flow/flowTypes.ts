@@ -18,6 +18,8 @@ export interface GateInfo {
   afterStage: WorkItemStage;
   label: string;
   state: GateState;
+  /** SPINE-1: the unmet conditions holding a locked gate, in backend words. A gate the user cannot explain is a UI failure. */
+  detail?: string;
 }
 
 export interface DraftCriterion {

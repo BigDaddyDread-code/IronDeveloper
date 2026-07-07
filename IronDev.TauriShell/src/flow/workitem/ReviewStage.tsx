@@ -19,7 +19,7 @@ interface ReviewStageProps {
   busyAction: string | null;
   onRequestCriticReview: () => void;
   onRecordDisposition: (findingId: string, disposition: string, reason: string) => void;
-  onRecordApproval: () => void;
+  onRecordApproval: (reason: string) => void;
   onRequestContinuation: () => void;
   onRequestApply: () => void;
 }
@@ -60,6 +60,27 @@ export function ReviewStage({
           This run self-repaired {repairAttempts.length === 1 ? 'once' : `${repairAttempts.length} times`} before reaching
           review — the critic reviewed the repaired proposal{report?.proposal ? ` (${report.proposal.proposalId})` : ''}, and
           the gate below is unchanged.
+        </p>
+      ) : null}
+      {report?.criticPackage ? (
+        <p style={{ fontSize: 12.5, color: 'var(--fl-ink2)' }} data-testid="flow.review.packageFacts">
+          Package {report.criticPackage.packageId} · announced hash{' '}
+          <code>{report.criticPackage.announcedSha256.slice(0, 12)}…</code> ·{' '}
+          {report.criticPackage.hashVerified ? (
+            'hash verified against disk ✓'
+          ) : (
+            <strong style={{ color: 'var(--fl-red, #a63232)' }}>
+              hash NOT verified — the file on disk does not match what the halt announced
+            </strong>
+          )}
+          {' · '}
+          {report.criticPackage.existsOnDisk ? 'evidence on disk' : 'EVIDENCE MISSING FROM DISK'}
+          {' · '}
+          criteria: {report.criticPackage.criterionCount - report.criticPackage.uncoveredCriterionCount}/
+          {report.criticPackage.criterionCount} covered
+          {report.criticPackage.uncoveredCriterionCount > 0
+            ? ' — uncovered criteria are part of what any approval consciously owns'
+            : ''}
         </p>
       ) : null}
       <CriticPackageViewer criticPackage={criticPackage} />

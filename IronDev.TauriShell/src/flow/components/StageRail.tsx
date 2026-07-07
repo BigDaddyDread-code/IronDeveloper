@@ -22,7 +22,12 @@ export function StageRail({ activeStage, gates }: StageRailProps) {
             {gate ? (
               <span
                 className={gate.state === 'locked' ? 'fl-gatechip fl-locked' : 'fl-gatechip fl-open'}
-                title={gate.state === 'locked' ? `Gate locked: ${gate.label}` : `Gate satisfied: ${gate.label}`}
+                title={
+                  gate.state === 'locked'
+                    ? `Gate locked: ${gate.label}${gate.detail ? ` — ${gate.detail}` : ''}`
+                    : `Gate satisfied: ${gate.label}`
+                }
+                data-testid={`flow.stagerail.gate.${gate.afterStage}`}
               >
                 <span className="fl-gate-glyph" aria-hidden="true" />
                 {gate.label}

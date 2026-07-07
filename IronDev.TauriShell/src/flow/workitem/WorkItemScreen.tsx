@@ -262,21 +262,53 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
   const gates: GateInfo[] = useMemo(() => {
     if (stage === 'shape') {
       return [
-        { afterStage: 'shape', label: 'readiness', state: shapeBlockers.length === 0 ? 'open' : 'locked' },
-        { afterStage: 'ticket', label: 'approval', state: 'locked' }
+        {
+          afterStage: 'shape',
+          label: 'readiness',
+          state: shapeBlockers.length === 0 ? 'open' : 'locked',
+          detail: shapeBlockers.length > 0 ? shapeBlockers.join('; ') : undefined
+        },
+        { afterStage: 'ticket', label: 'approval', state: 'locked', detail: 'a governed run must halt at the gate first' }
       ];
     }
+    const readinessBlockers = (readiness?.blockingIssues ?? []).filter(Boolean) as string[];
     return [
       { afterStage: 'shape', label: 'ready', state: 'open' },
-      { afterStage: 'ticket', label: 'readiness', state: readiness?.isReady ? 'open' : 'locked' },
-      { afterStage: 'build', label: 'findings', state: hasUndispositionedFindings ? 'locked' : 'open' },
+      {
+        afterStage: 'ticket',
+        label: 'readiness',
+        state: readiness?.isReady ? 'open' : 'locked',
+        detail: readiness?.isReady
+          ? undefined
+          : readinessBlockers.length > 0
+            ? readinessBlockers.join('; ')
+            : (readiness?.message ?? 'readiness not yet evaluated')
+      },
+      {
+        afterStage: 'build',
+        label: 'findings',
+        state: hasUndispositionedFindings ? 'locked' : 'open',
+        detail: hasUndispositionedFindings ? 'critic findings await human dispositions' : undefined
+      },
       {
         afterStage: 'review',
         label: 'human gate',
-        state: report?.approval?.continuationUnblocked === true ? 'open' : 'locked'
+        state: report?.approval?.continuationUnblocked === true ? 'open' : 'locked',
+        detail:
+          report?.approval?.continuationUnblocked === true
+            ? undefined
+            : 'continuation has not consumed a live accepted approval'
       }
     ];
-  }, [stage, shapeBlockers.length, readiness?.isReady, hasUndispositionedFindings, report?.approval?.continuationUnblocked]);
+  }, [
+    stage,
+    shapeBlockers,
+    readiness?.isReady,
+    readiness?.blockingIssues,
+    readiness?.message,
+    hasUndispositionedFindings,
+    report?.approval?.continuationUnblocked
+  ]);
 
   const sendPrompt = useCallback(
     async (event: FormEvent) => {
@@ -459,7 +491,7 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
     [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence]
   );
 
-  const recordApproval = useCallback(async () => {
+  const recordApproval = useCallback(async (reason: string) => {
     const requirement = report?.approval;
     if (project.selectedProjectId === null || run === null || !requirement || busyAction !== null) {
       return;
@@ -475,7 +507,9 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
         approvalPurpose: 'workflow-continuation-input',
         correlationId: run.runId,
         causationId: `critic-pkg-${run.runId}`,
-        evidenceReferences: [`critic-package-sha256:${requirement.targetHash}`],
+        // The ceremony's typed reason rides as a labeled durable evidence entry —
+        // the approval record itself says why the human approved.
+        evidenceReferences: [`critic-package-sha256:${requirement.targetHash}`, `human-reason:${reason}`],
         boundaryMaxims: ['Approval binds to the reviewed critic package hash.', 'Halt is not approval.']
       });
       setGateNotice(
@@ -566,7 +600,7 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
               busyAction={busyAction}
               onRequestCriticReview={() => void requestCriticReview()}
               onRecordDisposition={(findingId, disposition, reason) => void recordDisposition(findingId, disposition, reason)}
-              onRecordApproval={() => void recordApproval()}
+              onRecordApproval={(reason) => void recordApproval(reason)}
               onRequestContinuation={() => void requestContinuation()}
               onRequestApply={() => void requestApply()}
             />
