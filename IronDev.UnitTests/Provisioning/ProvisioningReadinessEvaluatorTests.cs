@@ -19,6 +19,7 @@ public sealed class ProvisioningReadinessEvaluatorTests
         RepoPathExists = true,
         RepoPathIsSafe = true,
         IsGitRepository = true,
+        WorkTreeState = ProvisioningWorkTreeStates.Clean,
         StoredProfile = new ProjectProfile { ProjectId = 3, PrimaryLanguage = "C#", ApplicationType = "WebApi", SolutionFile = "BookSeller.slnx" },
         StoredBuildCommand = new ProjectCommand { ProjectId = 3, CommandType = "Build", CommandText = "dotnet build BookSeller.slnx" },
         StoredTestCommand = new ProjectCommand { ProjectId = 3, CommandType = "Test", CommandText = "dotnet test BookSeller.slnx" }
@@ -135,12 +136,61 @@ public sealed class ProvisioningReadinessEvaluatorTests
     }
 
     [TestMethod]
-    public void DirtyRepoState_IsHonestlyNotEvaluated_AndNeverBlocks()
+    public void CleanWorkTree_IsConfirmed_AndDoesNotBlock()
     {
         var result = ProvisioningReadinessEvaluator.Evaluate(FullyConfirmedInput());
 
         var check = result.Checks.Single(c => c.Name == "Dirty-repo state");
-        Assert.AreEqual(ProvisioningCheckStates.NotEvaluated, check.State);
+        Assert.AreEqual(ProvisioningCheckStates.Confirmed, check.State);
         Assert.IsFalse(check.Blocking);
+        Assert.IsTrue(result.IsReady);
+    }
+
+    [TestMethod]
+    public void DirtyWorkTree_Blocks_AsBlockedDirtyRepo_WithNamedRemedy()
+    {
+        var result = ProvisioningReadinessEvaluator.Evaluate(FullyConfirmedInput() with
+        {
+            WorkTreeState = ProvisioningWorkTreeStates.Dirty,
+            WorkTreeDetail = "2 changed path(s): src/App.cs, README.md"
+        });
+
+        Assert.IsFalse(result.IsReady, "A governed run must start from an unambiguous source tree.");
+        CollectionAssert.Contains(result.BlockedStates.ToList(), ProvisioningBlockedStates.DirtyRepo);
+        var check = result.Checks.Single(c => c.Name == "Dirty-repo state");
+        Assert.IsTrue(check.Blocking);
+        StringAssert.Contains(check.Evidence, "src/App.cs");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(check.Remedy), "A blocking check without a remedy is a dead end.");
+    }
+
+    [TestMethod]
+    public void UnknownWorkTree_IsHonestlyNotEvaluated_AndNeverBlocks()
+    {
+        var result = ProvisioningReadinessEvaluator.Evaluate(FullyConfirmedInput() with
+        {
+            WorkTreeState = ProvisioningWorkTreeStates.Unknown,
+            WorkTreeDetail = "git status timed out after 15 seconds."
+        });
+
+        var check = result.Checks.Single(c => c.Name == "Dirty-repo state");
+        Assert.AreEqual(ProvisioningCheckStates.NotEvaluated, check.State);
+        Assert.IsFalse(check.Blocking, "An unanswerable git is named, never guessed — and never blocks by itself.");
+        StringAssert.Contains(check.Evidence, "timed out");
+        Assert.IsTrue(result.IsReady, "Unknown work-tree state alone must not block an otherwise-ready project.");
+    }
+
+    [TestMethod]
+    public void NonGitRepository_GetsNoWorkTreeCheck_GitCheckAlreadyCoversIt()
+    {
+        var result = ProvisioningReadinessEvaluator.Evaluate(FullyConfirmedInput() with
+        {
+            IsGitRepository = false,
+            WorkTreeState = ProvisioningWorkTreeStates.NotAGitRepository
+        });
+
+        Assert.IsFalse(result.Checks.Any(c => c.Name == "Dirty-repo state"));
+        Assert.AreEqual(
+            ProvisioningCheckStates.NeedsConfirmation,
+            result.Checks.Single(c => c.Name == "Git repository").State);
     }
 }

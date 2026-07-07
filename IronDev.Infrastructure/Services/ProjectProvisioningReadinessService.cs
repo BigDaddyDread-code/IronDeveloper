@@ -44,6 +44,13 @@ public sealed class ProjectProvisioningReadinessService : IProjectProvisioningRe
         var (isSafe, safetyDetail) = repoPathExists ? CheckRootSafety(repoPath!) : (false, string.Empty);
         var isGitRepository = repoPathExists && Directory.Exists(Path.Combine(repoPath!, ".git"));
 
+        var workTreeState = Core.Provisioning.ProvisioningWorkTreeStates.NotAGitRepository;
+        var workTreeDetail = string.Empty;
+        if (isGitRepository && isSafe)
+        {
+            (workTreeState, workTreeDetail) = await ProbeWorkTreeAsync(repoPath!, cancellationToken);
+        }
+
         var storedProfile = await _profiles.GetProjectProfileAsync(projectId, cancellationToken);
         var storedBuild = await _profiles.GetDefaultCommandAsync(projectId, "Build", cancellationToken);
         var storedTest = await _profiles.GetDefaultCommandAsync(projectId, "Test", cancellationToken);
@@ -83,6 +90,8 @@ public sealed class ProjectProvisioningReadinessService : IProjectProvisioningRe
             RepoPathIsSafe = isSafe,
             RepoPathSafetyDetail = safetyDetail,
             IsGitRepository = isGitRepository,
+            WorkTreeState = workTreeState,
+            WorkTreeDetail = workTreeDetail,
             StoredProfile = storedProfile,
             StoredBuildCommand = storedBuild,
             StoredTestCommand = storedTest,
@@ -175,6 +184,73 @@ public sealed class ProjectProvisioningReadinessService : IProjectProvisioningRe
         }
 
         return (true, string.Empty);
+    }
+
+    /// <summary>
+    /// DOGFOOD-2 entry criterion: reports the working-tree state via git status --porcelain.
+    /// Read-only, bounded, and honest — a git failure returns Unknown with the error named,
+    /// never a guessed Clean. Public static so the probe is pinned by tests against real
+    /// temporary repositories.
+    /// </summary>
+    public static async Task<(string State, string Detail)> ProbeWorkTreeAsync(string repoPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(15));
+
+            var startInfo = new System.Diagnostics.ProcessStartInfo("git")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("-C");
+            startInfo.ArgumentList.Add(repoPath);
+            startInfo.ArgumentList.Add("status");
+            startInfo.ArgumentList.Add("--porcelain");
+
+            using var process = System.Diagnostics.Process.Start(startInfo);
+            if (process is null)
+            {
+                return (Core.Provisioning.ProvisioningWorkTreeStates.Unknown, "git process could not be started.");
+            }
+
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+
+            if (process.ExitCode != 0)
+            {
+                var error = string.IsNullOrWhiteSpace(stderr) ? $"git status exited with code {process.ExitCode}." : stderr.Trim();
+                return (Core.Provisioning.ProvisioningWorkTreeStates.Unknown, Bounded(error));
+            }
+
+            var changedPaths = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (changedPaths.Length == 0)
+            {
+                return (Core.Provisioning.ProvisioningWorkTreeStates.Clean, string.Empty);
+            }
+
+            var examples = string.Join(", ", changedPaths.Take(3).Select(line => line.Length > 60 ? line[..60] : line));
+            var suffix = changedPaths.Length > 3 ? ", …" : string.Empty;
+            return (
+                Core.Provisioning.ProvisioningWorkTreeStates.Dirty,
+                $"{changedPaths.Length} changed path(s): {examples}{suffix}");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return (Core.Provisioning.ProvisioningWorkTreeStates.Unknown, "git status timed out after 15 seconds.");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
+        {
+            return (Core.Provisioning.ProvisioningWorkTreeStates.Unknown, Bounded(ex.Message));
+        }
+
+        static string Bounded(string text) => text.Length > 200 ? text[..200] : text;
     }
 
     private static bool HasReparsePointInExistingAncestorChain(string path)
