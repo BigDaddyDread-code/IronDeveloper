@@ -598,7 +598,8 @@ else {
     if ($ModelMode -eq "Deterministic") {
         $env:AlphaSmoke__Enabled = "true"
         $env:AlphaSmoke__ModelMode = "Deterministic"
-        Add-Stage "DeterministicModelPin" "Passed" "DemoStartupPassed" "Demo API armed with the explicit deterministic alpha-smoke model provider. A live model is never used silently, and deterministic words are not live-model proof." ""
+        $env:AlphaSmoke__ResponseSetRoot = Join-Path $repoRoot "TestFixtures\BookSeller\alpha-smoke\responses"
+        Add-Stage "DeterministicModelPin" "Passed" "DemoStartupPassed" "Demo API armed with the explicit deterministic alpha-smoke model provider and the BookSeller fixture response set. A live model is never used silently, and deterministic words are not live-model proof." ""
     }
 
     $apiProject = Join-Path $repoRoot "IronDev.Api\IronDev.Api.csproj"
