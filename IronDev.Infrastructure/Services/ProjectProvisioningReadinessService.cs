@@ -95,13 +95,43 @@ public sealed class ProjectProvisioningReadinessService : IProjectProvisioningRe
     }
 
     /// <summary>
-    /// Root safety: IronDev must never treat a drive root, a user-profile root, or a
-    /// system directory as a repository. Conservative on purpose — a false "unsafe"
-    /// costs a path change; a false "safe" costs someone's home directory.
+    /// Root safety for a REPOSITORY root: IronDev must never treat a drive root, a
+    /// user-profile root, a system directory, a relative/traversal path, or anything
+    /// that is or lives under a symlink/reparse point as a repository. The reparse
+    /// rule matters most: a path that "looks under a safe folder" can silently point
+    /// somewhere else, and a provisioning screen that calls a path safe becomes the
+    /// front door to mutation. Mirrors LocalRootSafetyValidator's
+    /// PathContainsSymlinkOrReparsePoint semantics (that validator guards runtime
+    /// OUTPUT roots and rejects the repository root by design, so it cannot be called
+    /// directly for this). Conservative on purpose — a false "unsafe" costs a path
+    /// change; a false "safe" costs someone's home directory.
     /// </summary>
-    internal static (bool IsSafe, string Detail) CheckRootSafety(string path)
+    public static (bool IsSafe, string Detail) CheckRootSafety(string path)
     {
-        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        var hasTraversalSegment = path
+            .Split(
+                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, '/', '\\'],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(segment => segment == "..");
+        if (hasTraversalSegment)
+        {
+            return (false, $"{path} contains traversal segments; the repository path must be a plain absolute path.");
+        }
+
+        if (!Path.IsPathFullyQualified(path))
+        {
+            return (false, $"{path} is not an absolute path; the repository path must be fully qualified.");
+        }
+
+        string full;
+        try
+        {
+            full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return (false, $"{path} could not be normalized to a usable path.");
+        }
 
         var root = Path.TrimEndingDirectorySeparator(Path.GetPathRoot(full) ?? string.Empty);
         if (string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
@@ -139,6 +169,28 @@ public sealed class ProjectProvisioningReadinessService : IProjectProvisioningRe
             }
         }
 
+        if (HasReparsePointInExistingAncestorChain(full))
+        {
+            return (false, $"{path} is, or lives under, a symlink or reparse point — the path could silently resolve somewhere else.");
+        }
+
         return (true, string.Empty);
+    }
+
+    private static bool HasReparsePointInExistingAncestorChain(string path)
+    {
+        var current = new DirectoryInfo(path);
+        while (current is not null)
+        {
+            if (current.Exists &&
+                (File.GetAttributes(current.FullName) & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
+            {
+                return true;
+            }
+
+            current = current.Parent;
+        }
+
+        return false;
     }
 }
