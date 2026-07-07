@@ -120,7 +120,7 @@ test('a finding with no disposition warns at the human gate', async ({ page }) =
   await expect(page.getByText('the backend will refuse continuation until every finding is answered')).toBeVisible();
 });
 
-test('recording an approval posts to the governed surface and continuation consumes it', async ({ page }) => {
+test('recording an approval requires the ceremony, posts the reason as evidence, and continuation consumes it', async ({ page }) => {
   await mockTicketWorkspace(page);
   const state = await mockSkeletonRun(page, { continuationUnblocked: false });
 
@@ -128,10 +128,28 @@ test('recording an approval posts to the governed surface and continuation consu
   await page.getByTestId('flow.ticket.startRun').click();
   await page.getByTestId('flow.build.toReview').click();
 
+  // APPROVAL-UX-1: one click opens the ceremony, it does not record. The
+  // delegated-policy truth is stated at the gate.
+  await expect(page.getByTestId('flow.review.delegatedPolicy')).toContainText('Delegated approval: none exists');
   await page.getByTestId('flow.review.recordApproval').click();
+  await expect(page.getByTestId('flow.review.approvalCeremony')).toBeVisible();
+
+  // Incomplete ceremony cannot record, and says why.
+  await expect(page.getByTestId('flow.review.confirmApproval')).toBeDisabled();
+  await expect(page.getByTestId('flow.review.ceremonyUnmet')).toContainText('a reason is required');
+
+  await page.getByTestId('flow.review.approvalReason').fill('Package reviewed end to end; criteria covered; no findings.');
+  await expect(page.getByTestId('flow.review.confirmApproval')).toBeDisabled();
+  await page.getByTestId('flow.review.approvalHashConfirmation').fill(PACKAGE_HASH.slice(0, 8));
+  await page.getByTestId('flow.review.confirmApproval').click();
+
   await expect(page.getByTestId('flow.review.gate')).toContainText('Recording is not continuation');
   expect(state.approvalRequestBody.approvalTargetHash).toBe(PACKAGE_HASH);
   expect(state.approvalRequestBody.capabilityCode).toBe('skeleton-run.continue');
+  // The typed reason rides as durable labeled evidence on the approval record.
+  expect(state.approvalRequestBody.evidenceReferences).toContain(
+    'human-reason:Package reviewed end to end; criteria covered; no findings.'
+  );
 
   state.continuationUnblocked = true;
   await page.getByTestId('flow.review.requestContinuation').click();
