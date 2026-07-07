@@ -634,6 +634,12 @@ DisposableCommandCompleted / Failed
 SkeletonEvidencePackaged
 SkeletonRepairAttemptStarted
 SkeletonRepairProposalGenerated
+SkeletonRevisionAttemptStarted
+SkeletonRevisionProposalGenerated
+SkeletonRevisionAttemptFailed
+SkeletonRevisionRefused
+SkeletonFindingDispositionRecorded
+SkeletonCriticReviewRecorded
 CriticReviewPackageReady
 ApprovalRequiredHalt
 SkeletonContinuationUnblocked
@@ -641,6 +647,10 @@ SkeletonApplyStarted
 SkeletonApplied
 SkeletonRunBlocked
 ```
+
+This list illustrates; it does not bind. The timeline renders backend event types
+verbatim from the run report — an event the backend records is shown even if this
+spec has not heard of it yet.
 
 ### 11.3 Current State Panel
 
@@ -809,23 +819,31 @@ timestamp
 
 ### 13.4 Disposition Actions
 
-Allowed dispositions:
+Allowed dispositions (the shipped backend vocabulary — `SkeletonFindingDispositionKind`):
 
 ```text
 AcceptRisk
-RejectFinding
-DeferFix
-FixRequired
+FixInFollowUp
+Reject
 ```
 
 Each must require a reason.
+
+"Fix it now" is NOT a disposition. It is the governed revise action (REVISE-1,
+`POST .../skeleton-runs/{runId}/revise`): the human cites undispositioned findings
+plus a written instruction, a bounded revision runs
+(`SkeletonRevision:MaxAttempts`, default 0), and ONLY a revision that builds green
+records `AddressedByRevision` for the cited findings. The disposition surface
+refuses `AddressedByRevision` directly — a human cannot claim a revision that
+never ran. A fourth disposition button is fiction; the fourth answer is a verb.
 
 ### 13.5 Continuation Rules
 
 The UX must show:
 
 ```text
-Continuation refuses if critic review missing.
+Continuation refuses if critic review missing — and the review must bind to the
+CURRENT package hash: after a revision, the superseded package's review satisfies nothing.
 Continuation refuses if findings are undispositioned.
 A finding is not a veto.
 A disposition is not approval.
@@ -1161,12 +1179,17 @@ allowed paths
 forbidden paths
 max changed files
 max repair attempts allowed
+max revision attempts allowed
 require no critic findings
 require all findings dispositioned
 require build passed
 require tests passed
 require package hash verified
 require no uncovered criteria
+require fresh verified critic canary measurement
+max measurement age hours
+required catch rate
+require canary control clean
 expiry
 max uses
 reason required
@@ -1189,7 +1212,17 @@ Allow continuation when:
 - package hash verified
 - changed paths inside allowed scope
 - approval profile not expired
+- a fresh, VERIFIED critic canary catch-rate measurement exists
+  (P2-6 parity: required catch-rate met, control clean, re-execution available;
+  stale, missing, or failing measurement = halt to human, named)
 ```
+
+The measurement condition is not optional decoration. The shipped advisory
+evaluator (P2-6 gate recommendation) already hard-requires it before it will even
+SAY "policy would approve" — turning advise into act must carry it forward, or
+delegation becomes tension theater. The dial reads the eval; autonomy is earned
+by measurement (P1-5/P1-6 canary corpus and durable catch-rate). The audit record
+of every delegated satisfaction names the measurement it relied on.
 
 ### 19.4 Delegated Apply
 
