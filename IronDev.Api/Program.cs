@@ -171,6 +171,7 @@ builder.Services.AddScoped<IProjectMemoryMapService, ProjectMemoryMapService>();
 builder.Services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
 builder.Services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
 builder.Services.AddScoped<IProjectProfileService, ProjectProfileService>();
+builder.Services.AddScoped<IronDev.Core.Provisioning.IProjectProvisioningReadinessService, ProjectProvisioningReadinessService>();
 builder.Services.AddScoped<IProjectDocumentService, ProjectDocumentService>();
 builder.Services.AddScoped<IProjectContextExportService, ProjectContextExportService>();
 builder.Services.AddScoped<ITicketService, TicketService>();

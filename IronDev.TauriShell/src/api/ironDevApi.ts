@@ -47,6 +47,7 @@ import type {
   LoginRequest,
   LoginResponse,
   PlannedSurfaceEnvelope,
+  ProjectProvisioningReadinessUi,
   ProjectDocument,
   ProjectDocumentVersion,
   ProjectChatSession,
@@ -938,6 +939,33 @@ class IronDevApiClient {
       `/api/v1/projects/${approvalProjectGuidFor(projectId)}/accepted-approvals`,
       { method: 'POST', body: request, signal }
     );
+  }
+
+  // ── PROJECT-0..3: provisioning readiness + wizard confirmations ──
+
+  async getProvisioningReadiness(projectId: number, signal?: AbortSignal): Promise<ProjectProvisioningReadinessUi> {
+    return this.request<ProjectProvisioningReadinessUi>(`/api/projects/${projectId}/provisioning/readiness`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  /** Confirming a command is a human decision entering stored truth — the wizard's pointed question answered. */
+  async saveProjectCommand(projectId: number, commandType: string, commandText: string, signal?: AbortSignal): Promise<void> {
+    await this.request<unknown>(`/api/projects/${projectId}/profile/commands`, {
+      method: 'POST',
+      body: { projectId, commandType, commandText, isDefault: true, isEnabled: true, timeoutSeconds: 300 },
+      signal
+    });
+  }
+
+  /** Confirms (or edits) the architecture profile — detection proposed it; this records the human's answer. */
+  async saveProjectProfile(projectId: number, profile: Record<string, unknown>, signal?: AbortSignal): Promise<void> {
+    await this.request<unknown>(`/api/projects/${projectId}/profile`, {
+      method: 'POST',
+      body: { ...profile, projectId },
+      signal
+    });
   }
 
   /**

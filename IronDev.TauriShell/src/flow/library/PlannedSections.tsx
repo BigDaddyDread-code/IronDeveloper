@@ -1,29 +1,15 @@
 import { useProjectContext } from '../../state/useProjectContext';
 import { NotImplementedPanel } from '../components/NotImplementedPanel';
+import { ProvisioningScreen } from './ProvisioningScreen';
 
 // NAV-1: the full information architecture is visible, and every unbuilt surface is an
 // honest 501 route — a real controller refusing with the owning roadmap slice named.
 // These sections graduate into real screens when their slices land; until then, clicking
 // through the whole product tells the truth about where the product ends.
+// PROJECT-0..3 graduated: ProvisioningSection is a real screen now.
 
 export function ProvisioningSection() {
-  const project = useProjectContext();
-  const projectId = project.selectedProjectId;
-
-  return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <p className="fl-sub" style={{ margin: 0 }}>
-        The bridge from demo to real use: repo scan, architecture wizard, readiness result. Profile and command
-        configuration exist today; the wizard and readiness contract arrive with PROJECT-0..3.
-      </p>
-      <NotImplementedPanel
-        title="Provisioning readiness"
-        path={projectId === null ? null : `/api/projects/${projectId}/provisioning/readiness`}
-        missingPrerequisite="Select a project to probe its provisioning readiness."
-        testId="flow.library.provisioning"
-      />
-    </div>
-  );
+  return <ProvisioningScreen />;
 }
 
 export function AuditSection() {
