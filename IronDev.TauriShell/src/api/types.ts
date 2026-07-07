@@ -1434,3 +1434,22 @@ export interface SkeletonAgentProfileOutcome {
   failureReason: string;
   profile?: SkeletonAgentProfile | null;
 }
+
+// ── AFFORDANCE-1: planned surfaces refuse honestly ──
+
+/**
+ * The refusal envelope returned by planned-but-unbuilt surfaces (HTTP 501).
+ * Shaped like a governed refusal on purpose — allowed is always false and reason is always
+ * 'NotImplemented' — so the UI renders it through the same refusal discipline as any other
+ * blocked action. Mirrors IronDev.Api PlannedSurfaceEnvelope.
+ */
+export interface PlannedSurfaceEnvelope {
+  allowed: boolean;
+  reason: string;
+  surface: string;
+  detail: string;
+  plannedSlice: string;
+  nextSafeAction: string;
+  boundary: string;
+  correlationId: string;
+}

@@ -9,11 +9,12 @@ import { BoardScreen } from './board/BoardScreen';
 import { FlowSurface } from './flowTypes';
 import { GovernanceHost } from './library/GovernanceHost';
 import { isGovernancePath } from './library/governanceRoutes';
+import { AdminInviteSection, AuditSection, ProvisioningSection } from './library/PlannedSections';
 import { SolutionExplorer } from './library/SolutionExplorer';
 import { SettingsScreen } from './settings/SettingsScreen';
 import { WorkItemScreen } from './workitem/WorkItemScreen';
 
-type LibrarySection = 'explorer' | 'governance';
+type LibrarySection = 'explorer' | 'governance' | 'provisioning' | 'audit' | 'admin';
 
 function initials(name: string | null | undefined): string {
   if (!name) {
@@ -149,9 +150,34 @@ export function FlowShell() {
                 >
                   Governance
                 </button>
+                <button
+                  className={librarySection === 'provisioning' ? 'fl-on' : ''}
+                  onClick={() => setLibrarySection('provisioning')}
+                  data-testid="flow.library.nav.provisioning"
+                >
+                  Provisioning
+                </button>
+                <button
+                  className={librarySection === 'audit' ? 'fl-on' : ''}
+                  onClick={() => setLibrarySection('audit')}
+                  data-testid="flow.library.nav.audit"
+                >
+                  Audit
+                </button>
+                <button
+                  className={librarySection === 'admin' ? 'fl-on' : ''}
+                  onClick={() => setLibrarySection('admin')}
+                  data-testid="flow.library.nav.admin"
+                >
+                  Admin
+                </button>
               </div>
             </div>
-            {librarySection === 'explorer' ? <SolutionExplorer /> : <GovernanceHost />}
+            {librarySection === 'explorer' ? <SolutionExplorer /> : null}
+            {librarySection === 'governance' ? <GovernanceHost /> : null}
+            {librarySection === 'provisioning' ? <ProvisioningSection /> : null}
+            {librarySection === 'audit' ? <AuditSection /> : null}
+            {librarySection === 'admin' ? <AdminInviteSection /> : null}
           </div>
         ) : null}
         {surface === 'settings' ? <SettingsScreen /> : null}

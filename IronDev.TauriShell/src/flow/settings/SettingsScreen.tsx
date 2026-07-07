@@ -10,6 +10,7 @@ import {
 } from './approvalPolicy';
 import { FlowRole, flowRoles } from './usersDraft';
 import { AgentsPanel } from './AgentsPanel';
+import { NotImplementedPanel } from '../components/NotImplementedPanel';
 
 const apiRoles = ['Owner', 'TenantAdmin', 'Approver', 'Reviewer', 'Operator', 'Viewer', 'Member'];
 
@@ -305,6 +306,19 @@ export function SettingsScreen() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <NotImplementedPanel
+          title="Human-intervention dial — backend contract"
+          path={
+            project.selectedProjectId === null
+              ? null
+              : `/api/projects/${project.selectedProjectId}/authority/intervention-dial`
+          }
+          missingPrerequisite="Select a project to probe the dial's backend contract."
+          testId="flow.settings.interventionDial"
+        />
       </div>
 
       <div style={{ marginTop: 16 }}>
