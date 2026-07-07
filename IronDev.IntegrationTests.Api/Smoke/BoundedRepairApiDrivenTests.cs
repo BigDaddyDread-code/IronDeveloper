@@ -245,6 +245,9 @@ public sealed class BoundedRepairApiDrivenTests : ApiTestBase
         public Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default) =>
             GenerateProposalAsync(0, ct);
 
+        public Task<BuilderProposal> GenerateRevisionProposalAsync(long ticketId, SkeletonRevisionContext revision, CancellationToken ct = default) =>
+            throw new NotSupportedException("REPAIR-1 proofs do not exercise human-directed revision.");
+
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotSupportedException("REPAIR-1 proofs apply nothing; the governed spine owns apply.");
 

@@ -438,15 +438,33 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return ToDto(run, projectId, ticketId, requiresHumanApproval: true);
         }
 
-        // P1-3: every critic finding must carry a human disposition before the gate
-        // will even evaluate approval evidence. A finding is not a veto — the human
-        // may accept the risk, defer the fix, or reject the finding — but it cannot
-        // be ignored. Evaluated from durable events alone.
-        var continueEvents = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
-        if (!HasRecordedCriticReview(continueEvents))
+        // The requirement is recomputed from durable evidence, never trusted from the
+        // request: the package hash on disk is what the approval must have bound to.
+        var packagePath = CriticPackagePath(ResolveEvidenceRoot(), runId);
+        if (!File.Exists(packagePath))
         {
             await PublishAsync(runId, "ContinuationRefused",
-                "Continuation refused: no critic review is recorded for this run. A human cannot continue work the critic never reviewed.",
+                "Continuation refused: the critic package evidence is missing, so the approval requirement cannot be recomputed.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["refusedReason"] = "CriticPackageEvidenceMissing",
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+            return ToDto(run, projectId, ticketId, requiresHumanApproval: true);
+        }
+
+        var packageHash = ComputeSha256(await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false));
+
+        // P1-3 / REVISE-1: the review must bind to the CURRENT package hash. A
+        // review of a superseded package (the world before a revision replaced
+        // the gate evidence) satisfies nothing — the revised work needs its own
+        // critic review. Evaluated from durable events alone.
+        var continueEvents = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (!HasRecordedCriticReviewForPackage(continueEvents, packageHash))
+        {
+            await PublishAsync(runId, "ContinuationRefused",
+                "Continuation refused: no critic review is recorded for this run's current critic package. " +
+                "A human cannot continue work the critic never reviewed — and after a revision, the revised package needs its own review.",
                 projectId, ticketId, new Dictionary<string, string>
                 {
                     ["refusedReason"] = "CriticReviewMissing",
@@ -469,23 +487,6 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 }, cancellationToken).ConfigureAwait(false);
             return ToDto(run, projectId, ticketId, requiresHumanApproval: true);
         }
-
-        // The requirement is recomputed from durable evidence, never trusted from the
-        // request: the package hash on disk is what the approval must have bound to.
-        var packagePath = CriticPackagePath(ResolveEvidenceRoot(), runId);
-        if (!File.Exists(packagePath))
-        {
-            await PublishAsync(runId, "ContinuationRefused",
-                "Continuation refused: the critic package evidence is missing, so the approval requirement cannot be recomputed.",
-                projectId, ticketId, new Dictionary<string, string>
-                {
-                    ["refusedReason"] = "CriticPackageEvidenceMissing",
-                    ["currentNode"] = "SkeletonRun"
-                }, cancellationToken).ConfigureAwait(false);
-            return ToDto(run, projectId, ticketId, requiresHumanApproval: true);
-        }
-
-        var packageHash = ComputeSha256(await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false));
         var requirement = new ApprovalRequirement
         {
             ProjectId = ApprovalProjectGuid(projectId),
@@ -565,6 +566,352 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         return ToDto(updated, projectId, ticketId, requiresHumanApproval: false);
     }
 
+    /// <summary>
+    /// REVISE-1 — finding-driven revision. The human at the gate directs the
+    /// Builder to revise the proposal under review instead of approving it. A
+    /// revision is human-directed, proposal-shaped work, never authority: the
+    /// revised package needs its own critic review, dispositions, and hash-bound
+    /// approval, and a failed revision leaves the previous gate package canonical.
+    /// Bounded by SkeletonRevision:MaxAttempts (default 0 = off, clamped to 3).
+    /// </summary>
+    public async Task<TicketBuildRunDto?> ReviseAsync(int projectId, long ticketId, string runId, SkeletonRunRevisionRequest request, CancellationToken cancellationToken = default)
+    {
+        var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
+        if (ticket is null || ticket.ProjectId != projectId)
+            return null;
+
+        var project = await _projects.GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+        if (project is null)
+            return null;
+
+        var run = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (run is null || run.ProjectId != projectId || run.TicketId != ticketId)
+            return null;
+
+        async Task<TicketBuildRunDto> RefuseAsync(string refusedReason, string message, IReadOnlyDictionary<string, string>? details = null)
+        {
+            var payload = new Dictionary<string, string>(details ?? new Dictionary<string, string>())
+            {
+                ["refusedReason"] = refusedReason,
+                ["currentNode"] = "SkeletonRun"
+            };
+            await PublishAsync(runId, "SkeletonRevisionRefused", $"Revision refused: {message}", projectId, ticketId, payload, cancellationToken).ConfigureAwait(false);
+            var current = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
+            return ToDto(current, projectId, ticketId, requiresHumanApproval: current.State == RunLifecycleState.PausedForApproval);
+        }
+
+        if (run.State != RunLifecycleState.PausedForApproval)
+        {
+            return await RefuseAsync("NotAwaitingApproval",
+                $"the run is {run.State}, not halted at the human gate. A revision answers the gate; it cannot revive or redirect a run elsewhere.").ConfigureAwait(false);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return await RefuseAsync("RevisionReasonMissing",
+                "a revision requires the human's written instruction. The Builder revises from that instruction — a revision without one is a dismissal, and dismissals are not decisions.").ConfigureAwait(false);
+        }
+
+        var citedFindingIds = (request.FindingIds ?? [])
+            .Select(findingId => findingId?.Trim() ?? string.Empty)
+            .Where(findingId => findingId.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (citedFindingIds.Count == 0)
+        {
+            return await RefuseAsync("RevisionFindingsMissing",
+                "a revision is driven by named critic findings. Cite the finding(s) this revision answers — to change course without findings, disposition and approve, or start a new run.").ConfigureAwait(false);
+        }
+
+        var evidenceRoot = ResolveEvidenceRoot();
+        var packagePath = CriticPackagePath(evidenceRoot, runId);
+        if (!File.Exists(packagePath))
+        {
+            return await RefuseAsync("CriticPackageEvidenceMissing",
+                "the critic package evidence is missing, so there is nothing at the gate to revise.").ConfigureAwait(false);
+        }
+
+        var packageBytes = await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false);
+        var currentPackageHash = ComputeSha256(packageBytes);
+
+        var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        var currentReviewFindingIds = events
+            .Where(runEvent => runEvent.EventType == "SkeletonCriticReviewRecorded" &&
+                string.Equals(Payload(runEvent, "packageSha256"), currentPackageHash, StringComparison.Ordinal))
+            .SelectMany(runEvent => Payload(runEvent, "findingIds")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .ToHashSet(StringComparer.Ordinal);
+
+        if (!HasRecordedCriticReviewForPackage(events, currentPackageHash))
+        {
+            return await RefuseAsync("CriticReviewMissing",
+                "no critic review is recorded for this run's current critic package. A revision answers the critic's findings — request a critic review first.").ConfigureAwait(false);
+        }
+
+        var dispositionedFindingIds = events
+            .Where(runEvent => runEvent.EventType == "SkeletonFindingDispositionRecorded")
+            .Select(runEvent => Payload(runEvent, "findingId"))
+            .Where(findingId => !string.IsNullOrEmpty(findingId))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var unknown = citedFindingIds.Where(findingId => !currentReviewFindingIds.Contains(findingId)).ToList();
+        if (unknown.Count > 0)
+        {
+            return await RefuseAsync("UnknownFinding",
+                $"finding(s) [{string.Join(", ", unknown)}] are not on any critic review of the current package. A revision can only answer findings the critic actually made against what is at the gate.").ConfigureAwait(false);
+        }
+
+        var alreadyDecided = citedFindingIds.Where(dispositionedFindingIds.Contains).ToList();
+        if (alreadyDecided.Count > 0)
+        {
+            return await RefuseAsync("FindingAlreadyDispositioned",
+                $"finding(s) [{string.Join(", ", alreadyDecided)}] already carry a human disposition. A decision was made; a revision cannot silently unmake it.").ConfigureAwait(false);
+        }
+
+        var unansweredUncited = UndispositionedFindingIds(events)
+            .Where(findingId => !citedFindingIds.Contains(findingId, StringComparer.Ordinal))
+            .ToList();
+        if (unansweredUncited.Count > 0)
+        {
+            return await RefuseAsync("UndispositionedFindingsNotCited",
+                $"finding(s) [{string.Join(", ", unansweredUncited)}] have no disposition and are not cited by this revision. A revision may not leave any finding unanswered behind it — cite them or disposition them first.").ConfigureAwait(false);
+        }
+
+        var maxRevisionAttempts = ReadMaxRevisionAttempts();
+        var priorAttempts = events.Count(runEvent => runEvent.EventType == "SkeletonRevisionAttemptStarted");
+        if (maxRevisionAttempts == 0)
+        {
+            return await RefuseAsync("RevisionDisabled",
+                "revision is disabled. Set SkeletonRevision:MaxAttempts explicitly to allow bounded, human-directed revisions — the gate's disposition and approval path remains fully available.").ConfigureAwait(false);
+        }
+        if (priorAttempts >= maxRevisionAttempts)
+        {
+            return await RefuseAsync("RevisionBudgetExhausted",
+                $"the revision budget ({maxRevisionAttempts}) is spent after {priorAttempts} attempt(s). The gate's disposition and approval path remains fully available, or start a new run.").ConfigureAwait(false);
+        }
+
+        var attemptNumber = priorAttempts + 1;
+        await PublishAsync(runId, "SkeletonRevisionAttemptStarted",
+            $"Revision attempt {attemptNumber} of {maxRevisionAttempts}: the human at the gate directed a revision answering {citedFindingIds.Count} cited finding(s). " +
+            "A revision is human-directed, proposal-shaped work, never authority — the revised package needs its own critic review, dispositions, and hash-bound approval.",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["attemptNumber"] = attemptNumber.ToString(),
+                ["maxRevisionAttempts"] = maxRevisionAttempts.ToString(),
+                ["findingIds"] = string.Join(",", citedFindingIds),
+                ["reason"] = request.Reason.Trim(),
+                ["requestedByUserId"] = request.RequestedByUserId,
+                ["supersedesPackageSha256"] = currentPackageHash,
+                ["currentNode"] = "SkeletonRun"
+            }, cancellationToken).ConfigureAwait(false);
+
+        await _runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = runId,
+            State = RunLifecycleState.Running,
+            Summary = $"Revision attempt {attemptNumber} building and testing in a fresh disposable workspace."
+        }, cancellationToken).ConfigureAwait(false);
+
+        async Task<TicketBuildRunDto> FailAttemptAsync(string failureKind, string failedCommand, string message)
+        {
+            await PublishAsync(runId, "SkeletonRevisionAttemptFailed",
+                $"Revision attempt {attemptNumber} failed: {message} The previous gate package remains canonical and the run returns to the same human gate.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["attemptNumber"] = attemptNumber.ToString(),
+                    ["failureKind"] = failureKind,
+                    ["failedCommand"] = failedCommand,
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+
+            await _runs.TransitionAsync(new RunStateTransition
+            {
+                RunId = runId,
+                State = RunLifecycleState.PausedForApproval,
+                Summary = $"Revision attempt {attemptNumber} failed; the previous gate package remains canonical. Halt is not approval."
+            }, cancellationToken).ConfigureAwait(false);
+
+            var current = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
+            return ToDto(current, projectId, ticketId, requiresHumanApproval: true);
+        }
+
+        var package = JsonSerializer.Deserialize<SkeletonCriticPackage>(System.Text.Encoding.UTF8.GetString(packageBytes), JsonOptions)!;
+
+        BuilderProposal proposal;
+        try
+        {
+            proposal = await _proposals.GenerateRevisionProposalAsync(ticketId, new SkeletonRevisionContext
+            {
+                AttemptNumber = attemptNumber,
+                FindingIds = citedFindingIds,
+                Instruction = request.Reason.Trim(),
+                PreviousChanges = package.Changes
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return await FailAttemptAsync("RevisionProposalGenerationFailed", string.Empty, exception.Message).ConfigureAwait(false);
+        }
+
+        var fileWrites = MapFileWrites(proposal);
+        if (fileWrites.Count == 0)
+        {
+            return await FailAttemptAsync("RevisionProposalEmpty", string.Empty,
+                "the revision proposal produced no valid file changes to exercise.").ConfigureAwait(false);
+        }
+
+        var proposalId = await PersistProposalEvidenceAsync(runId, evidenceRoot, proposal, cancellationToken, $"revise-{attemptNumber}").ConfigureAwait(false);
+        var proposalEvidenceFileName = $"proposal-revise-{attemptNumber}.json";
+
+        await PublishAsync(runId, "SkeletonRevisionProposalGenerated",
+            $"Revision proposal {proposalId} generated with {fileWrites.Count} file change(s). A proposal is review material, not approval.",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["attemptNumber"] = attemptNumber.ToString(),
+                ["proposalId"] = proposalId,
+                ["fileChangeCount"] = fileWrites.Count.ToString(),
+                ["modelProvider"] = proposal.ModelProvider ?? string.Empty,
+                ["modelName"] = proposal.ModelName ?? string.Empty,
+                ["currentNode"] = "SkeletonRun"
+            }, cancellationToken).ConfigureAwait(false);
+
+        // The Tester re-authors from the unchanged acceptance criteria — still
+        // blind to the revised diff by contract. The revised package's coverage
+        // matrix must be as honest as the original's.
+        var authoring = await _testAuthoring.AuthorTestsAsync(new SkeletonTestAuthoringRequest
+        {
+            TicketId = ticketId,
+            ProjectId = projectId,
+            TicketTitle = ticket.Title ?? string.Empty,
+            AcceptanceCriteria = ticket.AcceptanceCriteria ?? string.Empty,
+            Problem = ticket.Problem ?? string.Empty
+        }, cancellationToken).ConfigureAwait(false);
+        var authoredTests = authoring.Succeeded ? SandboxTestPaths(authoring.Tests) : [];
+
+        var allWrites = fileWrites
+            .Concat(authoredTests.Select(test => new DisposableWorkspaceFileWrite
+            {
+                RelativePath = test.RelativePath,
+                Content = test.Content
+            }))
+            .ToList();
+
+        var workspaceResult = await _workspaces.RunAsync(new DisposableWorkspaceRunRequest
+        {
+            RunId = runId,
+            SourcePath = project.LocalPath!,
+            WorkspaceRoot = ResolveWorkspaceRoot(),
+            EvidenceRoot = evidenceRoot,
+            CleanWorkspaceOnSuccess = true,
+            PreserveWorkspaceOnFailure = true,
+            PreserveWorkspaceOnCancellation = true,
+            OwnsRunLifecycle = false,
+            // Attempt-scoped paths: a revision never erases a previous attempt.
+            AttemptLabel = $"revise-{attemptNumber}",
+            FileWrites = allWrites,
+            Commands = DotNetCommandProfile.BuildAndTest(project.LocalPath!, ReadTimeout("BuildTimeoutSeconds"), ReadTimeout("TestTimeoutSeconds"))
+        }, cancellationToken).ConfigureAwait(false);
+
+        await PublishAsync(runId, "SkeletonEvidencePackaged",
+            "Evidence packaged for the revision attempt. This run grants nothing: critic review, human approval, and any apply remain separate governed steps.",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["proposalId"] = proposalId,
+                ["revisionAttempt"] = attemptNumber.ToString(),
+                ["succeeded"] = workspaceResult.Succeeded.ToString().ToLowerInvariant(),
+                ["evidencePath"] = workspaceResult.EvidencePath,
+                ["commandCount"] = workspaceResult.Commands.Count.ToString(),
+                ["currentNode"] = "SkeletonRun"
+            }, cancellationToken).ConfigureAwait(false);
+
+        if (!workspaceResult.Succeeded)
+        {
+            var classification = SkeletonBuildFailureClassifier.Classify(workspaceResult.Commands);
+            return await FailAttemptAsync(classification.Kind.ToString(), classification.FailedCommand,
+                $"{classification.Kind} on '{classification.FailedCommand}'. The failed attempt's workspace and evidence are preserved.").ConfigureAwait(false);
+        }
+
+        // The superseded package stays on disk as history — never erased. Only a
+        // GREEN revision replaces the canonical gate package.
+        File.Copy(packagePath, Path.Combine(Path.GetDirectoryName(packagePath)!, $"critic-package-superseded-{attemptNumber}.json"), overwrite: true);
+
+        var (newPackagePath, criterionCount, uncoveredCriterionCount) = await PersistCriticPackageAsync(
+            runId, evidenceRoot, proposalId, proposalEvidenceFileName, ticket, proposal, authoredTests, workspaceResult, cancellationToken).ConfigureAwait(false);
+        var newPackageHash = ComputeSha256(await File.ReadAllBytesAsync(newPackagePath, cancellationToken).ConfigureAwait(false));
+
+        await PublishAsync(runId, "CriticReviewPackageReady",
+            "Revised critic review package prepared. A package is review material, not a review: the revised work needs its OWN critic review — the superseded package's review satisfies nothing." +
+            (uncoveredCriterionCount > 0
+                ? $" {uncoveredCriterionCount} of {criterionCount} acceptance criteria have NO covering test — the coverage hole is explicit in the package."
+                : string.Empty),
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["packageId"] = $"critic-pkg-{runId}",
+                ["packagePath"] = newPackagePath,
+                ["packageSha256"] = newPackageHash,
+                ["proposalId"] = proposalId,
+                ["proposalEvidenceFile"] = proposalEvidenceFileName,
+                ["criterionCount"] = criterionCount.ToString(),
+                ["uncoveredCriterionCount"] = uncoveredCriterionCount.ToString(),
+                ["revisionAttempt"] = attemptNumber.ToString(),
+                ["currentNode"] = "SkeletonRun"
+            }, cancellationToken).ConfigureAwait(false);
+
+        // The cited findings are now answered: AddressedByRevision, decided by
+        // the requesting human, recorded ONLY here — after the revision built
+        // green and the revised package became canonical. A failed revision
+        // records nothing, and the findings keep blocking.
+        foreach (var findingId in citedFindingIds)
+        {
+            await _events.PublishAsync(new RunEventDto
+            {
+                RunId = runId,
+                EventType = "SkeletonFindingDispositionRecorded",
+                Message =
+                    $"Finding {findingId} dispositioned as AddressedByRevision by the human who directed revision attempt {attemptNumber}. " +
+                    "A disposition is a human decision about a finding; it is not approval — the revised package still needs its own critic review and accepted approval.",
+                Payload = new Dictionary<string, string>
+                {
+                    ["findingId"] = findingId,
+                    ["disposition"] = SkeletonFindingDispositionKind.AddressedByRevision.ToString(),
+                    ["reason"] = $"Addressed by revision attempt {attemptNumber}: {request.Reason.Trim()}",
+                    ["decidedByUserId"] = request.RequestedByUserId,
+                    ["projectId"] = projectId.ToString(),
+                    ["ticketId"] = ticketId.ToString(),
+                    ["skeletonRun"] = "true",
+                    ["currentNode"] = "SkeletonFindingDisposition"
+                }
+            }, cancellationToken).ConfigureAwait(false);
+        }
+
+        await _runs.TransitionAsync(new RunStateTransition
+        {
+            RunId = runId,
+            State = RunLifecycleState.PausedForApproval,
+            Summary = "Halted for approval after revision. Halt is not approval: continuation requires a live accepted approval matching the REVISED package's requirement."
+        }, cancellationToken).ConfigureAwait(false);
+
+        await PublishAsync(runId, "ApprovalRequiredHalt",
+            "Halted for approval after revision. The gate is exactly as hard as before: record a critic review of the revised package, disposition its findings, then record an accepted approval matching this requirement." +
+            (uncoveredCriterionCount > 0
+                ? $" NOTE: {uncoveredCriterionCount} of {criterionCount} acceptance criteria have no covering test — approving this run includes consciously owning that coverage hole."
+                : string.Empty),
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["approvalProjectId"] = ApprovalProjectGuid(projectId).ToString("D"),
+                ["approvalTargetKind"] = ApprovalTargetKind,
+                ["approvalTargetId"] = runId,
+                ["approvalTargetHash"] = newPackageHash,
+                ["capabilityCode"] = ContinueCapabilityCode,
+                ["criterionCount"] = criterionCount.ToString(),
+                ["uncoveredCriterionCount"] = uncoveredCriterionCount.ToString(),
+                ["currentNode"] = "SkeletonRun"
+            }, cancellationToken).ConfigureAwait(false);
+
+        var revised = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
+        return ToDto(revised, projectId, ticketId, requiresHumanApproval: revised.State == RunLifecycleState.PausedForApproval);
+    }
+
     public async Task<TicketBuildRunDto?> ApplyAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default)
     {
         var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
@@ -600,11 +947,29 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 cancellationToken).ConfigureAwait(false);
         }
 
-        if (!HasRecordedCriticReview(events))
+        // The approval is re-verified LIVE at the mutation step — an approval that
+        // expired or no longer matches the package hash refuses the apply.
+        var evidenceRoot = ResolveEvidenceRoot();
+        var packagePath = CriticPackagePath(evidenceRoot, runId);
+        if (!File.Exists(packagePath))
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                "CriticPackageEvidenceMissing",
+                "The critic package evidence is missing, so the approval cannot be re-verified.",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var packageBytes = await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false);
+        var packageHash = ComputeSha256(packageBytes);
+
+        // P1-3 / REVISE-1, re-checked at the mutation step: the review must bind
+        // to the CURRENT package hash — a review of a superseded pre-revision
+        // package satisfies nothing.
+        if (!HasRecordedCriticReviewForPackage(events, packageHash))
         {
             return await RefuseApplyAsync(run, projectId, ticketId,
                 "CriticReviewMissing",
-                "no critic review is recorded for this run. Source mutation cannot proceed on work the critic never reviewed.",
+                "no critic review is recorded for this run's current critic package. Source mutation cannot proceed on work the critic never reviewed.",
                 cancellationToken).ConfigureAwait(false);
         }
 
@@ -630,21 +995,6 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 $"{undispositionedAtApply.Count} critic finding(s) have no human disposition. A finding is not a veto, but it cannot be ignored — record dispositions, then request apply again.",
                 cancellationToken).ConfigureAwait(false);
         }
-
-        // The approval is re-verified LIVE at the mutation step — an approval that
-        // expired or no longer matches the package hash refuses the apply.
-        var evidenceRoot = ResolveEvidenceRoot();
-        var packagePath = CriticPackagePath(evidenceRoot, runId);
-        if (!File.Exists(packagePath))
-        {
-            return await RefuseApplyAsync(run, projectId, ticketId,
-                "CriticPackageEvidenceMissing",
-                "The critic package evidence is missing, so the approval cannot be re-verified.",
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        var packageBytes = await File.ReadAllBytesAsync(packagePath, cancellationToken).ConfigureAwait(false);
-        var packageHash = ComputeSha256(packageBytes);
         var requirement = new ApprovalRequirement
         {
             ProjectId = ApprovalProjectGuid(projectId),
@@ -875,13 +1225,19 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         var evidenceRoot = ResolveEvidenceRoot();
 
         // Proposal link. `Proposal` is the FINAL/CURRENT proposal — the one the gate,
-        // critic package, and approval hash bind to. When bounded repair replaced the
-        // initial proposal, the original failed attempt is preserved separately as
-        // `InitialProposal`: history, never the gate proposal.
+        // critic package, and approval hash bind to. When bounded repair or a
+        // human-directed revision replaced the initial proposal, the original is
+        // preserved separately as `InitialProposal`: history, never the gate proposal.
         SkeletonRunProposalTrace? proposalTrace = null;
         SkeletonRunProposalTrace? initialProposalTrace = null;
         var initialProposalEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "ProposalGenerated");
         var lastRepairProposalEvent = events.LastOrDefault(runEvent => runEvent.EventType == "SkeletonRepairProposalGenerated");
+        // REVISE-1: only a revision that built GREEN replaced the canonical gate
+        // package — a failed attempt's proposal is history, never the gate proposal.
+        var lastSuccessfulRevisionEvent = events.LastOrDefault(runEvent =>
+            runEvent.EventType == "SkeletonRevisionProposalGenerated" &&
+            !events.Any(failedEvent => failedEvent.EventType == "SkeletonRevisionAttemptFailed" &&
+                Payload(failedEvent, "attemptNumber") == Payload(runEvent, "attemptNumber")));
 
         SkeletonRunProposalTrace BuildProposalTrace(RunEventDto sourceEvent, string evidenceFileName)
         {
@@ -897,7 +1253,18 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             };
         }
 
-        if (lastRepairProposalEvent is not null)
+        if (lastSuccessfulRevisionEvent is not null)
+        {
+            var revisionAttemptNumber = Payload(lastSuccessfulRevisionEvent, "attemptNumber");
+            proposalTrace = BuildProposalTrace(lastSuccessfulRevisionEvent, $"proposal-revise-{revisionAttemptNumber}.json");
+            if (initialProposalEvent is not null)
+            {
+                initialProposalTrace = BuildProposalTrace(initialProposalEvent, "proposal.json");
+                if (!initialProposalTrace.EvidenceExistsOnDisk)
+                    gaps.Add("Initial (pre-revision) proposal evidence file is missing from disk.");
+            }
+        }
+        else if (lastRepairProposalEvent is not null)
         {
             var repairAttemptNumber = Payload(lastRepairProposalEvent, "attemptNumber");
             proposalTrace = BuildProposalTrace(lastRepairProposalEvent, $"proposal-repair-{repairAttemptNumber}.json");
@@ -964,9 +1331,45 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             .OrderBy(trace => trace.AttemptNumber)
             .ToList();
 
+        // REVISE-1: every human-directed revision attempt, in order, from durable
+        // events. History, not judgment — a failed attempt left the previous gate
+        // package canonical, and the report says a revision was tried.
+        var revisionAttempts = events
+            .Where(runEvent => runEvent.EventType == "SkeletonRevisionAttemptStarted")
+            .Select(startEvent =>
+            {
+                var attemptNumber = int.TryParse(Payload(startEvent, "attemptNumber"), out var number) ? number : 0;
+                var generatedEvent = events.FirstOrDefault(runEvent =>
+                    runEvent.EventType == "SkeletonRevisionProposalGenerated" &&
+                    Payload(runEvent, "attemptNumber") == attemptNumber.ToString());
+                var failedEvent = events.FirstOrDefault(runEvent =>
+                    runEvent.EventType == "SkeletonRevisionAttemptFailed" &&
+                    Payload(runEvent, "attemptNumber") == attemptNumber.ToString());
+                var revisionProposalPath = Path.Combine(evidenceRoot, runId, "evidence", $"proposal-revise-{attemptNumber}.json");
+                return new SkeletonRunRevisionAttemptTrace
+                {
+                    AttemptNumber = attemptNumber,
+                    FindingIds = Payload(startEvent, "findingIds")
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                    Reason = Payload(startEvent, "reason"),
+                    RequestedByUserId = Payload(startEvent, "requestedByUserId"),
+                    RevisionProposalId = generatedEvent is null ? string.Empty : Payload(generatedEvent, "proposalId"),
+                    ModelProvider = generatedEvent is null ? string.Empty : Payload(generatedEvent, "modelProvider"),
+                    ModelName = generatedEvent is null ? string.Empty : Payload(generatedEvent, "modelName"),
+                    RevisionProposalEvidenceExistsOnDisk = File.Exists(revisionProposalPath),
+                    Failed = failedEvent is not null,
+                    FailureKind = failedEvent is null ? string.Empty : Payload(failedEvent, "failureKind"),
+                    FailedCommand = failedEvent is null ? string.Empty : Payload(failedEvent, "failedCommand")
+                };
+            })
+            .OrderBy(trace => trace.AttemptNumber)
+            .ToList();
+
         // Critic package link — the hash is recomputed from disk, never just recited.
+        // The LAST package-ready event announced the CURRENT canonical package: a
+        // green revision replaces the gate package and announces it again.
         SkeletonRunCriticPackageTrace? packageTrace = null;
-        var packageEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "CriticReviewPackageReady");
+        var packageEvent = events.LastOrDefault(runEvent => runEvent.EventType == "CriticReviewPackageReady");
         if (packageEvent is not null)
         {
             var packagePath = CriticPackagePath(evidenceRoot, runId);
@@ -1000,7 +1403,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // Approval link: the requirement the run halted on, and the continuation that
         // consumed a verified accepted approval.
         SkeletonRunApprovalTrace? approvalTrace = null;
-        var haltEvent = events.FirstOrDefault(runEvent =>
+        // The LAST halt names the CURRENT requirement — after a revision, the gate
+        // re-halted on the revised package's hash.
+        var haltEvent = events.LastOrDefault(runEvent =>
             runEvent.EventType == "ApprovalRequiredHalt" && !string.IsNullOrEmpty(Payload(runEvent, "approvalTargetKind")));
         var unblockedEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "SkeletonContinuationUnblocked");
         if (haltEvent is not null || unblockedEvent is not null)
@@ -1149,6 +1554,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             CriticReviews = criticReviews,
             FindingDispositions = findingDispositions,
             RepairAttempts = repairAttempts,
+            RevisionAttempts = revisionAttempts,
             Apply = applyTrace,
             Gaps = gaps,
             LoopComplete = loopComplete
@@ -1180,8 +1586,14 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             .ToList();
     }
 
-    private static bool HasRecordedCriticReview(IReadOnlyList<RunEventDto> events) =>
-        events.Any(runEvent => string.Equals(runEvent.EventType, "SkeletonCriticReviewRecorded", StringComparison.Ordinal));
+    /// <summary>
+    /// REVISE-1: a review counts only when it binds to the CURRENT package hash —
+    /// a review of a superseded pre-revision package satisfies nothing.
+    /// </summary>
+    private static bool HasRecordedCriticReviewForPackage(IReadOnlyList<RunEventDto> events, string packageHash) =>
+        events.Any(runEvent =>
+            string.Equals(runEvent.EventType, "SkeletonCriticReviewRecorded", StringComparison.Ordinal) &&
+            string.Equals(Payload(runEvent, "packageSha256"), packageHash, StringComparison.Ordinal));
 
     private async Task<TicketBuildRunDto> BlockAsync(
         string runId,
@@ -1314,6 +1726,17 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     /// </summary>
     private int ReadMaxRepairAttempts() =>
         int.TryParse(_configuration["SkeletonRepair:MaxAttempts"], out var configured)
+            ? Math.Clamp(configured, 0, 3)
+            : 0;
+
+    /// <summary>
+    /// SkeletonRevision:MaxAttempts — how many human-directed revision attempts
+    /// a halted run may make. Default 0: revision is off unless explicitly
+    /// configured. Clamped to 3 so no configuration can turn bounded revision
+    /// into an unbounded rework loop.
+    /// </summary>
+    private int ReadMaxRevisionAttempts() =>
+        int.TryParse(_configuration["SkeletonRevision:MaxAttempts"], out var configured)
             ? Math.Clamp(configured, 0, 3)
             : 0;
 

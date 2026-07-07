@@ -56,6 +56,9 @@ public sealed class TicketBuildContext
     public IReadOnlyList<string> AffectedFiles     { get; set; } = [];
     public IReadOnlyList<string> RetrievedSnippets { get; set; } = [];
     public IReadOnlyList<string> PastBuildFailures { get; set; } = [];
+    // REVISE-1: populated only on a human-directed revision attempt — the
+    // human's instruction and cited finding ids, never critic text.
+    public IReadOnlyList<string> RevisionDirectives { get; set; } = [];
     public IReadOnlyList<IronDev.Data.Models.ProjectRule> Standards { get; set; } = [];
 }
 

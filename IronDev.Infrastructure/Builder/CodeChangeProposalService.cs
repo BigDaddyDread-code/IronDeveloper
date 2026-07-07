@@ -185,6 +185,22 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
             sb.AppendLine();
         }
 
+        // REVISE-1: populated only on a human-directed revision attempt — the
+        // prior proposal reached the human gate, and the human directed a
+        // revision instead of approving it.
+        if (ctx.RevisionDirectives.Count > 0)
+        {
+            sb.AppendLine("HUMAN-DIRECTED REVISION — THE HUMAN AT THE GATE ASKED FOR CHANGES:");
+            sb.AppendLine("- Your previous proposal built green and reached the human approval gate.");
+            sb.AppendLine("- The human directed a revision instead of approving. Follow the directives below while keeping the ticket's intent. Do not change unrelated code.");
+            sb.AppendLine("- The proposal under revision's files are included under RELEVANT CODE CONTEXT; revise from them, do not start over.");
+            foreach (var directive in ctx.RevisionDirectives)
+            {
+                sb.AppendLine(directive);
+            }
+            sb.AppendLine();
+        }
+
         if (ctx.SourceDocumentVersionId.HasValue)
         {
             sb.AppendLine("SOURCE PROJECT DOCUMENT:");

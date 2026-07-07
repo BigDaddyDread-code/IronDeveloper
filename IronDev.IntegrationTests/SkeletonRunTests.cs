@@ -532,6 +532,10 @@ public sealed class SkeletonRunTests
         var findingIdList = findingIds
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+        // REVISE-1: the gate accepts only reviews bound to the CURRENT package
+        // hash, so a fabricated review must be honest about what it reviewed.
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+
         return harness.Events.PublishAsync(new RunEventDto
         {
             RunId = runId,
@@ -542,7 +546,8 @@ public sealed class SkeletonRunTests
                 ["reviewId"] = "critic-review-x",
                 ["verdict"] = "RequestChanges",
                 ["findingCount"] = findingIdList.Length.ToString(),
-                ["findingIds"] = string.Join(",", findingIdList)
+                ["findingIds"] = string.Join(",", findingIdList),
+                ["packageSha256"] = packageHash
             }
         });
     }
@@ -1236,8 +1241,11 @@ public sealed class SkeletonRunTests
         // push, release, or review-create surface.
         // P0-6 adds GetRunReportAsync: read-only reconstruction of the whole loop from
         // durable evidence — a report grants nothing and cannot alter the run.
-        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ApplyAsync", "GetRunReportAsync" }, methods,
-            "The skeleton contract is start + read-package + approval-gated continue + governed apply + read-report: no approve, promote, commit, push, release, or review-create surface.");
+        // REVISE-1 adds ReviseAsync: a HUMAN-directed, bounded revision at the gate —
+        // proposal-shaped work only. It mints no approval and the revised package
+        // needs its own critic review, dispositions, and hash-bound approval.
+        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ReviseAsync", "ApplyAsync", "GetRunReportAsync" }, methods,
+            "The skeleton contract is start + read-package + approval-gated continue + human-directed revise + governed apply + read-report: no approve, promote, commit, push, release, or review-create surface.");
     }
 
     // ── Workspace containment: file writes cannot escape ──────────────────────
@@ -1397,6 +1405,8 @@ public sealed class SkeletonRunTests
         public Task<BuilderProposal> GenerateProposalFromRequestAsync(int projectId, string request, CancellationToken ct = default) =>
             throw new NotImplementedException();
         public Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default) =>
+            Task.FromResult(behavior());
+        public Task<BuilderProposal> GenerateRevisionProposalAsync(long ticketId, SkeletonRevisionContext revision, CancellationToken ct = default) =>
             Task.FromResult(behavior());
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotImplementedException();

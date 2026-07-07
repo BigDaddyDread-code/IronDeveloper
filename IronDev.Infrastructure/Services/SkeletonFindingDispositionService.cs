@@ -45,6 +45,16 @@ public sealed class SkeletonFindingDispositionService : ISkeletonFindingDisposit
             return Failure("The disposition kind is not part of the vocabulary: accept the risk, defer the fix, or reject the finding.");
         }
 
+        // REVISE-1: AddressedByRevision is recorded only by the governed revision
+        // path after a revision builds green. A human recording it directly would
+        // be claiming a revision that never ran.
+        if (request.Disposition == SkeletonFindingDispositionKind.AddressedByRevision)
+        {
+            return Failure(
+                "AddressedByRevision is recorded only by the governed revision path after a revision builds green — " +
+                "a human cannot claim a revision that never ran. Direct a revision through the revise surface instead.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
             return Failure("A disposition requires a reason. A disposition without a reason is a dismissal, and dismissals are not decisions.");
