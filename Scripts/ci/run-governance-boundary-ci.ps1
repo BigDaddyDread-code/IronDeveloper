@@ -148,7 +148,10 @@ $securityBoundaryFilter = @(
     "FullyQualifiedName~BlockJ09TestEnvironmentIsolationTests",
     # PROJECT-1: provisioning root safety (drive/user/system roots, reparse ancestors).
     # Listed by name because selection is not execution.
-    "FullyQualifiedName~ProvisioningRootSafetyTests"
+    "FullyQualifiedName~ProvisioningRootSafetyTests",
+    # DOGFOOD-2 entry criterion: work-tree probe against real temp git repos
+    # (clean/dirty/unknown - never a guessed Clean). Listed by name.
+    "FullyQualifiedName~ProvisioningWorkTreeProbeTests"
 ) -join "|"
 
 $apiBoundaryFilter = @(

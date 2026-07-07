@@ -27,6 +27,18 @@ public static class ProvisioningBlockedStates
     public const string MissingBuildCommand = "BlockedMissingBuildCommand";
     public const string MissingTestCommand = "BlockedMissingTestCommand";
     public const string UnknownArchitecture = "BlockedUnknownArchitecture";
+    public const string DirtyRepo = "BlockedDirtyRepo";
+}
+
+/// <summary>DOGFOOD-2 entry criterion: what the git working tree looked like when readiness was evaluated.</summary>
+public static class ProvisioningWorkTreeStates
+{
+    public const string Clean = "Clean";
+    public const string Dirty = "Dirty";
+    public const string NotAGitRepository = "NotAGitRepository";
+
+    /// <summary>git could not answer — the state is named, never guessed.</summary>
+    public const string Unknown = "Unknown";
 }
 
 /// <summary>One provisioning check: what was looked at, what state it is in, and the named remedy.</summary>
@@ -75,6 +87,13 @@ public sealed record ProvisioningEvaluationInput
     public bool RepoPathIsSafe { get; init; }
     public string RepoPathSafetyDetail { get; init; } = string.Empty;
     public bool IsGitRepository { get; init; }
+
+    /// <summary>One of ProvisioningWorkTreeStates. Gathered by the service via git status --porcelain.</summary>
+    public string WorkTreeState { get; init; } = ProvisioningWorkTreeStates.Unknown;
+
+    /// <summary>Bounded evidence for the work-tree state — changed-path count/examples, or the git error.</summary>
+    public string WorkTreeDetail { get; init; } = string.Empty;
+
     public ProjectProfile? StoredProfile { get; init; }
     public ProjectCommand? StoredBuildCommand { get; init; }
     public ProjectCommand? StoredTestCommand { get; init; }
@@ -161,14 +180,50 @@ public static class ProvisioningReadinessEvaluator
                 Blocking = false
             });
 
-            checks.Add(new ProvisioningCheck
+            // DOGFOOD-2 entry criterion: a governed run must start from an unambiguous
+            // source tree. Dirty blocks with the reason named; an unanswerable git is
+            // honestly Unknown/NotEvaluated — named, never guessed, never blocking.
+            if (input.IsGitRepository)
             {
-                Name = "Dirty-repo state",
-                State = ProvisioningCheckStates.NotEvaluated,
-                Evidence = "Working-tree cleanliness is not evaluated by this readiness check yet.",
-                Remedy = "Arrives with wizard hardening; until then the run's own workspace isolation is the protection.",
-                Blocking = false
-            });
+                switch (input.WorkTreeState)
+                {
+                    case ProvisioningWorkTreeStates.Clean:
+                        checks.Add(new ProvisioningCheck
+                        {
+                            Name = "Dirty-repo state",
+                            State = ProvisioningCheckStates.Confirmed,
+                            Evidence = "Working tree is clean (git status --porcelain reported no changes).",
+                            Remedy = string.Empty,
+                            Blocking = false
+                        });
+                        break;
+
+                    case ProvisioningWorkTreeStates.Dirty:
+                        checks.Add(new ProvisioningCheck
+                        {
+                            Name = "Dirty-repo state",
+                            State = ProvisioningCheckStates.NeedsConfirmation,
+                            Evidence = $"Working tree has uncommitted changes: {input.WorkTreeDetail}",
+                            Remedy = "Commit or stash local changes before governed work — a run must start from an unambiguous source tree. A dirty-repo allow policy is a future project-safety setting; until it exists, dirty blocks.",
+                            Blocking = true
+                        });
+                        blocked.Add(ProvisioningBlockedStates.DirtyRepo);
+                        break;
+
+                    default:
+                        checks.Add(new ProvisioningCheck
+                        {
+                            Name = "Dirty-repo state",
+                            State = ProvisioningCheckStates.NotEvaluated,
+                            Evidence = string.IsNullOrWhiteSpace(input.WorkTreeDetail)
+                                ? "git could not report the working-tree state."
+                                : $"git could not report the working-tree state: {input.WorkTreeDetail}",
+                            Remedy = "Verify git is installed and the path is a working tree, then re-evaluate.",
+                            Blocking = false
+                        });
+                        break;
+                }
+            }
         }
 
         // 3. Build command — stored default confirms; a detected candidate only proposes.
