@@ -46,6 +46,7 @@ import type {
   EnvironmentInfo,
   LoginRequest,
   LoginResponse,
+  PlannedSurfaceEnvelope,
   ProjectDocument,
   ProjectDocumentVersion,
   ProjectChatSession,
@@ -939,6 +940,39 @@ class IronDevApiClient {
     );
   }
 
+  /**
+   * AFFORDANCE-1: probe a planned surface. A real route answers one of three ways —
+   * 501 with the refusal envelope (still planned), success (the surface became real and
+   * the calling panel is stale), or an error (backend truth unavailable). The probe never
+   * invents state: whatever the backend said is what the caller renders.
+   */
+  async probePlannedSurface(
+    path: string,
+    method: 'GET' | 'POST' = 'GET',
+    signal?: AbortSignal
+  ): Promise<PlannedSurfaceProbe> {
+    try {
+      const data = await this.request<unknown>(path, {
+        method,
+        ...(method === 'POST' ? { body: {} } : {}),
+        signal
+      });
+      return { kind: 'ready', data };
+    } catch (error: unknown) {
+      if (error instanceof IronDevApiError) {
+        if (error.status === 501 && isPlannedSurfaceEnvelope(error.body)) {
+          return { kind: 'notImplemented', envelope: error.body };
+        }
+        return { kind: 'error', status: error.status, message: error.message };
+      }
+      return {
+        kind: 'error',
+        status: null,
+        message: error instanceof Error ? error.message : 'The request did not reach IronDev.Api.'
+      };
+    }
+  }
+
   private async request<T>(path: string, options: RequestOptions): Promise<T> {
     const headers = new Headers({ Accept: 'application/json' });
 
@@ -974,6 +1008,25 @@ interface RequestOptions {
   body?: unknown;
   signal?: AbortSignal;
   skipAuth?: boolean;
+}
+
+/** AFFORDANCE-1: the three honest outcomes of probing a planned surface. */
+export type PlannedSurfaceProbe =
+  | { kind: 'notImplemented'; envelope: PlannedSurfaceEnvelope }
+  | { kind: 'ready'; data: unknown }
+  | { kind: 'error'; status: number | null; message: string };
+
+function isPlannedSurfaceEnvelope(body: unknown): body is PlannedSurfaceEnvelope {
+  if (body === null || typeof body !== 'object') {
+    return false;
+  }
+  const candidate = body as Partial<PlannedSurfaceEnvelope>;
+  return (
+    candidate.reason === 'NotImplemented' &&
+    typeof candidate.surface === 'string' &&
+    typeof candidate.plannedSlice === 'string' &&
+    typeof candidate.nextSafeAction === 'string'
+  );
 }
 
 /** Deterministic governance-scope Guid for an int project id — mirrors TicketSkeletonRunService.ApprovalProjectGuid. */

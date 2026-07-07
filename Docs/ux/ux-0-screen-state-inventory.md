@@ -137,3 +137,31 @@ Killjoy line:
 ```text
 The backend is ahead of the cockpit. The work is making truth visible, not making truth.
 ```
+
+---
+
+## 9. Correction (AFFORDANCE-1 PR)
+
+The original survey read `src/features/` and missed `src/flow/` — the flow-first shell is
+already substantially built. Corrected statuses:
+
+```text
+Board surface              Ready — flow/board/BoardScreen.tsx (was: Missing frontend)
+Work item spine            Ready — flow/workitem/WorkItemScreen + Build/Review stages,
+                           StageRail, ContractRail (was: Partial)
+Repair panel (REPAIR-2)    Ready — flow/workitem/RepairAttemptsPanel.tsx renders
+                           report.repairAttempts with the honest boundary (was: Missing)
+Critic package/findings    Ready — CriticPackageViewer, FindingsPanel, ApprovalGate exist
+Batch surface              Ready — flow/batch/BatchScreen.tsx
+Library                    Ready — SolutionExplorer + GovernanceHost re-homed
+Settings                   Partial — users/roles live against tenant API; approval policy
+                           (the intervention dial) is an honestly-labeled LOCAL DRAFT with
+                           backend invariants locked; backend contract is AUTH-0
+```
+
+What this PR added on top: the `PlannedSurfaceEnvelope` + honest-501 convention
+(`PlannedSurfacesController`), the shared `NotImplementedPanel` (universal state 6), Library
+sections for Provisioning/Audit/Admin-invite probing real 501 routes, and the dial's backend
+probe in Settings. REPAIR-2 required no code — it was already built and wired.
+
+Lesson recorded: inventory against ALL frontend roots before declaring anything missing.
