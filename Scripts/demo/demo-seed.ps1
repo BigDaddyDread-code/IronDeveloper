@@ -462,6 +462,18 @@ function Initialize-BookSellerSourceCopy {
     # noise instead of the path. Output is captured; it surfaces ONLY on
     # failure (as diagnosis), so -Json stdout stays parseable.
     Copy-Item -LiteralPath $sampleRoot -Destination $sourceCopy -Recurse
+
+    # DEMO-REHEARSAL-001 finding: the apply spine's validate stage rebuilds in a
+    # fresh worktree of this copy; default obj/ restore state is untracked and
+    # never reaches it. Same pattern the proof harness uses: restore assets into
+    # a tracked .assets/ folder so worktrees carry them.
+    Set-Content -LiteralPath (Join-Path $sourceCopy "Directory.Build.props") -Encoding UTF8 -Value @"
+<Project>
+  <PropertyGroup>
+    <MSBuildProjectExtensionsPath>.assets/`$(MSBuildProjectName)/</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>
+"@
     $restoreOutput = dotnet restore (Join-Path $sourceCopy "BookSeller.slnx") --nologo --verbosity minimal 2>&1
     if ($LASTEXITCODE -ne 0) {
         $restoreOutput | Select-Object -Last 10 | ForEach-Object { Write-Host ("  {0}" -f $_) }
