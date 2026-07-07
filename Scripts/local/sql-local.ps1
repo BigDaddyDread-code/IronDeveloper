@@ -48,7 +48,13 @@ function Invoke-NativeQuiet {
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        & $FileName @Arguments *> $null
+        # DEMO-REHEARSAL-001 finding: fully swallowed output turned a named SQL
+        # error into an unexplained SqlSetupScriptFailed. Quiet on success;
+        # on failure the captured output is the diagnosis and must surface.
+        $captured = & $FileName @Arguments 2>&1
+        if ($LASTEXITCODE -ne 0 -and $null -ne $captured) {
+            $captured | Select-Object -Last 10 | ForEach-Object { Write-Host ("  {0}" -f $_) }
+        }
         return $LASTEXITCODE
     }
     finally {

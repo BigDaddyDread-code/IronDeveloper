@@ -563,16 +563,11 @@ BEGIN
 END
 GO
 
--- Seed Project Rules
-IF NOT EXISTS (SELECT 1 FROM dbo.ProjectRules)
-BEGIN
-    INSERT INTO dbo.ProjectRules (TenantId, ProjectId, Name, Type, Description, EnforcementLevel, AppliesTo, ValidationHint)
-    VALUES 
-    (1, 1, 'SQL Server Source of Truth', 'ArchitectureDecision', 'SQL Server (dbo.ProjectTickets) is the authoritative source of truth for ticket persistence. Do not use Weaviate or other stores as the primary record.', 'Blocking', 'Both', 'Check TicketService.cs for SQL-based persistence.'),
-    (1, 1, 'WPF MVVM Pattern', 'CodeStandard', 'All UI must follow the WPF MVVM pattern using CommunityToolkit.Mvvm. ViewModels must not reference UI elements.', 'Required', 'Build', 'Check for [ObservableProperty] and [RelayCommand] in ViewModels.'),
-    (1, 1, 'Soft Delete for Tickets', 'WorkflowRule', 'Tickets should be archived (soft-deleted) by setting IsDeleted=1 instead of being physically removed from the database.', 'Required', 'Ticket', 'Ensure ArchiveTicketAsync is used instead of a DELETE command.');
-END
-GO
+-- Project Rules are seeded in section 4, AFTER the tenant and project rows
+-- exist. DEMO-REHEARSAL-001 finding: this block previously ran here with
+-- hardcoded TenantId=1/ProjectId=1 and failed every fresh-database setup with
+-- an FK violation — it only ever worked on databases where tenant 1 already
+-- existed.
 
 -- 4. Seed Local Dev Data
 -- Seed Tenant
@@ -622,5 +617,20 @@ BEGIN
         INSERT INTO dbo.Projects (TenantId, Name, Description, LocalPath, IndexingStatus)
         VALUES (@TenantId, 'IronDeveloper', 'Main IronDev development project.', @LocalPath, 'Needs Index');
     END
+END
+GO
+
+-- Seed Project Rules (resolved ids, never hardcoded — fresh databases have no
+-- tenant/project 1)
+DECLARE @RuleTenantId INT = (SELECT Id FROM dbo.Tenants WHERE Slug = 'local-dev');
+DECLARE @RuleProjectId INT = (SELECT TOP 1 Id FROM dbo.Projects WHERE TenantId = @RuleTenantId AND Name = 'IronDeveloper');
+
+IF @RuleTenantId IS NOT NULL AND @RuleProjectId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.ProjectRules)
+BEGIN
+    INSERT INTO dbo.ProjectRules (TenantId, ProjectId, Name, Type, Description, EnforcementLevel, AppliesTo, ValidationHint)
+    VALUES
+    (@RuleTenantId, @RuleProjectId, 'SQL Server Source of Truth', 'ArchitectureDecision', 'SQL Server (dbo.ProjectTickets) is the authoritative source of truth for ticket persistence. Do not use Weaviate or other stores as the primary record.', 'Blocking', 'Both', 'Check TicketService.cs for SQL-based persistence.'),
+    (@RuleTenantId, @RuleProjectId, 'WPF MVVM Pattern', 'CodeStandard', 'All UI must follow the WPF MVVM pattern using CommunityToolkit.Mvvm. ViewModels must not reference UI elements.', 'Required', 'Build', 'Check for [ObservableProperty] and [RelayCommand] in ViewModels.'),
+    (@RuleTenantId, @RuleProjectId, 'Soft Delete for Tickets', 'WorkflowRule', 'Tickets should be archived (soft-deleted) by setting IsDeleted=1 instead of being physically removed from the database.', 'Required', 'Ticket', 'Ensure ArchiveTicketAsync is used instead of a DELETE command.');
 END
 GO

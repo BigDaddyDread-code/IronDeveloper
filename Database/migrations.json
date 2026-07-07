@@ -114,6 +114,26 @@
                            "id":  "2026-06-pr218-release-readiness-decision-record",
                            "path":  "Database/migrate_release_readiness_decision_record.sql",
                            "description":  "Creates durable ReleaseReadinessDecisionRecord table, stored procedures, append-only trigger, and release-readiness-decision-record authority protections."
+                       },
+                       {
+                           "id":  "2026-07-rehearsal-project-profiles",
+                           "path":  "Database/migrate_project_profiles.sql",
+                           "description":  "DEMO-REHEARSAL-001: ProjectProfiles/ProjectCommands tables - required by builder readiness; a fresh demo database could not start a governed run without them."
+                       },
+                       {
+                           "id":  "2026-07-rehearsal-code-indexing",
+                           "path":  "Database/migrate_code_indexing.sql",
+                           "description":  "DEMO-REHEARSAL-001: code index tables required by readiness and context assembly on a fresh database."
+                       },
+                       {
+                           "id":  "2026-07-rehearsal-projects-indexing-fields",
+                           "path":  "Database/migrate_projects_indexing_fields.sql",
+                           "description":  "DEMO-REHEARSAL-001: Projects indexing status fields required by readiness on a fresh database. Catalog-agnostic since the USE landmine was removed."
+                       },
+                       {
+                           "id":  "2026-07-rehearsal-agent-run-audit-envelope",
+                           "path":  "Database/migrate_agent_run_audit_envelope.sql",
+                           "description":  "DEMO-REHEARSAL-001: append-only agent run audit envelope store - the real critic persists durable reviews here."
                        }
                    ]
 }

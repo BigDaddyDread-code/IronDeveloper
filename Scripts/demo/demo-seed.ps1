@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$CheckOnly,
     [switch]$Seed,
     [string]$Project = "BookSeller",
@@ -7,8 +7,11 @@ param(
     [ValidateSet("RunningApi", "ProofHarness")]
     [string]$SeedTarget = "RunningApi",
     [string]$ApiBaseUrl = "http://localhost:5118",
-    [string]$DemoUserEmail = $env:IRONDEV_DEMO_USER_EMAIL,
-    [string]$DemoUserPassword = $env:IRONDEV_DEMO_USER_PASSWORD,
+    # Defaults are the documented local-dev seed user created by
+    # Database/local_dev_setup.sql (local-only, committed there already).
+    # Environment variables override for any non-default setup.
+    [string]$DemoUserEmail = $(if ([string]::IsNullOrWhiteSpace($env:IRONDEV_DEMO_USER_EMAIL)) { "bob@irondev.local" } else { $env:IRONDEV_DEMO_USER_EMAIL }),
+    [string]$DemoUserPassword = $(if ([string]::IsNullOrWhiteSpace($env:IRONDEV_DEMO_USER_PASSWORD)) { "change-me-local-only" } else { $env:IRONDEV_DEMO_USER_PASSWORD }),
     [int]$DemoTenantId = 1,
     [switch]$CreateLiveChatTicket,
     [switch]$ProveUsable,
@@ -344,7 +347,11 @@ function Invoke-DemoApi {
         $params.ContentType = "application/json"
     }
 
-    return Invoke-RestMethod @params
+    # DEMO-REHEARSAL-001 finding: Windows PowerShell 5.1 returns a top-level
+    # JSON array response as ONE nested Object[] item, so list callers saw a
+    # single element containing every row once a second row existed. Piping
+    # enumerates the nested array into real items; scalar responses pass through.
+    return Invoke-RestMethod @params | ForEach-Object { $_ }
 }
 
 function Test-DemoApiHealth {
@@ -450,17 +457,34 @@ function Initialize-BookSellerSourceCopy {
         Complete-DemoSeed -RepoRoot $RepoRoot -OverallStatus "Blocked" -ExitCode 1
     }
 
+    # DEMO-REHEARSAL-001 finding: native command output inside a PowerShell
+    # function joins the RETURN stream â€” the fresh-copy path returned restore
+    # noise instead of the path. Output is captured; it surfaces ONLY on
+    # failure (as diagnosis), so -Json stdout stays parseable.
     Copy-Item -LiteralPath $sampleRoot -Destination $sourceCopy -Recurse
-    dotnet restore (Join-Path $sourceCopy "BookSeller.slnx") --nologo --verbosity minimal
+
+    # DEMO-REHEARSAL-001 finding: the apply spine's validate stage rebuilds in a
+    # fresh worktree of this copy; default obj/ restore state is untracked and
+    # never reaches it. Same pattern the proof harness uses: restore assets into
+    # a tracked .assets/ folder so worktrees carry them.
+    Set-Content -LiteralPath (Join-Path $sourceCopy "Directory.Build.props") -Encoding UTF8 -Value @"
+<Project>
+  <PropertyGroup>
+    <MSBuildProjectExtensionsPath>.assets/`$(MSBuildProjectName)/</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>
+"@
+    $restoreOutput = dotnet restore (Join-Path $sourceCopy "BookSeller.slnx") --nologo --verbosity minimal 2>&1
     if ($LASTEXITCODE -ne 0) {
+        $restoreOutput | Select-Object -Last 10 | ForEach-Object { Write-Host ("  {0}" -f $_) }
         Add-Stage "SourceCopy" "Failed" "DemoKnowledgeSeedFailed" "BookSeller sample restore failed before registering the demo project."
         Complete-DemoSeed -RepoRoot $RepoRoot -OverallStatus "Failed" -ExitCode 1
     }
 
-    git -C $sourceCopy init -q
-    git -C $sourceCopy config user.email "demo-seed@irondev.local"
-    git -C $sourceCopy config user.name "IronDev Demo Seed"
-    git -C $sourceCopy add .
+    git -C $sourceCopy init -q | Out-Null
+    git -C $sourceCopy config user.email "demo-seed@irondev.local" | Out-Null
+    git -C $sourceCopy config user.name "IronDev Demo Seed" | Out-Null
+    git -C $sourceCopy add . | Out-Null
     git -C $sourceCopy commit -m "demo seed baseline" -q | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Add-Stage "SourceCopy" "Failed" "DemoKnowledgeSeedFailed" "BookSeller demo source git baseline could not be created."
@@ -481,18 +505,39 @@ function Resolve-DemoProject {
     )
 
     $projects = @(Invoke-DemoApi -Method "GET" -Path "/api/projects" -Headers $Headers)
-    $matches = @($projects | Where-Object { $_.name -eq "BookSeller" })
-    if ($matches.Count -gt 1) {
+    # DEMO-REHEARSAL-001 finding: `$matches` is PowerShell's AUTOMATIC regex
+    # variable — using it as a plain variable returned ALL projects instead of
+    # the filtered one, corrupting the idempotency comparison. Never shadow it.
+    $bookSellerProjects = @($projects | Where-Object { $_.name -eq "BookSeller" })
+    if ($bookSellerProjects.Count -gt 1) {
         Add-Stage "ProjectResolve" "Blocked" "DemoIdempotencyConflict" "More than one BookSeller project exists in the selected tenant."
         Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
     }
 
-    if ($matches.Count -eq 1) {
-        $project = $matches[0]
+    if ($bookSellerProjects.Count -eq 1) {
+        $project = $bookSellerProjects[0]
         $existingPath = [string]$project.localPath
-        if (-not [string]::IsNullOrWhiteSpace($existingPath) -and
-            -not ([System.IO.Path]::GetFullPath($existingPath).Equals([System.IO.Path]::GetFullPath($SourcePath), [System.StringComparison]::OrdinalIgnoreCase))) {
-            Add-Stage "ProjectResolve" "Blocked" "DemoIdempotencyConflict" "An existing BookSeller project points at a different local path."
+        # DEMO-REHEARSAL-001 finding: an uncomparable stored path crashed the
+        # seed with a raw exception instead of a named block. Comparison
+        # failures now block with the offending values named (redacted).
+        $pathsDiffer = $false
+        if (-not [string]::IsNullOrWhiteSpace($existingPath)) {
+            try {
+                $pathsDiffer = -not ([System.IO.Path]::GetFullPath($existingPath).Equals([System.IO.Path]::GetFullPath($SourcePath), [System.StringComparison]::OrdinalIgnoreCase))
+            }
+            catch {
+                Add-Stage "ProjectResolve" "Blocked" "DemoIdempotencyConflict" "The existing BookSeller project's local path could not be compared: $($_.Exception.Message)" @{
+                    existingPath = Redact-UserPath $existingPath
+                    sourcePath = Redact-UserPath ([string]$SourcePath)
+                }
+                Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
+            }
+        }
+        if ($pathsDiffer) {
+            Add-Stage "ProjectResolve" "Blocked" "DemoIdempotencyConflict" "An existing BookSeller project points at a different local path." @{
+                existingPath = Redact-UserPath $existingPath
+                sourcePath = Redact-UserPath ([string]$SourcePath)
+            }
             Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
         }
 
@@ -525,18 +570,19 @@ function Resolve-DemoTicket {
 
     $fixtureTicket = Read-FixtureTicket -Key $Key
     $tickets = @(Invoke-DemoApi -Method "GET" -Path "/api/projects/$($Project.id)/tickets" -Headers $Headers)
-    $matches = @($tickets | Where-Object { $_.title -eq $fixtureTicket.title })
-    if ($matches.Count -gt 1) {
+    # `$matches` is PowerShell's automatic regex variable — never shadow it.
+    $fixtureTickets = @($tickets | Where-Object { $_.title -eq $fixtureTicket.title })
+    if ($fixtureTickets.Count -gt 1) {
         Add-Stage "TicketResolve" "Blocked" "DemoIdempotencyConflict" "More than one ticket exists for fixture key '$Key'."
         Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Blocked" -ExitCode 1
     }
 
-    if ($matches.Count -eq 1) {
+    if ($fixtureTickets.Count -eq 1) {
         Add-Stage "TicketResolve" "Passed" "DemoSeedPassed" "Resolved existing fixture ticket '$Key' through the product API." @{
-            ticketId = $matches[0].id
+            ticketId = $fixtureTickets[0].id
             key = $Key
         }
-        return $matches[0]
+        return $fixtureTickets[0]
     }
 
     try {
@@ -562,6 +608,48 @@ function Resolve-DemoTicket {
     }
     catch {
         Add-Stage "TicketResolve" "Failed" "DemoTicketSeedFailed" "Could not create fixture ticket '$Key' through the running API."
+        Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
+    }
+}
+
+function Initialize-DemoProjectProfile {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Headers,
+        [Parameter(Mandatory = $true)]$Project,
+        [Parameter(Mandatory = $true)][string]$SourcePath
+    )
+
+    # DEMO-REHEARSAL-001 finding: the real Builder enforces readiness (profile,
+    # build/test commands, code index). The seed now performs the same first-run
+    # journey the product expects — through product routes, granting nothing.
+    try {
+        $detection = Invoke-DemoApi -Method "POST" -Path "/api/profile/detect" -Headers $Headers -Body @{
+            projectRoot = $SourcePath
+            projectId = [int]$Project.id
+        }
+
+        $profile = $detection.profile
+        $profile.projectId = [int]$Project.id
+        $profile.allowBuilderApply = $true
+        if ([string]::IsNullOrWhiteSpace([string]$profile.databaseEngine)) { $profile.databaseEngine = "None" }
+        if ([string]::IsNullOrWhiteSpace([string]$profile.dataAccessStyle)) { $profile.dataAccessStyle = "None" }
+        Invoke-DemoApi -Method "POST" -Path "/api/projects/$($Project.id)/profile" -Headers $Headers -Body $profile | Out-Null
+
+        $detection.buildCommand.projectId = [int]$Project.id
+        $detection.buildCommand.isDefault = $true
+        Invoke-DemoApi -Method "POST" -Path "/api/projects/$($Project.id)/profile/commands" -Headers $Headers -Body $detection.buildCommand | Out-Null
+        $detection.testCommand.projectId = [int]$Project.id
+        $detection.testCommand.isDefault = $true
+        Invoke-DemoApi -Method "POST" -Path "/api/projects/$($Project.id)/profile/commands" -Headers $Headers -Body $detection.testCommand | Out-Null
+
+        Invoke-DemoApi -Method "POST" -Path "/api/projects/$($Project.id)/code-index" -Headers $Headers -Body @{
+            directoryPath = $SourcePath
+        } | Out-Null
+
+        Add-Stage "ProjectProfile" "Passed" "DemoSeedPassed" "Project profile detected/saved and source indexed through product routes. A profile is readiness input, not authority."
+    }
+    catch {
+        Add-Stage "ProjectProfile" "Failed" "DemoProjectResolveFailed" "Project profile/index setup failed through the product routes." @{ error = $_.Exception.Message }
         Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Failed" -ExitCode 1
     }
 }
@@ -1005,7 +1093,7 @@ Add-Stage "ModelCheck" "Passed" "DemoModelModeDeterministic" "Deterministic mode
 if ($SeedTarget -eq "RunningApi") {
     # The seed authenticates and mutates product state (tickets, runs, approvals,
     # continuation, apply, usability probes). A local demo seed that can mutate a
-    # remote API is not local — refuse anything that is not explicitly loopback.
+    # remote API is not local â€” refuse anything that is not explicitly loopback.
     if (Test-LocalApiBaseUrl -BaseUrl $ApiBaseUrl) {
         Add-Stage "ApiBaseUrlCheck" "Passed" "DemoApiBaseUrlLocal" "Demo API base URL is loopback-local." @{ apiBaseUrl = Redact-UserPath $ApiBaseUrl }
     }
@@ -1093,6 +1181,7 @@ else {
 
     $sourceCopy = Initialize-BookSellerSourceCopy -RepoRoot $repoRoot -OutputRoot $script:OutputRoot
     $projectRecord = Resolve-DemoProject -Headers $headers -SourcePath $sourceCopy
+    Initialize-DemoProjectProfile -Headers $headers -Project $projectRecord -SourcePath $sourceCopy
     $validateTicket = Resolve-DemoTicket -Headers $headers -Project $projectRecord -Key "validate-book"
     $searchTicket = Resolve-DemoTicket -Headers $headers -Project $projectRecord -Key "search-by-author"
 
@@ -1145,3 +1234,4 @@ if (-not ($script:Stages | Where-Object { $_.stage -eq "ReceiptWrite" -and $_.st
 }
 
 Complete-DemoSeed -RepoRoot $repoRoot -OverallStatus "Passed" -ExitCode 0
+
