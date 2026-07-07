@@ -194,6 +194,48 @@ public sealed class BuilderProposalService : IBuilderProposalService
         return proposal;
     }
 
+    public async Task<BuilderProposal> GenerateRevisionProposalAsync(long ticketId, SkeletonRevisionContext revision, CancellationToken ct = default)
+    {
+        var ticket = await _ticketService.GetTicketByIdAsync(ticketId, ct)
+            ?? throw new InvalidOperationException($"Ticket {ticketId} not found.");
+
+        var context = await _contextService.AssembleContextAsync(ticket.ProjectId, ticketId, ct);
+
+        // REVISE-1: the Builder revises from the human's written instruction and
+        // the cited finding ids — never from critic text the requester pasted in.
+        context.RevisionDirectives =
+        [
+            $"Human instruction: {revision.Instruction}",
+            .. revision.FindingIds.Select(findingId => $"Cited critic finding: {findingId}")
+        ];
+        context.RetrievedSnippets = context.RetrievedSnippets
+            .Concat(revision.PreviousChanges.Select(change =>
+                $"--- PROPOSAL UNDER REVISION FILE: {change.FilePath} ---\n{change.FullContentAfter}"))
+            .ToList();
+
+        var innerProposal = await _proposalService.GenerateProposalAsync(context, ct);
+        var proposal = MapToBuilderProposal(innerProposal, context);
+        ValidateProposal(proposal);
+
+        _llmTraceService.AddTrace(new LlmTraceEntry
+        {
+            FeatureName = "Builder.RevisionProposal",
+            WorkspaceName = "Builder",
+            ProjectId = ticket.ProjectId,
+            TicketId = ticketId,
+            ActiveProjectName = context.ProjectName,
+            ActiveProjectPath = context.ProjectPath,
+            IsProposalOnly = true,
+            ProposedFileCount = proposal.Changes.Count,
+            ProposedFilesList = string.Join(", ", proposal.Changes.Select(change => change.FilePath)),
+            WasSuccessful = proposal.IsAllValid,
+            ParsedResponseSummary = $"Revision attempt {revision.AttemptNumber}: {(proposal.IsAllValid ? "Validation Passed" : "Validation Failed")}",
+            CreatedAt = DateTime.UtcNow
+        });
+
+        return proposal;
+    }
+
     public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default)
     {
         // Retired by P0-4: the direct file-write path mutated source without the

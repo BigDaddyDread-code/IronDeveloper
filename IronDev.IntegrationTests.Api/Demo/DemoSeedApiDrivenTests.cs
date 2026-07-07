@@ -1190,6 +1190,9 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
         public Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default) =>
             GenerateProposalAsync(ticketId, ct);
 
+        public Task<BuilderProposal> GenerateRevisionProposalAsync(long ticketId, SkeletonRevisionContext revision, CancellationToken ct = default) =>
+            throw new NotSupportedException("DEMO seed proofs do not exercise human-directed revision.");
+
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotSupportedException("DEMO seed applies through skeleton-run API endpoints, not direct builder writes.");
 

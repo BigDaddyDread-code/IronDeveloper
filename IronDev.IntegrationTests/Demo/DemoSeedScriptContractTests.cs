@@ -352,6 +352,47 @@ public sealed class DemoSeedScriptContractTests
     }
 
     [TestMethod]
+    public void FindingDrivenRevision_IsOffByDefaultBoundedHumanDirectedAndExecutedInCi()
+    {
+        var orchestrator = File.ReadAllText(RepoFile("IronDev.Infrastructure", "Services", "TicketSkeletonRunService.cs"));
+
+        // REVISE-1 invariants: off unless explicitly configured, hard-clamped,
+        // human-directed at the gate only, findings never left unanswered, and
+        // only a GREEN revision replaces the canonical gate package.
+        StringAssert.Contains(orchestrator, "SkeletonRevision:MaxAttempts");
+        StringAssert.Contains(orchestrator, "Default 0: revision is off unless explicitly");
+        StringAssert.Contains(orchestrator, "RevisionDisabled");
+        StringAssert.Contains(orchestrator, "RevisionBudgetExhausted");
+        StringAssert.Contains(orchestrator, "UndispositionedFindingsNotCited");
+        StringAssert.Contains(orchestrator, "SkeletonRevisionAttemptStarted");
+        StringAssert.Contains(orchestrator, "GREEN revision replaces the canonical gate package");
+
+        // A revision is human-directed, proposal-shaped work, never authority —
+        // and the revised package needs its OWN review: the gate is hash-scoped.
+        StringAssert.Contains(orchestrator, "A revision is human-directed, proposal-shaped work, never authority");
+        StringAssert.Contains(orchestrator, "HasRecordedCriticReviewForPackage");
+
+        // AddressedByRevision cannot be claimed directly by a human.
+        var dispositions = File.ReadAllText(RepoFile("IronDev.Infrastructure", "Services", "SkeletonFindingDispositionService.cs"));
+        StringAssert.Contains(dispositions, "a human cannot claim a revision that never ran");
+
+        // A client can request a revision; it can never generate one.
+        var client = File.ReadAllText(RepoFile("IronDev.Client", "Tickets", "TicketsApiClient.cs"));
+        StringAssert.Contains(client, "Revision proposals are orchestrated server-side inside bounded skeleton runs.");
+
+        var proofs = File.ReadAllText(RepoFile("IronDev.IntegrationTests.Api", "Smoke", "FindingDrivenRevisionApiDrivenTests.cs"));
+        StringAssert.Contains(proofs, "Revise_CitedFinding_RunsRevisionToTheSameGate_AndTheRevisedPackageNeedsItsOwnReview");
+        StringAssert.Contains(proofs, "Revise_OffByDefault_RefusedNamed_AndTheGateIsUnchanged");
+        StringAssert.Contains(proofs, "Revise_RefusesToLeaveUncitedFindingsUnanswered");
+        StringAssert.Contains(proofs, "Revise_FailedRevisionBuild_LeavesThePreviousGateCanonical_AndSpendsTheBudget");
+        StringAssert.Contains(proofs, "Revise_AHumanCannotClaimAddressedByRevisionDirectly");
+
+        // Selection is not execution: the revision proof class executes in the full SQL lane.
+        var ciScript = File.ReadAllText(RepoFile("Scripts", "ci", "run-full-sql-integration-ci.ps1"));
+        StringAssert.Contains(ciScript, "FullyQualifiedName~FindingDrivenRevisionApiDrivenTests");
+    }
+
+    [TestMethod]
     public void FlowUi_SurfacesRepairAttemptsHonestly()
     {
         // REPAIR-1 in the UI: a repaired run says so, the failed original is

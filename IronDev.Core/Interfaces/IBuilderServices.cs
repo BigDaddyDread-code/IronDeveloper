@@ -74,6 +74,14 @@ public interface IBuilderProposalService
     /// context; the result is proposal-shaped work only — no authority, no apply.
     /// </summary>
     Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default);
+
+    /// <summary>
+    /// REVISE-1: generate a bounded, human-directed revision proposal for a run
+    /// halted at the gate. The human's instruction, the cited finding ids, and
+    /// the proposal under revision enter the Builder's context; the result is
+    /// proposal-shaped work only — no authority, no apply.
+    /// </summary>
+    Task<BuilderProposal> GenerateRevisionProposalAsync(long ticketId, SkeletonRevisionContext revision, CancellationToken ct = default);
 }
 
 /// <summary>

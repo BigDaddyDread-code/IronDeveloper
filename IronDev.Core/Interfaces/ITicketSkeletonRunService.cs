@@ -40,6 +40,17 @@ public interface ITicketSkeletonRunService
     Task<TicketBuildRunDto?> ContinueAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// REVISE-1: the human at the gate directs a bounded revision instead of
+    /// approving — cited undispositioned findings plus a written instruction
+    /// produce a new proposal, a fresh attempt-scoped build/test, and a NEW
+    /// critic package at the SAME human gate. Off unless SkeletonRevision:MaxAttempts
+    /// is explicitly configured. A revision grants nothing: the revised package
+    /// needs its own critic review, dispositions, and hash-bound approval, and a
+    /// failed revision leaves the previous gate package canonical and untouched.
+    /// </summary>
+    Task<TicketBuildRunDto?> ReviseAsync(int projectId, long ticketId, string runId, SkeletonRunRevisionRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Applies an approved, continued run through the governed workspace apply spine —
     /// copy-only, evidence-chained, sandbox repositories only (off by default via
     /// SkeletonApply:Enabled). The approval is re-verified live at this step; the

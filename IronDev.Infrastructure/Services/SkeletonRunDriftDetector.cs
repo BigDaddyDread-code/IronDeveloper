@@ -35,7 +35,9 @@ public sealed class SkeletonRunDriftDetector
     public async Task<string?> DetectAsync(int projectId, string runId, string evidenceRoot, CancellationToken cancellationToken = default)
     {
         var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
-        var packageReady = events.FirstOrDefault(runEvent => runEvent.EventType == "CriticReviewPackageReady");
+        // REVISE-1: the LAST package-ready is the CURRENT gate evidence — a green
+        // revision re-prepared the package, refreshing what staleness is measured from.
+        var packageReady = events.LastOrDefault(runEvent => runEvent.EventType == "CriticReviewPackageReady");
         if (packageReady is null)
             return null;
 

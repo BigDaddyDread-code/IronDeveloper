@@ -16,7 +16,15 @@ public enum SkeletonFindingDispositionKind
     FixInFollowUp = 2,
 
     /// <summary>The finding is judged wrong or inapplicable — the reason must say why.</summary>
-    Reject = 3
+    Reject = 3,
+
+    /// <summary>
+    /// REVISE-1: the finding was answered by a human-directed revision that
+    /// built green and replaced the gate package. Recorded ONLY by the governed
+    /// revision path after the revision succeeds — a human cannot claim a
+    /// revision that never ran, and the disposition surface refuses this kind.
+    /// </summary>
+    AddressedByRevision = 4
 }
 
 /// <summary>

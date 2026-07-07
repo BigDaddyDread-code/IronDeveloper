@@ -428,6 +428,9 @@ public sealed class AlphaLoopSmokeTests
         public Task<BuilderProposal> GenerateRepairProposalAsync(long ticketId, SkeletonRepairContext repair, CancellationToken ct = default) =>
             GenerateProposalAsync(ticketId, ct);
 
+        public Task<BuilderProposal> GenerateRevisionProposalAsync(long ticketId, SkeletonRevisionContext revision, CancellationToken ct = default) =>
+            throw new NotSupportedException("The alpha smoke does not exercise human-directed revision.");
+
         public Task ApplyProposalAsync(BuilderProposal proposal, CancellationToken ct = default) =>
             throw new NotSupportedException("The skeleton loop applies through its own governed spine, not the builder.");
     }

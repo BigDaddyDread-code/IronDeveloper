@@ -300,6 +300,36 @@ public sealed class TicketsController : ControllerBase
     }
 
     /// <summary>
+    /// POST skeleton-runs/{runId}/revise — the human at the gate directs a bounded
+    /// revision instead of approving (REVISE-1): cited undispositioned findings
+    /// plus a written instruction produce a new proposal, a fresh build/test, and
+    /// a NEW critic package at the SAME human gate. Off unless
+    /// SkeletonRevision:MaxAttempts is explicitly configured. A revision grants
+    /// nothing — the revised package needs its own critic review, dispositions,
+    /// and hash-bound accepted approval.
+    /// </summary>
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/revise")]
+    public async Task<ActionResult<TicketBuildRunDto>> ReviseSkeletonRun(
+        int projectId,
+        long ticketId,
+        string runId,
+        [FromBody] SkeletonRevisionBody body,
+        CancellationToken ct)
+    {
+        var result = await _skeletonRuns.ReviseAsync(projectId, ticketId, runId, new SkeletonRunRevisionRequest
+        {
+            FindingIds = body.FindingIds ?? [],
+            Reason = body.Reason ?? string.Empty,
+            RequestedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value
+                ?? "unknown-user"
+        }, ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    public sealed record SkeletonRevisionBody(string[]? FindingIds, string? Reason);
+
+    /// <summary>
     /// POST skeleton-runs/{runId}/apply — applies an approved, continued run through
     /// the governed workspace spine. Copy-only, evidence-chained, sandbox-only
     /// (SkeletonApply:Enabled, off by default); the approval is re-verified live.

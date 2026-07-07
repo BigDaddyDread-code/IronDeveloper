@@ -57,6 +57,13 @@ public sealed record SkeletonRunReport
     /// </summary>
     public IReadOnlyList<SkeletonRunRepairAttemptTrace> RepairAttempts { get; init; } = [];
 
+    /// <summary>
+    /// REVISE-1: every human-directed revision attempt this run made, in order,
+    /// from durable events. A failed revision is history too — the previous gate
+    /// package stayed canonical, and the report says a revision was tried.
+    /// </summary>
+    public IReadOnlyList<SkeletonRunRevisionAttemptTrace> RevisionAttempts { get; init; } = [];
+
     public SkeletonRunApplyTrace? Apply { get; init; }
 
     /// <summary>Every loop link the report could not verify, by name. Empty means every observed link verified.</summary>
@@ -191,6 +198,35 @@ public sealed record SkeletonRunRepairAttemptTrace
     public string ModelProvider { get; init; } = string.Empty;
     public string ModelName { get; init; } = string.Empty;
     public bool RepairProposalEvidenceExistsOnDisk { get; init; }
+}
+
+/// <summary>
+/// One human-directed revision attempt, reconstructed from durable events
+/// (REVISE-1). A revision is directed by the human's written instruction, never
+/// by the critic's authority — and a failed attempt left the previous gate
+/// package canonical.
+/// </summary>
+public sealed record SkeletonRunRevisionAttemptTrace
+{
+    /// <summary>The revision ordinal for this run (1 = first revision).</summary>
+    public int AttemptNumber { get; init; }
+
+    /// <summary>The finding ids the human cited.</summary>
+    public IReadOnlyList<string> FindingIds { get; init; } = [];
+
+    /// <summary>The human's written revision instruction.</summary>
+    public string Reason { get; init; } = string.Empty;
+    public string RequestedByUserId { get; init; } = string.Empty;
+
+    public string RevisionProposalId { get; init; } = string.Empty;
+    public string ModelProvider { get; init; } = string.Empty;
+    public string ModelName { get; init; } = string.Empty;
+    public bool RevisionProposalEvidenceExistsOnDisk { get; init; }
+
+    /// <summary>True when this attempt failed; the previous gate package remained canonical.</summary>
+    public bool Failed { get; init; }
+    public string FailureKind { get; init; } = string.Empty;
+    public string FailedCommand { get; init; } = string.Empty;
 }
 
 /// <summary>A human disposition recorded for a critic finding. A decision, not approval.</summary>

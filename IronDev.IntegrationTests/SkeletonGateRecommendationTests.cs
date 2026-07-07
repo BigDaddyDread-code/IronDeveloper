@@ -343,6 +343,9 @@ public sealed class SkeletonGateRecommendationTests
         public Task<TicketBuildRunDto?> ContinueAsync(int projectId, long ticketId, string runId, CancellationToken ct = default) =>
             throw new NotSupportedException("Policy cannot continue runs — policy cannot click.");
 
+        public Task<TicketBuildRunDto?> ReviseAsync(int projectId, long ticketId, string runId, SkeletonRunRevisionRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("Policy cannot direct revisions — policy cannot click.");
+
         public Task<TicketBuildRunDto?> ApplyAsync(int projectId, long ticketId, string runId, CancellationToken ct = default) =>
             throw new NotSupportedException("Policy cannot apply runs — policy cannot click.");
     }

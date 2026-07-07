@@ -313,6 +313,9 @@ public sealed class SkeletonBatchRunTests
         public Task<TicketBuildRunDto?> ContinueAsync(int projectId, long ticketId, string runId, CancellationToken ct = default) =>
             throw new NotSupportedException("The batch must never continue a run — that gate is human.");
 
+        public Task<TicketBuildRunDto?> ReviseAsync(int projectId, long ticketId, string runId, SkeletonRunRevisionRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException("The batch must never direct a revision — that decision is human.");
+
         public Task<TicketBuildRunDto?> ApplyAsync(int projectId, long ticketId, string runId, CancellationToken ct = default) =>
             throw new NotSupportedException("The batch must never apply a run — that gate is human.");
 
