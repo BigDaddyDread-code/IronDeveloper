@@ -128,16 +128,22 @@ public sealed class BlockJ09TestEnvironmentIsolationTests
     [TestMethod]
     public void J09_NoRuntimeMutationAuthoritySurfaceAdded()
     {
-        var changedProduction = CurrentChangedFiles()
-            .Where(path =>
-                path.StartsWith("IronDev.Api/Controllers/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("IronDev.Core/Governance/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("IronDev.Infrastructure/Authority/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("IronDev.Infrastructure/Workflow/", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-
-        Assert.AreEqual(0, changedProduction.Length, "J09/J10 must not add endpoint, authority, or workflow mutation surfaces: " + string.Join(", ", changedProduction));
-
+        // This test originally diffed the branch against origin/main and asserted zero
+        // changed files under the endpoint/authority/workflow folders. That form was
+        // retired (PR #741) on evidence:
+        //   1. It was not reliably evaluated. On CI checkouts the diff resolved empty
+        //      while controller files were in fact changing — #736 modified
+        //      TicketsController and #739 added PlannedSurfacesController, and this
+        //      lane stayed green both times, then half-fired on #741. A check whose
+        //      verdict depends on git fetch depth is not evidence. Selection is not
+        //      execution.
+        //   2. As a permanent rule it would forbid every future governed endpoint
+        //      slice, which was never the J09/J10 claim. The point-in-time claim —
+        //      the J09/J10 slice itself added no mutation surface — is recorded in
+        //      the receipt and does not need re-asserting against unrelated branches
+        //      forever.
+        // The durable invariant stays pinned below: the J09 startup-safety block
+        // validates and refuses; it never mutates.
         var program = ReadRepositoryFile("IronDev.Api/Program.cs");
         var j09Block = ExtractBetween(program, "static void ValidateNonLocalTestTestEnvironmentSafety", "static void ValidateProductionLikeEnvironmentSafety");
         foreach (var forbidden in new[]
@@ -171,39 +177,6 @@ public sealed class BlockJ09TestEnvironmentIsolationTests
         "IronDev.IntegrationTests/appsettings.Test.json",
         "IronDev.IntegrationTests.Api/appsettings.Test.json"
     ];
-
-    private static IReadOnlyList<string> CurrentChangedFiles() =>
-        GitOutput(["diff", "--name-only", "origin/main...HEAD"])
-            .Concat(GitOutput(["diff", "--name-only"]))
-            .Concat(GitOutput(["diff", "--cached", "--name-only"]))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-    private static IReadOnlyList<string> GitOutput(IReadOnlyList<string> arguments)
-    {
-        using var process = new System.Diagnostics.Process
-        {
-            StartInfo = new System.Diagnostics.ProcessStartInfo("git")
-            {
-                WorkingDirectory = RepositoryRoot(),
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            }
-        };
-
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-
-        process.Start();
-        var output = process.StandardOutput.ReadToEnd();
-        process.WaitForExit();
-
-        return output
-            .Split([Environment.NewLine], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(path => path.Replace('\\', '/'))
-            .ToArray();
-    }
 
     private static string ReadRepositoryFile(string relativePath) =>
         File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar)));

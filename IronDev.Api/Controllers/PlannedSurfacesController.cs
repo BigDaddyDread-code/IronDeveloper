@@ -24,13 +24,8 @@ public sealed class PlannedSurfacesController : ControllerBase
         detail: "Audit truth exists today across governance traces, agent-run audit, and workflow transition records; the unified actor/action/evidence ledger view is not built.",
         nextSafeAction: "Use Library > Governance for traces, receipts, and agent-run audit.");
 
-    /// <summary>Provisioning readiness result (full-ux-map §8.1). Profile/commands exist; scan + readiness contract do not.</summary>
-    [HttpGet("api/projects/{projectId:int}/provisioning/readiness")]
-    public IActionResult GetProvisioningReadiness(int projectId) => Planned(
-        surface: "Project provisioning readiness",
-        plannedSlice: "PROJECT-3 (readiness result and blockers)",
-        detail: $"Project {projectId} has profile and command configuration endpoints today; the repo scan, architecture wizard, and readiness-result contract arrive with PROJECT-0..3.",
-        nextSafeAction: "Configure the project profile and build/test commands via the existing project profile endpoints.");
+    // PROJECT-3 note: the provisioning-readiness stub that lived here graduated to
+    // ProvisioningController — the route is real now. Stubs are meant to die this way.
 
     /// <summary>Invite flow (full-ux-map §8.3 step 2). Direct user creation exists; invite is gated on TEAM-0.</summary>
     [HttpPost("api/tenants/{tenantId:int}/users/invite")]

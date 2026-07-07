@@ -1435,6 +1435,29 @@ export interface SkeletonAgentProfileOutcome {
   profile?: SkeletonAgentProfile | null;
 }
 
+// ── PROJECT-0..3: provisioning readiness (computed server-side, never asserted) ──
+
+export interface ProvisioningCheckUi {
+  name: string;
+  /** Confirmed | Detected | NeedsConfirmation | Missing | Unsafe | NotEvaluated */
+  state: string;
+  evidence: string;
+  remedy: string;
+  blocking: boolean;
+  /** Detected candidate for wizard prefill — a proposal, never a confirmation. */
+  detectedValue: string;
+}
+
+export interface ProjectProvisioningReadinessUi {
+  projectId: number;
+  isReady: boolean;
+  blockedStates: string[];
+  checks: ProvisioningCheckUi[];
+  /** The detected architecture profile awaiting one-click human confirmation, when present. */
+  proposedProfile?: Record<string, unknown> | null;
+  boundary: string;
+}
+
 // ── AFFORDANCE-1: planned surfaces refuse honestly ──
 
 /**

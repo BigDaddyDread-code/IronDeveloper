@@ -629,6 +629,34 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
                   {report.apply ? (
                     <>
                       <p className="fl-plabel" style={{ marginTop: 14 }}>
+                        Apply chain — stage by stage
+                      </p>
+                      <p style={{ fontSize: 12.5, color: 'var(--fl-ink2)' }} data-testid="flow.done.applyOutcome">
+                        {report.apply.applied
+                          ? `Applied — copy-only source mutation completed into ${report.apply.workspacePath || 'the governed workspace'}.`
+                          : `Not applied${report.apply.refusedReason ? ` — refused: ${report.apply.refusedReason}` : '.'}`}
+                      </p>
+                      {report.apply.stages.length > 0 ? (
+                        <div data-testid="flow.done.applyStages">
+                          {report.apply.stages.map((stage) => (
+                            <div className="fl-qbox" key={stage.stage} data-testid={`flow.done.applyStage.${stage.stage}`}>
+                              <span>
+                                <strong style={{ fontSize: 12.5 }}>
+                                  {stage.stage} · {stage.succeeded ? 'succeeded' : 'BLOCKED'}
+                                </strong>
+                                {stage.errors ? (
+                                  <span style={{ display: 'block', fontSize: 12.5, color: 'var(--fl-red, #a63232)' }}>
+                                    {stage.errors}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="fl-empty">No apply stages recorded — the chain never started.</p>
+                      )}
+                      <p className="fl-plabel" style={{ marginTop: 14 }}>
                         Receipts — the evidence chain
                       </p>
                       <div data-testid="flow.done.receipts">
@@ -636,6 +664,9 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
                           <div className="fl-qbox" key={receipt.name}>
                             <span>
                               {receipt.name} · {receipt.existsOnDisk ? 'on disk' : 'MISSING'}
+                              {receipt.path ? (
+                                <span style={{ display: 'block', fontSize: 11.5, color: 'var(--fl-muted)' }}>{receipt.path}</span>
+                              ) : null}
                             </span>
                           </div>
                         ))}

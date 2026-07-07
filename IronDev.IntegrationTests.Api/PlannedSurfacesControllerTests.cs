@@ -31,13 +31,6 @@ public sealed class PlannedSurfacesControllerTests
     }
 
     [TestMethod]
-    public void ProvisioningReadiness_Refuses501_WithFullEnvelope()
-    {
-        var result = CreateController().GetProvisioningReadiness(projectId: 3);
-        AssertPlannedEnvelope(result, expectedSliceFragment: "PROJECT-3");
-    }
-
-    [TestMethod]
     public void InviteTenantUser_Refuses501_WithFullEnvelope()
     {
         var result = CreateController().InviteTenantUser(tenantId: 1);

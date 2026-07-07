@@ -145,7 +145,10 @@ $securityBoundaryFilter = @(
     "FullyQualifiedName~BlockC14SensitiveApiRateLimitAuthBoundaryTests",
     "FullyQualifiedName~BlockC15SecurityAuditLogBoundaryTests",
     "FullyQualifiedName~BlockC16CiArtifactRetentionBoundaryTests",
-    "FullyQualifiedName~BlockJ09TestEnvironmentIsolationTests"
+    "FullyQualifiedName~BlockJ09TestEnvironmentIsolationTests",
+    # PROJECT-1: provisioning root safety (drive/user/system roots, reparse ancestors).
+    # Listed by name because selection is not execution.
+    "FullyQualifiedName~ProvisioningRootSafetyTests"
 ) -join "|"
 
 $apiBoundaryFilter = @(
