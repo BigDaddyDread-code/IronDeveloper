@@ -451,8 +451,11 @@ function Initialize-BookSellerSourceCopy {
 
     $sourceCopy = Join-Path $OutputRoot "BookSeller-source"
     if (Test-Path -LiteralPath $sourceCopy) {
-        Add-Stage "SourceCopy" "Blocked" "DemoIdempotencyConflict" "BookSeller demo source copy already exists without a verified seed receipt. Refusing to overwrite local demo source." @{
-            sourceCopy = Redact-UserPath $sourceCopy
+        # DEMO-REHEARSAL-001 residual R3: the refusal is deliberate (never
+        # overwrite local demo source silently), but the remedy must be named.
+        $redactedCopyPath = Redact-UserPath $sourceCopy
+        Add-Stage "SourceCopy" "Blocked" "DemoIdempotencyConflict" "BookSeller demo source copy already exists without a verified seed receipt - usually left behind by an earlier failed seed. Refusing to overwrite local demo source. Next safe action: verify nothing of yours lives under '$redactedCopyPath', delete that folder, then rerun the seed." @{
+            sourceCopy = $redactedCopyPath
         }
         Complete-DemoSeed -RepoRoot $RepoRoot -OverallStatus "Blocked" -ExitCode 1
     }

@@ -4,6 +4,7 @@ param(
     [string]$Database,
     [string]$ConnectionString,
     [switch]$TrustServerCertificate,
+    [switch]$ResolveConnectionStringOnly,
     [int]$CommandTimeoutSeconds = 120
 )
 
@@ -19,6 +20,16 @@ function Get-RepositoryRoot {
     }
 
     throw "Could not find repository root from $PSScriptRoot."
+}
+
+function Test-LocalDeveloperSqlTarget {
+    param([Parameter(Mandatory = $true)][string]$ServerName)
+
+    if ($ServerName -like "(localdb)\*") {
+        return $true
+    }
+
+    return $ServerName -match "^(localhost|127\.0\.0\.1|\.)(,|\\|$)"
 }
 
 function New-ConnectionString {
@@ -38,8 +49,22 @@ function New-ConnectionString {
     $builder["Data Source"] = $Server
     $builder["Initial Catalog"] = $Database
     $builder["Integrated Security"] = $true
-    $builder["Encrypt"] = $true
-    $builder["TrustServerCertificate"] = [bool]$TrustServerCertificate
+    if (Test-LocalDeveloperSqlTarget -ServerName $Server) {
+        # DEMO-REHEARSAL-001 residual R2 (review-narrowed): legacy
+        # System.Data.SqlClient cannot open an Encrypt=true connection to LocalDB,
+        # so explicit LOCAL developer targets (LocalDB, localhost, 127.0.0.1, .)
+        # run unencrypted. This branch must never widen beyond local targets.
+        $builder["Encrypt"] = $false
+        $builder["TrustServerCertificate"] = $false
+    }
+    else {
+        # Every non-local generated connection stays encrypted by default.
+        # -TrustServerCertificate keeps encryption ON and trusts the server
+        # certificate (the self-signed remote case). Fully custom needs go
+        # through -ConnectionString.
+        $builder["Encrypt"] = $true
+        $builder["TrustServerCertificate"] = [bool]$TrustServerCertificate
+    }
     return $builder.ConnectionString
 }
 
@@ -88,6 +113,14 @@ try {
     }
 
     $sqlConnectionString = New-ConnectionString
+    if ($ResolveConnectionStringOnly) {
+        # Test seam: print the resolved connection string and stop before any
+        # connection is opened. ApplyMigrationsScriptContractTests pins the
+        # encryption defaults through this switch.
+        Write-Output $sqlConnectionString
+        exit 0
+    }
+
     $connection = New-Object System.Data.SqlClient.SqlConnection $sqlConnectionString
     $connection.Open()
 

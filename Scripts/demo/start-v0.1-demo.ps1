@@ -545,8 +545,22 @@ elseif (Test-Path -LiteralPath $sqlScript) {
     )
 
     if ($sqlExit -eq 0) {
-        Add-Stage "SqlCheck" "Passed" "DemoStartupPassed" "Local SQL check-only command accepted the configured local database target." "" @{
-            databaseName = $DatabaseName
+        # DEMO-REHEARSAL-001 residual R1: the check-only command validates the
+        # database NAME is safe, not that the database EXISTS. Probe existence
+        # so a missing database blocks HERE with the exact remedy, instead of the
+        # stack coming "up" and dying at seed authentication.
+        $previousEap = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        & sqlcmd -b -S $SqlServer -d $DatabaseName -E -Q "SELECT 1" 2>&1 | Out-Null
+        $databaseProbeExit = $LASTEXITCODE
+        $ErrorActionPreference = $previousEap
+        if ($databaseProbeExit -eq 0) {
+            Add-Stage "SqlCheck" "Passed" "DemoStartupPassed" "Local SQL target accepted and the demo database exists." "" @{
+                databaseName = $DatabaseName
+            }
+        }
+        else {
+            Add-Stage "SqlCheck" "Blocked" "DemoStartupSqlUnavailable" "The demo database '$DatabaseName' does not exist or is not reachable." "Create it: Scripts/local/sql-local.ps1 -Create -ApplyLocalDevSetup -DatabaseName '$DatabaseName', then Database/apply-migrations.ps1 -Server '$SqlServer' -Database '$DatabaseName', then rerun the demo startup script."
         }
     }
     else {
@@ -690,7 +704,10 @@ else {
         }
     }
     else {
-        Add-Stage "DemoSeedCheck" "Blocked" "DemoStartupSeedUnavailable" "Demo seed failed or blocked." "Run Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic -ApiBaseUrl $ApiBaseUrl -OutputDirectory '$outputFull' -Json and fix the first reported blocker."
+        # DEMO-REHEARSAL-001 residual R4: a mid-seed failure leaves a half-seeded
+        # state; the rerun path must be named, not discovered.
+        $staleCopyPath = Redact-UserPath (Join-Path $outputFull "BookSeller-source")
+        Add-Stage "DemoSeedCheck" "Blocked" "DemoStartupSeedUnavailable" "Demo seed failed or blocked." "Run Scripts/demo/demo-seed.ps1 -Seed -Project BookSeller -ModelMode Deterministic -ApiBaseUrl $ApiBaseUrl -OutputDirectory '$outputFull' -Json and fix the first reported blocker. If it reports DemoIdempotencyConflict on SourceCopy, an earlier failed seed left '$staleCopyPath' behind - verify nothing of yours lives there, delete it, then rerun Scripts/demo/start-v0.1-demo.ps1."
     }
 }
 

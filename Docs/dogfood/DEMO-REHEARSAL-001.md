@@ -64,19 +64,34 @@ Fixed in this slice (each has its own commit):
 14. Skeleton apply was unarmed for the demo's disposable copy — SkeletonApplyPin arms the sandbox case; the governed gate chain is unchanged.
 15. An uncomparable stored project path crashed the seed — now a named `DemoIdempotencyConflict` block with redacted values.
 
-Recorded, not yet fixed (named residuals):
+Residuals — addressed in the follow-up slice (R1-R4, validated by execution):
 
-- R1. `SqlCheck` (startup) validates database-name SAFETY, not existence — the stack can report healthy against a nonexistent database and fail only at seed auth. Remedy path exists (`sql-local -Create -ApplyLocalDevSetup` + `apply-migrations`), but the doctor should say so at the right moment.
-- R2. `apply-migrations.ps1` default connection builder (legacy SqlClient + Encrypt) fails against LocalDB — the `-ConnectionString` escape hatch works and is what the runbook should show.
-- R3. A failed seed leaves `BookSeller-source` behind and the next run blocks `DemoIdempotencyConflict` without naming the delete-the-copy remedy.
-- R4. The startup script is not itself idempotent about a half-seeded state; rerunning after a mid-seed failure requires the R3 cleanup first.
+- R1 FIXED. Startup `SqlCheck` now probes database EXISTENCE after name-safety; a
+  missing database blocks at startup with the exact remedy (create + migrations
+  commands), validated against both a missing and a real database.
+- R2 FIXED (review-narrowed). `apply-migrations.ps1` runs unencrypted ONLY for
+  explicit local developer targets (LocalDB, localhost, 127.0.0.1, `.`), where
+  legacy SqlClient cannot encrypt — so plain `-Server/-Database` now works
+  locally (validated). Non-local generated connections stay encrypted by
+  default; `-TrustServerCertificate` means encrypted + trusted certificate;
+  fully custom needs use `-ConnectionString`. Behavior is contract-pinned
+  (`ApplyMigrationsScriptContractTests`) and executed by exact name in the
+  governance-boundary CI lane.
+- R3 FIXED. The seed's `DemoIdempotencyConflict` refusal (still deliberate —
+  local demo source is never overwritten silently) now NAMES its remedy: verify,
+  delete the stale copy, rerun. Contract-pinned.
+- R4 FIXED. The startup's seed-blocked next-safe-action now names the stale-copy
+  cleanup and the rerun, so a mid-seed failure has a written path back.
+
+Note: the runbook command list below was updated for R2 — `apply-migrations.ps1`
+now works with plain `-Server/-Database` locally.
 
 ## Required Demo Commands (validated in this dry-run)
 
 1. `git rev-parse HEAD`
 2. `Scripts/local/doctor-local.ps1 -CheckOnly -Json`
 3. `Scripts/local/sql-local.ps1 -Create -ApplyLocalDevSetup -DatabaseName IronDeveloper_Local` (fresh machine)
-4. `Database/apply-migrations.ps1 -ConnectionString "Server=(localdb)\MSSQLLocalDB;Database=IronDeveloper_Local;Integrated Security=True;"` (fresh machine)
+4. `Database/apply-migrations.ps1 -Server "(localdb)\MSSQLLocalDB" -Database IronDeveloper_Local` (fresh machine)
 5. `Scripts/demo/start-v0.1-demo.ps1` (starts SQL check, JWT/db/model/apply pins, API, UI, seed)
 6. Open `http://127.0.0.1:5173`
 7. Walk the BookSeller ticket/run/report path; the seed receipt carries the backend evidence refs.
