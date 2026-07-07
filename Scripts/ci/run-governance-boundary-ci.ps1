@@ -180,6 +180,14 @@ Invoke-GovernanceBoundaryTestLane `
     -Name "Static boundary tests" `
     -Filter "TestCategory=StaticBoundary"
 
+# DEMO-REHEARSAL-001 residual R2 (review-narrowed): the migration script's
+# generated connection stays encrypted for every non-local server; only explicit
+# local developer targets (LocalDB, localhost, 127.0.0.1, .) run unencrypted.
+# Executed here by exact name — selection is not execution.
+Invoke-GovernanceBoundaryTestLane `
+    -Name "Migration connection encryption contract" `
+    -Filter "FullyQualifiedName~ApplyMigrationsScriptContractTests"
+
 Invoke-ApiBoundaryTestLane `
     -Name "API boundary tests" `
     -Filter $apiBoundaryFilter

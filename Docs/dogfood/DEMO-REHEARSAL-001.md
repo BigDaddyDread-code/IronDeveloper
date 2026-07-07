@@ -69,10 +69,14 @@ Residuals — addressed in the follow-up slice (R1-R4, validated by execution):
 - R1 FIXED. Startup `SqlCheck` now probes database EXISTENCE after name-safety; a
   missing database blocks at startup with the exact remedy (create + migrations
   commands), validated against both a missing and a real database.
-- R2 FIXED. `apply-migrations.ps1` default builder no longer forces Encrypt
-  (legacy SqlClient cannot encrypt to LocalDB); `-Server/-Database` now works
-  locally — validated. `-TrustServerCertificate` opts into encryption; fully
-  custom needs use `-ConnectionString`.
+- R2 FIXED (review-narrowed). `apply-migrations.ps1` runs unencrypted ONLY for
+  explicit local developer targets (LocalDB, localhost, 127.0.0.1, `.`), where
+  legacy SqlClient cannot encrypt — so plain `-Server/-Database` now works
+  locally (validated). Non-local generated connections stay encrypted by
+  default; `-TrustServerCertificate` means encrypted + trusted certificate;
+  fully custom needs use `-ConnectionString`. Behavior is contract-pinned
+  (`ApplyMigrationsScriptContractTests`) and executed by exact name in the
+  governance-boundary CI lane.
 - R3 FIXED. The seed's `DemoIdempotencyConflict` refusal (still deliberate —
   local demo source is never overwritten silently) now NAMES its remedy: verify,
   delete the stale copy, rerun. Contract-pinned.
