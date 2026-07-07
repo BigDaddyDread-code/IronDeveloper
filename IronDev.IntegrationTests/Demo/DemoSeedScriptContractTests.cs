@@ -375,6 +375,16 @@ public sealed class DemoSeedScriptContractTests
     }
 
     [TestMethod]
+    public void DemoSeedContract_ExecutesInCi()
+    {
+        // Selection is not execution: this class must be executed by exact name
+        // in a CI lane, not merely selected by category.
+        var ciScript = File.ReadAllText(RepoFile("Scripts", "ci", "run-governance-boundary-ci.ps1"));
+
+        StringAssert.Contains(ciScript, "FullyQualifiedName~DemoSeedScriptContractTests");
+    }
+
+    [TestMethod]
     public void DemoSeed_ReceiptDocumentsBoundary()
     {
         var receipt = File.ReadAllText(RepoFile("Docs", "receipts", "DEMO1_API_DRIVEN_DEMO_SEED.md"));

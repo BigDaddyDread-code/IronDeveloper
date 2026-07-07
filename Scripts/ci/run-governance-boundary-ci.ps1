@@ -188,6 +188,15 @@ Invoke-GovernanceBoundaryTestLane `
     -Name "Migration connection encryption contract" `
     -Filter "FullyQualifiedName~ApplyMigrationsScriptContractTests"
 
+# The demo seed contract pins (demo-seed.ps1 refusal behavior, catalog guards,
+# repair invariants, UI honesty strings, and CI lane wiring) previously ran in
+# no CI lane. CheckOnly and the refusal paths never touch SQL or a running API,
+# so they run on a bare runner. Executed here by exact name — selection is not
+# execution.
+Invoke-GovernanceBoundaryTestLane `
+    -Name "Demo seed script contract" `
+    -Filter "FullyQualifiedName~DemoSeedScriptContractTests"
+
 Invoke-ApiBoundaryTestLane `
     -Name "API boundary tests" `
     -Filter $apiBoundaryFilter
