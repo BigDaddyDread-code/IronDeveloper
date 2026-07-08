@@ -517,11 +517,23 @@ criterion coverage (covered / uncovered named) · repair attempt count
 ```text
 ┌ F-1 · High · Missing null guard in OrderService ────────────────────┐
 │ problem · why it matters · required fix · blocks merge: yes         │
-│ Disposition: [FixRequired] [AcceptRisk] [RejectFinding] [DeferFix]  │
-│ — reason required for all four; decided-by + timestamp recorded —   │
+│ Disposition: [AcceptRisk] [FixInFollowUp] [Reject]   [Revise…]      │
+│ — reason required for all three; decided-by + timestamp recorded —  │
 └─────────────────────────────────────────────────────────────────────┘
 Ground truth checks: 4 run · 0 mismatched
 ```
+
+`[Revise…]` is a verb, not a fourth disposition (shipped as REVISE-1, #736): it
+cites this finding (and any other undispositioned ones) into
+`POST .../skeleton-runs/{runId}/revise` with the human's written instruction. A
+green revision replaces the gate package (superseded package preserved) and
+records `AddressedByRevision` for the cited findings; a failed revision returns
+to the unchanged gate with the budget spent. Off unless
+`SkeletonRevision:MaxAttempts` is configured — the button renders its named
+refusal (`RevisionDisabled`, `RevisionBudgetExhausted`,
+`UndispositionedFindingsNotCited`, …) exactly like every other governed action.
+The revised package needs its OWN critic review: the review requirement is
+hash-scoped to the current package.
 
 **Human gate** (foot of the pane) — visible to every role, actionable only by an eligible
 Approver (Section 2.2):
@@ -544,8 +556,10 @@ Eligibility is always shown, even when it excludes the viewer — an ineligible 
 
 ```text
 Refusal codes rendered inline when the gate refuses:
-CriticReviewMissing · UndispositionedFindings · ApprovalExpired ·
-PackageHashMismatch · StaleAfterUpstreamApply · DelegatedApprovalScopeMismatch
+CriticReviewMissing (hash-scoped: means no review of the CURRENT package —
+a superseded pre-revision review satisfies nothing) · UndispositionedFindings ·
+ApprovalExpired · PackageHashMismatch · StaleAfterUpstreamApply ·
+DelegatedApprovalScopeMismatch
 Language rules: never "Auto approved". Always "Delegated approval policy matched (policy name,
 reason code, remaining uses)". A finding is not a veto. A disposition is not approval.
 ```
@@ -835,6 +849,12 @@ Level 2 · Trusted lane         Level 1 + repair attempts within budget allowed 
                                delegated apply within a narrow path scope (future; AUTH-3).
 Level 3 · Autonomous lane      all gates delegated within scope; humans review reports and
                                audit after the fact. Never includes commit/push/release.
+
+Every level above 0 ALSO requires a fresh, VERIFIED critic canary catch-rate
+measurement (P2-6 parity: required catch-rate met, control clean, re-execution
+available). Stale, missing, or failing measurement halts every delegated gate to
+a human, named — the dial reads the eval; autonomy is earned by measurement, and
+each delegated satisfaction's audit row names the measurement it relied on.
 ```
 
 **UX:**
@@ -894,10 +914,12 @@ product ends.
 **J6 — Three humans, one work item.** Bob (Developer) shapes and confirms WI-9, starts the
 run; it halts at the gate. Bob's gate panel says: *not eligible — SelfApprovalProhibited;
 eligible: alice, marek.* Alice (Reviewer) finds WI-9 in her "waiting on you" queue, records
-the critic review, dispositions nothing (one finding is Bob's to answer). Bob dispositions
-`FixRequired` → new run → clean package. Marek (Approver) sees it in his queue, replays the
-package (hash, no repair this time, alice's review, Bob's disposition trail), records
-approval with reason. Bob applies. The audit ledger reads as a conversation between three
+the critic review, dispositions nothing (one finding is Bob's to answer). Bob directs a
+revision citing the finding with a written instruction → the run rebuilds green, the revised
+package (new hash) supersedes the old one, and the cited finding reads `AddressedByRevision`.
+The revised package needs its own review — alice reviews again, clean. Marek (Approver) sees
+it in his queue, replays the package (new hash, the revision trail, alice's fresh review,
+Bob's disposition trail), records approval with reason. Bob applies. The audit ledger reads as a conversation between three
 named humans and one backend — no step required anyone to ask "who was supposed to do this?"
 
 **J7 — The autonomous lane halts.** A project runs at Level 1 (Review-light). Four tickets
