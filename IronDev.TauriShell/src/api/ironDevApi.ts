@@ -278,6 +278,19 @@ class IronDevApiClient {
     return this.request<{ projectId: number }>(`/api/projects/${projectId}/select`, { method: 'POST', signal });
   }
 
+  /**
+   * UX-START-0: creates a governed project shell. A created project is a
+   * context boundary, not readiness — the caller lands on the readiness
+   * screen next, never straight into governed work.
+   */
+  async createProject(name: string, localPath: string, signal?: AbortSignal): Promise<ProjectSummary> {
+    return this.request<ProjectSummary>('/api/projects', {
+      method: 'POST',
+      body: { name, description: '', localPath },
+      signal
+    });
+  }
+
   async getProjectTickets(projectId: number, signal?: AbortSignal): Promise<TicketLoadResult> {
     try {
       const tickets = await this.request<ProjectTicket[]>(`/api/projects/${projectId}/tickets`, {
