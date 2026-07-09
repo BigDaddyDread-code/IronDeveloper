@@ -1,6 +1,8 @@
 # DOGFOOD-2 — Second Repo Runbook
 
-**Status:** Entry criteria satisfied by the dirty-repo gate PR; cycle not yet run.
+**Status:** Cycle 001 run 2026-07-08/09 (author dry-run) — completed to Applied with
+14 findings and 2 recorded deviations. Receipts: `DOGFOOD2_SECOND_REPO_CYCLE_001.md`.
+The non-author walk remains open.
 **Purpose:** walk a second, non-BookSeller repository through the full governed loop —
 provisioning → ticket → run → gate → apply → report — using only the product surfaces.
 This is the viability test: it measures whether the value of a governed run exceeds the
