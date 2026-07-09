@@ -34,10 +34,35 @@ public sealed class ProfilesController : ControllerBase
         _profiles.GetProjectCommandsAsync(projectId, ct);
 
     [HttpPost("api/projects/{projectId:int}/profile/commands")]
-    public async Task<IActionResult> SaveCommand(ProjectCommand command, CancellationToken ct)
+    public async Task<IActionResult> SaveCommand(int projectId, ProjectCommand command, CancellationToken ct)
     {
+        // DOGFOOD-2 finding F-C: a malformed body (wrong field name) used to bind
+        // to an EMPTY command and return 200 OK, silently poisoning the wizard.
+        // The refusal names the fields; the route owns the project id.
+        command.ProjectId = projectId;
+        if (string.IsNullOrWhiteSpace(command.CommandType) || string.IsNullOrWhiteSpace(command.CommandText))
+        {
+            return BadRequest(new
+            {
+                error = "A command requires commandType (Build, Test, Run, Lint, Format) and a non-empty commandText.",
+                remedy = "POST { \"commandType\": \"Build\", \"commandText\": \"<the command line>\", \"isDefault\": true }."
+            });
+        }
+
         await _profiles.SaveProjectCommandAsync(command, ct);
         return Ok();
+    }
+
+    /// <summary>
+    /// DELETE profile/commands/{projectCommandId} — DOGFOOD-2 finding F-D: a stored
+    /// command row had no product path out; a poisoned wizard could only be repaired
+    /// with direct SQL. Deletion is configuration repair, not authority.
+    /// </summary>
+    [HttpDelete("api/projects/{projectId:int}/profile/commands/{projectCommandId:long}")]
+    public async Task<IActionResult> DeleteCommand(int projectId, long projectCommandId, CancellationToken ct)
+    {
+        var removed = await _profiles.DeleteProjectCommandAsync(projectId, projectCommandId, ct);
+        return removed ? Ok() : NotFound();
     }
 
     [HttpGet("api/projects/{projectId:int}/profile/commands/default/{commandType}")]

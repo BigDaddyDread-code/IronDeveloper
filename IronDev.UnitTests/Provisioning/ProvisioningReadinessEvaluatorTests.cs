@@ -20,9 +20,12 @@ public sealed class ProvisioningReadinessEvaluatorTests
         RepoPathIsSafe = true,
         IsGitRepository = true,
         WorkTreeState = ProvisioningWorkTreeStates.Clean,
-        StoredProfile = new ProjectProfile { ProjectId = 3, PrimaryLanguage = "C#", ApplicationType = "WebApi", SolutionFile = "BookSeller.slnx" },
+        StoredProfile = new ProjectProfile { ProjectId = 3, PrimaryLanguage = "C#", ApplicationType = "WebApi", SolutionFile = "BookSeller.slnx", AllowBuilderApply = true },
         StoredBuildCommand = new ProjectCommand { ProjectId = 3, CommandType = "Build", CommandText = "dotnet build BookSeller.slnx" },
-        StoredTestCommand = new ProjectCommand { ProjectId = 3, CommandType = "Test", CommandText = "dotnet test BookSeller.slnx" }
+        StoredTestCommand = new ProjectCommand { ProjectId = 3, CommandType = "Test", CommandText = "dotnet test BookSeller.slnx" },
+        // F-E: run-start requirements are provisioning requirements — one readiness truth.
+        HasCodeIndex = true,
+        IndexingStatus = "Ready"
     };
 
     [TestMethod]
@@ -177,6 +180,49 @@ public sealed class ProvisioningReadinessEvaluatorTests
         Assert.IsFalse(check.Blocking, "An unanswerable git is named, never guessed — and never blocks by itself.");
         StringAssert.Contains(check.Evidence, "timed out");
         Assert.IsTrue(result.IsReady, "Unknown work-tree state alone must not block an otherwise-ready project.");
+    }
+
+    [TestMethod]
+    public void NotIndexedProject_Blocks_AsBlockedProjectNotIndexed_WithNamedRemedy()
+    {
+        // DOGFOOD-2 finding F-E: provisioning said ReadyToRun while the run start
+        // refused for the missing code index. One readiness truth.
+        var result = ProvisioningReadinessEvaluator.Evaluate(FullyConfirmedInput() with { HasCodeIndex = false, IndexingStatus = null });
+
+        Assert.IsFalse(result.IsReady, "The Builder's readiness gate refuses unindexed projects — provisioning must say so first.");
+        CollectionAssert.Contains(result.BlockedStates.ToList(), ProvisioningBlockedStates.ProjectNotIndexed);
+        var check = result.Checks.Single(c => c.Name == "Code index");
+        Assert.IsTrue(check.Blocking);
+        StringAssert.Contains(check.Remedy, "code-index");
+    }
+
+    [TestMethod]
+    public void IndexNotReady_Blocks_WithTheStatusNamed()
+    {
+        var result = ProvisioningReadinessEvaluator.Evaluate(FullyConfirmedInput() with { IndexingStatus = "Stale Index" });
+
+        Assert.IsFalse(result.IsReady);
+        CollectionAssert.Contains(result.BlockedStates.ToList(), ProvisioningBlockedStates.ProjectNotIndexed);
+        StringAssert.Contains(result.Checks.Single(c => c.Name == "Code index").Evidence, "Stale Index");
+    }
+
+    [TestMethod]
+    public void BuilderApplyDisabled_Blocks_AndTheRemedyIsADeliberateHumanAct()
+    {
+        // F-E: AllowBuilderApply=false is a valid, safe default — but the run start
+        // refuses while it is off, so readiness names it instead of letting the
+        // run's refusal be the first mention. The remedy states the boundary:
+        // enabling it permits governed workspace writes only.
+        var input = FullyConfirmedInput();
+        input.StoredProfile!.AllowBuilderApply = false;
+        var result = ProvisioningReadinessEvaluator.Evaluate(input);
+
+        Assert.IsFalse(result.IsReady);
+        CollectionAssert.Contains(result.BlockedStates.ToList(), ProvisioningBlockedStates.BuilderApplyDisabled);
+        var check = result.Checks.Single(c => c.Name == "Builder apply permission");
+        Assert.IsTrue(check.Blocking);
+        StringAssert.Contains(check.Remedy, "allowBuilderApply");
+        StringAssert.Contains(check.Remedy, "workspace writes only");
     }
 
     [TestMethod]
