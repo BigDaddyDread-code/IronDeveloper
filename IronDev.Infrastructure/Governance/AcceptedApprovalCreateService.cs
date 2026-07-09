@@ -198,7 +198,9 @@ public sealed class AcceptedApprovalCreateService : IAcceptedApprovalCreateServi
 
         if (requireSafeId && !IsSafeReference(normalized))
         {
-            Add(issues, "UNSUPPORTED_CHARACTERS", field, "Value contains unsupported characters.");
+            // DOGFOOD-2 finding F-L: the refusal names the allowed alphabet — a
+            // named refusal the operator cannot act on is only half a refusal.
+            Add(issues, "UNSUPPORTED_CHARACTERS", field, "Value contains unsupported characters. Allowed: letters, digits, '-', '_', '.', ':'.");
         }
 
         return normalized;

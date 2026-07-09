@@ -146,9 +146,11 @@ test('recording an approval requires the ceremony, posts the reason as evidence,
   await expect(page.getByTestId('flow.review.gate')).toContainText('Recording is not continuation');
   expect(state.approvalRequestBody.approvalTargetHash).toBe(PACKAGE_HASH);
   expect(state.approvalRequestBody.capabilityCode).toBe('skeleton-run.continue');
-  // The typed reason rides as durable labeled evidence on the approval record.
+  // The typed reason rides as durable labeled evidence on the approval record,
+  // encoded to the backend's reference alphabet (letters, digits, -_.: only —
+  // the real API refuses spaces; DOGFOOD-2 finding F-L).
   expect(state.approvalRequestBody.evidenceReferences).toContain(
-    'human-reason:Package reviewed end to end; criteria covered; no findings.'
+    'human-reason:Package-reviewed-end-to-end-criteria-covered-no-findings.'
   );
 
   state.continuationUnblocked = true;
