@@ -14,7 +14,11 @@ public sealed class DisposableWorkspaceValidationService : IDisposableWorkspaceV
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Profiles =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
-            ["dotnet-build-test"] = ["dotnet-build", "dotnet-test"]
+            // DOGFOOD-2 finding F-M: restore runs FIRST, as its own evidenced
+            // step. A fresh workspace copy of a normal repo has no
+            // project.assets.json; without restore the profile could only pass
+            // on repos that committed restore scaffolding.
+            ["dotnet-build-test"] = ["dotnet-restore", "dotnet-build", "dotnet-test"]
         };
 
     private readonly IDisposableWorkspaceCommandService _commandService;
