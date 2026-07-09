@@ -486,6 +486,18 @@ public sealed class ProjectChatResponseServiceTests
     public void ProjectChatResponseMetadataBuilder_RecordsMemoryEvidenceInReasoningTrace()
     {
         var builder = new ProjectChatResponseMetadataBuilder();
+        var routeDecision = new ContextAgentRouteDecision
+        {
+            RequestKind = ContextRequestKind.CreateTicket,
+            Confidence = 0.81,
+            Reason = "Route test setup",
+            ContextModeHint = "Exploration",
+            AllowTicketCreation = true,
+            NeedsClarification = false,
+            EvidenceUsed = ["Ticket lookup"],
+            AllowConflictAssessment = true,
+            AllowDeepLookup = true
+        };
 
         var context = new ProjectChatContextPipelineResult(
             new Project
@@ -508,18 +520,7 @@ public sealed class ProjectChatResponseServiceTests
             },
             new List<ProjectContextDocument>(),
             new List<MemoryEvidence>(),
-            new ContextAgentRouteDecision
-            {
-                RequestKind = ContextRequestKind.CreateTicket,
-                Confidence = 0.81,
-                Reason = "Route test setup",
-                ContextModeHint = "Exploration",
-                AllowTicketCreation = true,
-                NeedsClarification = false,
-                EvidenceUsed = ["Ticket lookup"],
-                AllowConflictAssessment = true,
-                AllowDeepLookup = true
-            },
+            routeDecision,
             new List<string>
             {
                 "Route signal: allow-ticket-creation",
@@ -529,7 +530,12 @@ public sealed class ProjectChatResponseServiceTests
             {
                 ContextSummary = "Decision context assembled for trace test",
                 WasSuccessful = true
-            });
+            },
+            EffectiveChatRoute.FromRouteDecision(
+                routeDecision,
+                ChatGovernanceMode.Exploration,
+                "ProjectChatContextPipeline",
+                ["CurrentPrompt", "RouteEvidence:Ticket lookup"]));
 
         var trace = builder.Build(
             context,
@@ -575,6 +581,8 @@ public sealed class ProjectChatResponseServiceTests
         StringAssert.Contains(reasoning, "Skill availability context");
         StringAssert.Contains(reasoning, "[True] CreateTicket=CreateTicket");
         StringAssert.Contains(reasoning, "Episodic memory disabled for this classification.");
+        StringAssert.Contains(reasoning, "Effective route: Mode=Exploration; Kind=CreateTicket; Source=ProjectChatContextPipeline");
+        StringAssert.Contains(reasoning, "Route challenge: none");
     }
 
     private static string FindRepositoryRoot()

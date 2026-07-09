@@ -194,6 +194,8 @@ export function useProjectChat() {
             dogfoodTraceId: response.dogfoodTraceId ?? null,
             dogfoodTracePath: response.dogfoodTracePath ?? null,
             routeTraceId: response.routeTraceId ?? null,
+            routeSource: response.routeSource ?? null,
+            routeChallenge: response.routeChallenge ?? null,
             auditSource: 'live',
             auditFallbackReason: null,
             auditHasFallbackEvidence: false,
@@ -342,6 +344,8 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
           dogfoodTraceId: metadata.dogfoodTraceId ?? null,
           dogfoodTracePath: metadata.dogfoodTracePath ?? null,
           routeTraceId: null,
+          routeSource: metadata.routeSource ?? null,
+          routeChallenge: metadata.routeChallenge ?? null,
           auditSource: hasTagReplay ? 'tags' : 'none',
           auditFallbackReason: hasTagReplay
             ? 'Durable audit row was unavailable; restored from ChatMessage.Tags replay envelope.'
@@ -427,6 +431,8 @@ function applyDurableAudit(message: ChatWorkspaceMessage, audit: ChatTurnAuditRe
       dogfoodTraceId: audit.dogfoodTraceId ?? null,
       dogfoodTracePath: null,
       routeTraceId: audit.routeTraceId ?? null,
+      routeSource: audit.routeSource ?? null,
+      routeChallenge: audit.routeChallenge ?? null,
       traceId: null,
       reasoningTrace: buildDurableAuditTrace(audit),
       disambiguationQuestion,
@@ -444,6 +450,10 @@ function buildDurableAuditTrace(audit: ChatTurnAuditResponse) {
     `Durable audit source: ${audit.source}.`,
     `Mode: ${audit.mode} (${Math.round(audit.modeConfidence * 100)}%).`,
     `Mode reason: ${audit.modeReason}`,
+    audit.routeSource ? `Effective route source: ${audit.routeSource}` : 'Effective route source: unknown.',
+    audit.routeChallenge
+      ? `Route challenge: ${audit.routeChallenge.suggestedMode ?? 'unknown'} / ${audit.routeChallenge.suggestedRequestKind ?? 'unknown'} (${Math.round((audit.routeChallenge.confidence ?? 0) * 100)}%) - ${audit.routeChallenge.reason ?? 'No reason recorded.'}`
+      : 'Route challenge: none.',
     clarification?.required
       ? `Clarification: ${clarification.kind} - ${(clarification.questions ?? []).join(' | ')}`
       : 'Clarification: none required.',

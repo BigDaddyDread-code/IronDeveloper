@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IronDev.AI;
 using IronDev.Core;
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
@@ -135,6 +136,87 @@ public class ContextAgentEvidenceTests
         var finalTrace = traces.GetRecentTraces().FirstOrDefault(t => t.FeatureName == ContextAgentStage.FinalAnswer);
         Assert.IsNotNull(finalTrace);
         Assert.IsTrue(finalTrace.RequestText.Contains("DO NOT emit <decision> tags"), "Final prompt should forbid decision tags for inspection.");
+    }
+
+    [TestMethod]
+    public async Task SuppliedEffectiveRoute_IsUsedWithoutInternalReroute()
+    {
+        const string sufficientJson = """{"isSufficient":true,"confidence":9,"reason":"Enough context.","requestedContext":{"codeSearchQueries":[],"clarificationQuestions":[]}}""";
+        var traces = new LlmTraceService();
+        var agent = new ContextAgentService(
+            new StubPromptContextBuilder(new ChatContextPacket
+            {
+                Intent = ChatIntent.SavedTicketManagement,
+                FormattedPrompt = "Prompt packet that could otherwise suggest ticket shaping."
+            }),
+            new StubCodeIndexService(),
+            new StubLlmService(sufficientJson),
+            traces,
+            routeJudge: new ThrowingRouteJudge());
+
+        var route = BuildEffectiveRoute(
+            ContextRequestKind.ExplainCode,
+            ChatGovernanceMode.Exploration,
+            allowsDecisionTags: false,
+            source: "TestPipeline");
+
+        var result = await agent.RunAsync(new ContextAgentRequest
+        {
+            ProjectId = 1,
+            SessionId = 7,
+            TraceGroupId = "trace-supplied-route",
+            UserRequest = "turn this into a ticket",
+            EffectiveRoute = route
+        });
+
+        Assert.IsTrue(result.WasSuccessful);
+        var routeTrace = traces.GetRecentTraces().FirstOrDefault(t => t.FeatureName == ContextAgentStage.RouteDecision);
+        Assert.IsNotNull(routeTrace);
+        StringAssert.Contains(routeTrace.RequestText, "EffectiveRouteSource=TestPipeline");
+        StringAssert.Contains(routeTrace.ParsedResponseSummary, "Kind=ExplainCode");
+
+        var finalTrace = traces.GetRecentTraces().FirstOrDefault(t => t.FeatureName == ContextAgentStage.FinalAnswer);
+        Assert.IsNotNull(finalTrace);
+        StringAssert.Contains(finalTrace.RequestText, "Your current route is: ExplainCode");
+        Assert.IsFalse(finalTrace.RequestText.Contains("ARCHITECTURE DECISION MODE", StringComparison.Ordinal));
+        Assert.IsFalse(finalTrace.RequestText.Contains("<decision>Decision Title | The detailed rule</decision>", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task SuppliedEffectiveRoute_ControlsDecisionTagInstruction()
+    {
+        const string sufficientJson = """{"isSufficient":true,"confidence":9,"reason":"Enough context.","requestedContext":{"codeSearchQueries":[],"clarificationQuestions":[]}}""";
+        var traces = new LlmTraceService();
+        var agent = new ContextAgentService(
+            new StubPromptContextBuilder(new ChatContextPacket
+            {
+                Intent = ChatIntent.General,
+                FormattedPrompt = "Prompt packet for architecture confirmation."
+            }),
+            new StubCodeIndexService(),
+            new StubLlmService(sufficientJson),
+            traces,
+            routeJudge: new ThrowingRouteJudge());
+
+        var route = BuildEffectiveRoute(
+            ContextRequestKind.ArchitectureDecisionExploration,
+            ChatGovernanceMode.Formalization,
+            allowsDecisionTags: true,
+            source: "TestPipeline");
+
+        await agent.RunAsync(new ContextAgentRequest
+        {
+            ProjectId = 1,
+            SessionId = 7,
+            TraceGroupId = "trace-decision-route",
+            UserRequest = "that one",
+            EffectiveRoute = route
+        });
+
+        var finalTrace = traces.GetRecentTraces().FirstOrDefault(t => t.FeatureName == ContextAgentStage.FinalAnswer);
+        Assert.IsNotNull(finalTrace);
+        StringAssert.Contains(finalTrace.RequestText, "ARCHITECTURE DECISION MODE");
+        StringAssert.Contains(finalTrace.RequestText, "<decision>Decision Title | The detailed rule</decision>");
     }
 
     [TestMethod]
@@ -280,5 +362,45 @@ public class ContextAgentEvidenceTests
         Assert.IsNotNull(proofTrace);
         Assert.IsTrue(proofTrace.WasSuccessful, "Proof should pass because direct lookup found all implementation details.");
         Assert.IsTrue(proofTrace.RawResponseText.Contains("Status: ProvenPresent"));
+    }
+
+    private static EffectiveChatRoute BuildEffectiveRoute(
+        ContextRequestKind requestKind,
+        ChatGovernanceMode mode,
+        bool allowsDecisionTags,
+        string source)
+    {
+        var routeDecision = new ContextAgentRouteDecision
+        {
+            OriginalUserRequest = "turn this into a ticket",
+            EffectiveWorkText = "Explain the current chat route behavior.",
+            RequestKind = requestKind,
+            Confidence = 0.91,
+            Reason = "Test supplied effective route.",
+            AllowCodeSearch = false,
+            AllowDeepLookup = false,
+            AllowConflictAssessment = false,
+            AllowConflictBlocking = false,
+            AllowTicketCreation = false,
+            RelatedTicketsAreContextOnly = true
+        };
+
+        var route = EffectiveChatRoute.FromRouteDecision(
+            routeDecision,
+            mode,
+            source,
+            ["TestRoute"]);
+
+        return route with { AllowsDecisionTagOutput = allowsDecisionTags };
+    }
+
+    private sealed class ThrowingRouteJudge : IContextAgentRouteJudge
+    {
+        public Task<ContextAgentRouteDecision> DecideRouteAsync(
+            ContextAgentRouteRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("The context agent must consume the supplied effective route instead of rerouting.");
+        }
     }
 }

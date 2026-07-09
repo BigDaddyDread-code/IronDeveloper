@@ -1,5 +1,6 @@
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Services;
 using Dapper;
@@ -58,6 +59,10 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
         Assert.IsTrue(snapshot.Gate.CanCreateTicket);
         Assert.AreEqual("route-123", snapshot.RouteTraceId);
         Assert.AreEqual("dogfood-456", snapshot.DogfoodTraceId);
+        Assert.AreEqual("ProjectChatContextPipeline", snapshot.RouteSource);
+        Assert.IsNotNull(snapshot.RouteChallenge);
+        Assert.AreEqual(ChatGovernanceMode.Confirmation, snapshot.RouteChallenge.SuggestedMode);
+        Assert.AreEqual(ContextRequestKind.CreateTicket, snapshot.RouteChallenge.SuggestedRequestKind);
         Assert.AreEqual("Context summary for persisted trace.", snapshot.ContextSummary);
         Assert.AreEqual("src/App.cs", snapshot.LinkedFilePaths);
         Assert.AreEqual("App", snapshot.LinkedSymbols);
@@ -210,6 +215,8 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
         Assert.IsTrue(snapshot.IsFallbackEvidence);
         Assert.AreEqual(ChatGovernanceMode.Formalization, snapshot.Mode);
         Assert.AreEqual(ChatClarificationKind.GovernanceIntent, snapshot.Clarification.Kind);
+        Assert.AreEqual("ProjectChatContextPipeline", snapshot.RouteSource);
+        Assert.IsNotNull(snapshot.RouteChallenge);
         Assert.AreEqual("Fallback context summary.", snapshot.ContextSummary);
         Assert.AreEqual("src/Fallback.cs", snapshot.LinkedFilePaths);
         Assert.AreEqual("Fallback", snapshot.LinkedSymbols);
@@ -512,7 +519,14 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
             "governanceActions": ["Save this response as a Discussion.", "Create a Ticket from the saved Discussion."]
           },
           "routeTraceId": "route-123",
-          "dogfoodTraceId": "dogfood-456"
+          "dogfoodTraceId": "dogfood-456",
+          "routeSource": "ProjectChatContextPipeline",
+          "routeChallenge": {
+            "suggestedMode": "Confirmation",
+            "suggestedRequestKind": "CreateTicket",
+            "confidence": 0.51,
+            "reason": "Classifier advisory differed, but the pipeline route remained final."
+          }
         }
         """;
 

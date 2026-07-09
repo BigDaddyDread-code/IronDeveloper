@@ -73,9 +73,9 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
 
         const string governanceSql = """
             INSERT INTO dbo.ChatTurnGovernance
-                (TenantId, ProjectId, ChatSessionId, ChatMessageId, Mode, ModeConfidence, ModeReason, GateJson)
+                (TenantId, ProjectId, ChatSessionId, ChatMessageId, Mode, ModeConfidence, ModeReason, GateJson, RouteSource, RouteChallengeJson)
             VALUES
-                (@TenantId, @ProjectId, @ChatSessionId, @ChatMessageId, @Mode, @ModeConfidence, @ModeReason, @GateJson);
+                (@TenantId, @ProjectId, @ChatSessionId, @ChatMessageId, @Mode, @ModeConfidence, @ModeReason, @GateJson, @RouteSource, @RouteChallengeJson);
             """;
 
         await connection.ExecuteAsync(new CommandDefinition(
@@ -89,7 +89,11 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
                 Mode = envelope.Mode.ToString(),
                 envelope.ModeConfidence,
                 ModeReason = envelope.ModeReason,
-                GateJson = JsonSerializer.Serialize(envelope.Gate, JsonOptions)
+                GateJson = JsonSerializer.Serialize(envelope.Gate, JsonOptions),
+                RouteSource = NormalizeRouteSource(envelope.RouteSource),
+                RouteChallengeJson = envelope.RouteChallenge is null
+                    ? null
+                    : JsonSerializer.Serialize(envelope.RouteChallenge, JsonOptions)
             },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -174,6 +178,8 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
                 g.ModeConfidence,
                 g.ModeReason,
                 g.GateJson,
+                g.RouteSource,
+                g.RouteChallengeJson,
                 c.Required,
                 c.Kind,
                 c.Reason AS ClarificationReason,
@@ -256,7 +262,9 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             row.ContextSummary,
             row.LinkedFilePaths,
             row.LinkedSymbols,
-            IsFallbackEvidence: true);
+            IsFallbackEvidence: true,
+            NormalizeRouteSource(envelope.RouteSource),
+            envelope.RouteChallenge);
     }
 
     private static ChatTurnPersistenceSnapshot BuildSnapshot(PersistedTurnRow row, bool isFallbackEvidence)
@@ -274,6 +282,9 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         var questions = string.IsNullOrWhiteSpace(row.QuestionsJson)
             ? Array.Empty<string>()
             : JsonSerializer.Deserialize<IReadOnlyList<string>>(row.QuestionsJson, JsonOptions) ?? Array.Empty<string>();
+        var routeChallenge = string.IsNullOrWhiteSpace(row.RouteChallengeJson)
+            ? null
+            : JsonSerializer.Deserialize<ChatRouteChallenge>(row.RouteChallengeJson, JsonOptions);
 
         var clarification = NormalizeClarification(row.Required, kind, questions, row.ClarificationReason);
 
@@ -289,7 +300,9 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             row.ContextSummary,
             row.LinkedFilePaths,
             row.LinkedSymbols,
-            isFallbackEvidence);
+            isFallbackEvidence,
+            NormalizeRouteSource(row.RouteSource),
+            routeChallenge);
     }
 
     private static ChatTurnEnvelope? ParseEnvelope(string? tags)
@@ -341,6 +354,9 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             string.IsNullOrWhiteSpace(reason) ? $"Clarification required for {normalizedKind}." : reason.Trim());
     }
 
+    private static string NormalizeRouteSource(string? routeSource) =>
+        string.IsNullOrWhiteSpace(routeSource) ? "unknown" : routeSource.Trim();
+
     private sealed class PersistedTurnRow
     {
         public long ChatMessageId { get; set; }
@@ -348,6 +364,8 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         public double ModeConfidence { get; set; }
         public string? ModeReason { get; set; }
         public string? GateJson { get; set; }
+        public string? RouteSource { get; set; }
+        public string? RouteChallengeJson { get; set; }
         public bool Required { get; set; }
         public string? Kind { get; set; }
         public string? ClarificationReason { get; set; }

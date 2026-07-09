@@ -16,7 +16,8 @@ public sealed record ProjectChatContextPipelineResult(
     IReadOnlyList<MemoryEvidence> SemanticMemoryEvidence,
     ContextAgentRouteDecision RouteDecision,
     IReadOnlyList<string> RouteSignals,
-    ContextAgentResult ContextAgentResult);
+    ContextAgentResult ContextAgentResult,
+    EffectiveChatRoute? EffectiveRoute = null);
 
 public sealed class ProjectChatContextPipeline
 {
@@ -49,7 +50,8 @@ public sealed class ProjectChatContextPipeline
         string prompt,
         string recentConversationSummary,
         string traceGroupId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ChatGovernanceMode? explicitMode = null)
     {
         var project = await _projects.GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
         if (project is null)
@@ -75,7 +77,12 @@ public sealed class ProjectChatContextPipeline
             traceGroupId,
             cancellationToken).ConfigureAwait(false);
 
-        var routeSignals = BuildRouteSignals(routeDecision);
+        var effectiveRoute = EffectiveChatRoute.FromRouteDecision(
+            routeDecision,
+            explicitMode ?? EffectiveChatRoute.InferMode(routeDecision),
+            source: "ProjectChatContextPipeline",
+            inputsUsed: BuildEffectiveRouteInputs(routeDecision, recentConversationSummary));
+        var routeSignals = BuildRouteSignals(effectiveRoute);
 
         var contextAgentResult = await RunContextAgentAsync(
             projectId,
@@ -83,6 +90,7 @@ public sealed class ProjectChatContextPipeline
             prompt,
             recentConversationSummary,
             traceGroupId,
+            effectiveRoute,
             contextAgentTickets,
             contextAgentDecisions,
             rules,
@@ -97,7 +105,8 @@ public sealed class ProjectChatContextPipeline
             semanticMemoryEvidence,
             routeDecision,
             routeSignals,
-            contextAgentResult);
+            contextAgentResult,
+            effectiveRoute);
     }
 
     private async Task<ContextAgentRouteDecision> ResolveContextRouteAsync(
@@ -125,6 +134,7 @@ public sealed class ProjectChatContextPipeline
         string prompt,
         string recentConversationSummary,
         string traceGroupId,
+        EffectiveChatRoute effectiveRoute,
         IReadOnlyList<ProjectTicket> contextAgentTickets,
         IReadOnlyList<ProjectDecision> contextAgentDecisions,
         IReadOnlyList<ProjectRule> rules,
@@ -139,6 +149,7 @@ public sealed class ProjectChatContextPipeline
                 TraceGroupId = traceGroupId,
                 UserRequest = prompt,
                 RecentConversationSummary = recentConversationSummary,
+                EffectiveRoute = effectiveRoute,
                 RecentTickets = contextAgentTickets,
                 RecentDecisions = contextAgentDecisions,
                 ProjectRules = rules,
@@ -159,13 +170,17 @@ public sealed class ProjectChatContextPipeline
         }
     }
 
-    private static IReadOnlyList<string> BuildRouteSignals(ContextAgentRouteDecision decision)
+    private static IReadOnlyList<string> BuildRouteSignals(EffectiveChatRoute effectiveRoute)
     {
+        var decision = effectiveRoute.RouteDecision;
         var routeSignals = new List<string>
         {
+            $"Effective route source: {effectiveRoute.Source}",
+            $"Effective route mode: {effectiveRoute.Mode}",
             $"Context route hint: Kind={decision.RequestKind}",
             $"Route confidence: {decision.Confidence:0.00}",
             $"Route reason: {(string.IsNullOrWhiteSpace(decision.Reason) ? "no explicit reason from router" : decision.Reason)}",
+            $"DecisionTagAllowed={effectiveRoute.AllowsDecisionTagOutput}; DecisionCaptureAllowed={effectiveRoute.AllowsDecisionCapture}; TicketDraftingAllowed={effectiveRoute.AllowsTicketDrafting}",
             $"ContextModeHint={decision.ContextModeHint}; allowTicketCreation={decision.AllowTicketCreation}; allowConflictBlocking={decision.AllowConflictBlocking}; allowDeepLookup={decision.AllowDeepLookup}",
             $"Route machinery: UsedConversationResolver={decision.UsedConversationContextResolver}; UsedLlmJudge={decision.UsedLlmJudge}; UsedFallbackRules={decision.UsedFallbackRules}"
         };
@@ -181,5 +196,17 @@ public sealed class ProjectChatContextPipeline
             routeSignals.Add($"Route risks: {string.Join(" | ", decision.Risks)}");
 
         return routeSignals;
+    }
+
+    private static IReadOnlyList<string> BuildEffectiveRouteInputs(
+        ContextAgentRouteDecision decision,
+        string recentConversationSummary)
+    {
+        var inputs = new List<string> { "CurrentPrompt", "ProjectState" };
+        if (!string.IsNullOrWhiteSpace(recentConversationSummary))
+            inputs.Add("RecentConversationSummary");
+        if (decision.EvidenceUsed.Count > 0)
+            inputs.AddRange(decision.EvidenceUsed.Select(e => $"RouteEvidence:{e}"));
+        return inputs;
     }
 }

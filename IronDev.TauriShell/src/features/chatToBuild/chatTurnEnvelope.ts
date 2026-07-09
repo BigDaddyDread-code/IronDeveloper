@@ -1,5 +1,5 @@
 import type { ChatCompletionResponse } from '../../api/types';
-import type { ChatClarificationKind, ChatClarificationState } from '../../api/types';
+import type { ChatClarificationKind, ChatClarificationState, ChatRouteChallenge } from '../../api/types';
 import { coerceChatGovernanceMode, getChatModeGate } from './chatGovernanceGate';
 import type { ChatModeGate } from './chatGovernanceGate';
 import type { ChatResponseMode } from './chatTypes';
@@ -18,6 +18,8 @@ export interface AssistantTagMetadata {
   dogfoodTraceId?: string | null;
   dogfoodTracePath?: string | null;
   traceId?: number | null;
+  routeSource?: string | null;
+  routeChallenge?: ChatRouteChallenge | null;
   contextSummary?: string | null;
   linkedFilePaths?: string | null;
   linkedSymbols?: string | null;
@@ -48,6 +50,8 @@ export function buildAssistantTagEnvelope(response: ChatCompletionResponse, mode
     dogfoodTraceId: response.dogfoodTraceId,
     dogfoodTracePath: response.dogfoodTracePath,
     traceId: response.traceId,
+    routeSource: response.routeSource,
+    routeChallenge: response.routeChallenge ?? null,
     contextSummary: response.contextSummary,
     linkedFilePaths: response.linkedFilePaths,
     linkedSymbols: response.linkedSymbols
@@ -83,6 +87,8 @@ export function parseAssistantTagMetadata(rawTags: string | null | undefined) {
       dogfoodTraceId: typeof record.dogfoodTraceId === 'string' ? record.dogfoodTraceId : null,
       dogfoodTracePath: typeof record.dogfoodTracePath === 'string' ? record.dogfoodTracePath : null,
       traceId: toNumber(record.traceId),
+      routeSource: typeof record.routeSource === 'string' ? record.routeSource : null,
+      routeChallenge: parseRouteChallenge(record.routeChallenge),
       contextSummary: typeof record.contextSummary === 'string' ? record.contextSummary : null,
       linkedFilePaths: typeof record.linkedFilePaths === 'string' ? record.linkedFilePaths : null,
       linkedSymbols: typeof record.linkedSymbols === 'string' ? record.linkedSymbols : null
@@ -151,6 +157,20 @@ function parseGate(value: unknown): ChatModeGate | null {
       : mode === 'Confirmation'
         ? 'warning'
         : 'neutral'
+  };
+}
+
+function parseRouteChallenge(value: unknown): ChatRouteChallenge | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    suggestedMode: typeof record.suggestedMode === 'string' ? record.suggestedMode : null,
+    suggestedRequestKind: typeof record.suggestedRequestKind === 'string' ? record.suggestedRequestKind : null,
+    confidence: toNumber(record.confidence),
+    reason: typeof record.reason === 'string' ? record.reason : null
   };
 }
 

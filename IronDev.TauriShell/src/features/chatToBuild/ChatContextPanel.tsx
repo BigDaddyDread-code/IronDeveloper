@@ -71,6 +71,24 @@ export function ChatContextPanel({
             }
           />
         ) : null}
+        <MetadataRow
+          label="Route source"
+          value={
+            <StatusBadge status={latestResponse?.routeSource ? 'ready' : 'neutral'}>
+              {latestResponse?.routeSource ?? 'Unknown'}
+            </StatusBadge>
+          }
+        />
+        {latestResponse?.routeChallenge ? (
+          <MetadataRow
+            label="Route challenge"
+            value={
+              <StatusBadge status="warning">
+                {latestResponse.routeChallenge.suggestedMode ?? 'Suggested route'}
+              </StatusBadge>
+            }
+          />
+        ) : null}
         {latestResponse?.auditHasFallbackEvidence ? (
           <MetadataRow
             label="Fallback evidence"

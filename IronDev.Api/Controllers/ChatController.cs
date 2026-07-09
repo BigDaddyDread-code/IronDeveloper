@@ -94,7 +94,9 @@ public sealed class ChatController : ControllerBase
             snapshot.ContextSummary,
             snapshot.LinkedFilePaths,
             snapshot.LinkedSymbols,
-            snapshot.IsFallbackEvidence));
+            snapshot.IsFallbackEvidence,
+            snapshot.RouteSource,
+            snapshot.RouteChallenge));
     }
 
     [HttpPost("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
@@ -144,7 +146,8 @@ public sealed class ChatController : ControllerBase
                 Gate: ChatGovernanceGate.FromDecision(new ChatModeDecision(
                     ChatGovernanceMode.Exploration,
                     1,
-                    "Project state review is not a formalization lane."))));
+                    "Project state review is not a formalization lane.")),
+                RouteSource: "ProjectStateReview"));
         }
 
         if (!string.Equals(mode, ProjectQuestionMode, StringComparison.OrdinalIgnoreCase))
@@ -176,7 +179,9 @@ public sealed class ChatController : ControllerBase
             answer.DisambiguationQuestion,
             answer.ReasoningSummary,
             answer.DogfoodTraceId,
-            null));
+            null,
+            answer.RouteSource,
+            answer.RouteChallenge));
 
     }
 
@@ -212,7 +217,9 @@ public sealed class ChatController : ControllerBase
         string? DisambiguationQuestion = null,
         string? ReasoningSummary = null,
         string? DogfoodTraceId = null,
-        string? DogfoodTracePath = null);
+        string? DogfoodTracePath = null,
+        string? RouteSource = null,
+        ChatRouteChallenge? RouteChallenge = null);
 
     [HttpPost("api/projects/{projectId:int}/chat/feedback")]
     public Task<long> SaveFeedback(ChatMessageFeedback feedback, CancellationToken ct) =>

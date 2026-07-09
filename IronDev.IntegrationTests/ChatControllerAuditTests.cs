@@ -35,6 +35,10 @@ public sealed class ChatControllerAuditTests
         Assert.AreEqual(ChatAuditSource.NormalizedRows, audit.Source);
         Assert.AreEqual(9001, audit.ChatMessageId);
         Assert.AreEqual(ChatGovernanceMode.Formalization, audit.Mode);
+        Assert.AreEqual("ProjectChatContextPipeline", audit.RouteSource);
+        Assert.IsNotNull(audit.RouteChallenge);
+        Assert.AreEqual(ChatGovernanceMode.Confirmation, audit.RouteChallenge.SuggestedMode);
+        Assert.AreEqual(ContextRequestKind.CreateTicket, audit.RouteChallenge.SuggestedRequestKind);
         Assert.IsFalse(audit.IsFallbackEvidence);
     }
 
@@ -79,6 +83,9 @@ public sealed class ChatControllerAuditTests
         StringAssert.Contains(json, "\"source\":\"NormalizedRows\"");
         StringAssert.Contains(json, "\"mode\":\"Formalization\"");
         StringAssert.Contains(json, "\"kind\":\"None\"");
+        StringAssert.Contains(json, "\"routeSource\":\"ProjectChatContextPipeline\"");
+        StringAssert.Contains(json, "\"suggestedMode\":\"Confirmation\"");
+        StringAssert.Contains(json, "\"suggestedRequestKind\":\"CreateTicket\"");
         Assert.IsFalse(json.Contains("\"mode\":0", StringComparison.Ordinal), json);
         Assert.IsFalse(json.Contains("\"kind\":0", StringComparison.Ordinal), json);
     }
@@ -118,7 +125,13 @@ public sealed class ChatControllerAuditTests
             "Durable audit context.",
             "src/App.cs",
             "App",
-            isFallbackEvidence);
+            isFallbackEvidence,
+            "ProjectChatContextPipeline",
+            new ChatRouteChallenge(
+                ChatGovernanceMode.Confirmation,
+                ContextRequestKind.CreateTicket,
+                0.51,
+                "Classifier advisory differed, but the pipeline route remained final."));
 
     private sealed class ScopedTurnPersistenceService : IChatTurnPersistenceService
     {

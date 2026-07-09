@@ -140,6 +140,8 @@ CREATE TABLE dbo.ChatTurnGovernance
     ModeConfidence FLOAT NOT NULL,
     ModeReason NVARCHAR(MAX) NOT NULL,
     GateJson NVARCHAR(MAX) NOT NULL,
+    RouteSource NVARCHAR(200) NOT NULL CONSTRAINT DF_ChatTurnGovernance_RouteSource DEFAULT N'unknown',
+    RouteChallengeJson NVARCHAR(MAX) NULL,
     CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnGovernance_CreatedUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT FK_ChatTurnGovernance_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
     CONSTRAINT FK_ChatTurnGovernance_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),

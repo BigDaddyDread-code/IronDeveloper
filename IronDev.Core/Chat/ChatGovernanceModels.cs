@@ -105,6 +105,88 @@ public sealed record ChatModeDecision(
     double Confidence,
     string Reason);
 
+public sealed record EffectiveChatRoute
+{
+    public required ChatGovernanceMode Mode { get; init; }
+    public required Models.ContextRequestKind RequestKind { get; init; }
+    public required string Source { get; init; }
+    public required double Confidence { get; init; }
+    public required string Reason { get; init; }
+    public required Models.ContextAgentRouteDecision RouteDecision { get; init; }
+
+    public string OriginalUserRequest { get; init; } = string.Empty;
+    public string EffectiveWorkText { get; init; } = string.Empty;
+    public string? ConversationTopic { get; init; }
+    public string? ActiveArtifactType { get; init; }
+    public long? ActiveTicketId { get; init; }
+    public long? ActiveDecisionId { get; init; }
+    public long? ActivePlanId { get; init; }
+    public bool AllowsDecisionTagOutput { get; init; }
+    public bool AllowsTicketDrafting { get; init; }
+    public bool AllowsDecisionCapture { get; init; }
+    public bool RequiresClarification { get; init; }
+    public IReadOnlyList<string> InputsUsed { get; init; } = Array.Empty<string>();
+
+    public static EffectiveChatRoute FromRouteDecision(
+        Models.ContextAgentRouteDecision routeDecision,
+        ChatGovernanceMode mode,
+        string source,
+        IReadOnlyList<string>? inputsUsed = null)
+    {
+        return new EffectiveChatRoute
+        {
+            Mode = mode,
+            RequestKind = routeDecision.RequestKind,
+            Source = source,
+            Confidence = routeDecision.Confidence,
+            Reason = string.IsNullOrWhiteSpace(routeDecision.Reason)
+                ? "Effective route derived from chat route decision."
+                : routeDecision.Reason,
+            RouteDecision = routeDecision,
+            OriginalUserRequest = routeDecision.OriginalUserRequest,
+            EffectiveWorkText = routeDecision.EffectiveWorkText,
+            AllowsDecisionTagOutput = AllowsDecisionTagOutputFor(mode, routeDecision.RequestKind),
+            AllowsTicketDrafting = routeDecision.AllowTicketCreation,
+            AllowsDecisionCapture = AllowsDecisionCaptureFor(mode, routeDecision.RequestKind),
+            RequiresClarification = routeDecision.NeedsClarification,
+            InputsUsed = inputsUsed ?? Array.Empty<string>()
+        };
+    }
+
+    public ChatModeDecision ToModeDecision() => new(Mode, Confidence, Reason);
+
+    public static ChatGovernanceMode InferMode(Models.ContextAgentRouteDecision routeDecision)
+    {
+        if (routeDecision.NeedsClarification)
+            return ChatGovernanceMode.Confirmation;
+
+        return routeDecision.RequestKind switch
+        {
+            Models.ContextRequestKind.CreateTicket => ChatGovernanceMode.Formalization,
+            Models.ContextRequestKind.CreateTicketsFromDiscussion => ChatGovernanceMode.Formalization,
+            Models.ContextRequestKind.BuildTicket => ChatGovernanceMode.Formalization,
+            Models.ContextRequestKind.ArchitectureDecisionExploration => ChatGovernanceMode.Formalization,
+            _ => ChatGovernanceMode.Exploration
+        };
+    }
+
+    private static bool AllowsDecisionTagOutputFor(ChatGovernanceMode mode, Models.ContextRequestKind requestKind) =>
+        mode == ChatGovernanceMode.Formalization &&
+        requestKind == Models.ContextRequestKind.ArchitectureDecisionExploration;
+
+    private static bool AllowsDecisionCaptureFor(ChatGovernanceMode mode, Models.ContextRequestKind requestKind) =>
+        mode == ChatGovernanceMode.Formalization &&
+        requestKind is Models.ContextRequestKind.ArchitectureDecisionExploration
+            or Models.ContextRequestKind.CreateTicketsFromDiscussion;
+}
+
+public sealed record ChatRouteChallenge(
+    ChatGovernanceMode SuggestedMode,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))]
+    Models.ContextRequestKind SuggestedRequestKind,
+    double Confidence,
+    string Reason);
+
 public sealed record ChatModeClassificationRequest(
     string UserMessage,
     string RecentConversationSummary,
@@ -170,7 +252,9 @@ public sealed record ChatTurnEnvelope(
     ChatClarificationState Clarification,
     ChatGovernanceGate Gate,
     string? RouteTraceId,
-    string? DogfoodTraceId);
+    string? DogfoodTraceId,
+    string? RouteSource = null,
+    ChatRouteChallenge? RouteChallenge = null);
 
 public sealed record ChatTurnPersistenceRequest(
     long ChatMessageId,
@@ -195,7 +279,9 @@ public sealed record ChatTurnPersistenceSnapshot(
     string? ContextSummary,
     string? LinkedFilePaths,
     string? LinkedSymbols,
-    bool IsFallbackEvidence = false);
+    bool IsFallbackEvidence = false,
+    string? RouteSource = null,
+    ChatRouteChallenge? RouteChallenge = null);
 
 public sealed record ChatTurnAuditResponse(
     long ChatMessageId,
@@ -210,7 +296,9 @@ public sealed record ChatTurnAuditResponse(
     string? ContextSummary,
     string? LinkedFilePaths,
     string? LinkedSymbols,
-    bool IsFallbackEvidence);
+    bool IsFallbackEvidence,
+    string? RouteSource = null,
+    ChatRouteChallenge? RouteChallenge = null);
 
 public sealed record ProjectChatResponseResult(
     string Response,
@@ -227,4 +315,6 @@ public sealed record ProjectChatResponseResult(
     string? LinkedSymbols = null,
     string? DogfoodTraceId = null,
     string? DogfoodTracePath = null,
-    long? TraceId = null);
+    long? TraceId = null,
+    string? RouteSource = null,
+    ChatRouteChallenge? RouteChallenge = null);

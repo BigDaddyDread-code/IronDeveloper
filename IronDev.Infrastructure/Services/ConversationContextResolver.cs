@@ -592,7 +592,11 @@ public sealed class ConversationContextResolver : IConversationContextResolver
         AddIfPresent(options, haystack, "winforms", "WinForms");
         AddIfPresent(options, haystack, "windows forms", "WinForms");
         AddIfPresent(options, haystack, "desktop", "Desktop");
-        return options.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var normalized = options.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (normalized.Contains("WinForms", StringComparer.OrdinalIgnoreCase))
+            normalized.RemoveAll(option => option.Equals("Desktop", StringComparison.OrdinalIgnoreCase));
+
+        return normalized;
     }
 
     private static IReadOnlyList<string> CoalesceStorageOptions(IReadOnlyList<string> options)
@@ -639,7 +643,7 @@ public sealed class ConversationContextResolver : IConversationContextResolver
 
         var match = Regex.Match(
             conversation,
-            @"build\s+(?:a|an)?\s*(?<name>[a-z0-9 '\-]+?game)",
+            @"(?:build|make|create)\s+(?:a|an)?\s*(?<name>[a-z0-9 '\-]+?game)",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         if (match.Success)

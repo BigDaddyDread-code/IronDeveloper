@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IronDev.AI;
 using IronDev.Core;
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Services;
@@ -117,7 +118,11 @@ public sealed class ContextAgentService : IContextAgentService
             try
             {
                 initialPacket = await _contextBuilder.BuildPacketAsync(
-                    request.ProjectId, request.SessionId, request.UserRequest, ct);
+                    request.ProjectId,
+                    request.SessionId,
+                    request.UserRequest,
+                    ct,
+                    request.EffectiveRoute);
             }
             catch (Exception ex)
             {
@@ -150,25 +155,34 @@ public sealed class ContextAgentService : IContextAgentService
         }
 
         // ── Stage 1.5: Executive Route Decision ──────────────────────────────
-        var routeRequest = new ContextAgentRouteRequest
+        ContextAgentRouteDecision route;
+        if (request.EffectiveRoute is not null)
         {
-            TraceGroupId = traceGroupId,
-            ProjectId = request.ProjectId,
-            SessionId = request.SessionId,
-            UserRequest = request.UserRequest,
-            RecentConversationSummary = request.RecentConversationSummary,
-            ConversationContextSnapshot = ConversationContextResolver.TryParseSnapshot(request.RecentConversationSummary),
-            InitialIntentFromPromptContextBuilder = initialPacket.Intent.ToString(),
-            RecentTickets = request.RecentTickets,
-            RecentDecisions = request.RecentDecisions,
-            ProjectRules = request.ProjectRules,
-            RetrievedFilePaths = initialPacket.MatchedFilePaths,
-            RetrievedSymbols = new List<string>(), // We don't have symbols from initial context currently
-            SelectedTicketTitle = string.Empty,
-            SelectedPlanTitle = string.Empty
-        };
+            route = request.EffectiveRoute.RouteDecision;
+            EmitSuppliedRouteTrace(request, request.EffectiveRoute, initialPacket, traceGroupId);
+        }
+        else
+        {
+            var routeRequest = new ContextAgentRouteRequest
+            {
+                TraceGroupId = traceGroupId,
+                ProjectId = request.ProjectId,
+                SessionId = request.SessionId,
+                UserRequest = request.UserRequest,
+                RecentConversationSummary = request.RecentConversationSummary,
+                ConversationContextSnapshot = ConversationContextResolver.TryParseSnapshot(request.RecentConversationSummary),
+                InitialIntentFromPromptContextBuilder = initialPacket.Intent.ToString(),
+                RecentTickets = request.RecentTickets,
+                RecentDecisions = request.RecentDecisions,
+                ProjectRules = request.ProjectRules,
+                RetrievedFilePaths = initialPacket.MatchedFilePaths,
+                RetrievedSymbols = new List<string>(), // We don't have symbols from initial context currently
+                SelectedTicketTitle = string.Empty,
+                SelectedPlanTitle = string.Empty
+            };
 
-        var route = await _routeJudge.DecideRouteAsync(routeRequest, ct);
+            route = await _routeJudge.DecideRouteAsync(routeRequest, ct);
+        }
         var effectiveWorkText = route.EffectiveWorkText;
 
         if (request.CreateTicketIntent != null)
@@ -774,7 +788,7 @@ public sealed class ContextAgentService : IContextAgentService
         // ── Stage 5: Assemble final prompt ────────────────────────────────────
         string finalPrompt;
         {
-            finalPrompt = AssembleFinalPrompt(request, initialPacket, evidence, sufficiency, limits, warnings, route, proofResult, candidates);
+            finalPrompt = AssembleFinalPrompt(request, initialPacket, evidence, sufficiency, limits, warnings, route, proofResult, candidates, request.EffectiveRoute);
 
             var contextSummary = BuildFinalContextSummary(initialPacket, evidence, sufficiency);
 
@@ -818,6 +832,45 @@ public sealed class ContextAgentService : IContextAgentService
             ParentTraceId = parentId,
             CreatedAt     = DateTime.UtcNow,
         };
+
+    private void EmitSuppliedRouteTrace(
+        ContextAgentRequest request,
+        EffectiveChatRoute effectiveRoute,
+        ChatContextPacket initialPacket,
+        string traceGroupId)
+    {
+        var decision = effectiveRoute.RouteDecision;
+        var tGate = MakeTrace(ContextAgentStage.RouteGateDecision, traceGroupId, null);
+        tGate.ProjectId = request.ProjectId;
+        tGate.ChatSessionId = request.SessionId.ToString();
+        tGate.CurrentUserMessage = request.UserRequest;
+        tGate.RawResponseText =
+            $"EffectiveRouteSource: {effectiveRoute.Source}\n" +
+            $"Route: {decision.RequestKind}\n" +
+            $"AllowCodeSearch: {decision.AllowCodeSearch}\n" +
+            $"AllowDeepLookup: {decision.AllowDeepLookup}\n" +
+            $"AllowConflictAssessment: {decision.AllowConflictAssessment}\n" +
+            $"AllowConflictBlocking: {decision.AllowConflictBlocking}\n" +
+            $"AllowTicketCreation: {decision.AllowTicketCreation}\n" +
+            $"RelatedTicketsAreContextOnly: {decision.RelatedTicketsAreContextOnly}\n" +
+            $"DecisionTagAllowed: {effectiveRoute.AllowsDecisionTagOutput}";
+        tGate.ParsedResponseSummary = $"Effective route supplied by {effectiveRoute.Source}: {decision.RequestKind}";
+        tGate.WasSuccessful = true;
+        _traceService.AddTrace(tGate);
+
+        var tRoute = MakeTrace(ContextAgentStage.RouteDecision, traceGroupId, null);
+        tRoute.ProjectId = request.ProjectId;
+        tRoute.ChatSessionId = request.SessionId.ToString();
+        tRoute.CurrentUserMessage = request.UserRequest;
+        tRoute.RequestText = $"EffectiveRouteSource={effectiveRoute.Source}; InitialIntent={initialPacket.Intent}";
+        tRoute.RawResponseText =
+            $"OriginalUserRequest={decision.OriginalUserRequest}\n" +
+            $"EffectiveWorkText={decision.EffectiveWorkText}\n" +
+            $"Reason={decision.Reason}";
+        tRoute.ParsedResponseSummary = $"Kind={decision.RequestKind} | Confidence={decision.Confidence:0.00} | Effective={decision.EffectiveWorkText}";
+        tRoute.WasSuccessful = true;
+        _traceService.AddTrace(tRoute);
+    }
 
     private static ContextAgentResult Fail(string traceGroupId, string reason)
         => new()
@@ -1025,7 +1078,8 @@ Return JSON only.";
         List<string>                warnings,
         ContextAgentRouteDecision   route,
         EvidenceProofResult         proof,
-        List<TicketCandidate>       candidates)
+        List<TicketCandidate>       candidates,
+        EffectiveChatRoute?         effectiveRoute)
     {
         var sb = new StringBuilder();
 
@@ -1077,10 +1131,14 @@ Return JSON only.";
             sb.AppendLine("- Answer the resolved effective request, while preserving the user's wording where it matters.");
         }
         
-        if (route.RequestKind == ContextRequestKind.InspectCode || 
+        var allowsDecisionTagOutput = effectiveRoute?.AllowsDecisionTagOutput
+            ?? route.RequestKind == ContextRequestKind.ArchitectureDecisionExploration;
+
+        if (!allowsDecisionTagOutput &&
+            (route.RequestKind == ContextRequestKind.InspectCode || 
             route.RequestKind == ContextRequestKind.VerifyImplementation || 
             route.RequestKind == ContextRequestKind.ExplainCode ||
-            route.RequestKind == ContextRequestKind.GeneralChat)
+            route.RequestKind == ContextRequestKind.GeneralChat))
         {
             sb.AppendLine("- DO NOT emit <decision> tags. The user is asking for inspection/explanation, not for you to finalize a technical decision.");
             sb.AppendLine("- SELF-REFERENCE RULE: You must NOT use Context Agent internal code (like ContextAgentService or ContextConflictService) as evidence that a product feature exists or does not exist.");
@@ -1102,7 +1160,7 @@ Return JSON only.";
             sb.AppendLine("- Use existing project profile, standards, and decisions as grounding if available.");
         }
 
-        if (route.RequestKind == ContextRequestKind.ArchitectureDecisionExploration)
+        if (allowsDecisionTagOutput)
         {
             sb.AppendLine("- ARCHITECTURE DECISION MODE: The user is confirming or selecting an architectural choice from the recent discussion.");
             sb.AppendLine("- Treat the resolved effective request as the decision being finalized unless it asks for more comparison.");

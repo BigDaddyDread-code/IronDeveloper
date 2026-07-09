@@ -48,7 +48,8 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             normalizedPrompt,
             recentSummary,
             correlationId,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            explicitMode).ConfigureAwait(false);
 
         if (context is null)
             return null;
@@ -68,6 +69,14 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
                 ExplicitMode: explicitMode,
                 ContextState: chatContextState),
             cancellationToken).ConfigureAwait(false);
+
+        var effectiveRoute = context.EffectiveRoute ?? EffectiveChatRoute.FromRouteDecision(
+            routeDecision,
+            modeDecision.Mode,
+            source: "ProjectChatResponseService.ModeClassifierFallback",
+            inputsUsed: ["RouteDecision", "ModeClassifier"]);
+        context = context with { EffectiveRoute = effectiveRoute };
+        modeDecision = effectiveRoute.ToModeDecision();
 
         var clarification = await _clarificationClassifier.ClassifyAsync(
             new ChatClarificationClassificationRequest(
@@ -106,6 +115,8 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             metadata.ContextSummary,
             metadata.LinkedFilePaths,
             metadata.LinkedSymbols,
-            correlationId);
+            DogfoodTraceId: correlationId,
+            RouteSource: effectiveRoute.Source,
+            RouteChallenge: contextAgentResult.RouteChallenge);
     }
 }

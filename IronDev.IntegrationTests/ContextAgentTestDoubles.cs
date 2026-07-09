@@ -1,4 +1,5 @@
 using IronDev.AI;
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
@@ -20,10 +21,20 @@ internal sealed class StubPromptContextBuilder : IPromptContextBuilder
         };
     }
 
-    public Task<string> BuildAsync(int projectId, long sessionId, string userRequest, CancellationToken ct = default) =>
+    public Task<string> BuildAsync(
+        int projectId,
+        long sessionId,
+        string userRequest,
+        CancellationToken ct = default,
+        EffectiveChatRoute? effectiveRoute = null) =>
         Task.FromResult(_packet.FormattedPrompt);
 
-    public Task<ChatContextPacket> BuildPacketAsync(int projectId, long sessionId, string userRequest, CancellationToken ct = default) =>
+    public Task<ChatContextPacket> BuildPacketAsync(
+        int projectId,
+        long sessionId,
+        string userRequest,
+        CancellationToken ct = default,
+        EffectiveChatRoute? effectiveRoute = null) =>
         Task.FromResult(_packet);
 
     public Task<PromptPreviewResult> BuildFullPromptForTestingAsync(int projectId, string userMessage, CancellationToken ct = default) =>

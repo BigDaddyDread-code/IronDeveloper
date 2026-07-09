@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using IronDev.Core.Chat;
 using IronDev.Services;
 
 namespace IronDev.AI;
@@ -107,8 +108,18 @@ public enum ChatIntent
 
 public interface IPromptContextBuilder
 {
-    Task<string> BuildAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default);
-    Task<ChatContextPacket> BuildPacketAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default);
+    Task<string> BuildAsync(
+        int projectId,
+        long sessionId,
+        string userRequest,
+        CancellationToken cancellationToken = default,
+        EffectiveChatRoute? effectiveRoute = null);
+    Task<ChatContextPacket> BuildPacketAsync(
+        int projectId,
+        long sessionId,
+        string userRequest,
+        CancellationToken cancellationToken = default,
+        EffectiveChatRoute? effectiveRoute = null);
 
     /// <summary>
     /// Developer-only: builds the full prompt for a sample user message and returns
@@ -143,15 +154,25 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         _projectService       = projectService;
     }
 
-    public async Task<string> BuildAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default)
+    public async Task<string> BuildAsync(
+        int projectId,
+        long sessionId,
+        string userRequest,
+        CancellationToken cancellationToken = default,
+        EffectiveChatRoute? effectiveRoute = null)
     {
-        var packet = await BuildPacketDataAsync(projectId, sessionId, userRequest, cancellationToken);
+        var packet = await BuildPacketDataAsync(projectId, sessionId, userRequest, effectiveRoute, cancellationToken);
         return packet.FormattedPrompt;
     }
 
-    public Task<ChatContextPacket> BuildPacketAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken = default)
+    public Task<ChatContextPacket> BuildPacketAsync(
+        int projectId,
+        long sessionId,
+        string userRequest,
+        CancellationToken cancellationToken = default,
+        EffectiveChatRoute? effectiveRoute = null)
     {
-        return BuildPacketDataAsync(projectId, sessionId, userRequest, cancellationToken);
+        return BuildPacketDataAsync(projectId, sessionId, userRequest, effectiveRoute, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -159,7 +180,7 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
     {
         // Single pipeline pass — BuildPacketDataAsync fetches all DB data, runs the
         // memory filter, and records diagnostics on the packet. No extra DB calls here.
-        var packet = await BuildPacketDataAsync(projectId, sessionId: 0, userRequest: userMessage, cancellationToken: ct);
+        var packet = await BuildPacketDataAsync(projectId, sessionId: 0, userRequest: userMessage, effectiveRoute: null, cancellationToken: ct);
 
         var project     = await _projectService.GetByIdAsync(projectId, ct);
         var indexStatus = project?.IndexingStatus ?? "Unknown";
@@ -201,7 +222,12 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
         return preview;
     }
 
-    private async Task<ChatContextPacket> BuildPacketDataAsync(int projectId, long sessionId, string userRequest, CancellationToken cancellationToken)
+    private async Task<ChatContextPacket> BuildPacketDataAsync(
+        int projectId,
+        long sessionId,
+        string userRequest,
+        EffectiveChatRoute? effectiveRoute,
+        CancellationToken cancellationToken)
     {
         var packet = new ChatContextPacket();
 
@@ -437,10 +463,13 @@ public sealed class PromptContextBuilder : IPromptContextBuilder
             sb.AppendLine();
         }
 
-        sb.AppendLine("IMPORTANT LOGIC RULE:");
-        sb.AppendLine("If you and the user finalize a new technical rule, architectural choice, or project decision during this turn, output a hidden XML tag block anywhere in your response like this:");
-        sb.AppendLine("<decision>Decision Title | The detailed rule</decision>");
-        sb.AppendLine();
+        if (effectiveRoute?.AllowsDecisionTagOutput == true)
+        {
+            sb.AppendLine("IMPORTANT LOGIC RULE:");
+            sb.AppendLine("If you and the user finalize a new technical rule, architectural choice, or project decision during this turn, output a hidden XML tag block anywhere in your response like this:");
+            sb.AppendLine("<decision>Decision Title | The detailed rule</decision>");
+            sb.AppendLine();
+        }
 
         // Not-indexed warning
         if (isNotIndexed)

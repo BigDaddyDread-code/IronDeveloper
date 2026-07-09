@@ -47,6 +47,7 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
         Assert.IsFalse(result.Gate.ShowGovernanceActions);
         Assert.IsFalse(result.Gate.CanCreateTicket);
         Assert.IsFalse(result.Gate.CanSaveDiscussion);
+        Assert.AreEqual("ProjectChatContextPipeline", result.RouteSource);
         Assert.AreEqual(1, semanticEvidenceProvider.CallCount);
         Assert.AreEqual(1, modeClassifier.CallCount);
         Assert.AreEqual(1, clarificationClassifier.CallCount);
@@ -78,7 +79,9 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
             Clarification: result.Clarification,
             Gate: result.Gate,
             RouteTraceId: result.DogfoodTraceId,
-            DogfoodTraceId: result.DogfoodTraceId);
+            DogfoodTraceId: result.DogfoodTraceId,
+            RouteSource: result.RouteSource,
+            RouteChallenge: result.RouteChallenge);
 
         var messageId = await chat.SaveMessageAsync(new ChatMessage
         {
@@ -100,6 +103,7 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
         Assert.IsNotNull(snapshot);
         Assert.IsFalse(snapshot.IsFallbackEvidence);
         Assert.AreEqual(ChatGovernanceMode.Exploration, snapshot.Mode);
+        Assert.AreEqual("ProjectChatContextPipeline", snapshot.RouteSource);
         Assert.IsFalse(snapshot.Gate.ShowGovernanceActions);
         Assert.IsFalse(snapshot.Gate.CanCreateTicket);
 
@@ -115,6 +119,7 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
         var audit = ok.Value as ChatTurnAuditResponse
             ?? throw new AssertFailedException("Audit controller did not return ChatTurnAuditResponse.");
         Assert.AreEqual(ChatAuditSource.NormalizedRows, audit.Source);
+        Assert.AreEqual("ProjectChatContextPipeline", audit.RouteSource);
         Assert.IsFalse(audit.IsFallbackEvidence);
 
         Assert.AreEqual(1, modeClassifier.CallCount, "Audit replay must not recompute mode.");
