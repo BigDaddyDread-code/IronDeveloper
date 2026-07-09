@@ -120,23 +120,79 @@ public sealed partial class IronDevCliTests
         }
     }
 
+    [TestMethod]
+    public async Task WorkspaceValidate_FreshRepoWithoutRestoreScaffolding_Succeeds()
+    {
+        // DOGFOOD-2 finding F-M: a normal repo has NO committed restore state and
+        // no MSBuildProjectExtensionsPath trick — exactly the shape that failed
+        // apply-validate with NETSDK1004 on the second dogfood repo. The
+        // validation profile now restores first, so "bring your own repository"
+        // does not require hidden scaffolding.
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-validate-no-scaffolding");
+        try
+        {
+            const string runId = "validate-no-scaffolding";
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            await File.WriteAllTextAsync(
+                Path.Combine(sourceRepo, ".gitignore"),
+                """
+                bin/
+                obj/
+                """);
+            await File.WriteAllTextAsync(
+                Path.Combine(sourceRepo, "TinyApp.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <OutputType>Exe</OutputType>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                </Project>
+                """);
+            await File.WriteAllTextAsync(
+                Path.Combine(sourceRepo, "Program.cs"),
+                """
+                Console.WriteLine("hello from an unscaffolded repo");
+                """);
+            await RunGitForTestAsync(sourceRepo, "config", "user.email", "irondev-tests@example.local");
+            await RunGitForTestAsync(sourceRepo, "config", "user.name", "IronDev Tests");
+            await RunGitForTestAsync(sourceRepo, "add", ".");
+            await RunGitForTestAsync(sourceRepo, "commit", "-m", "initial", "-q");
+
+            var workspaceRoot = Path.Combine(testRoot, "workspaces");
+            Directory.CreateDirectory(workspaceRoot);
+            using var prepareDoc = await RunWorkspacePrepareAsync(runId, sourceRepo, workspaceRoot, expectedExitCode: 0);
+            var workspacePath = prepareDoc.RootElement.GetProperty("data").GetProperty("workspacePath").GetString()!;
+
+            using var validateDoc = await RunWorkspaceValidateAsync(runId, workspacePath, "dotnet-build-test", expectedExitCode: 0);
+            Assert.AreEqual("succeeded", validateDoc.RootElement.GetProperty("status").GetString(),
+                "An unscaffolded repo validates: restore is the product's job, not the repo's secret.");
+
+            // The restore ran as its own evidenced step, not implicitly.
+            Assert.IsTrue(
+                File.Exists(Path.Combine(workspacePath, ".irondev", "runs", runId, "dotnet-restore", "command.json")),
+                "The restore step leaves its own command evidence.");
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
     private static async Task<string> CreateCopyOnlyApplyTinyDotnetRepositoryAsync(string testRoot)
     {
+        // DOGFOOD-2 finding F-M: no committed restore scaffolding. The validation
+        // profile restores in the workspace itself now, and restore outputs land
+        // in gitignored obj/ — committing .assets-style restore state would leak
+        // restore artifacts into the copy-only diff.
         var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
         await File.WriteAllTextAsync(
             Path.Combine(sourceRepo, ".gitignore"),
             """
             bin/
             obj/
-            """);
-        await File.WriteAllTextAsync(
-            Path.Combine(sourceRepo, "Directory.Build.props"),
-            """
-            <Project>
-              <PropertyGroup>
-                <MSBuildProjectExtensionsPath>.assets/</MSBuildProjectExtensionsPath>
-              </PropertyGroup>
-            </Project>
             """);
         await File.WriteAllTextAsync(
             Path.Combine(sourceRepo, "TinyApp.csproj"),
@@ -156,7 +212,6 @@ public sealed partial class IronDevCliTests
             Console.WriteLine("hello from source");
             """);
 
-        await RunDotnetForTestAsync(sourceRepo, "restore", "--nologo");
         await RunGitForTestAsync(sourceRepo, "config", "user.email", "irondev-tests@example.local");
         await RunGitForTestAsync(sourceRepo, "config", "user.name", "IronDev Tests");
         await RunGitForTestAsync(sourceRepo, "add", ".");

@@ -18,6 +18,12 @@ public sealed class DisposableWorkspaceCommandService : IDisposableWorkspaceComm
     private static readonly IReadOnlyDictionary<string, WorkspaceCommandDefinition> CommandDefinitions =
         new Dictionary<string, WorkspaceCommandDefinition>(StringComparer.OrdinalIgnoreCase)
         {
+            // DOGFOOD-2 finding F-M: a fresh workspace copy has no restore state,
+            // so validation must restore explicitly — as its own evidenced step,
+            // never implicitly inside build. Without this, every normal repo
+            // failed apply-validate with NETSDK1004 unless it committed restore
+            // scaffolding (hidden local knowledge the product must not require).
+            ["dotnet-restore"] = new("dotnet", ["restore"]),
             ["dotnet-build"] = new("dotnet", ["build", "--no-restore"]),
             ["dotnet-test"] = new("dotnet", ["test", "--no-build"])
         };
