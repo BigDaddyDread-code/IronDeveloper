@@ -28,6 +28,8 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
   const modeReason = gate.reason;
   const auditSourceLabel = formatAuditSource(message.response?.auditSource);
   const reasoningSummary = message.response?.reasoningSummary;
+  const routeSource = message.response?.routeSource;
+  const routeChallenge = message.response?.routeChallenge;
 
   return (
     <article className={`chat-message chat-message--${message.role}`} data-testid={`chat.message.${message.role}`}>
@@ -77,6 +79,18 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
             <p className="chat-message__auditSource" data-testid="chat.message.auditSource">
               <strong>Audit source:</strong> {auditSourceLabel}
               {message.response?.auditHasFallbackEvidence ? ' (fallback evidence present)' : null}
+            </p>
+          ) : null}
+          {routeSource ? (
+            <p className="chat-message__routeSource" data-testid="chat.message.routeSource">
+              <strong>Route source:</strong> {routeSource}
+            </p>
+          ) : null}
+          {routeChallenge ? (
+            <p className="chat-message__routeChallenge" data-testid="chat.message.routeChallenge">
+              <strong>Route challenge:</strong> {routeChallenge.suggestedMode ?? 'unknown'} / {routeChallenge.suggestedRequestKind ?? 'unknown'}
+              {typeof routeChallenge.confidence === 'number' ? ` (${Math.round(routeChallenge.confidence * 100)}%)` : null}
+              {routeChallenge.reason ? ` - ${routeChallenge.reason}` : null}
             </p>
           ) : null}
           {message.response?.auditFallbackReason ? (

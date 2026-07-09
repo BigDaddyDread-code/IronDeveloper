@@ -218,9 +218,24 @@ public abstract class IntegrationTestBase
                     ModeConfidence FLOAT NOT NULL,
                     ModeReason NVARCHAR(MAX) NOT NULL,
                     GateJson NVARCHAR(MAX) NOT NULL,
+                    RouteSource NVARCHAR(200) NOT NULL CONSTRAINT DF_ChatTurnGovernance_RouteSource DEFAULT N'unknown',
+                    RouteChallengeJson NVARCHAR(MAX) NULL,
                     CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnGovernance_CreatedUtc DEFAULT SYSUTCDATETIME()
                 );
                 CREATE UNIQUE INDEX UX_ChatTurnGovernance_MessageTenant ON dbo.ChatTurnGovernance(ChatMessageId, TenantId);
+            END
+
+            IF COL_LENGTH('dbo.ChatTurnGovernance', 'RouteSource') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ChatTurnGovernance
+                    ADD RouteSource NVARCHAR(200) NOT NULL
+                        CONSTRAINT DF_ChatTurnGovernance_RouteSource DEFAULT N'unknown' WITH VALUES;
+            END
+
+            IF COL_LENGTH('dbo.ChatTurnGovernance', 'RouteChallengeJson') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ChatTurnGovernance
+                    ADD RouteChallengeJson NVARCHAR(MAX) NULL;
             END
 
             IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NULL

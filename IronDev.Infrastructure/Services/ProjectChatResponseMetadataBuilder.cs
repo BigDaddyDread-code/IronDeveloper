@@ -31,7 +31,8 @@ public sealed class ProjectChatResponseMetadataBuilder
             context.Documents,
             context.Rules,
             context.RouteSignals,
-            context.ContextAgentResult.ContextSummary);
+            context.ContextAgentResult.ContextSummary,
+            context.EffectiveRoute);
 
         var linkedFilePaths = responseMode == ChatGovernanceMode.Formalization || responseMode == ChatGovernanceMode.Confirmation
             ? string.Join(Environment.NewLine, DistinctDelimited(
@@ -54,6 +55,7 @@ public sealed class ProjectChatResponseMetadataBuilder
             context.RouteSignals,
             modeDecision,
             traceGroupId,
+            context.EffectiveRoute,
             contextState);
 
         var reasoningSummary = BuildReasoningSummary(context.ContextAgentResult, responseMode, reasoningTrace);
@@ -75,6 +77,7 @@ public sealed class ProjectChatResponseMetadataBuilder
         IReadOnlyList<string> routeSignals,
         ChatModeDecision modeDecision,
         string traceGroupId,
+        EffectiveChatRoute? effectiveRoute,
         ChatContextState? contextState)
     {
         var grouped = contextAgentResult.TraceGroupId.Length > 0
@@ -86,6 +89,30 @@ public sealed class ProjectChatResponseMetadataBuilder
             traceLines.Add($"Dogfood trace group: {grouped}");
 
         traceLines.Add($"Mode classifier: {modeDecision.Mode} ({modeDecision.Confidence:0.00}) - {modeDecision.Reason}");
+        if (effectiveRoute is not null)
+        {
+            traceLines.Add(
+                $"Effective route: Mode={effectiveRoute.Mode}; Kind={effectiveRoute.RequestKind}; Source={effectiveRoute.Source}; Confidence={effectiveRoute.Confidence:0.00}; RequiresClarification={effectiveRoute.RequiresClarification}");
+            traceLines.Add(
+                $"Effective route capabilities: DecisionTag={effectiveRoute.AllowsDecisionTagOutput}; DecisionCapture={effectiveRoute.AllowsDecisionCapture}; TicketDrafting={effectiveRoute.AllowsTicketDrafting}");
+            traceLines.Add(effectiveRoute.InputsUsed.Count > 0
+                ? $"Effective route inputs: {string.Join(" | ", effectiveRoute.InputsUsed)}"
+                : "Effective route inputs: none recorded");
+        }
+        else
+        {
+            traceLines.Add("Effective route: unknown; falling back to mode classifier and route signals.");
+        }
+
+        if (contextAgentResult.RouteChallenge is not null)
+        {
+            traceLines.Add(
+                $"Route challenge: SuggestedMode={contextAgentResult.RouteChallenge.SuggestedMode}; SuggestedKind={contextAgentResult.RouteChallenge.SuggestedRequestKind}; Confidence={contextAgentResult.RouteChallenge.Confidence:0.00}; Reason={contextAgentResult.RouteChallenge.Reason}");
+        }
+        else
+        {
+            traceLines.Add("Route challenge: none");
+        }
         var clarification = contextState?.ClassifiedClarification ?? ChatClarificationState.None;
         traceLines.Add(
             $"Clarification classifier: Required={clarification.Required}; Kind={clarification.Kind}; Reason={clarification.Reason ?? "none"}");
@@ -174,7 +201,8 @@ public sealed class ProjectChatResponseMetadataBuilder
         IReadOnlyList<ProjectContextDocument> documents,
         IReadOnlyList<ProjectRule> rules,
         IReadOnlyList<string> routeSignals,
-        string contextResultSummary)
+        string contextResultSummary,
+        EffectiveChatRoute? effectiveRoute)
     {
         var laneLabel = mode == ChatGovernanceMode.Formalization
             ? "formalization"
@@ -186,10 +214,14 @@ public sealed class ProjectChatResponseMetadataBuilder
             ? "No route signals were attached."
             : $"Route signal count: {routeSignals.Count}.";
 
+        var routeSummary = effectiveRoute is null
+            ? "Effective route unavailable."
+            : $"Effective route: {effectiveRoute.RequestKind} from {effectiveRoute.Source}.";
+
         var contextSummary =
             $"{project.Name}: {laneLabel} lane using project context " +
             $"(tickets={tickets.Count}, decisions={decisions.Count}, documents={documents.Count}, rules={rules.Count}). " +
-            signalSummary;
+            $"{signalSummary} {routeSummary}";
 
         if (!string.IsNullOrWhiteSpace(contextResultSummary))
             return $"{contextSummary} {contextResultSummary}".Trim();

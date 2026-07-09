@@ -1,4 +1,5 @@
 using IronDev.Data.Models;
+using IronDev.Core.Chat;
 
 namespace IronDev.Client.Chat;
 
@@ -34,4 +35,6 @@ public sealed record ChatCompletionResponse(
     string? DisambiguationQuestion = null,
     string? ReasoningSummary = null,
     string? DogfoodTraceId = null,
-    string? DogfoodTracePath = null);
+    string? DogfoodTracePath = null,
+    string? RouteSource = null,
+    ChatRouteChallenge? RouteChallenge = null);

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using IronDev.Core.Chat;
 
 namespace IronDev.Core.Models;
 
@@ -196,6 +197,7 @@ public sealed class ContextAgentRequest
     public string TraceGroupId { get; init; } = string.Empty;
     public string UserRequest { get; init; } = string.Empty;
     public string RecentConversationSummary { get; init; } = string.Empty;
+    public EffectiveChatRoute? EffectiveRoute { get; init; }
 
     // Optional navigation context
     public long? TicketId { get; init; }
@@ -389,6 +391,7 @@ public sealed class ContextAgentResult
     public string Warnings          { get; init; } = string.Empty;
     public IReadOnlyList<CodeEvidence> Evidence { get; init; } = Array.Empty<CodeEvidence>();
     public IReadOnlyList<TicketCandidate> TicketCandidates { get; init; } = Array.Empty<TicketCandidate>();
+    public ChatRouteChallenge? RouteChallenge { get; init; }
 
     // ── Evidence rule ─────────────────────────────────────────────────────
     /// <summary>
