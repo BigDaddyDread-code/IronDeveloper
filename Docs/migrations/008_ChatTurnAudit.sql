@@ -20,6 +20,7 @@ BEGIN
         GateJson NVARCHAR(MAX) NOT NULL,
         RouteSource NVARCHAR(200) NOT NULL CONSTRAINT DF_ChatTurnGovernance_RouteSource DEFAULT N'unknown',
         RouteChallengeJson NVARCHAR(MAX) NULL,
+        BaDraftJson NVARCHAR(MAX) NULL,
         CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ChatTurnGovernance_CreatedUtc DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_ChatTurnGovernance_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
         CONSTRAINT FK_ChatTurnGovernance_Projects FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(Id),
@@ -44,6 +45,12 @@ IF COL_LENGTH('dbo.ChatTurnGovernance', 'RouteChallengeJson') IS NULL
 BEGIN
     ALTER TABLE dbo.ChatTurnGovernance
         ADD RouteChallengeJson NVARCHAR(MAX) NULL;
+END
+
+IF COL_LENGTH('dbo.ChatTurnGovernance', 'BaDraftJson') IS NULL
+BEGIN
+    ALTER TABLE dbo.ChatTurnGovernance
+        ADD BaDraftJson NVARCHAR(MAX) NULL;
 END
 GO
 

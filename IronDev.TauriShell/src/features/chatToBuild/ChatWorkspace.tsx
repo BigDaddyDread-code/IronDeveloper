@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ChatCompletionResponse } from '../../api/types';
+import type { BaWorkingDraft, ChatCompletionResponse } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
 import { Surface } from '../../design-system/Surface';
 import { ChatComposer } from './ChatComposer';
@@ -21,6 +21,10 @@ interface ChatWorkspaceProps {
   onSend: (request?: ChatSendRequest) => void;
   onReviewProjectState: () => void;
   onSaveDiscussion: (messageId: string) => void;
+  onKeepDiscussingBaDraft: () => void;
+  onAskNextBaQuestion: (draft: BaWorkingDraft) => void;
+  onEditBaDraft: (draft: BaWorkingDraft) => void;
+  onConfirmBaDraft: (draft: BaWorkingDraft) => void;
 }
 
 export function ChatWorkspace({
@@ -36,7 +40,11 @@ export function ChatWorkspace({
   onComposerChange,
   onSend,
   onReviewProjectState,
-  onSaveDiscussion
+  onSaveDiscussion,
+  onKeepDiscussingBaDraft,
+  onAskNextBaQuestion,
+  onEditBaDraft,
+  onConfirmBaDraft
 }: ChatWorkspaceProps) {
   const [isContextOpen, setIsContextOpen] = useState(true);
 
@@ -67,6 +75,10 @@ export function ChatWorkspace({
           projectLabel={projectLabel}
           isCollapsed={!isContextOpen}
           onToggleCollapsed={() => setIsContextOpen((current) => !current)}
+          onKeepDiscussingBaDraft={onKeepDiscussingBaDraft}
+          onAskNextBaQuestion={onAskNextBaQuestion}
+          onEditBaDraft={onEditBaDraft}
+          onConfirmBaDraft={onConfirmBaDraft}
         />
         {!isContextOpen ? (
           <CommandButton

@@ -144,6 +144,7 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
             new ProjectChatContextStateCompiler(),
             modeClassifier,
             clarificationClassifier,
+            ServiceProvider.GetRequiredService<IChatBaDraftService>(),
             new ProjectChatResponseComposer(new StubPromptTemplateProvider(), new StubLlmService()),
             new ProjectChatResponseMetadataBuilder());
     }

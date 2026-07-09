@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -9,7 +9,7 @@ namespace IronDev.IntegrationTests.Api;
 /// DOGFOOD-2 wizard hardening (findings F-C, F-C2, F-D, F-J), pinned against the
 /// real API and SQL. Cycle 001's provisioning wizard was poisoned by ONE malformed
 /// request: an empty command bound silently, returned 200 OK, accumulated as one of
-/// many isDefault rows, and had no product path out â€” only direct SQL recovered it.
+/// many isDefault rows, and had no product path out — only direct SQL recovered it.
 /// A confirm is an upsert, an empty command is a refusal, and a stored row is
 /// deletable. Configuration repair is not authority.
 /// </summary>
@@ -32,7 +32,7 @@ public sealed class ProvisioningCommandsApiTests : ApiTestBase
         StringAssert.Contains(text, "commandText");
 
         var stored = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/profile/commands");
-        Assert.AreEqual(0, stored.GetArrayLength(), "A refused command stores nothing â€” the wizard cannot be poisoned.");
+        Assert.AreEqual(0, stored.GetArrayLength(), "A refused command stores nothing — the wizard cannot be poisoned.");
     }
 
     [TestMethod]
@@ -49,7 +49,7 @@ public sealed class ProvisioningCommandsApiTests : ApiTestBase
         var buildDefaults = commands.EnumerateArray()
             .Where(command => command.GetProperty("commandType").GetString() == "Build" && command.GetProperty("isDefault").GetBoolean())
             .ToList();
-        Assert.AreEqual(1, buildDefaults.Count, "Exactly one default per command type â€” a new default replaces, never accumulates.");
+        Assert.AreEqual(1, buildDefaults.Count, "Exactly one default per command type — a new default replaces, never accumulates.");
         Assert.AreEqual("dotnet build new.slnx", buildDefaults[0].GetProperty("commandText").GetString());
 
         var resolved = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/profile/commands/default/Build");
@@ -68,7 +68,7 @@ public sealed class ProvisioningCommandsApiTests : ApiTestBase
         var commandId = stored.EnumerateArray().Single().GetProperty("projectCommandId").GetInt64();
 
         var deleted = await client.DeleteAsync($"/api/projects/{projectId}/profile/commands/{commandId}");
-        Assert.AreEqual(HttpStatusCode.OK, deleted.StatusCode, "A stored command has a product path out â€” never only SQL.");
+        Assert.AreEqual(HttpStatusCode.OK, deleted.StatusCode, "A stored command has a product path out — never only SQL.");
 
         var again = await client.DeleteAsync($"/api/projects/{projectId}/profile/commands/{commandId}");
         Assert.AreEqual(HttpStatusCode.NotFound, again.StatusCode);
@@ -117,7 +117,7 @@ public sealed class ProvisioningCommandsApiTests : ApiTestBase
         var linked = created.GetProperty("linkedFilePaths").GetString();
         StringAssert.Contains(linked, "src/App/Program.cs");
         StringAssert.Contains(linked, "src/App/Feature.cs");
-        Assert.IsFalse(linked!.Contains(' '), "Paths are trimmed â€” whitespace never reaches the Builder's path hints.");
+        Assert.IsFalse(linked!.Contains(' '), "Paths are trimmed — whitespace never reaches the Builder's path hints.");
     }
 
     private static async Task<int> CreateProjectAsync(HttpClient client, string name)
@@ -128,7 +128,7 @@ public sealed class ProvisioningCommandsApiTests : ApiTestBase
             description = "DOGFOOD-2 wizard-hardening contract pin."
         });
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.IsTrue(response.IsSuccessStatusCode, json.ToString());
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, json.ToString());
         return json.GetProperty("id").GetInt32();
     }
 

@@ -39,6 +39,8 @@ public sealed class ChatControllerAuditTests
         Assert.IsNotNull(audit.RouteChallenge);
         Assert.AreEqual(ChatGovernanceMode.Confirmation, audit.RouteChallenge.SuggestedMode);
         Assert.AreEqual(ContextRequestKind.CreateTicket, audit.RouteChallenge.SuggestedRequestKind);
+        Assert.IsNotNull(audit.BaDraft);
+        Assert.AreEqual("Parcels can be marked Lost", audit.BaDraft.CandidateTitle);
         Assert.IsFalse(audit.IsFallbackEvidence);
     }
 
@@ -86,6 +88,8 @@ public sealed class ChatControllerAuditTests
         StringAssert.Contains(json, "\"routeSource\":\"ProjectChatContextPipeline\"");
         StringAssert.Contains(json, "\"suggestedMode\":\"Confirmation\"");
         StringAssert.Contains(json, "\"suggestedRequestKind\":\"CreateTicket\"");
+        StringAssert.Contains(json, "\"baDraft\"");
+        StringAssert.Contains(json, "\"candidateTitle\":\"Parcels can be marked Lost\"");
         Assert.IsFalse(json.Contains("\"mode\":0", StringComparison.Ordinal), json);
         Assert.IsFalse(json.Contains("\"kind\":0", StringComparison.Ordinal), json);
     }
@@ -131,7 +135,14 @@ public sealed class ChatControllerAuditTests
                 ChatGovernanceMode.Confirmation,
                 ContextRequestKind.CreateTicket,
                 0.51,
-                "Classifier advisory differed, but the pipeline route remained final."));
+                "Classifier advisory differed, but the pipeline route remained final."),
+            new BaWorkingDraft
+            {
+                CandidateTitle = "Parcels can be marked Lost",
+                SourceMessageIds = ["101"],
+                Confidence = 0.82,
+                ReadyForConfirmation = true
+            });
 
     private sealed class ScopedTurnPersistenceService : IChatTurnPersistenceService
     {
