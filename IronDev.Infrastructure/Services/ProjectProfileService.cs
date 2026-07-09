@@ -101,7 +101,25 @@ public sealed class ProjectProfileService : IProjectProfileService
 
     public async Task SaveProjectCommandAsync(ProjectCommand command, CancellationToken ct = default)
     {
+        // DOGFOOD-2 findings F-C/F-D: an empty command stored as a default poisoned
+        // the provisioning wizard (detection stopped proposing, TOP 1 default
+        // resolution read the empty row) with no product path out. A command must
+        // say what it runs, and a new default REPLACES the old default of its type —
+        // it never accumulates beside it.
+        if (string.IsNullOrWhiteSpace(command.CommandType))
+            throw new ArgumentException("CommandType is required (Build, Test, Run, Lint, Format).", nameof(command));
+        if (string.IsNullOrWhiteSpace(command.CommandText))
+            throw new ArgumentException("CommandText is required — a command that runs nothing cannot be confirmed.", nameof(command));
+
         const string sql = """
+            IF @IsDefault = 1
+            BEGIN
+                UPDATE dbo.ProjectCommands
+                SET IsDefault = 0, UpdatedUtc = sysutcdatetime()
+                WHERE ProjectId = @ProjectId AND TenantId = @TenantId AND CommandType = @CommandType
+                  AND ProjectCommandId <> @ProjectCommandId AND IsDefault = 1
+            END
+
             IF EXISTS (SELECT 1 FROM dbo.ProjectCommands WHERE ProjectCommandId = @ProjectCommandId AND TenantId = @TenantId)
             BEGIN
                 UPDATE dbo.ProjectCommands
@@ -137,6 +155,25 @@ public sealed class ProjectProfileService : IProjectProfileService
             command.IsDefault,
             command.IsEnabled
         }, cancellationToken: ct));
+    }
+
+    public async Task<bool> DeleteProjectCommandAsync(int projectId, long projectCommandId, CancellationToken ct = default)
+    {
+        // DOGFOOD-2 finding F-D: a stored command row had no product path out —
+        // only direct SQL recovered a poisoned wizard. Deletion is scoped to the
+        // tenant AND the route's project, so a command id cannot reach across.
+        const string sql = """
+            DELETE FROM dbo.ProjectCommands
+            WHERE ProjectCommandId = @ProjectCommandId AND ProjectId = @ProjectId AND TenantId = @TenantId
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        var affected = await connection.ExecuteAsync(new CommandDefinition(sql, new
+        {
+            ProjectCommandId = projectCommandId,
+            ProjectId = projectId,
+            _tenant.TenantId
+        }, cancellationToken: ct));
+        return affected > 0;
     }
 
     public async Task<ProjectCommand?> GetDefaultCommandAsync(int projectId, string commandType, CancellationToken ct = default)

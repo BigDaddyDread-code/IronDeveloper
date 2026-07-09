@@ -44,6 +44,10 @@ export function ChatRoute({ route, onRouteReady }: ChatRouteProps) {
         onSend={chat.sendMessage}
         onReviewProjectState={chat.reviewProjectState}
         onSaveDiscussion={chat.saveDiscussionFromMessage}
+        onKeepDiscussingBaDraft={chat.keepDiscussingBaDraft}
+        onAskNextBaQuestion={chat.askNextBaQuestion}
+        onEditBaDraft={chat.editBaDraft}
+        onConfirmBaDraft={chat.confirmBaDraft}
       />
     </main>
   );

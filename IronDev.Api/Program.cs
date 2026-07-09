@@ -158,6 +158,7 @@ builder.Services.AddScoped<IContextAgentRouteJudge, ContextAgentRouteJudgeServic
 builder.Services.AddScoped<IContextAgentService, ContextAgentService>();
 builder.Services.AddScoped<IChatModeClassifier, LlmChatModeClassifier>();
 builder.Services.AddScoped<IChatClarificationClassifier, LlmChatClarificationClassifier>();
+builder.Services.AddScoped<IChatBaDraftService, ChatBaDraftService>();
 builder.Services.AddScoped<IChatTurnPersistenceService, ChatTurnPersistenceService>();
 builder.Services.AddScoped<IChatPromptTemplateProvider, FileSystemChatPromptTemplateProvider>();
 builder.Services.AddScoped<ProjectChatContextPipeline>();

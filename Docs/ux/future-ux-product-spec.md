@@ -443,7 +443,15 @@ BlockedForbiddenPathConfigMissing
 BlockedApprovalProfileMissing
 BlockedExternalDependencyMissing
 BlockedDirtyRepo
+BlockedProjectNotIndexed
+BlockedBuilderApplyDisabled
 ```
+
+One readiness truth (DOGFOOD-2 finding F-E): provisioning readiness includes every
+requirement the run start enforces — cycle 001 hit a wizard that said ReadyToRun
+while the Builder's readiness gate still refused for the missing code index and
+the disabled AllowBuilderApply. `isReady=true` means the governed loop may
+actually be attempted, not merely that the wizard's own questions were answered.
 
 ### 8.4 Pointed Questions
 

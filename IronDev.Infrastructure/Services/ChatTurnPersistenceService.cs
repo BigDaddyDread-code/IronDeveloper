@@ -73,9 +73,9 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
 
         const string governanceSql = """
             INSERT INTO dbo.ChatTurnGovernance
-                (TenantId, ProjectId, ChatSessionId, ChatMessageId, Mode, ModeConfidence, ModeReason, GateJson, RouteSource, RouteChallengeJson)
+                (TenantId, ProjectId, ChatSessionId, ChatMessageId, Mode, ModeConfidence, ModeReason, GateJson, RouteSource, RouteChallengeJson, BaDraftJson)
             VALUES
-                (@TenantId, @ProjectId, @ChatSessionId, @ChatMessageId, @Mode, @ModeConfidence, @ModeReason, @GateJson, @RouteSource, @RouteChallengeJson);
+                (@TenantId, @ProjectId, @ChatSessionId, @ChatMessageId, @Mode, @ModeConfidence, @ModeReason, @GateJson, @RouteSource, @RouteChallengeJson, @BaDraftJson);
             """;
 
         await connection.ExecuteAsync(new CommandDefinition(
@@ -93,7 +93,10 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
                 RouteSource = NormalizeRouteSource(envelope.RouteSource),
                 RouteChallengeJson = envelope.RouteChallenge is null
                     ? null
-                    : JsonSerializer.Serialize(envelope.RouteChallenge, JsonOptions)
+                    : JsonSerializer.Serialize(envelope.RouteChallenge, JsonOptions),
+                BaDraftJson = envelope.BaDraft is null
+                    ? null
+                    : JsonSerializer.Serialize(envelope.BaDraft, JsonOptions)
             },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -180,6 +183,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
                 g.GateJson,
                 g.RouteSource,
                 g.RouteChallengeJson,
+                g.BaDraftJson,
                 c.Required,
                 c.Kind,
                 c.Reason AS ClarificationReason,
@@ -264,7 +268,8 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             row.LinkedSymbols,
             IsFallbackEvidence: true,
             NormalizeRouteSource(envelope.RouteSource),
-            envelope.RouteChallenge);
+            envelope.RouteChallenge,
+            envelope.BaDraft);
     }
 
     private static ChatTurnPersistenceSnapshot BuildSnapshot(PersistedTurnRow row, bool isFallbackEvidence)
@@ -285,6 +290,9 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         var routeChallenge = string.IsNullOrWhiteSpace(row.RouteChallengeJson)
             ? null
             : JsonSerializer.Deserialize<ChatRouteChallenge>(row.RouteChallengeJson, JsonOptions);
+        var baDraft = string.IsNullOrWhiteSpace(row.BaDraftJson)
+            ? null
+            : JsonSerializer.Deserialize<BaWorkingDraft>(row.BaDraftJson, JsonOptions);
 
         var clarification = NormalizeClarification(row.Required, kind, questions, row.ClarificationReason);
 
@@ -302,7 +310,8 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             row.LinkedSymbols,
             isFallbackEvidence,
             NormalizeRouteSource(row.RouteSource),
-            routeChallenge);
+            routeChallenge,
+            baDraft);
     }
 
     private static ChatTurnEnvelope? ParseEnvelope(string? tags)
@@ -366,6 +375,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
         public string? GateJson { get; set; }
         public string? RouteSource { get; set; }
         public string? RouteChallengeJson { get; set; }
+        public string? BaDraftJson { get; set; }
         public bool Required { get; set; }
         public string? Kind { get; set; }
         public string? ClarificationReason { get; set; }

@@ -11,6 +11,14 @@ public sealed class CreateProjectTicketRequest
     public IReadOnlyList<string> AcceptanceCriteria { get; init; } = [];
     public IReadOnlyList<ExternalReferenceDto> ExternalReferences { get; init; } = [];
     public TicketProvenanceDto? Provenance { get; init; }
+
+    /// <summary>
+    /// DOGFOOD-2 finding F-J: repo-relative paths the work is expected to touch.
+    /// The single most reliability-critical Builder input (HERO-2, cycle 001:
+    /// without it the live builder writes plausible code at guessed paths), and
+    /// the form-shaped ticket path could not carry it at all.
+    /// </summary>
+    public IReadOnlyList<string> LinkedFilePaths { get; init; } = [];
 }
 
 public sealed class ImportExternalTicketRequest

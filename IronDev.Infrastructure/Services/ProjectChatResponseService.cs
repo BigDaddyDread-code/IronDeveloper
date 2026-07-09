@@ -10,6 +10,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
     private readonly ProjectChatContextStateCompiler _contextStateCompiler;
     private readonly IChatModeClassifier _modeClassifier;
     private readonly IChatClarificationClassifier _clarificationClassifier;
+    private readonly IChatBaDraftService _baDraftService;
     private readonly ProjectChatResponseComposer _composer;
     private readonly ProjectChatResponseMetadataBuilder _metadataBuilder;
 
@@ -18,6 +19,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         ProjectChatContextStateCompiler contextStateCompiler,
         IChatModeClassifier modeClassifier,
         IChatClarificationClassifier clarificationClassifier,
+        IChatBaDraftService baDraftService,
         ProjectChatResponseComposer composer,
         ProjectChatResponseMetadataBuilder metadataBuilder)
     {
@@ -25,6 +27,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         _contextStateCompiler = contextStateCompiler;
         _modeClassifier = modeClassifier;
         _clarificationClassifier = clarificationClassifier;
+        _baDraftService = baDraftService;
         _composer = composer;
         _metadataBuilder = metadataBuilder;
     }
@@ -89,6 +92,15 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             cancellationToken).ConfigureAwait(false);
         chatContextState = chatContextState with { ClassifiedClarification = clarification };
 
+        var baDraft = await _baDraftService.BuildAsync(
+            new ChatBaDraftRequest(
+                projectId,
+                sessionId,
+                normalizedPrompt,
+                recentSummary,
+                effectiveRoute),
+            cancellationToken).ConfigureAwait(false);
+
         var gate = ChatGovernanceGate.FromDecision(modeDecision);
         var assistantResponse = await _composer.BuildAsync(
             contextAgentResult,
@@ -117,6 +129,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             metadata.LinkedSymbols,
             DogfoodTraceId: correlationId,
             RouteSource: effectiveRoute.Source,
-            RouteChallenge: contextAgentResult.RouteChallenge);
+            RouteChallenge: contextAgentResult.RouteChallenge,
+            BaDraft: baDraft);
     }
 }

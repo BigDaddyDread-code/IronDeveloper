@@ -187,6 +187,34 @@ public sealed record ChatRouteChallenge(
     double Confidence,
     string Reason);
 
+public sealed record BaWorkingDraft
+{
+    public string? CandidateTitle { get; init; }
+    public string? Problem { get; init; }
+    public string? ProposedChange { get; init; }
+    public IReadOnlyList<string> BusinessRules { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> AcceptanceCriteria { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> Assumptions { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> OpenQuestions { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> SourceMessageIds { get; init; } = Array.Empty<string>();
+    public double Confidence { get; init; }
+    public bool ReadyForConfirmation { get; init; }
+    public IReadOnlyList<string> PotentialConflicts { get; init; } = Array.Empty<string>();
+    public string? SuggestedArtifact { get; init; }
+    public string Boundary { get; init; } = "A BA draft is shaped evidence, not a ticket, decision, approval, continuation, apply, commit, push, release, or deploy.";
+}
+
+public sealed record ChatBaDraftRequest(
+    int ProjectId,
+    long? SessionId,
+    string Prompt,
+    string RecentConversationSummary,
+    EffectiveChatRoute EffectiveRoute);
+
+public sealed record ConfirmBaWorkingDraftRequest(
+    long? SourceChatSessionId,
+    BaWorkingDraft Draft);
+
 public sealed record ChatModeClassificationRequest(
     string UserMessage,
     string RecentConversationSummary,
@@ -254,7 +282,8 @@ public sealed record ChatTurnEnvelope(
     string? RouteTraceId,
     string? DogfoodTraceId,
     string? RouteSource = null,
-    ChatRouteChallenge? RouteChallenge = null);
+    ChatRouteChallenge? RouteChallenge = null,
+    BaWorkingDraft? BaDraft = null);
 
 public sealed record ChatTurnPersistenceRequest(
     long ChatMessageId,
@@ -281,7 +310,8 @@ public sealed record ChatTurnPersistenceSnapshot(
     string? LinkedSymbols,
     bool IsFallbackEvidence = false,
     string? RouteSource = null,
-    ChatRouteChallenge? RouteChallenge = null);
+    ChatRouteChallenge? RouteChallenge = null,
+    BaWorkingDraft? BaDraft = null);
 
 public sealed record ChatTurnAuditResponse(
     long ChatMessageId,
@@ -298,7 +328,8 @@ public sealed record ChatTurnAuditResponse(
     string? LinkedSymbols,
     bool IsFallbackEvidence,
     string? RouteSource = null,
-    ChatRouteChallenge? RouteChallenge = null);
+    ChatRouteChallenge? RouteChallenge = null,
+    BaWorkingDraft? BaDraft = null);
 
 public sealed record ProjectChatResponseResult(
     string Response,
@@ -317,4 +348,5 @@ public sealed record ProjectChatResponseResult(
     string? DogfoodTracePath = null,
     long? TraceId = null,
     string? RouteSource = null,
-    ChatRouteChallenge? RouteChallenge = null);
+    ChatRouteChallenge? RouteChallenge = null,
+    BaWorkingDraft? BaDraft = null);
