@@ -12,6 +12,7 @@ import { isGovernancePath } from './library/governanceRoutes';
 import { AdminInviteSection, AuditSection, ProvisioningSection } from './library/PlannedSections';
 import { SolutionExplorer } from './library/SolutionExplorer';
 import { SettingsScreen } from './settings/SettingsScreen';
+import { PreflightGate, ProjectChooser } from './start/StartGate';
 import { WorkItemScreen } from './workitem/WorkItemScreen';
 
 type LibrarySection = 'explorer' | 'governance' | 'provisioning' | 'audit' | 'admin';
@@ -43,11 +44,33 @@ export function FlowShell() {
   );
   const [activeTicket, setActiveTicket] = useState<ProjectTicket | null>(null);
 
-  const needsSignIn =
-    surface !== 'settings' && (project.accessStatus === 'authRequired' || project.accessStatus === 'authInvalid');
-
-  if (needsSignIn) {
-    return <SignInRoute />;
+  // UX-START-0 — the entry sequence. Order matters: an unreachable API gets a
+  // named preflight (not a mute error chip), auth gets the sign-in route, and a
+  // missing project gets the chooser — no work-item flow exists outside a
+  // selected project. Settings stays reachable as the escape hatch.
+  if (surface !== 'settings') {
+    if (project.accessStatus === 'apiOffline' || project.accessStatus === 'apiError') {
+      return <PreflightGate onOpenSettings={() => setSurface('settings')} />;
+    }
+    if (
+      project.accessStatus === 'authRequired' ||
+      project.accessStatus === 'authInvalid' ||
+      project.accessStatus === 'tenantRequired'
+    ) {
+      return <SignInRoute />;
+    }
+    if (project.accessStatus === 'projectRequired' || (project.accessStatus !== 'loading' && project.selectedProjectId === null)) {
+      return (
+        <ProjectChooser
+          onOpenSettings={() => setSurface('settings')}
+          onProjectCreated={() => {
+            // A created project lands on readiness, never straight into work.
+            setLibrarySection('provisioning');
+            setSurface('library');
+          }}
+        />
+      );
+    }
   }
 
   const projectName =
@@ -115,7 +138,16 @@ export function FlowShell() {
       </header>
 
       <main className="fl-main">
-        {surface === 'board' ? <BoardScreen onOpenWorkItem={openWorkItem} onOpenBatch={() => setSurface('batch')} /> : null}
+        {surface === 'board' ? (
+          <BoardScreen
+            onOpenWorkItem={openWorkItem}
+            onOpenBatch={() => setSurface('batch')}
+            onOpenProvisioning={() => {
+              setLibrarySection('provisioning');
+              setSurface('library');
+            }}
+          />
+        ) : null}
         {surface === 'batch' ? <BatchScreen /> : null}
         {surface === 'workitem' ? (
           <WorkItemScreen
