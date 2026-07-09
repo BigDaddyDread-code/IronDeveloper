@@ -22,6 +22,12 @@ public sealed class ProjectProfilesApiClient : IronDevApiClientBase, IProjectPro
     public Task SaveProjectCommandAsync(ProjectCommand command, CancellationToken ct = default) =>
         PostAsync<object>($"projects/{command.ProjectId}/profile/commands", command, ct);
 
+    public async Task<bool> DeleteProjectCommandAsync(int projectId, long projectCommandId, CancellationToken ct = default)
+    {
+        await DeleteAsync($"projects/{projectId}/profile/commands/{projectCommandId}", ct);
+        return true;
+    }
+
     public Task<ProjectCommand?> GetDefaultCommandAsync(int projectId, string commandType, CancellationToken ct = default) =>
         GetAsync<ProjectCommand?>($"projects/{projectId}/profile/commands/default/{Uri.EscapeDataString(commandType)}", ct);
 

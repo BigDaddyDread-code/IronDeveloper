@@ -668,6 +668,11 @@ public sealed class TicketsController : ControllerBase
             Problem = request.Problem,
             AcceptanceCriteria = acceptanceCriteria,
             TechnicalNotes = technicalNotes,
+            // F-J: linked files ride the form path too — prose hints do not steer
+            // the Builder (HERO-2); this field does.
+            LinkedFilePaths = request.LinkedFilePaths.Count > 0
+                ? string.Join("\n", request.LinkedFilePaths.Select(path => path.Trim()).Where(path => path.Length > 0))
+                : null,
             Status = "Draft",
             Content = BuildContent(request, acceptanceCriteria, technicalNotes, generationNote),
             IsGenerated = request.Provenance is not null,

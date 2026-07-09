@@ -28,6 +28,13 @@ public static class ProvisioningBlockedStates
     public const string MissingTestCommand = "BlockedMissingTestCommand";
     public const string UnknownArchitecture = "BlockedUnknownArchitecture";
     public const string DirtyRepo = "BlockedDirtyRepo";
+
+    // DOGFOOD-2 finding F-E: provisioning said ReadyToRun while the Builder's own
+    // readiness still refused for these two — two disjoint readiness truths. One
+    // truth: provisioning readiness includes every requirement the run start
+    // enforces, so isReady=true means the governed loop may actually be attempted.
+    public const string ProjectNotIndexed = "BlockedProjectNotIndexed";
+    public const string BuilderApplyDisabled = "BlockedBuilderApplyDisabled";
 }
 
 /// <summary>DOGFOOD-2 entry criterion: what the git working tree looked like when readiness was evaluated.</summary>
@@ -102,6 +109,11 @@ public sealed record ProvisioningEvaluationInput
     public ProjectProfile? DetectedProfile { get; init; }
     public IReadOnlyList<string> DetectionFacts { get; init; } = [];
     public IReadOnlyList<string> DetectionWarnings { get; init; } = [];
+
+    // F-E: the Builder-readiness requirements the run start enforces, gathered
+    // from the same stored truth BuilderReadinessService reads.
+    public bool HasCodeIndex { get; init; }
+    public string? IndexingStatus { get; init; }
 }
 
 /// <summary>
@@ -293,7 +305,79 @@ public static class ProvisioningReadinessEvaluator
             blocked.Add(ProvisioningBlockedStates.UnknownArchitecture);
         }
 
-        // 6. Detection facts and warnings ride along as evidence, never as judgment.
+        // 6. Code index — the Builder's readiness refuses to run without it (F-E:
+        // this used to live only behind the run start, so provisioning could say
+        // ready while the run refused).
+        if (pathUsable)
+        {
+            if (!input.HasCodeIndex)
+            {
+                checks.Add(new ProvisioningCheck
+                {
+                    Name = "Code index",
+                    State = ProvisioningCheckStates.Missing,
+                    Evidence = "The project has never been indexed — the Builder's readiness gate will refuse to start a run.",
+                    Remedy = "Index it: POST /api/projects/{projectId}/code-index with body { \"directoryPath\": \"<the repo path>\" }.",
+                    Blocking = true
+                });
+                blocked.Add(ProvisioningBlockedStates.ProjectNotIndexed);
+            }
+            else if (!string.Equals(input.IndexingStatus, "Ready", StringComparison.OrdinalIgnoreCase))
+            {
+                checks.Add(new ProvisioningCheck
+                {
+                    Name = "Code index",
+                    State = ProvisioningCheckStates.NeedsConfirmation,
+                    Evidence = $"The code index is not ready: {(string.IsNullOrWhiteSpace(input.IndexingStatus) ? "no status recorded" : input.IndexingStatus)}.",
+                    Remedy = "Re-index: POST /api/projects/{projectId}/code-index with body { \"directoryPath\": \"<the repo path>\" }.",
+                    Blocking = true
+                });
+                blocked.Add(ProvisioningBlockedStates.ProjectNotIndexed);
+            }
+            else
+            {
+                checks.Add(new ProvisioningCheck
+                {
+                    Name = "Code index",
+                    State = ProvisioningCheckStates.Confirmed,
+                    Evidence = "The project is indexed and the index reports Ready.",
+                    Remedy = string.Empty,
+                    Blocking = false
+                });
+            }
+        }
+
+        // 7. Builder apply permission — off by default, and the run start refuses
+        // while it is off (F-E). Confirming it is a deliberate human act; readiness
+        // names it instead of letting the run's refusal be the first mention.
+        if (storedProfileMeaningful)
+        {
+            if (input.StoredProfile!.AllowBuilderApply)
+            {
+                checks.Add(new ProvisioningCheck
+                {
+                    Name = "Builder apply permission",
+                    State = ProvisioningCheckStates.Confirmed,
+                    Evidence = "AllowBuilderApply is enabled on the stored profile. It permits governed workspace writes only — copy-only apply stays behind the full gate chain.",
+                    Remedy = string.Empty,
+                    Blocking = false
+                });
+            }
+            else
+            {
+                checks.Add(new ProvisioningCheck
+                {
+                    Name = "Builder apply permission",
+                    State = ProvisioningCheckStates.NeedsConfirmation,
+                    Evidence = "AllowBuilderApply is false on the stored profile — the Builder's readiness gate will refuse to start a run.",
+                    Remedy = "Deliberately enable it: GET /api/projects/{projectId}/profile, set allowBuilderApply=true, POST it back. This permits governed workspace writes only; critic review, dispositions, approval, and copy-only apply remain separate gates.",
+                    Blocking = true
+                });
+                blocked.Add(ProvisioningBlockedStates.BuilderApplyDisabled);
+            }
+        }
+
+        // 8. Detection facts and warnings ride along as evidence, never as judgment.
         foreach (var warning in input.DetectionWarnings)
         {
             checks.Add(new ProvisioningCheck

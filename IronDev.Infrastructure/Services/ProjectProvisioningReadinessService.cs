@@ -99,7 +99,10 @@ public sealed class ProjectProvisioningReadinessService : IProjectProvisioningRe
             DetectedTestCommand = detectedTest,
             DetectedProfile = detectedProfile,
             DetectionFacts = detectionFacts,
-            DetectionWarnings = detectionWarnings
+            DetectionWarnings = detectionWarnings,
+            // F-E: the same stored truth BuilderReadinessService reads at run start.
+            HasCodeIndex = project.LastIndexedUtc.HasValue,
+            IndexingStatus = project.IndexingStatus
         });
     }
 
