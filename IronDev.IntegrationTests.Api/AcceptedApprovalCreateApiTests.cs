@@ -89,6 +89,43 @@ public sealed class AcceptedApprovalCreateApiTests : ApiTestBase
         await AssertBadRequestNoRowAsync(ValidRequest() with { BoundaryMaxims = [] });
 
     [TestMethod]
+    public async Task AcceptedApprovalCreateApi_AcceptsTheApprovalCeremonysEncodedHumanReason()
+    {
+        // DOGFOOD-2 finding F-L: the cockpit's approval ceremony rides the typed
+        // reason as a labeled evidence entry, ENCODED to the reference alphabet.
+        // This pins the UI-shaped entry against the REAL validator — the mocked
+        // Playwright spec cannot prove this contract.
+        using var client = await AuthedClientAsync();
+        var response = await client.PostAsJsonAsync($"/api/v1/projects/{Guid.NewGuid()}/accepted-approvals", ValidRequest() with
+        {
+            EvidenceReferences =
+            [
+                "approval-package:approval-package-pr171",
+                "human-reason:Package-reviewed-end-to-end-criteria-covered-no-findings."
+            ]
+        });
+
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
+    }
+
+    [TestMethod]
+    public async Task AcceptedApprovalCreateApi_RefusesFreeTextEvidenceNamingTheAlphabet()
+    {
+        // A refusal the operator cannot act on is only half a refusal: the
+        // UNSUPPORTED_CHARACTERS message names the allowed alphabet.
+        using var client = await AuthedClientAsync();
+        var response = await client.PostAsJsonAsync($"/api/v1/projects/{Guid.NewGuid()}/accepted-approvals", ValidRequest() with
+        {
+            EvidenceReferences = ["human-reason: free text with spaces"]
+        });
+        var text = await response.Content.ReadAsStringAsync();
+
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode, text);
+        StringAssert.Contains(text, "UNSUPPORTED_CHARACTERS");
+        StringAssert.Contains(text, "letters, digits");
+    }
+
+    [TestMethod]
     [DataRow("chain-of-thought")]
     [DataRow("raw prompt")]
     [DataRow("scratchpad")]

@@ -491,6 +491,18 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
     [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence]
   );
 
+  // DOGFOOD-2 finding F-L: evidence references are reference-shaped by contract —
+  // the backend allows only letters, digits, '-', '_', '.', ':' (no spaces). The
+  // typed reason is free text, so it is encoded to that alphabet before it rides
+  // as the labeled human-reason evidence entry; anything else is refused
+  // UNSUPPORTED_CHARACTERS by the real API (the mocked spec never noticed).
+  const encodeHumanReasonEvidence = (reason: string): string =>
+    reason
+      .trim()
+      .replace(/[^A-Za-z0-9\-_.:]+/g, '-')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-+|-+$/g, '');
+
   const recordApproval = useCallback(async (reason: string) => {
     const requirement = report?.approval;
     if (project.selectedProjectId === null || run === null || !requirement || busyAction !== null) {
@@ -509,7 +521,7 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
         causationId: `critic-pkg-${run.runId}`,
         // The ceremony's typed reason rides as a labeled durable evidence entry —
         // the approval record itself says why the human approved.
-        evidenceReferences: [`critic-package-sha256:${requirement.targetHash}`, `human-reason:${reason}`],
+        evidenceReferences: [`critic-package-sha256:${requirement.targetHash}`, `human-reason:${encodeHumanReasonEvidence(reason)}`],
         boundaryMaxims: ['Approval binds to the reviewed critic package hash.', 'Halt is not approval.']
       });
       setGateNotice(

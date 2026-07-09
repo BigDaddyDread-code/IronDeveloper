@@ -202,7 +202,8 @@ public sealed class AcceptedApprovalsV1Controller : ControllerBase
 
         if (!IsSafeId(value))
         {
-            errors.Add(Error(field, "Value contains unsupported characters."));
+            // DOGFOOD-2 finding F-L: name the allowed alphabet in the refusal.
+            errors.Add(Error(field, "Value contains unsupported characters. Allowed: letters, digits, '-', '_', '.', ':'."));
         }
 
         if (ContainsAny([value], PrivateReasoningMarkers))

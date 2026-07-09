@@ -336,6 +336,38 @@ public sealed class SkeletonCriticReviewTests
     }
 
     [TestMethod]
+    public async Task Verifier_PackageHash_AfterRevision_ComparesTheCurrentAnnouncement()
+    {
+        // REVISE-1 / DOGFOOD-2 finding F-I: a green revision re-prepares the
+        // package and announces the NEW hash. The verifier must compare against
+        // the current announcement — not the superseded pre-revision one, which
+        // made every revised run a permanent blocking mismatch.
+        var events = new RecordingEventStore();
+        await events.PublishAsync(new RunEventDto
+        {
+            RunId = RunId,
+            EventType = "CriticReviewPackageReady",
+            Payload = new Dictionary<string, string> { ["packageSha256"] = "aaaa" }
+        });
+        await events.PublishAsync(new RunEventDto
+        {
+            RunId = RunId,
+            EventType = "CriticReviewPackageReady",
+            Payload = new Dictionary<string, string> { ["packageSha256"] = "bbbb" }
+        });
+        var verifier = BuildVerifier(events);
+
+        var current = await verifier.VerifyAsync(RunId, MinimalPackage(), "pkg.json", "bbbb");
+        Assert.IsTrue(current.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.PackageHashCheck).Passed,
+            "The revised package matches the CURRENT halt announcement.");
+
+        var superseded = await verifier.VerifyAsync(RunId, MinimalPackage(), "pkg.json", "aaaa");
+        var supersededCheck = superseded.Checks.Single(check => check.CheckName == SkeletonCriticGroundTruthVerifier.PackageHashCheck);
+        Assert.IsFalse(supersededCheck.Passed,
+            "The superseded pre-revision package no longer matches — history is not the gate package.");
+    }
+
+    [TestMethod]
     public async Task Verifier_InternalContradictions_AreMismatches()
     {
         var verifier = BuildVerifier(new RecordingEventStore());

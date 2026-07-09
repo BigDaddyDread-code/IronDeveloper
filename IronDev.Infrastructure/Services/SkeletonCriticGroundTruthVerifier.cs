@@ -75,10 +75,14 @@ public sealed class SkeletonCriticGroundTruthVerifier : ISkeletonCriticGroundTru
         CancellationToken cancellationToken)
     {
         var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        // REVISE-1 (DOGFOOD-2 finding F-I): the LAST announcement is the CURRENT
+        // canonical package — a green revision re-prepares the package and
+        // announces it again. Comparing against the first announcement made every
+        // revised run a permanent blocking mismatch.
         var announced = events
             .Where(runEvent => runEvent.EventType == "CriticReviewPackageReady")
             .Select(runEvent => runEvent.Payload.TryGetValue("packageSha256", out var value) ? value : string.Empty)
-            .FirstOrDefault(value => !string.IsNullOrEmpty(value));
+            .LastOrDefault(value => !string.IsNullOrEmpty(value));
 
         if (string.IsNullOrEmpty(announced))
         {
