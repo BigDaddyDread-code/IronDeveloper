@@ -11,7 +11,7 @@ test('captures login hierarchy for LocalTest review', async ({ page }) => {
   await expect(page.getByTestId('auth.form')).toBeVisible();
   await expect(page.getByTestId('auth.flowHint')).toHaveText('Sign in, then select a project to continue.');
   await expect(page.getByTestId('auth.localtestCredentials')).toBeVisible();
-  await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
+  await expect(page.getByTestId('auth.email')).toHaveValue('bob@irondev.local');
   await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
   await expect(page.getByTestId('auth.submit')).toBeVisible();
   await expect(page.getByTestId('auth.apiStatusChip')).toContainText('LocalTest');

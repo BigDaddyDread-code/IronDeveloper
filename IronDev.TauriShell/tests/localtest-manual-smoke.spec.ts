@@ -16,7 +16,7 @@ test.describe('LocalTest manual flow-shell smoke', () => {
     await page.reload();
 
     await expect(page.getByTestId('auth.form')).toBeVisible({ timeout: 15_000 });
-    await page.getByTestId('auth.email').fill('localtest@irondev.local');
+    await page.getByTestId('auth.email').fill('bob@irondev.local');
     await page.getByTestId('auth.password').fill('change-me-local-only');
     await page.getByTestId('auth.submit').click();
 
@@ -28,7 +28,7 @@ test.describe('LocalTest manual flow-shell smoke', () => {
     }
 
     await expect(page.getByTestId('flow.chooser')).toBeVisible({ timeout: 15_000 });
-    await page.getByTestId('flow.chooser.project.1').click();
+    await page.getByRole('button', { name: /Open IronDev Local Test Project/i }).click();
     notes.push('Project chooser shown and IronDev Local Test Project selected.');
 
     await expect(page.getByTestId('flow.shell')).toBeVisible({ timeout: 15_000 });
@@ -48,7 +48,7 @@ test.describe('LocalTest manual flow-shell smoke', () => {
 
     await page.getByTestId('flow.nav.settings').click();
     await expect(page.getByTestId('flow.settings.banner')).toContainText('never mutation authority');
-    await expect(page.getByText('localtest@irondev.local')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('bob@irondev.local')).toBeVisible({ timeout: 15_000 });
     notes.push('Settings lists the seeded tenant membership from the tenant users API.');
 
     await page.getByTestId('flow.nav.library').click();

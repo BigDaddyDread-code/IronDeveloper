@@ -87,7 +87,11 @@ function Resolve-SqlCmdDataSource {
         foreach ($line in $info) {
             $match = [regex]::Match($line, '^\s*Instance pipe name:\s*(?<pipe>.+?)\s*$')
             if ($match.Success -and -not [string]::IsNullOrWhiteSpace($match.Groups['pipe'].Value)) {
-                return "np:$($match.Groups['pipe'].Value.Trim())"
+                $pipe = $match.Groups['pipe'].Value.Trim()
+                if ($pipe.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase)) {
+                    return $pipe
+                }
+                return "np:$pipe"
             }
         }
     }
@@ -99,6 +103,9 @@ function Resolve-SqlCmdDataSource {
             if ($match.Success) {
                 $pipe = $match.Groups['pipe'].Value.Trim()
                 if ($pipe -like '\\.\pipe\*\tsql\query') {
+                    if ($pipe.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase)) {
+                        return $pipe
+                    }
                     return "np:$pipe"
                 }
             }
@@ -157,7 +164,7 @@ function Initialize-FixtureGitRepository {
         throw "git add failed for '$Path'."
     }
 
-    & $git.Source -C $Path -c user.email=localtest@irondev.local -c user.name="LocalTest Seed" commit -m "Seed LocalTest fixture" -q
+    & $git.Source -C $Path -c user.email=bob@irondev.local -c user.name="LocalTest Seed" commit -m "Seed LocalTest fixture" -q
     if ($LASTEXITCODE -ne 0) {
         throw "git commit failed for '$Path'."
     }
@@ -182,6 +189,30 @@ public static class LocalTestMarker
     public static string Describe() => "LocalTest disposable build marker";
 }
 "@ | Set-Content -Path (Join-Path $localTestProjectPath "LocalTestMarker.cs") -Encoding UTF8
+
+Initialize-FixtureGitRepository -Path $localTestProjectPath
+
+$setupProjectPath = Join-Path $workspaceRoot "IronDevSetupTestProject"
+Reset-FixtureDirectory -Root $workspaceRoot -Path $setupProjectPath
+@"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
+"@ | Set-Content -Path (Join-Path $setupProjectPath "IronDevSetupTestProject.csproj") -Encoding UTF8
+
+@"
+namespace IronDevSetupTestProject;
+
+public static class SetupMarker
+{
+    public static string Describe() => "LocalTest guided setup marker";
+}
+"@ | Set-Content -Path (Join-Path $setupProjectPath "SetupMarker.cs") -Encoding UTF8
+
+Initialize-FixtureGitRepository -Path $setupProjectPath
 
 $bookSellerPath = Join-Path $workspaceRoot "BookSellerTestFixture"
 Reset-FixtureDirectory -Root $workspaceRoot -Path $bookSellerPath
@@ -366,4 +397,6 @@ Write-Host "LocalTest reset complete."
 Write-Host "Database: $database"
 Write-Host "Workspace root: $workspaceRoot"
 Write-Host "Logs root: $logsRoot"
-Write-Host "Login: localtest@irondev.local / change-me-local-only"
+Write-Host "Ready fixture: IronDev Local Test Project"
+Write-Host "Setup fixture: IronDev Setup Test Project"
+Write-Host "Login: bob@irondev.local / change-me-local-only"

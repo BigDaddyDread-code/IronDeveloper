@@ -15,6 +15,7 @@ import { SettingsScreen } from './settings/SettingsScreen';
 import { PreflightGate, ProjectChooser } from './start/StartGate';
 import { TenantChooser } from './start/TenantChooser';
 import { WorkItemScreen } from './workitem/WorkItemScreen';
+import { ProjectSetupScreen } from './projects/ProjectSetupScreen';
 
 type LibrarySection = 'explorer' | 'governance' | 'provisioning' | 'audit' | 'admin';
 
@@ -45,6 +46,21 @@ export function FlowShell() {
   );
   const [activeTicket, setActiveTicket] = useState<ProjectTicket | null>(null);
 
+  const openProjectBoard = () => {
+    setActiveTicket(null);
+    setSurface('board');
+  };
+
+  const openProjectSetup = () => {
+    setActiveTicket(null);
+    setSurface('setup');
+  };
+
+  const openProjectEntry = () => {
+    setActiveTicket(null);
+    setSurface('projects');
+  };
+
   // UX-START-0 — the entry sequence. Order matters: an unreachable API gets a
   // named preflight (not a mute error chip), auth gets the sign-in route, and a
   // missing project gets the chooser — no work-item flow exists outside a
@@ -62,15 +78,31 @@ export function FlowShell() {
     if (project.accessStatus === 'tenantRequired') {
       return <TenantChooser onOpenSettings={() => setSurface('settings')} />;
     }
+    if (surface === 'projects') {
+      return (
+        <ProjectChooser
+          onOpenSettings={() => setSurface('settings')}
+          onOpenBoard={openProjectBoard}
+          onOpenProvisioning={openProjectSetup}
+        />
+      );
+    }
     if (project.accessStatus === 'projectRequired' || (project.accessStatus !== 'loading' && project.selectedProjectId === null)) {
       return (
         <ProjectChooser
           onOpenSettings={() => setSurface('settings')}
-          onProjectCreated={() => {
-            // A created project lands on readiness, never straight into work.
-            setLibrarySection('provisioning');
-            setSurface('library');
-          }}
+          onOpenBoard={openProjectBoard}
+          onOpenProvisioning={openProjectSetup}
+        />
+      );
+    }
+    if (surface === 'setup' && project.selectedProjectId !== null) {
+      return (
+        <ProjectSetupScreen
+          projectId={project.selectedProjectId}
+          entryMode
+          onBackToProjects={openProjectEntry}
+          onOpenBoard={openProjectBoard}
         />
       );
     }
@@ -94,7 +126,9 @@ export function FlowShell() {
         <div className="fl-brand">
           <span className="fl-brand-mark">I</span>
           IronDev <span style={{ color: 'var(--fl-line2)' }}>/</span>{' '}
-          <span className="fl-brand-proj">{projectName}</span>
+          <button className="fl-project-switcher" data-testid="flow.projectSwitcher" type="button" onClick={openProjectEntry}>
+            {projectName}
+          </button>
         </div>
         <nav className="fl-nav" aria-label="Surfaces">
           <button
@@ -190,7 +224,7 @@ export function FlowShell() {
                   onClick={() => setLibrarySection('provisioning')}
                   data-testid="flow.library.nav.provisioning"
                 >
-                  Provisioning
+                  Project setup
                 </button>
                 <button
                   className={librarySection === 'audit' ? 'fl-on' : ''}
@@ -210,7 +244,9 @@ export function FlowShell() {
             </div>
             {librarySection === 'explorer' ? <SolutionExplorer /> : null}
             {librarySection === 'governance' ? <GovernanceHost /> : null}
-            {librarySection === 'provisioning' ? <ProvisioningSection /> : null}
+            {librarySection === 'provisioning' ? (
+              <ProvisioningSection onBackToProjects={openProjectEntry} onOpenBoard={openProjectBoard} />
+            ) : null}
             {librarySection === 'audit' ? <AuditSection /> : null}
             {librarySection === 'admin' ? <AdminInviteSection /> : null}
           </div>

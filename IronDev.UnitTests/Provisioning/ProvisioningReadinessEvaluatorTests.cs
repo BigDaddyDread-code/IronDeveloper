@@ -35,6 +35,9 @@ public sealed class ProvisioningReadinessEvaluatorTests
 
         Assert.IsTrue(result.IsReady);
         Assert.AreEqual(0, result.BlockedStates.Count);
+        Assert.AreEqual(0, result.BlockedCount);
+        Assert.AreEqual(ProvisioningActionKinds.OpenBoard, result.NextAction.Kind);
+        Assert.IsTrue(result.NextAction.Allowed);
         Assert.IsNull(result.ProposedProfile, "A stored profile means no proposal is pending.");
         Assert.AreEqual(ProjectProvisioningReadiness.BoundaryText, result.Boundary);
     }
@@ -92,6 +95,9 @@ public sealed class ProvisioningReadinessEvaluatorTests
         var check = result.Checks.Single(c => c.Name == "Build command");
         Assert.AreEqual(ProvisioningCheckStates.NeedsConfirmation, check.State);
         Assert.AreEqual("dotnet build BookSeller.slnx", check.DetectedValue);
+        Assert.AreEqual(ProvisioningCheckCodes.BuildCommand, check.Code);
+        Assert.AreEqual(ProvisioningActionKinds.ConfirmBuildCommand, result.NextAction.Kind);
+        Assert.AreEqual(ProvisioningCheckCodes.BuildCommand, result.NextAction.CheckCode);
         Assert.IsTrue(check.Blocking);
     }
 
@@ -238,5 +244,48 @@ public sealed class ProvisioningReadinessEvaluatorTests
         Assert.AreEqual(
             ProvisioningCheckStates.NeedsConfirmation,
             result.Checks.Single(c => c.Name == "Git repository").State);
+    }
+
+    [TestMethod]
+    public void EveryReadinessCheck_HasAStableCode()
+    {
+        var result = ProvisioningReadinessEvaluator.Evaluate(new ProvisioningEvaluationInput { ProjectId = 9 });
+
+        Assert.IsTrue(result.Checks.Count > 0);
+        Assert.IsFalse(result.Checks.Any(check => string.IsNullOrWhiteSpace(check.Code)));
+        Assert.IsFalse(result.Checks.Any(check => check.Code == ProvisioningCheckCodes.Unknown));
+    }
+
+    [TestMethod]
+    public void NextAction_UsesStableCode_NotDisplayLabel()
+    {
+        var result = ProvisioningReadinessEvaluator.Evaluate(FullyConfirmedInput() with
+        {
+            StoredTestCommand = null,
+            DetectedTestCommand = "dotnet test BookSeller.slnx"
+        });
+
+        var check = result.Checks.Single(candidate => candidate.Code == ProvisioningCheckCodes.TestCommand);
+        Assert.AreEqual("Test command", check.Label);
+        Assert.AreEqual(ProvisioningActionKinds.ConfirmTestCommand, result.NextAction.Kind);
+        Assert.AreEqual(ProvisioningCheckCodes.TestCommand, result.NextAction.CheckCode);
+        Assert.AreEqual(ProvisioningBlockedStates.MissingTestCommand, result.NextAction.ReasonCode);
+    }
+
+    [TestMethod]
+    public void UnknownFutureCheckCode_RemainsSerializableContractData()
+    {
+        var check = new ProvisioningCheck
+        {
+            Code = "FutureRepositoryPolicy",
+            Name = "Future repository policy",
+            State = ProvisioningCheckStates.NeedsConfirmation,
+            Evidence = "A future backend check requires attention.",
+            Remedy = "Follow the backend-provided remedy.",
+            Blocking = true
+        };
+
+        Assert.AreEqual("FutureRepositoryPolicy", check.Code);
+        Assert.AreEqual(ProvisioningActionKinds.ResolveAdditionalSetup, check.ActionKind);
     }
 }

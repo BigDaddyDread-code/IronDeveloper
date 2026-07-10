@@ -127,7 +127,11 @@ function Resolve-LocalDbDataSource {
         foreach ($line in $info) {
             $match = [regex]::Match($line, '^\s*Instance pipe name:\s*(?<pipe>.+?)\s*$')
             if ($match.Success -and -not [string]::IsNullOrWhiteSpace($match.Groups['pipe'].Value)) {
-                return "np:$($match.Groups['pipe'].Value.Trim())"
+                $pipe = $match.Groups['pipe'].Value.Trim()
+                if ($pipe.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase)) {
+                    return $pipe
+                }
+                return "np:$pipe"
             }
         }
     }
@@ -139,6 +143,9 @@ function Resolve-LocalDbDataSource {
             if ($match.Success) {
                 $pipe = $match.Groups['pipe'].Value.Trim()
                 if ($pipe -like '\\.\pipe\*\tsql\query') {
+                    if ($pipe.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase)) {
+                        return $pipe
+                    }
                     return "np:$pipe"
                 }
             }
@@ -205,7 +212,7 @@ function Test-LocalTestAuthenticationContract {
         $login = Invoke-JsonRequest `
             -Method "POST" `
             -Uri "$BaseUrl/api/auth/login" `
-            -Body @{ email = "localtest@irondev.local"; password = "change-me-local-only" } `
+            -Body @{ email = "bob@irondev.local"; password = "change-me-local-only" } `
             -TimeoutSeconds $TimeoutSeconds
 
         if ($null -eq $login -or [string]::IsNullOrWhiteSpace($login.token)) {

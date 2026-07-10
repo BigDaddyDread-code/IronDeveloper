@@ -96,7 +96,7 @@ DECLARE @PassHash NVARCHAR(MAX) = '$2a$11$1cy/VVDEmHFmY9ZSuzPojuyv91DkR3AuHEILmT
 
 SET IDENTITY_INSERT dbo.Users ON;
 INSERT INTO dbo.Users (Id, Email, DisplayName, PasswordHash, IsActive)
-VALUES (1, 'localtest@irondev.local', 'Local Test User', @PassHash, 1);
+VALUES (1, 'bob@irondev.local', 'Bob Developer', @PassHash, 1);
 SET IDENTITY_INSERT dbo.Users OFF;
 
 INSERT INTO dbo.TenantUsers (TenantId, UserId, Role)
@@ -112,9 +112,9 @@ VALUES
     'IronDev Local Test Project',
     'Seeded project for manual Tauri cockpit testing against isolated LocalTest data.',
     'C:\IronDevTestWorkspaces\IronDevLocalTestProject',
-    NULL,
-    'LocalTest Seeded',
-    0
+    SYSUTCDATETIME(),
+    'Ready',
+    2
 ),
 (
     2,
@@ -123,8 +123,18 @@ VALUES
     'Realistic LocalTest fixture for provisioning, build, review, and apply journeys.',
     'C:\IronDevTestWorkspaces\BookSellerTestFixture',
     SYSUTCDATETIME(),
-    'Indexed',
+    'Ready',
     4
+),
+(
+    3,
+    1,
+    'IronDev Setup Test Project',
+    'Disposable LocalTest fixture with one setup decision awaiting confirmation.',
+    'C:\IronDevTestWorkspaces\IronDevSetupTestProject',
+    SYSUTCDATETIME(),
+    'Ready',
+    2
 );
 SET IDENTITY_INSERT dbo.Projects OFF;
 GO
@@ -132,8 +142,9 @@ GO
 INSERT INTO dbo.ProjectProfiles
     (TenantId, ProjectId, IsExternalProject, ApplicationType, PrimaryLanguage, Framework, DatabaseEngine, DataAccessStyle, TestFramework, SolutionFile, SafeWriteRoot, AllowBuilderApply, AllowWritesOutsideProjectRoot, ProfileNotes)
 VALUES
-    (1, 1, 1, 'ClassLibrary', 'CSharp', 'DotNet10', 'None', 'None', 'None', 'IronDevLocalTestProject.csproj', 'C:\IronDevTestWorkspaces\IronDevLocalTestProject', 0, 0, 'Tiny deterministic baseline fixture for every PR.'),
-    (1, 2, 1, 'ConsoleApp', 'CSharp', 'DotNet10', 'None', 'InMemory', 'SelfTest', 'BookSeller.TestFixture.csproj', 'C:\IronDevTestWorkspaces\BookSellerTestFixture', 1, 0, 'Realistic BookSeller fixture for provisioning/build/review/apply manual testing.');
+    (1, 1, 1, 'ClassLibrary', 'CSharp', 'DotNet10', 'None', 'None', 'None', 'IronDevLocalTestProject.csproj', 'C:\IronDevTestWorkspaces\IronDevLocalTestProject', 1, 0, 'Tiny deterministic baseline fixture for every PR.'),
+    (1, 2, 1, 'ConsoleApp', 'CSharp', 'DotNet10', 'None', 'InMemory', 'SelfTest', 'BookSeller.TestFixture.csproj', 'C:\IronDevTestWorkspaces\BookSellerTestFixture', 1, 0, 'Realistic BookSeller fixture for provisioning/build/review/apply manual testing.'),
+    (1, 3, 1, 'ClassLibrary', 'CSharp', 'DotNet10', 'None', 'None', 'None', 'IronDevSetupTestProject.csproj', 'C:\IronDevTestWorkspaces\IronDevSetupTestProject', 1, 0, 'Disposable guided-setup fixture; the build command is intentionally unconfirmed.');
 GO
 
 INSERT INTO dbo.ProjectCommands
@@ -142,7 +153,8 @@ VALUES
     (1, 1, 'Build', 'dotnet build "IronDevLocalTestProject.csproj" -v quiet', 'C:\IronDevTestWorkspaces\IronDevLocalTestProject', 300, 1, 1),
     (1, 1, 'Test', 'dotnet build "IronDevLocalTestProject.csproj" -v quiet', 'C:\IronDevTestWorkspaces\IronDevLocalTestProject', 300, 1, 1),
     (1, 2, 'Build', 'dotnet build "BookSeller.TestFixture.csproj" -v quiet', 'C:\IronDevTestWorkspaces\BookSellerTestFixture', 300, 1, 1),
-    (1, 2, 'Test', 'dotnet run --project "BookSeller.TestFixture.csproj" -- --self-test', 'C:\IronDevTestWorkspaces\BookSellerTestFixture', 300, 1, 1);
+    (1, 2, 'Test', 'dotnet run --project "BookSeller.TestFixture.csproj" -- --self-test', 'C:\IronDevTestWorkspaces\BookSellerTestFixture', 300, 1, 1),
+    (1, 3, 'Test', 'dotnet build "IronDevSetupTestProject.csproj" -v quiet', 'C:\IronDevTestWorkspaces\IronDevSetupTestProject', 300, 1, 1);
 GO
 
 SET IDENTITY_INSERT dbo.ProjectChatSessions ON;

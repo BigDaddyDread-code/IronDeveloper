@@ -8,8 +8,8 @@ import { ProvisioningScreen } from './ProvisioningScreen';
 // through the whole product tells the truth about where the product ends.
 // PROJECT-0..3 graduated: ProvisioningSection is a real screen now.
 
-export function ProvisioningSection() {
-  return <ProvisioningScreen />;
+export function ProvisioningSection({ onBackToProjects, onOpenBoard }: { onBackToProjects: () => void; onOpenBoard: () => void }) {
+  return <ProvisioningScreen onBackToProjects={onBackToProjects} onOpenBoard={onOpenBoard} />;
 }
 
 export function AuditSection() {

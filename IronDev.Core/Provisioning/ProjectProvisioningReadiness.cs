@@ -19,6 +19,51 @@ public static class ProvisioningCheckStates
     public const string NotEvaluated = "NotEvaluated";
 }
 
+/// <summary>
+/// Stable machine-readable identifiers for provisioning checks. Labels may change;
+/// clients select behavior from these codes and render unknown future codes honestly.
+/// </summary>
+public static class ProvisioningCheckCodes
+{
+    public const string RepositoryAccess = "RepositoryAccess";
+    public const string RootSafety = "RootSafety";
+    public const string GitRepository = "GitRepository";
+    public const string WorkTree = "WorkTree";
+    public const string BuildCommand = "BuildCommand";
+    public const string TestCommand = "TestCommand";
+    public const string ProjectProfile = "ProjectProfile";
+    public const string CodeIndex = "CodeIndex";
+    public const string BuilderApplyPermission = "BuilderApplyPermission";
+    public const string DetectionWarning = "DetectionWarning";
+    public const string WorkspaceRoot = "WorkspaceRoot";
+    public const string EvidenceRoot = "EvidenceRoot";
+    public const string Unknown = "Unknown";
+}
+
+public static class ProvisioningActionKinds
+{
+    public const string None = "None";
+    public const string ChangeRepository = "ChangeRepository";
+    public const string ConfirmBuildCommand = "ConfirmBuildCommand";
+    public const string ConfirmTestCommand = "ConfirmTestCommand";
+    public const string ConfirmProjectProfile = "ConfirmProjectProfile";
+    public const string RecheckSetup = "RecheckSetup";
+    public const string ResolveAdditionalSetup = "ResolveAdditionalSetup";
+    public const string OpenBoard = "OpenBoard";
+
+    public static string ForCheck(string code, bool blocking) => blocking
+        ? code switch
+        {
+            ProvisioningCheckCodes.RepositoryAccess or ProvisioningCheckCodes.RootSafety => ChangeRepository,
+            ProvisioningCheckCodes.BuildCommand => ConfirmBuildCommand,
+            ProvisioningCheckCodes.TestCommand => ConfirmTestCommand,
+            ProvisioningCheckCodes.ProjectProfile => ConfirmProjectProfile,
+            ProvisioningCheckCodes.WorkTree => RecheckSetup,
+            _ => ResolveAdditionalSetup
+        }
+        : None;
+}
+
 /// <summary>The spec's readiness blocker vocabulary (future-ux-product-spec §8.3).</summary>
 public static class ProvisioningBlockedStates
 {
@@ -51,13 +96,20 @@ public static class ProvisioningWorkTreeStates
 /// <summary>One provisioning check: what was looked at, what state it is in, and the named remedy.</summary>
 public sealed record ProvisioningCheck
 {
+    /// <summary>Stable machine-readable code. Display labels must never be used for behavior.</summary>
+    public string Code { get; init; } = ProvisioningCheckCodes.Unknown;
+
     public string Name { get; init; } = string.Empty;
+
+    public string Label => Name;
 
     /// <summary>One of ProvisioningCheckStates.</summary>
     public string State { get; init; } = string.Empty;
 
     /// <summary>What the check saw — honest, specific, in backend words.</summary>
     public string Evidence { get; init; } = string.Empty;
+
+    public string Summary => Evidence;
 
     /// <summary>The named remedy. A blocked check without a remedy is a dead end.</summary>
     public string Remedy { get; init; } = string.Empty;
@@ -66,6 +118,18 @@ public sealed record ProvisioningCheck
 
     /// <summary>The detected candidate value for the wizard to prefill — a proposal, never a confirmation.</summary>
     public string DetectedValue { get; init; } = string.Empty;
+
+    public string ActionKind => ProvisioningActionKinds.ForCheck(Code, Blocking);
+}
+
+public sealed record ProvisioningNextAction
+{
+    public string Kind { get; init; } = ProvisioningActionKinds.ResolveAdditionalSetup;
+    public string? CheckCode { get; init; }
+    public bool Allowed { get; init; }
+    public string? ReasonCode { get; init; }
+    public string Label { get; init; } = string.Empty;
+    public string NextSafeAction { get; init; } = string.Empty;
 }
 
 public sealed record ProjectProvisioningReadiness
@@ -76,8 +140,10 @@ public sealed record ProjectProvisioningReadiness
 
     public int ProjectId { get; init; }
     public bool IsReady { get; init; }
+    public int BlockedCount { get; init; }
     public IReadOnlyList<string> BlockedStates { get; init; } = [];
     public IReadOnlyList<ProvisioningCheck> Checks { get; init; } = [];
+    public ProvisioningNextAction NextAction { get; init; } = new();
 
     /// <summary>The detected architecture profile awaiting human confirmation, when one exists and none is stored.</summary>
     public ProjectProfile? ProposedProfile { get; init; }
@@ -132,6 +198,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = ProvisioningCheckCodes.RepositoryAccess,
                 Name = "Repo path",
                 State = ProvisioningCheckStates.Missing,
                 Evidence = "No local path is set on the project.",
@@ -144,6 +211,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = ProvisioningCheckCodes.RepositoryAccess,
                 Name = "Repo path",
                 State = ProvisioningCheckStates.Missing,
                 Evidence = $"The configured path does not exist on this machine: {input.RepoPath}",
@@ -156,6 +224,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = ProvisioningCheckCodes.RootSafety,
                 Name = "Repo path safety",
                 State = ProvisioningCheckStates.Unsafe,
                 Evidence = input.RepoPathSafetyDetail,
@@ -168,6 +237,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = ProvisioningCheckCodes.RepositoryAccess,
                 Name = "Repo path",
                 State = ProvisioningCheckStates.Confirmed,
                 Evidence = $"{input.RepoPath} exists and passed the root-safety check.",
@@ -183,6 +253,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = ProvisioningCheckCodes.GitRepository,
                 Name = "Git repository",
                 State = input.IsGitRepository ? ProvisioningCheckStates.Confirmed : ProvisioningCheckStates.NeedsConfirmation,
                 Evidence = input.IsGitRepository
@@ -202,6 +273,7 @@ public static class ProvisioningReadinessEvaluator
                     case ProvisioningWorkTreeStates.Clean:
                         checks.Add(new ProvisioningCheck
                         {
+                            Code = ProvisioningCheckCodes.WorkTree,
                             Name = "Dirty-repo state",
                             State = ProvisioningCheckStates.Confirmed,
                             Evidence = "Working tree is clean (git status --porcelain reported no changes).",
@@ -213,6 +285,7 @@ public static class ProvisioningReadinessEvaluator
                     case ProvisioningWorkTreeStates.Dirty:
                         checks.Add(new ProvisioningCheck
                         {
+                            Code = ProvisioningCheckCodes.WorkTree,
                             Name = "Dirty-repo state",
                             State = ProvisioningCheckStates.NeedsConfirmation,
                             Evidence = $"Working tree has uncommitted changes: {input.WorkTreeDetail}",
@@ -225,6 +298,7 @@ public static class ProvisioningReadinessEvaluator
                     default:
                         checks.Add(new ProvisioningCheck
                         {
+                            Code = ProvisioningCheckCodes.WorkTree,
                             Name = "Dirty-repo state",
                             State = ProvisioningCheckStates.NotEvaluated,
                             Evidence = string.IsNullOrWhiteSpace(input.WorkTreeDetail)
@@ -241,6 +315,7 @@ public static class ProvisioningReadinessEvaluator
         // 3. Build command — stored default confirms; a detected candidate only proposes.
         AddCommandCheck(
             checks, blocked,
+            code: ProvisioningCheckCodes.BuildCommand,
             name: "Build command",
             stored: input.StoredBuildCommand,
             detected: input.DetectedBuildCommand,
@@ -250,6 +325,7 @@ public static class ProvisioningReadinessEvaluator
         // 4. Test command.
         AddCommandCheck(
             checks, blocked,
+            code: ProvisioningCheckCodes.TestCommand,
             name: "Test command",
             stored: input.StoredTestCommand,
             detected: input.DetectedTestCommand,
@@ -268,6 +344,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = ProvisioningCheckCodes.ProjectProfile,
                 Name = "Architecture profile",
                 State = ProvisioningCheckStates.Confirmed,
                 Evidence =
@@ -281,6 +358,7 @@ public static class ProvisioningReadinessEvaluator
             proposedProfile = input.DetectedProfile;
             checks.Add(new ProvisioningCheck
             {
+                Code = ProvisioningCheckCodes.ProjectProfile,
                 Name = "Architecture profile",
                 State = ProvisioningCheckStates.NeedsConfirmation,
                 Evidence = $"Detection proposes: {Describe(input.DetectedProfile)}. Unknowns remain until a human confirms.",
@@ -294,6 +372,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = ProvisioningCheckCodes.ProjectProfile,
                 Name = "Architecture profile",
                 State = ProvisioningCheckStates.Missing,
                 Evidence = pathUsable
@@ -314,6 +393,7 @@ public static class ProvisioningReadinessEvaluator
             {
                 checks.Add(new ProvisioningCheck
                 {
+                    Code = ProvisioningCheckCodes.CodeIndex,
                     Name = "Code index",
                     State = ProvisioningCheckStates.Missing,
                     Evidence = "The project has never been indexed — the Builder's readiness gate will refuse to start a run.",
@@ -326,6 +406,7 @@ public static class ProvisioningReadinessEvaluator
             {
                 checks.Add(new ProvisioningCheck
                 {
+                    Code = ProvisioningCheckCodes.CodeIndex,
                     Name = "Code index",
                     State = ProvisioningCheckStates.NeedsConfirmation,
                     Evidence = $"The code index is not ready: {(string.IsNullOrWhiteSpace(input.IndexingStatus) ? "no status recorded" : input.IndexingStatus)}.",
@@ -338,6 +419,7 @@ public static class ProvisioningReadinessEvaluator
             {
                 checks.Add(new ProvisioningCheck
                 {
+                    Code = ProvisioningCheckCodes.CodeIndex,
                     Name = "Code index",
                     State = ProvisioningCheckStates.Confirmed,
                     Evidence = "The project is indexed and the index reports Ready.",
@@ -356,6 +438,7 @@ public static class ProvisioningReadinessEvaluator
             {
                 checks.Add(new ProvisioningCheck
                 {
+                    Code = ProvisioningCheckCodes.BuilderApplyPermission,
                     Name = "Builder apply permission",
                     State = ProvisioningCheckStates.Confirmed,
                     Evidence = "AllowBuilderApply is enabled on the stored profile. It permits governed workspace writes only — copy-only apply stays behind the full gate chain.",
@@ -367,6 +450,7 @@ public static class ProvisioningReadinessEvaluator
             {
                 checks.Add(new ProvisioningCheck
                 {
+                    Code = ProvisioningCheckCodes.BuilderApplyPermission,
                     Name = "Builder apply permission",
                     State = ProvisioningCheckStates.NeedsConfirmation,
                     Evidence = "AllowBuilderApply is false on the stored profile — the Builder's readiness gate will refuse to start a run.",
@@ -382,6 +466,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = ProvisioningCheckCodes.DetectionWarning,
                 Name = "Detection warning",
                 State = ProvisioningCheckStates.NeedsConfirmation,
                 Evidence = warning,
@@ -390,19 +475,23 @@ public static class ProvisioningReadinessEvaluator
             });
         }
 
+        var isReady = blocked.Count == 0;
         return new ProjectProvisioningReadiness
         {
             ProjectId = input.ProjectId,
-            IsReady = blocked.Count == 0,
+            IsReady = isReady,
+            BlockedCount = checks.Count(check => check.Blocking),
             BlockedStates = blocked,
             Checks = checks,
-            ProposedProfile = proposedProfile
+            ProposedProfile = proposedProfile,
+            NextAction = CreateNextAction(isReady, checks)
         };
     }
 
     private static void AddCommandCheck(
         List<ProvisioningCheck> checks,
         List<string> blocked,
+        string code,
         string name,
         ProjectCommand? stored,
         string detected,
@@ -413,6 +502,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = code,
                 Name = name,
                 State = ProvisioningCheckStates.Confirmed,
                 Evidence = $"Stored default: {stored.CommandText}",
@@ -426,6 +516,7 @@ public static class ProvisioningReadinessEvaluator
         {
             checks.Add(new ProvisioningCheck
             {
+                Code = code,
                 Name = name,
                 State = ProvisioningCheckStates.NeedsConfirmation,
                 Evidence = $"Detected candidate: {detected}. A detected command is a proposal — it runs nothing until confirmed.",
@@ -439,6 +530,7 @@ public static class ProvisioningReadinessEvaluator
 
         checks.Add(new ProvisioningCheck
         {
+            Code = code,
             Name = name,
             State = ProvisioningCheckStates.Missing,
             Evidence = "No stored default and detection found no candidate.",
@@ -447,6 +539,71 @@ public static class ProvisioningReadinessEvaluator
         });
         blocked.Add(blockedState);
     }
+
+    private static ProvisioningNextAction CreateNextAction(
+        bool isReady,
+        IReadOnlyList<ProvisioningCheck> checks)
+    {
+        if (isReady)
+        {
+            return new ProvisioningNextAction
+            {
+                Kind = ProvisioningActionKinds.OpenBoard,
+                Allowed = true,
+                Label = "Open Board",
+                NextSafeAction = "Open the project Board."
+            };
+        }
+
+        var priority = new[]
+        {
+            ProvisioningCheckCodes.RepositoryAccess,
+            ProvisioningCheckCodes.RootSafety,
+            ProvisioningCheckCodes.BuildCommand,
+            ProvisioningCheckCodes.TestCommand,
+            ProvisioningCheckCodes.ProjectProfile,
+            ProvisioningCheckCodes.WorkTree,
+            ProvisioningCheckCodes.CodeIndex,
+            ProvisioningCheckCodes.BuilderApplyPermission
+        };
+        var next = priority
+            .Select(code => checks.FirstOrDefault(check => check.Blocking && check.Code == code))
+            .FirstOrDefault(check => check is not null)
+            ?? checks.First(check => check.Blocking);
+
+        return new ProvisioningNextAction
+        {
+            Kind = next.ActionKind,
+            CheckCode = next.Code,
+            Allowed = true,
+            ReasonCode = ReasonCodeFor(next.Code),
+            Label = ActionLabel(next.ActionKind),
+            NextSafeAction = next.Remedy
+        };
+    }
+
+    private static string ActionLabel(string actionKind) => actionKind switch
+    {
+        ProvisioningActionKinds.ChangeRepository => "Change repository",
+        ProvisioningActionKinds.ConfirmBuildCommand => "Confirm build command",
+        ProvisioningActionKinds.ConfirmTestCommand => "Confirm test command",
+        ProvisioningActionKinds.ConfirmProjectProfile => "Confirm project structure",
+        ProvisioningActionKinds.RecheckSetup => "Re-check setup",
+        _ => "Complete required setup"
+    };
+
+    private static string? ReasonCodeFor(string checkCode) => checkCode switch
+    {
+        ProvisioningCheckCodes.RepositoryAccess => ProvisioningBlockedStates.MissingRepoPath,
+        ProvisioningCheckCodes.RootSafety => ProvisioningBlockedStates.UnsafeRepoPath,
+        ProvisioningCheckCodes.BuildCommand => ProvisioningBlockedStates.MissingBuildCommand,
+        ProvisioningCheckCodes.TestCommand => ProvisioningBlockedStates.MissingTestCommand,
+        ProvisioningCheckCodes.ProjectProfile => ProvisioningBlockedStates.UnknownArchitecture,
+        ProvisioningCheckCodes.WorkTree => ProvisioningBlockedStates.DirtyRepo,
+        ProvisioningCheckCodes.CodeIndex => ProvisioningBlockedStates.ProjectNotIndexed,
+        ProvisioningCheckCodes.BuilderApplyPermission => ProvisioningBlockedStates.BuilderApplyDisabled,
+        _ => null
+    };
 
     private static string Describe(ProjectProfile profile)
     {
