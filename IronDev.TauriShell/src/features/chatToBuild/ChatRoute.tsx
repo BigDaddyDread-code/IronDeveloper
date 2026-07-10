@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import type { WorkspaceRoute, WorkspaceRouteMeta } from '../../app/routes';
+import type { ProjectTicket } from '../../api/types';
 import { RouteOutcomeScreen } from '../../flow/components/RouteOutcomeScreen';
 import { ChatWorkspace } from './ChatWorkspace';
 import { useProjectChat } from './useProjectChat';
@@ -9,6 +10,7 @@ interface ChatRouteProps {
   requestedSessionId: number | null;
   onOpenSession: (sessionId: number) => void;
   onOpenLanding: () => void;
+  onOpenWorkItem: (ticket: ProjectTicket) => void;
   onRouteReady?: (state: WorkspaceRouteMeta) => void;
 }
 
@@ -17,6 +19,7 @@ export function ChatRoute({
   requestedSessionId,
   onOpenSession,
   onOpenLanding,
+  onOpenWorkItem,
   onRouteReady
 }: ChatRouteProps) {
   const chat = useProjectChat({ requestedSessionId, onSessionCreated: onOpenSession });
@@ -102,7 +105,8 @@ export function ChatRoute({
         onKeepDiscussingBaDraft={chat.keepDiscussingBaDraft}
         onAskNextBaQuestion={chat.askNextBaQuestion}
         onEditBaDraft={chat.editBaDraft}
-        onConfirmBaDraft={chat.confirmBaDraft}
+        onCreateTicketFromDraft={chat.createTicketFromBaDraft}
+        onOpenWorkItem={onOpenWorkItem}
       />
     </main>
   );

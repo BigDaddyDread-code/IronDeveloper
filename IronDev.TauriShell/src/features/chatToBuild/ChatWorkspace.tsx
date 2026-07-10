@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { BaWorkingDraft, ChatCompletionResponse, ProjectChatSession } from '../../api/types';
+import type { BaWorkingDraft, ChatCompletionResponse, ProjectChatSession, ProjectTicket } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
 import { ChatComposer } from './ChatComposer';
 import { ChatContextPanel } from './ChatContextPanel';
 import { ChatSessionRail } from './ChatSessionRail';
+import { ChatTicketDraftReview } from './ChatTicketDraftReview';
 import { ChatThread } from './ChatThread';
 import type { ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
@@ -28,7 +29,8 @@ interface ChatWorkspaceProps {
   onKeepDiscussingBaDraft: () => void;
   onAskNextBaQuestion: (draft: BaWorkingDraft) => void;
   onEditBaDraft: (draft: BaWorkingDraft) => void;
-  onConfirmBaDraft: (draft: BaWorkingDraft) => void;
+  onCreateTicketFromDraft: (draft: BaWorkingDraft) => Promise<ProjectTicket>;
+  onOpenWorkItem: (ticket: ProjectTicket) => void;
 }
 
 export function ChatWorkspace({
@@ -52,14 +54,17 @@ export function ChatWorkspace({
   onKeepDiscussingBaDraft,
   onAskNextBaQuestion,
   onEditBaDraft,
-  onConfirmBaDraft
+  onCreateTicketFromDraft,
+  onOpenWorkItem
 }: ChatWorkspaceProps) {
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [isSessionRailOpen, setIsSessionRailOpen] = useState(false);
+  const [reviewedDraft, setReviewedDraft] = useState<BaWorkingDraft | null>(null);
 
   useEffect(() => {
     setIsContextOpen(false);
     setIsSessionRailOpen(false);
+    setReviewedDraft(null);
   }, [activeSessionId]);
 
   useEffect(() => {
@@ -143,10 +148,20 @@ export function ChatWorkspace({
             onKeepDiscussingBaDraft={onKeepDiscussingBaDraft}
             onAskNextBaQuestion={onAskNextBaQuestion}
             onEditBaDraft={onEditBaDraft}
-            onConfirmBaDraft={onConfirmBaDraft}
+            onReviewBaDraft={setReviewedDraft}
           />
         </div>
       </div>
+      {reviewedDraft ? (
+        <ChatTicketDraftReview
+          draft={reviewedDraft}
+          projectLabel={projectLabel}
+          sourceSessionId={activeSessionId}
+          onClose={() => setReviewedDraft(null)}
+          onCreateTicket={onCreateTicketFromDraft}
+          onOpenWorkItem={onOpenWorkItem}
+        />
+      ) : null}
     </section>
   );
 }

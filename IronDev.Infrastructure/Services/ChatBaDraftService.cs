@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
@@ -132,6 +133,10 @@ public sealed class ChatBaDraftService : IChatBaDraftService
 
     private static string DeriveTitle(IReadOnlyList<BaSourceTurn> sourceTurns, string prompt)
     {
+        var explicitTitle = ExtractExplicitTitle(prompt);
+        if (!string.IsNullOrWhiteSpace(explicitTitle))
+            return NormalizeTitle(explicitTitle);
+
         var allText = string.Join(" ", sourceTurns.Select(turn => turn.Text));
         if (ContainsParcelLost(allText))
             return "Parcels can be marked Lost";
@@ -151,7 +156,25 @@ public sealed class ChatBaDraftService : IChatBaDraftService
         if (string.IsNullOrWhiteSpace(seed))
             return "Candidate work item";
 
-        return Capitalize(seed.Length > 80 ? seed[..77].TrimEnd() + "..." : seed);
+        return NormalizeTitle(seed);
+    }
+
+    private static string? ExtractExplicitTitle(string prompt)
+    {
+        var match = Regex.Match(
+            prompt,
+            @"\b(?:ticket|work item)\s+(?:is\s+)?(?:titled|title\s*:)\s*(?<title>[^.;\r\n]+)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        return match.Success
+            ? match.Groups["title"].Value.Trim(' ', '\'', '"')
+            : null;
+    }
+
+    private static string NormalizeTitle(string title)
+    {
+        var trimmed = title.Trim();
+        return Capitalize(trimmed.Length > 80 ? trimmed[..77].TrimEnd() + "..." : trimmed);
     }
 
     private static string DeriveProblem(string allText, string title)

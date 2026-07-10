@@ -499,6 +499,7 @@ export function FlowShell() {
             requestedSessionId={currentRoute.chatSessionId}
             onOpenSession={(sessionId) => navigateProductPath(chatSessionPath(activeProjectId, sessionId))}
             onOpenLanding={() => navigateProductPath(projectPath(activeProjectId, 'chat'))}
+            onOpenWorkItem={openWorkItem}
           />
         ) : null}
         {displayedKind === 'workItem' && workItemLoadState === 'loading' ? (

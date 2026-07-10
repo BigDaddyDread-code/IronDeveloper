@@ -3532,6 +3532,172 @@ p {
   font-size: 11px;
 }
 
+.chat-ticket-review__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgba(34, 38, 43, 0.42);
+  padding: 24px;
+}
+
+.chat-ticket-review {
+  width: min(52rem, 100%);
+  max-height: min(52rem, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
+  border: 1px solid var(--fl-line2);
+  border-radius: 8px;
+  background: var(--fl-panel);
+  box-shadow: 0 24px 60px rgba(34, 38, 43, 0.24);
+  color: var(--fl-ink);
+}
+
+.chat-ticket-review__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--fl-line);
+  padding: 20px 22px;
+}
+
+.chat-ticket-review__header h2,
+.chat-ticket-review__success h2 {
+  margin: 2px 0 0;
+  color: var(--fl-ink);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.chat-ticket-review__header > div > p:last-child {
+  margin-top: 4px;
+  color: var(--fl-ink2);
+}
+
+.chat-ticket-review__body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.chat-ticket-review__section {
+  display: grid;
+  gap: 12px;
+  padding: 18px 22px;
+}
+
+.chat-ticket-review__section + .chat-ticket-review__section {
+  border-top: 1px solid var(--fl-line);
+}
+
+.chat-ticket-review__decision {
+  background: #f7f8f5;
+}
+
+.chat-ticket-review__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-ticket-review__section h3,
+.chat-ticket-review__text h4,
+.chat-ticket-review__list h4 {
+  margin: 0;
+  color: var(--fl-ink);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.chat-ticket-review__text,
+.chat-ticket-review__list {
+  display: grid;
+  gap: 4px;
+}
+
+.chat-ticket-review__text p,
+.chat-ticket-review__section > p {
+  color: var(--fl-ink2);
+}
+
+.chat-ticket-review__list ul,
+.chat-ticket-review__list ol,
+.chat-ticket-review__decision > ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--fl-ink2);
+}
+
+.chat-ticket-review__decision > ul {
+  color: var(--fl-gate);
+}
+
+.chat-ticket-review__section dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 22px;
+  margin: 0;
+}
+
+.chat-ticket-review__section dl div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.chat-ticket-review__section dt {
+  color: var(--fl-muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.chat-ticket-review__section dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--fl-ink);
+}
+
+.chat-ticket-review__error {
+  margin: 0;
+  border-top: 1px solid #efcaca;
+  background: #fff1f1;
+  color: var(--fl-red);
+  padding: 12px 22px;
+}
+
+.chat-ticket-review__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid var(--fl-line);
+  padding: 14px 22px;
+}
+
+.chat-ticket-review__boundary {
+  color: var(--fl-muted);
+  font-size: 12px;
+}
+
+.chat-ticket-review__success {
+  display: grid;
+  gap: 10px;
+  padding: 24px;
+}
+
+.chat-ticket-review__success .chat-ticket-review__footer {
+  margin: 8px -24px -24px;
+}
+
 .chat-page-header {
   width: min(100%, 56rem);
   margin: 0 auto;
@@ -3815,11 +3981,14 @@ p {
     box-shadow: 12px 0 30px rgba(34, 38, 43, 0.16);
     padding: 22px 16px;
     transform: translateX(-105%);
-    transition: transform 160ms ease-out;
+    visibility: hidden;
+    transition: transform 160ms ease-out, visibility 0s linear 160ms;
   }
 
   .chat-session-rail--open {
     transform: translateX(0);
+    visibility: visible;
+    transition-delay: 0s;
   }
 
   .chat-session-rail__header {
@@ -3897,5 +4066,39 @@ p {
 
   .chat-composer {
     bottom: 8px;
+  }
+
+  .chat-ticket-review__backdrop {
+    padding: 0;
+  }
+
+  .chat-ticket-review {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .chat-ticket-review__header,
+  .chat-ticket-review__footer {
+    padding-inline: 16px;
+  }
+
+  .chat-ticket-review__section {
+    padding-inline: 16px;
+  }
+
+  .chat-ticket-review__section dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-ticket-review__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chat-ticket-review__footer .command-button--primary {
+    width: 100%;
   }
 }
