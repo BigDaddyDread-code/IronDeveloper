@@ -363,6 +363,26 @@ try {
             ,@{ Name = "MemoryProposal status staging-only check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposal') AND name = N'CK_MemoryProposal_Status_StagingOnly'" }
             ,@{ Name = "MemoryProposalEvidenceReference evidence type check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposalEvidenceReference') AND name = N'CK_MemoryProposalEvidenceReference_EvidenceType_Allowed'" }
             ,@{ Name = "MemoryProposalWorkflowReference target check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposalWorkflowReference') AND name = N'CK_MemoryProposalWorkflowReference_Target'" }
+            ,@{ Name = "dbo.ProjectDocuments table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectDocuments', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "dbo.ProjectDocumentVersions table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectDocumentVersions', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "dbo.ProjectDocumentLinks table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectDocumentLinks', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "ProjectDocuments Origin column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ProjectDocuments', N'Origin') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "ProjectDocuments ProcessingStatus column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ProjectDocuments', N'ProcessingStatus') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "ProjectDocuments Visibility column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ProjectDocuments', N'Visibility') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "ProjectDocuments upload metadata columns"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ProjectDocuments', N'OriginalFileName') IS NULL OR COL_LENGTH(N'dbo.ProjectDocuments', N'MediaType') IS NULL OR COL_LENGTH(N'dbo.ProjectDocuments', N'ByteSize') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "ProjectDocuments origin check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.ProjectDocuments') AND name = N'CK_ProjectDocuments_Origin_Allowed'" }
+            ,@{ Name = "ProjectDocuments processing status check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.ProjectDocuments') AND name = N'CK_ProjectDocuments_ProcessingStatus_Allowed'" }
+            ,@{ Name = "ProjectDocuments visibility check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.ProjectDocuments') AND name = N'CK_ProjectDocuments_Visibility_Allowed'" }
+            ,@{ Name = "ProjectDocuments byte size check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.ProjectDocuments') AND name = N'CK_ProjectDocuments_ByteSize_NonNegative'" }
+            ,@{ Name = "dbo.ProjectProfiles table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectProfiles', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "dbo.ProjectCommands table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectCommands', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "dbo.ProjectProfileOptions table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectProfileOptions', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "dbo.ProjectFiles table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectFiles', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Projects LocalPath column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.Projects', N'LocalPath') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Projects LastIndexedUtc column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.Projects', N'LastIndexedUtc') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Projects IndexingStatus column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.Projects', N'IndexingStatus') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "agent.AgentRunAuditEnvelope table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'agent.AgentRunAuditEnvelope', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "AgentRunAuditEnvelope no private reasoning constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'agent.AgentRunAuditEnvelope') AND name = N'CK_AgentRunAuditEnvelope_NoRawPrivateReasoning'" }
         )
 
         foreach ($check in $checks) {

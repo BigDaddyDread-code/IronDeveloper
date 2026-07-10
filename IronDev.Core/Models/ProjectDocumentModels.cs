@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace IronDev.Data.Models;
 
@@ -35,6 +36,21 @@ public sealed class ProjectDocument
 
     /// <summary>Active | Archived | Deleted</summary>
     public string Status { get; set; } = "Active";
+
+    /// <summary>CreatedInIronDev | Uploaded</summary>
+    public string Origin { get; set; } = "CreatedInIronDev";
+
+    /// <summary>Uploading | Processing | Draft | Ready | ProcessingFailed | Unsupported | Superseded | Unavailable</summary>
+    public string ProcessingStatus { get; set; } = "Draft";
+
+    public string? Description { get; set; }
+
+    /// <summary>Project | MembersOnly</summary>
+    public string Visibility { get; set; } = "Project";
+
+    public string? OriginalFileName { get; set; }
+    public string? MediaType { get; set; }
+    public long? ByteSize { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }
@@ -115,10 +131,72 @@ public sealed class CreateProjectDocumentRequest
     public string ContentMarkdown { get; set; } = string.Empty;
     public string? ChangeSummary { get; set; }
     public string? CreatedBy { get; set; }
+    [JsonIgnore]
+    public string Origin { get; set; } = "CreatedInIronDev";
+
+    [JsonIgnore]
+    public string ProcessingStatus { get; set; } = "Draft";
+
+    public string? Description { get; set; }
+
+    [JsonIgnore]
+    public string Visibility { get; set; } = "Project";
+
+    [JsonIgnore]
+    public string? OriginalFileName { get; set; }
+
+    [JsonIgnore]
+    public string? MediaType { get; set; }
+
+    [JsonIgnore]
+    public long? ByteSize { get; set; }
 
     /// <summary>Optional source link for the initial version (e.g. a chat session).</summary>
     public string? SourceEntityType { get; set; }
     public long? SourceEntityId { get; set; }
+}
+
+public sealed class ProjectDocumentUploadRequest
+{
+    public int ProjectId { get; set; }
+    public string? DisplayName { get; set; }
+    public string DocumentType { get; set; } = "DiscussionSummary";
+    public string? Description { get; set; }
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string? MediaType { get; set; }
+    public long ByteSize { get; set; }
+    public Stream Content { get; set; } = Stream.Null;
+    public string? CreatedBy { get; set; }
+}
+
+public sealed class ProjectDocumentUploadResult
+{
+    public required ProjectDocument Document { get; init; }
+    public required ProjectDocumentVersion Version { get; init; }
+    public string ProcessingStatus { get; init; } = "Draft";
+    public string Boundary { get; init; } =
+        "The uploaded file is an immutable Draft document. It is not attached to Chat, indexed for retrieval, approved, or source-mutation authority.";
+}
+
+public enum ProjectDocumentUploadFailureKind
+{
+    InvalidRequest,
+    UnsupportedType,
+    TooLarge,
+    InvalidEncoding,
+    DuplicateTitle,
+    ProjectNotFound
+}
+
+public sealed class ProjectDocumentUploadException : Exception
+{
+    public ProjectDocumentUploadException(ProjectDocumentUploadFailureKind kind, string message)
+        : base(message)
+    {
+        Kind = kind;
+    }
+
+    public ProjectDocumentUploadFailureKind Kind { get; }
 }
 
 public sealed class AddProjectDocumentVersionRequest

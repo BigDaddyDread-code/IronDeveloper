@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Dapper;
 using IronDev.Core.Models;
@@ -46,6 +47,7 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}/review-package",
             "/api/projects/{projectId}/tickets/{ticketId}/evidence-summary",
             "/api/projects/{projectId}/documents",
+            "/api/projects/{projectId}/documents/upload",
             "/api/projects/{projectId}/documents/{documentId}",
             "/api/projects/{projectId}/documents/{documentId}/archive",
             "/api/projects/{projectId}/documents/{documentId}/resolve",
@@ -468,6 +470,48 @@ public sealed class EndpointContractTests : ApiTestBase
 
         var archive = await client.PostAsync($"/api/projects/{project.Id}/documents/{document.Id}/archive", null);
         Assert.AreEqual(HttpStatusCode.NoContent, archive.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ProjectDocumentUpload_ShouldPersistUploadedDraftAndRejectUnsupportedFiles()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+        var project = await CreateProjectAsync(client, "Document Upload Project");
+
+        using var upload = new MultipartFormDataContent();
+        var file = new ByteArrayContent(Encoding.UTF8.GetBytes("# Upload contract\n\nPersist backend truth."));
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/markdown");
+        upload.Add(file, "file", "upload-contract.md");
+        upload.Add(new StringContent("Upload Contract"), "displayName");
+        upload.Add(new StringContent("Architecture"), "documentType");
+        upload.Add(new StringContent("Uploaded through the project-scoped API."), "description");
+
+        var response = await client.PostAsync($"/api/projects/{project.Id}/documents/upload", upload);
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<ProjectDocumentUploadResult>();
+        Assert.IsNotNull(result);
+        Assert.AreEqual("Uploaded", result!.Document.Origin);
+        Assert.AreEqual("Draft", result.Document.ProcessingStatus);
+        Assert.AreEqual("upload-contract.md", result.Document.OriginalFileName);
+        Assert.AreEqual("text/markdown", result.Document.MediaType);
+        Assert.AreEqual("Project", result.Document.Visibility);
+        Assert.AreEqual("# Upload contract\n\nPersist backend truth.", result.Version.ContentMarkdown);
+        StringAssert.Contains(result.Boundary, "not attached to Chat");
+
+        var persistedResponse = await client.GetAsync($"/api/projects/{project.Id}/documents/{result.Document.Id}");
+        Assert.AreEqual(HttpStatusCode.OK, persistedResponse.StatusCode);
+        var persisted = await persistedResponse.Content.ReadFromJsonAsync<ProjectDocument>();
+        Assert.IsNotNull(persisted);
+        Assert.AreEqual("Uploaded", persisted!.Origin);
+        Assert.AreEqual("Draft", persisted.ProcessingStatus);
+
+        using var unsupported = new MultipartFormDataContent();
+        unsupported.Add(new ByteArrayContent([1, 2, 3]), "file", "payload.pdf");
+        unsupported.Add(new StringContent("Unsupported Payload"), "displayName");
+        var unsupportedResponse = await client.PostAsync($"/api/projects/{project.Id}/documents/upload", unsupported);
+        Assert.AreEqual(HttpStatusCode.UnsupportedMediaType, unsupportedResponse.StatusCode);
     }
 
     [TestMethod]

@@ -107,12 +107,34 @@ public sealed class ProjectDocumentServiceTenantTests : IntegrationTestBase
                     DocumentType NVARCHAR(100) NOT NULL,
                     CurrentVersionId BIGINT NULL,
                     Status NVARCHAR(50) NOT NULL,
+                    Origin NVARCHAR(50) NOT NULL DEFAULT 'CreatedInIronDev',
+                    ProcessingStatus NVARCHAR(50) NOT NULL DEFAULT 'Draft',
+                    Description NVARCHAR(1000) NULL,
+                    Visibility NVARCHAR(50) NOT NULL DEFAULT 'Project',
+                    OriginalFileName NVARCHAR(260) NULL,
+                    MediaType NVARCHAR(100) NULL,
+                    ByteSize BIGINT NULL,
                     CreatedAtUtc DATETIME2 NOT NULL,
                     UpdatedAtUtc DATETIME2 NULL,
                     CreatedBy NVARCHAR(200) NULL,
                     UpdatedBy NVARCHAR(200) NULL
                 );
             END
+
+            IF COL_LENGTH('dbo.ProjectDocuments', 'Origin') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD Origin NVARCHAR(50) NOT NULL DEFAULT 'CreatedInIronDev' WITH VALUES;
+            IF COL_LENGTH('dbo.ProjectDocuments', 'ProcessingStatus') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ProcessingStatus NVARCHAR(50) NOT NULL DEFAULT 'Draft' WITH VALUES;
+            IF COL_LENGTH('dbo.ProjectDocuments', 'Description') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD Description NVARCHAR(1000) NULL;
+            IF COL_LENGTH('dbo.ProjectDocuments', 'Visibility') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD Visibility NVARCHAR(50) NOT NULL DEFAULT 'Project' WITH VALUES;
+            IF COL_LENGTH('dbo.ProjectDocuments', 'OriginalFileName') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD OriginalFileName NVARCHAR(260) NULL;
+            IF COL_LENGTH('dbo.ProjectDocuments', 'MediaType') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD MediaType NVARCHAR(100) NULL;
+            IF COL_LENGTH('dbo.ProjectDocuments', 'ByteSize') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ByteSize BIGINT NULL;
 
             IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NULL
             BEGIN

@@ -49,13 +49,18 @@ public sealed class ProjectDocumentService : IProjectDocumentService
         // Step 1: Insert document (no CurrentVersionId yet)
         const string insertDocSql = """
             INSERT INTO dbo.ProjectDocuments
-                (TenantId, ProjectId, Title, Slug, DocumentType, Status, CreatedAtUtc, CreatedBy)
+                (TenantId, ProjectId, Title, Slug, DocumentType, Status,
+                 Origin, ProcessingStatus, Description, Visibility, OriginalFileName, MediaType, ByteSize,
+                 CreatedAtUtc, CreatedBy)
             OUTPUT inserted.Id, inserted.TenantId, inserted.ProjectId, inserted.Title,
                    inserted.Slug, inserted.DocumentType, inserted.CurrentVersionId,
-                   inserted.Status, inserted.CreatedAtUtc, inserted.UpdatedAtUtc,
+                   inserted.Status, inserted.Origin, inserted.ProcessingStatus, inserted.Description,
+                   inserted.Visibility, inserted.OriginalFileName, inserted.MediaType, inserted.ByteSize,
+                   inserted.CreatedAtUtc, inserted.UpdatedAtUtc,
                    inserted.CreatedBy, inserted.UpdatedBy
             VALUES
                 (@TenantId, @ProjectId, @Title, @Slug, @DocumentType, 'Active',
+                 @Origin, @ProcessingStatus, @Description, @Visibility, @OriginalFileName, @MediaType, @ByteSize,
                  SYSUTCDATETIME(), @CreatedBy);
             """;
 
@@ -68,6 +73,13 @@ public sealed class ProjectDocumentService : IProjectDocumentService
                 request.Title,
                 Slug         = slug,
                 request.DocumentType,
+                request.Origin,
+                request.ProcessingStatus,
+                request.Description,
+                request.Visibility,
+                request.OriginalFileName,
+                request.MediaType,
+                request.ByteSize,
                 request.CreatedBy
             },
             cancellationToken: ct));
@@ -256,7 +268,9 @@ public sealed class ProjectDocumentService : IProjectDocumentService
 
         var sql = $"""
             SELECT Id, TenantId, ProjectId, Title, Slug, DocumentType, CurrentVersionId,
-                   Status, CreatedAtUtc, UpdatedAtUtc, CreatedBy, UpdatedBy
+                   Status, Origin, ProcessingStatus, Description, Visibility,
+                   OriginalFileName, MediaType, ByteSize,
+                   CreatedAtUtc, UpdatedAtUtc, CreatedBy, UpdatedBy
             FROM dbo.ProjectDocuments
             WHERE {string.Join(" AND ", whereParts)}
             ORDER BY UpdatedAtUtc DESC, CreatedAtUtc DESC;
@@ -435,7 +449,9 @@ public sealed class ProjectDocumentService : IProjectDocumentService
     {
         const string sql = """
             SELECT Id, TenantId, ProjectId, Title, Slug, DocumentType, CurrentVersionId,
-                   Status, CreatedAtUtc, UpdatedAtUtc, CreatedBy, UpdatedBy
+                   Status, Origin, ProcessingStatus, Description, Visibility,
+                   OriginalFileName, MediaType, ByteSize,
+                   CreatedAtUtc, UpdatedAtUtc, CreatedBy, UpdatedBy
             FROM dbo.ProjectDocuments
             WHERE Id = @DocumentId AND TenantId = @TenantId;
             """;

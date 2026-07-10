@@ -1,6 +1,3 @@
-USE [IronDeveloper];
-GO
-
 -- =====================================================================
 -- migrate_project_documents.sql
 --
@@ -36,6 +33,14 @@ BEGIN
 
         Status          NVARCHAR(50)  NOT NULL CONSTRAINT DF_ProjectDocuments_Status DEFAULT 'Active',
 
+        Origin          NVARCHAR(50)  NOT NULL CONSTRAINT DF_ProjectDocuments_Origin DEFAULT 'CreatedInIronDev',
+        ProcessingStatus NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectDocuments_ProcessingStatus DEFAULT 'Draft',
+        Description     NVARCHAR(1000) NULL,
+        Visibility      NVARCHAR(50)  NOT NULL CONSTRAINT DF_ProjectDocuments_Visibility DEFAULT 'Project',
+        OriginalFileName NVARCHAR(260) NULL,
+        MediaType       NVARCHAR(100) NULL,
+        ByteSize        BIGINT NULL,
+
         CreatedAtUtc    DATETIME2(7) NOT NULL CONSTRAINT DF_ProjectDocuments_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
         UpdatedAtUtc    DATETIME2(7) NULL,
         CreatedBy       NVARCHAR(200) NULL,
@@ -59,6 +64,80 @@ END
 ELSE
 BEGIN
     PRINT 'dbo.ProjectDocuments already exists — skipped';
+END
+GO
+
+-- Existing document stores gain upload metadata without changing their
+-- current identity or implying retrieval readiness.
+IF COL_LENGTH('dbo.ProjectDocuments', 'Origin') IS NULL
+BEGIN
+    ALTER TABLE dbo.ProjectDocuments ADD Origin NVARCHAR(50) NOT NULL
+        CONSTRAINT DF_ProjectDocuments_Origin DEFAULT 'CreatedInIronDev' WITH VALUES;
+END
+GO
+
+IF COL_LENGTH('dbo.ProjectDocuments', 'ProcessingStatus') IS NULL
+BEGIN
+    ALTER TABLE dbo.ProjectDocuments ADD ProcessingStatus NVARCHAR(50) NOT NULL
+        CONSTRAINT DF_ProjectDocuments_ProcessingStatus DEFAULT 'Draft' WITH VALUES;
+END
+GO
+
+IF COL_LENGTH('dbo.ProjectDocuments', 'Description') IS NULL
+    ALTER TABLE dbo.ProjectDocuments ADD Description NVARCHAR(1000) NULL;
+GO
+
+IF COL_LENGTH('dbo.ProjectDocuments', 'Visibility') IS NULL
+BEGIN
+    ALTER TABLE dbo.ProjectDocuments ADD Visibility NVARCHAR(50) NOT NULL
+        CONSTRAINT DF_ProjectDocuments_Visibility DEFAULT 'Project' WITH VALUES;
+END
+GO
+
+IF COL_LENGTH('dbo.ProjectDocuments', 'OriginalFileName') IS NULL
+    ALTER TABLE dbo.ProjectDocuments ADD OriginalFileName NVARCHAR(260) NULL;
+GO
+
+IF COL_LENGTH('dbo.ProjectDocuments', 'MediaType') IS NULL
+    ALTER TABLE dbo.ProjectDocuments ADD MediaType NVARCHAR(100) NULL;
+GO
+
+IF COL_LENGTH('dbo.ProjectDocuments', 'ByteSize') IS NULL
+    ALTER TABLE dbo.ProjectDocuments ADD ByteSize BIGINT NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_ProjectDocuments_Origin_Allowed')
+BEGIN
+    ALTER TABLE dbo.ProjectDocuments WITH CHECK ADD CONSTRAINT CK_ProjectDocuments_Origin_Allowed
+        CHECK (Origin IN ('CreatedInIronDev', 'Uploaded'));
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_ProjectDocuments_ProcessingStatus_Allowed')
+BEGIN
+    ALTER TABLE dbo.ProjectDocuments WITH CHECK ADD CONSTRAINT CK_ProjectDocuments_ProcessingStatus_Allowed
+        CHECK (ProcessingStatus IN ('Uploading', 'Processing', 'Draft', 'Ready', 'ProcessingFailed', 'Unsupported', 'Superseded', 'Unavailable'));
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_ProjectDocuments_Visibility_Allowed')
+BEGIN
+    ALTER TABLE dbo.ProjectDocuments WITH CHECK ADD CONSTRAINT CK_ProjectDocuments_Visibility_Allowed
+        CHECK (Visibility IN ('Project', 'MembersOnly'));
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_ProjectDocuments_ByteSize_NonNegative')
+BEGIN
+    ALTER TABLE dbo.ProjectDocuments WITH CHECK ADD CONSTRAINT CK_ProjectDocuments_ByteSize_NonNegative
+        CHECK (ByteSize IS NULL OR ByteSize >= 0);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.ProjectDocuments') AND name = 'IX_ProjectDocuments_Project_Origin_Processing')
+BEGIN
+    CREATE INDEX IX_ProjectDocuments_Project_Origin_Processing
+        ON dbo.ProjectDocuments(TenantId, ProjectId, Origin, ProcessingStatus);
 END
 GO
 

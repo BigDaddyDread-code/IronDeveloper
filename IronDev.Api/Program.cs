@@ -174,6 +174,7 @@ builder.Services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetect
 builder.Services.AddScoped<IProjectProfileService, ProjectProfileService>();
 builder.Services.AddScoped<IronDev.Core.Provisioning.IProjectProvisioningReadinessService, ProjectProvisioningReadinessService>();
 builder.Services.AddScoped<IProjectDocumentService, ProjectDocumentService>();
+builder.Services.AddScoped<IProjectDocumentUploadService, ProjectDocumentUploadService>();
 builder.Services.AddScoped<IProjectContextExportService, ProjectContextExportService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<SqlCodeIndexService>();
@@ -362,7 +363,7 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test"))
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Test") || app.Environment.IsEnvironment("LocalTest"))
 {
     app.MapOpenApi();
     app.UseSwagger();

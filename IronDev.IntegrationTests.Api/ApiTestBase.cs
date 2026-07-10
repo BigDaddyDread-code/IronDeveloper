@@ -209,6 +209,28 @@ public abstract class ApiTestBase
             IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProjectTickets') AND name = 'LinkedSymbols')
                 ALTER TABLE dbo.ProjectTickets ADD LinkedSymbols NVARCHAR(MAX) NULL;
 
+            -- Extend ProjectDocuments (backend-owned upload metadata)
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'Origin') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD Origin NVARCHAR(50) NOT NULL DEFAULT 'CreatedInIronDev' WITH VALUES;
+
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'ProcessingStatus') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ProcessingStatus NVARCHAR(50) NOT NULL DEFAULT 'Draft' WITH VALUES;
+
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'Description') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD Description NVARCHAR(1000) NULL;
+
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'Visibility') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD Visibility NVARCHAR(50) NOT NULL DEFAULT 'Project' WITH VALUES;
+
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'OriginalFileName') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD OriginalFileName NVARCHAR(260) NULL;
+
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'MediaType') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD MediaType NVARCHAR(100) NULL;
+
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'ByteSize') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ByteSize BIGINT NULL;
+
             -- Ensure ProjectChatSessions exists
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NULL
             BEGIN
@@ -537,6 +559,10 @@ public abstract class ApiTestBase
             IF OBJECT_ID('governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete ON governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID('governance.ToolRequest', 'U') IS NOT NULL DELETE FROM governance.ToolRequest;
             IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
+            IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnClarifications;
+            IF OBJECT_ID('dbo.ChatTurnGovernance', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnGovernance;
+            IF OBJECT_ID('dbo.ChatTurnTraces', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnTraces;
+            IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectContextDocuments;
             IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;
             IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentVersions;
             IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocuments;
@@ -552,6 +578,7 @@ public abstract class ApiTestBase
             DELETE FROM dbo.ProjectSummaries;
             DELETE FROM dbo.ProjectTickets;
             DELETE FROM dbo.ProjectFiles;
+            IF OBJECT_ID('dbo.ProjectObservableStates', 'U') IS NOT NULL DELETE FROM dbo.ProjectObservableStates;
             DELETE FROM dbo.ChatMessages;
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
             DELETE FROM dbo.Projects;

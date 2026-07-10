@@ -33,8 +33,22 @@ export interface EnvironmentInfo {
 
 export type ProjectTicket = components['schemas']['ProjectTicket'];
 export type ProjectSummary = components['schemas']['Project'];
-export type ProjectDocument = components['schemas']['ProjectDocument'];
+export type ProjectDocument = components['schemas']['ProjectDocument'] & {
+  origin?: string | null;
+  processingStatus?: string | null;
+  description?: string | null;
+  visibility?: string | null;
+  originalFileName?: string | null;
+  mediaType?: string | null;
+  byteSize?: number | null;
+};
 export type ProjectDocumentVersion = components['schemas']['ProjectDocumentVersion'];
+export interface ProjectDocumentUploadResult {
+  document: ProjectDocument;
+  version: ProjectDocumentVersion;
+  processingStatus: string;
+  boundary: string;
+}
 export type BuildReadinessResult = components['schemas']['BuildReadinessResult'];
 export type CreateProjectTicketRequest = components['schemas']['CreateProjectTicketRequest'];
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];

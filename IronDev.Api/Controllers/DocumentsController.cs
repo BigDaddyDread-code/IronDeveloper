@@ -1,7 +1,10 @@
 using IronDev.Core.Interfaces;
 using IronDev.Data.Models;
+using IronDev.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace IronDev.Api.Controllers;
 
@@ -10,10 +13,58 @@ namespace IronDev.Api.Controllers;
 public sealed class DocumentsController : ControllerBase
 {
     private readonly IProjectDocumentService _documents;
+    private readonly IProjectDocumentUploadService _uploads;
 
-    public DocumentsController(IProjectDocumentService documents)
+    public DocumentsController(IProjectDocumentService documents, IProjectDocumentUploadService uploads)
     {
         _documents = documents;
+        _uploads = uploads;
+    }
+
+    [HttpPost("api/projects/{projectId:int}/documents/upload")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(ProjectDocumentUploadService.MaximumFileBytes + 64 * 1024)]
+    public async Task<ActionResult<ProjectDocumentUploadResult>> UploadDocument(
+        int projectId,
+        [FromForm] ProjectDocumentUploadForm form,
+        CancellationToken ct)
+    {
+        if (form.File is null)
+            return BadRequest(new { error = "Choose a document file." });
+
+        try
+        {
+            await using var content = form.File.OpenReadStream();
+            var result = await _uploads.UploadAsync(new ProjectDocumentUploadRequest
+            {
+                ProjectId = projectId,
+                DisplayName = form.DisplayName,
+                DocumentType = form.DocumentType ?? "DiscussionSummary",
+                Description = form.Description,
+                OriginalFileName = form.File.FileName,
+                MediaType = form.File.ContentType,
+                ByteSize = form.File.Length,
+                Content = content,
+                CreatedBy = User.FindFirst(ClaimTypes.Email)?.Value
+                    ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("sub")?.Value
+            }, ct);
+            return CreatedAtAction(
+                nameof(GetDocument),
+                new { projectId, documentId = result.Document.Id },
+                result);
+        }
+        catch (ProjectDocumentUploadException error)
+        {
+            return error.Kind switch
+            {
+                ProjectDocumentUploadFailureKind.UnsupportedType => StatusCode(StatusCodes.Status415UnsupportedMediaType, new { error = error.Message }),
+                ProjectDocumentUploadFailureKind.TooLarge => StatusCode(StatusCodes.Status413PayloadTooLarge, new { error = error.Message }),
+                ProjectDocumentUploadFailureKind.DuplicateTitle => Conflict(new { error = error.Message }),
+                ProjectDocumentUploadFailureKind.ProjectNotFound => NotFound(new { error = error.Message }),
+                _ => BadRequest(new { error = error.Message })
+            };
+        }
     }
 
     [HttpGet("api/projects/{projectId:int}/documents")]
@@ -120,4 +171,12 @@ public sealed class DocumentsController : ControllerBase
         var document = await _documents.GetDocumentAsync(documentId, ct);
         return document is not null && document.ProjectId == projectId;
     }
+}
+
+public sealed class ProjectDocumentUploadForm
+{
+    public IFormFile? File { get; set; }
+    public string? DisplayName { get; set; }
+    public string? DocumentType { get; set; }
+    public string? Description { get; set; }
 }
