@@ -35,6 +35,61 @@ if ([string]::IsNullOrWhiteSpace($SqlServer)) {
     throw "SQL Server data source could not be resolved from '$ConfigPath'."
 }
 
+function Start-LocalDbIfNeeded {
+    param([Parameter(Mandatory = $true)][string]$DataSource)
+
+    if ($DataSource -notmatch '^\(localdb\)\\(?<instance>.+)$') {
+        return
+    }
+
+    $localDb = Get-Command sqllocaldb -ErrorAction SilentlyContinue
+    if ($null -eq $localDb) {
+        Write-Warning "sqllocaldb was not found; continuing and relying on sqlcmd to reach '$DataSource'."
+        return
+    }
+
+    $instance = $Matches.instance
+    & $localDb.Source start $instance | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Could not start LocalDB instance '$instance' through sqllocaldb; attempting to resolve an existing named pipe."
+    }
+}
+
+function Resolve-SqlCmdDataSource {
+    param([Parameter(Mandatory = $true)][string]$DataSource)
+
+    if ($DataSource -notmatch '^\(localdb\)\\(?<instance>.+)$') {
+        return $DataSource
+    }
+
+    $instance = $Matches.instance
+    $localDb = Get-Command sqllocaldb -ErrorAction SilentlyContinue
+    if ($null -ne $localDb) {
+        $info = & $localDb.Source info $instance 2>$null
+        foreach ($line in $info) {
+            $match = [regex]::Match($line, '^\s*Instance pipe name:\s*(?<pipe>.+?)\s*$')
+            if ($match.Success -and -not [string]::IsNullOrWhiteSpace($match.Groups['pipe'].Value)) {
+                return "np:$($match.Groups['pipe'].Value.Trim())"
+            }
+        }
+    }
+
+    $errorLog = Join-Path $env:LOCALAPPDATA "Microsoft\Microsoft SQL Server Local DB\Instances\$instance\error.log"
+    if (Test-Path -LiteralPath $errorLog -PathType Leaf) {
+        foreach ($line in (Get-Content -LiteralPath $errorLog | Select-Object -Last 200)) {
+            $match = [regex]::Match($line, 'Server local connection provider is ready to accept connection on \[(?<pipe>[^\]]+)\]')
+            if ($match.Success) {
+                $pipe = $match.Groups['pipe'].Value.Trim()
+                if ($pipe -like '\\.\pipe\*\tsql\query') {
+                    return "np:$pipe"
+                }
+            }
+        }
+    }
+
+    throw "Could not resolve LocalDB instance '$instance' to a sqlcmd named pipe."
+}
+
 $workspaceRoot = $config.LocalTest.WorkspaceRoot
 $logsRoot = $config.LocalTest.LogsRoot
 if ([string]::IsNullOrWhiteSpace($workspaceRoot) -or $workspaceRoot -notmatch "Test") {
@@ -47,12 +102,51 @@ if ([string]::IsNullOrWhiteSpace($logsRoot) -or $logsRoot -notmatch "Test") {
 
 New-Item -ItemType Directory -Force -Path $workspaceRoot, $logsRoot | Out-Null
 
-$localTestProjectPath = Join-Path $workspaceRoot "IronDevLocalTestProject"
-if (Test-Path $localTestProjectPath) {
-    Remove-Item -LiteralPath $localTestProjectPath -Recurse -Force
+function Reset-FixtureDirectory {
+    param(
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $resolvedRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd('\')
+    $resolvedPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
+    if (-not $resolvedPath.StartsWith($resolvedRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to reset fixture path '$resolvedPath' outside LocalTest workspace root '$resolvedRoot'."
+    }
+
+    if (Test-Path $resolvedPath) {
+        Remove-Item -LiteralPath $resolvedPath -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Force -Path $resolvedPath | Out-Null
 }
 
-New-Item -ItemType Directory -Force -Path $localTestProjectPath | Out-Null
+function Initialize-FixtureGitRepository {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if ($null -eq $git) {
+        throw "git was not found. LocalTest fixtures require git for deterministic readiness."
+    }
+
+    & $git.Source -C $Path init -q
+    if ($LASTEXITCODE -ne 0) {
+        throw "git init failed for '$Path'."
+    }
+
+    & $git.Source -C $Path add -A
+    if ($LASTEXITCODE -ne 0) {
+        throw "git add failed for '$Path'."
+    }
+
+    & $git.Source -C $Path -c user.email=localtest@irondev.local -c user.name="LocalTest Seed" commit -m "Seed LocalTest fixture" -q
+    if ($LASTEXITCODE -ne 0) {
+        throw "git commit failed for '$Path'."
+    }
+}
+
+$localTestProjectPath = Join-Path $workspaceRoot "IronDevLocalTestProject"
+Reset-FixtureDirectory -Root $workspaceRoot -Path $localTestProjectPath
 @"
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -71,10 +165,93 @@ public static class LocalTestMarker
 }
 "@ | Set-Content -Path (Join-Path $localTestProjectPath "LocalTestMarker.cs") -Encoding UTF8
 
+$bookSellerPath = Join-Path $workspaceRoot "BookSellerTestFixture"
+Reset-FixtureDirectory -Root $workspaceRoot -Path $bookSellerPath
+@"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+</Project>
+"@ | Set-Content -Path (Join-Path $bookSellerPath "BookSeller.TestFixture.csproj") -Encoding UTF8
+
+@'
+if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
+{
+    BookSellerSelfTest.Run();
+    Console.WriteLine("BookSeller self-test passed.");
+    return;
+}
+
+var catalog = new CatalogService();
+foreach (var book in catalog.SearchByAuthor("Le Guin"))
+{
+    Console.WriteLine($"{book.Title} by {book.Author} - {book.Price:C}");
+}
+
+public sealed record Book(string Isbn, string Title, string Author, decimal Price);
+
+public sealed class CatalogService
+{
+    private readonly Book[] books =
+    [
+        new("9780441478125", "The Left Hand of Darkness", "Ursula K. Le Guin", 9.99m),
+        new("9780547928227", "The Hobbit", "J. R. R. Tolkien", 12.50m),
+        new("9780143111597", "Parable of the Sower", "Octavia E. Butler", 11.25m)
+    ];
+
+    public IReadOnlyList<Book> SearchByAuthor(string authorFragment)
+    {
+        if (string.IsNullOrWhiteSpace(authorFragment))
+        {
+            return [];
+        }
+
+        return books
+            .Where(book => book.Author.Contains(authorFragment, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(book => book.Title, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+}
+
+public static class BookSellerSelfTest
+{
+    public static void Run()
+    {
+        var results = new CatalogService().SearchByAuthor("Le Guin");
+        if (results.Count != 1 || results[0].Title != "The Left Hand of Darkness")
+        {
+            throw new InvalidOperationException("Search by author returned the wrong result.");
+        }
+    }
+}
+'@ | Set-Content -Path (Join-Path $bookSellerPath "Program.cs") -Encoding UTF8
+
+@'
+# BookSeller Test Fixture
+
+Realistic LocalTest fixture for provisioning, build, review, and apply journeys.
+
+Commands:
+
+```powershell
+dotnet build .\BookSeller.TestFixture.csproj
+dotnet run --project .\BookSeller.TestFixture.csproj -- --self-test
+```
+'@ | Set-Content -Path (Join-Path $bookSellerPath "README.md") -Encoding UTF8
+
+Initialize-FixtureGitRepository -Path $bookSellerPath
+
 $sqlcmd = Get-Command sqlcmd -ErrorAction SilentlyContinue
 if ($null -eq $sqlcmd) {
     throw "sqlcmd was not found. Install SQL Server command-line tools, then rerun this LocalTest reset."
 }
+
+Start-LocalDbIfNeeded -DataSource $SqlServer
+$sqlCmdServer = Resolve-SqlCmdDataSource -DataSource $SqlServer
 
 function Invoke-SqlFile {
     param(
@@ -82,7 +259,7 @@ function Invoke-SqlFile {
         [Parameter(Mandatory = $true)][string]$Path
     )
 
-    $args = @("-S", $SqlServer, "-d", $DatabaseName, "-b", "-i", $Path)
+    $args = @("-S", $sqlCmdServer, "-d", $DatabaseName, "-b", "-i", $Path)
 
     if ($builder.IntegratedSecurity) {
         $args += "-E"
@@ -106,6 +283,7 @@ if (-not $SkipSchema) {
     try {
         $schemaPath = Join-Path $tempDir "localtest-schema.sql"
         $documentMigrationPath = Join-Path $tempDir "localtest-documents.sql"
+        $profileMigrationPath = Join-Path $tempDir "localtest-project-profiles.sql"
 
         $schemaPreamble = @"
 IF NOT EXISTS (SELECT name FROM master.sys.databases WHERE name = N'$database')
@@ -151,8 +329,13 @@ GO
             Replace("[IronDeveloper]", "[$database]") |
             Set-Content -Path $documentMigrationPath -Encoding UTF8
 
+        (Get-Content -Path (Join-Path $repoRoot "Database\migrate_project_profiles.sql") -Raw).
+            Replace("[IronDeveloper]", "[$database]") |
+            Set-Content -Path $profileMigrationPath -Encoding UTF8
+
         Invoke-SqlFile -DatabaseName "master" -Path $schemaPath
         Invoke-SqlFile -DatabaseName $database -Path $documentMigrationPath
+        Invoke-SqlFile -DatabaseName $database -Path $profileMigrationPath
     }
     finally {
         Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

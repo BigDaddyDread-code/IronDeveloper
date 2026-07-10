@@ -13,13 +13,13 @@ This plan verifies the Tauri cockpit against isolated LocalTest data. It must no
 2. Start the backend API and Tauri shell in LocalTest mode:
 
    ```powershell
-   .\tools\localtest\start-alpha-localtest.ps1
+   .\tools\localtest\start-alpha-localtest.ps1 -Reset -FreshSession
    ```
 
    For browser-only UI testing instead of the desktop shell:
 
    ```powershell
-   .\tools\localtest\start-alpha-localtest.ps1 -BrowserOnly
+   .\tools\localtest\start-alpha-localtest.ps1 -Reset -FreshSession -BrowserOnly
    ```
 
 3. Run the Playwright/manual-smoke hybrid and generate a report:
@@ -36,10 +36,11 @@ This plan verifies the Tauri cockpit against isolated LocalTest data. It must no
 - Password: `change-me-local-only`
 - Tenant: `Local Test Tenant`
 - Project: `IronDev Local Test Project`
+- Realistic fixture: `BookSeller Test Fixture`
 
 ## Checklist
 
-- Confirm `GET /api/environment` reports `LocalTest`, database `IronDeveloper_Test`, and `isTestEnvironment: true`.
+- Confirm `/api/environment` reports `LocalTest`, database `IronDeveloper_Test`, and `isTestEnvironment: true` through the authenticated UI or a token-bearing API request.
 - Confirm the UI header shows a `LocalTest` environment badge.
 - Sign in with the LocalTest user.
 - Select `Local Test Tenant` if tenant selection is shown.
@@ -73,10 +74,9 @@ Use these endpoints while the LocalTest API is running:
 
 ```powershell
 Invoke-RestMethod http://localhost:5000/health
-Invoke-RestMethod http://localhost:5000/api/environment
 ```
 
-Authenticated cockpit data should be loaded through the UI or through a token-bearing API client.
+`/api/environment` and cockpit data should be loaded through the UI or through a token-bearing API client.
 
 ## Safety Rules
 
