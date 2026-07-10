@@ -1,316 +1,139 @@
 # IronDev
 
-IronDev is a governed AI software engineering system under active release-track construction.
+IronDev is a governed AI software engineering workspace. It turns project-scoped conversation and work items into traceable build, review, approval, continuation, and controlled-apply journeys without allowing model output or client state to grant authority.
 
-The current backend foundation is a governed substrate for project memory, authority boundaries, workflow evaluation, safe dry-run review material, and candidate workflow review packages. It is **not** a real autonomous workflow execution engine yet.
+The current product is usable through the React/Tauri shell against the ASP.NET Core API. It is under active development, but working routes are described by their actual capability rather than by maturity labels.
 
-The design goal is simple:
+## Product model
 
-> Help developers move from messy intent to reviewable engineering work without giving AI uncontrolled authority over source code, memory, tools, workflow state, or approvals.
+```text
+Board | Chat | Work Item | Library
+```
 
----
+- **Board** is the project cockpit: readiness, attention, work-item stages, and the run queue.
+- **Chat** holds direct IronDev sessions and project channels, with source and document context plus reviewed ticket-draft handoff.
+- **Work Item** carries one item through Shape, Ticket, Build, Review, and Done.
+- **Library** contains Explorer, Documents, Tools, Members, Governance, Project setup, Audit, and Settings.
 
-## Current status
+Entry is explicit: sign in, resolve tenant access, choose or connect a project, complete setup when required, then enter the Board. Tenant choice appears only when more than one accessible tenant needs a decision.
 
-IronDev is currently in **release-track backend construction**.
+See [Docs/product/README.md](Docs/product/README.md) for the current product contracts and [Docs/product/CURRENT_PRODUCT_CAPABILITIES.md](Docs/product/CURRENT_PRODUCT_CAPABILITIES.md) for the maintained capability matrix.
 
-The project has moved beyond the original ticket-generator framing. The current backend focus is durable governance, explicit authority boundaries, governed memory proposals, and a governed runner substrate.
+## Capability truth
 
-The important status line:
-
-> IronDev can describe, validate, halt, dry-run, and package review material. It still cannot autonomously execute real workflow work, mutate source, promote memory, dispatch agents, invoke tools, or approve itself.
-
----
-
-## Current governed substrate
-
-The current backend foundation includes:
-
-- **Durable governance substrate** — append-only governance events, read models, and receipt-style proof boundaries.
-- **Project authority model** — project-scoped authority and approval policy boundaries.
-- **A2A handoff contract spine** — reference-only handoff material and validation boundaries.
-- **Durable workflow run substrate** — workflow run and step records as source-of-truth state, not hidden orchestration.
-- **Governed memory proposal substrate** — staged memory proposal, duplicate/stale/conflict detection, promotion request packaging, and tests proving memory cannot promote itself.
-- **Governed runner substrate** — typed step contracts, evaluation-only runner checks, policy preflight, ThoughtLedger traceability, A2A validation, approval-required halt, safe dry-run execution, boxed route labels, and tests proving workflow cannot grant authority.
-
-SQL remains the source of truth. Vector/search systems are rebuildable retrieval aids, not authority.
-
----
-
-## Block L governed runner substrate
-
-Block L establishes the governed runner foundation:
-
-| Area | What exists | Boundary |
+| Area | Current status | Boundary |
 | --- | --- | --- |
-| Typed workflow step contract | Steps can be represented with required evidence | Contract is not execution |
-| Runner skeleton | Supplied step contracts can be evaluated | Evaluation only |
-| Policy preflight | Sensitive steps can be blocked before future execution | Check is not approval |
-| ThoughtLedger reference | Steps require traceability references | Traceability is not authority |
-| A2A validation | Supplied handoff snapshots can be validated | Validation is not dispatch |
-| Approval halt | Approval-required state can be reported explicitly | Halt is not approval |
-| Safe dry-run | Eligible snapshots can produce deterministic review material | Dry-run is not real execution |
-| Boxed route adapter | Supplied runner/dry-run snapshots can become advisory labels | Route label is not decision ownership |
-| Authority test pack | Workflow artifacts are proven unable to mint authority | Evidence is not approval |
+| Authentication and tenant resolution | Supported | JWT identity and backend tenant access remain authoritative. |
+| Project choose, connect, and setup | Supported | Readiness and remedies come from the API; the client does not infer them. |
+| Board and work-item navigation | Supported | Board columns currently derive from ticket status; richer backend read models are the next product work. |
+| Direct Chat and project channels | Supported | Conversation can form work; it cannot approve, continue, or apply work. |
+| Ticket draft and confirmation | Supported | A ticket is created only through the backend confirmation contract. |
+| Governed run, build, test, critic review, and finding disposition | Supported | Refusals, evidence, and stage transitions are backend-owned. |
+| Human approval and continuation | Supported | Approval is actor- and hash-bound; recording approval is separate from continuation. |
+| Controlled apply | Supported with explicit configuration | Applies reviewed changes only through disposable or isolated workspace boundaries. It does not write directly to `main`, commit, push, merge, release, or deploy. |
+| Documents and immutable versions | Supported | Upload, processing, detail, version, and exact-version routes are project-scoped. |
+| Governed tool catalogue | Read-only supported | Registration, connection, health, declared scope, and evidence are visible. General product-side tool invocation/configuration is not implemented. |
+| Tenant-user and channel membership | Supported | Tenant and channel eligibility is re-evaluated by the backend; project-specific membership is not implemented. |
+| Project-specific membership | Not implemented | Current project visibility is tenant-scoped. |
+| Unified audit ledger | Not implemented | Existing governance and run evidence remains available through current viewers. |
+| User invitation lifecycle | Not implemented | Direct tenant-user administration exists; invite/pending/accept does not. |
+| Notifications, presence, and unread collaboration state | Not implemented | Shared channels persist messages but do not claim realtime collaboration completeness. |
+| Production shared-host offering | Not implemented | Multi-user contracts exist; deployment, operations, and production security posture are not yet a supported product offering. |
 
-Block L is a substrate. It does not mean IronDev can drive the workflow car yet.
+## Governance boundaries
 
----
-
-## Hard invariants
-
-These are not slogans. They are boundaries the tests are meant to protect.
+These are enforced design boundaries, not product slogans:
 
 ```text
 Evidence is not approval.
 Traceability is not authority.
 Validation is not dispatch.
-Halt is not approval.
-Dry-run is not execution.
-Route label is not decision ownership.
-Receipt is not capability.
-SQL remains source of truth.
+Recording approval is not continuation.
+Continuation is not apply permission.
+Retrieval is not source of truth.
+The client requests actions; the backend decides.
+SQL remains the durable source of truth.
 ```
 
-Provider configuration does not grant authority. Live model output is advisory evidence only. Tool authority remains controlled by governed capability definitions, policy gates, ThoughtLedger traceability, approval boundaries, and workflow invariants.
+Provider configuration enables model access. It does not grant tool, workflow, source, approval, memory, or retrieval authority. Live model output is advisory material until a governed backend contract accepts it.
 
----
+No agent may approve itself, silently mutate accepted memory, or write the active repository as autonomous authority. The controlled worktree and skeleton apply paths require explicit policy, evidence, and human approval, and remain separate from commit, push, merge, release, and deployment.
 
-## What IronDev can do today
+## Runtime posture
 
-Current backend capabilities include:
+### Local development and LocalTest
 
-- store project, governance, workflow, and memory-proposal records through explicit contracts;
-- represent typed workflow steps and required evidence;
-- evaluate supplied workflow steps for missing evidence and boundary blockers;
-- require ThoughtLedger traceability references on workflow steps;
-- validate supplied A2A handoff snapshots without sending handoffs;
-- report approval-required halt state without granting approval;
-- run deterministic non-mutating dry-run review checks from supplied eligible snapshots;
-- map supplied runner/dry-run snapshots to boxed advisory route labels;
-- stage memory proposals and promotion request packages without allowing memory to promote itself;
-- prove through regression tests that workflow artifacts cannot grant authority;
-- run focused backend validation bands through the .NET test suite.
+The supported development posture is local:
 
----
+- ASP.NET Core API;
+- isolated SQL Server or LocalDB database;
+- React/Vite in a browser or the Tauri desktop shell;
+- optional configured model provider;
+- optional Weaviate as a rebuildable retrieval index.
 
-## What IronDev cannot do yet
-
-IronDev currently cannot:
-
-- execute real workflow steps;
-- transition workflow state as part of real execution;
-- complete workflow steps;
-- create, grant, deny, or satisfy approvals;
-- satisfy policy;
-- dispatch agents;
-- send A2A handoffs;
-- invoke tools as workflow authority;
-- call models as workflow authority;
-- build prompts as workflow execution;
-- mutate the real repository;
-- apply patches to source;
-- promote memory into accepted memory autonomously;
-- activate retrieval as authority;
-- write SQL as part of workflow execution;
-- expose API/CLI/UI runtime execution for governed workflows;
-- act as an unsupervised autonomous developer.
-
-A future source-apply path still requires a separate controlled design: review package, isolated branch/worktree proof, explicit approval, dry-run/apply boundary, and human-owned promotion.
-
----
-
-## Candidate workflows
-
-Block M candidate workflows sit on top of the Block L substrate.
-
-Candidate workflows are allowed to produce safe review material from supplied evidence. They are not allowed to mutate source, dispatch agents, invoke tools, promote memory, activate retrieval, transition workflow state, or claim root-cause certainty.
-
-The first candidate workflow is the Test Failure Review candidate: it turns supplied test failure evidence into review material only. It does not run tests or fix code.
-
----
-
-## Memory direction
-
-IronDev uses staged, governed memory movement.
-
-Current memory direction:
-
-- project-specific truth remains isolated;
-- proposed memory is staged before promotion;
-- duplicate, stale, and conflicting memory candidates can be detected;
-- promotion requests are review packages, not automatic acceptance;
-- memory cannot promote itself;
-- cross-project learning belongs in sanitized portable engineering memory, not leaked project facts.
-
-Accepted memory and confidential project facts must not be mixed with generalized engineering lessons.
-
----
-
-## Agent and model boundary
-
-IronDev keeps agents governed rather than free-running.
-
-Agent/model output may become advisory evidence or review material. It must not become authority by itself.
-
-Current boundary:
-
-- no self-approval;
-- no hidden chain-of-thought storage;
-- no ConscienceAgent or ThoughtLedger bypass;
-- no raw prompt/raw completion/raw tool output as durable proof;
-- no whole-patch payloads as durable hidden evidence;
-- no model/provider configuration as permission;
-- no tool use without governed capability and policy boundaries;
-- no source mutation without a future controlled source-apply design.
-
-See `Docs/AGENTS.md` for agent details when current.
-
----
-
-## CLI and validation surface
-
-The repository includes a CLI/dogfood runner surface used for validation and proof campaigns.
-
-Common validation shape:
+Start the LocalTest API and browser client in separate terminals with:
 
 ```powershell
-# Focused workflow/governance style tests
-dotnet test IronDev.IntegrationTests\IronDev.IntegrationTests.csproj --no-restore --filter "FullyQualifiedName~Workflow" --logger "console;verbosity=minimal"
-
-# Governance regression band
-dotnet test IronDev.IntegrationTests\IronDev.IntegrationTests.csproj --no-restore --filter "FullyQualifiedName~Governance" --logger "console;verbosity=minimal"
-
-# API/CLI contract gates
-dotnet test IronDev.IntegrationTests\IronDev.IntegrationTests.csproj --no-restore --filter "FullyQualifiedName~ApiCliContract|FullyQualifiedName~ApiCliReleaseGate" --logger "console;verbosity=minimal"
-
-# Build
-dotnet build IronDev.slnx --no-restore -v:minimal
+.\tools\localtest\start-localtest.ps1
+.\tools\localtest\start-ui-localtest.ps1 -BrowserOnly
 ```
 
-CLI and dogfood commands are useful validation/control surfaces. They do not override governance boundaries.
+The unified PR-test launcher and reset controls are documented in [Docs/testing/LOCAL_MANUAL_TEST_PLAN.md](Docs/testing/LOCAL_MANUAL_TEST_PLAN.md). The UI reports the actual `LocalTest` environment and deterministic model mode.
 
----
-
-## Solution layout
+LocalTest credentials are seeded for local use only:
 
 ```text
-Database/                      SQL schema and local setup scripts
-Docs/                          Architecture, ADRs, receipts, roadmap, agent, testing, and setup docs
-IronDev.Api/                   ASP.NET Core REST backend
-IronDev.Core/                  Core contracts, workflow/governance models, agent/run/report contracts
-IronDev.Infrastructure/        SQL services, AI provider adapters, infrastructure implementations
-IronDev.IntegrationTests/      Governance, workflow, memory, CLI, and boundary tests
-IronDev.IntegrationTests.Api/  API-level integration tests
-IronDev.TauriShell/            Client shell spike
-Scripts/                       Local setup and development scripts
-tools/IronDev.ReplayRunner/    CLI/dogfood runner and campaign surface
-tools/dogfood/                 Dogfood plans, run evidence, knowledge mirror, fixtures
-IronDev.slnx                   Root solution file
+bob@irondev.local
+change-me-local-only
 ```
 
----
+For development setup details, see [Docs/local-development.md](Docs/local-development.md) and [Docs/testing/LOCAL_MANUAL_TEST_PLAN.md](Docs/testing/LOCAL_MANUAL_TEST_PLAN.md).
 
-## Quick local setup
+### Shared hosting
 
-### Prerequisites
+IronDev has tenant, member, channel, attribution, and authority contracts that support multi-user behavior. That does not make this repository a supported production-hosted service. Production identity integration, deployment topology, secret management, backup/restore, observability, service-level objectives, and security operations are not yet a published shared-host contract.
 
-- .NET SDK used by the solution
-- SQL Server / LocalDB / SQL Express
-- Visual Studio or another .NET-capable IDE
-- Optional: OpenAI API key, local OpenAI-compatible endpoint, or Ollama
-- Optional: Docker Desktop for local Weaviate semantic-memory dogfooding
+## API contract
 
-### Bootstrap script
-
-For a local dev machine with .NET and Docker Desktop installed:
+The running API's Swagger document is the transport source of truth. The checked-in OpenAPI snapshot and TypeScript types make drift reviewable:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1
+.\tools\contracts\update-openapi-contract.ps1 -Check
+.\Scripts\ci\run-frontend-contract-ci.ps1
 ```
 
-Database setup is opt-in:
+API-changing PRs must update the generated artifacts in the same PR. CI starts an isolated API, regenerates both artifacts, and fails if the generated tree becomes dirty.
+
+## Validation
+
+Common validation lanes:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Scripts\setup-local-dev.ps1 -RunDatabaseSetup
+# Fast unit tests
+dotnet test .\IronDev.UnitTests\IronDev.UnitTests.csproj --no-restore
+
+# Frontend type-check and live API contract drift
+.\Scripts\ci\run-frontend-contract-ci.ps1
+
+# Full solution build
+dotnet build .\IronDev.slnx --no-restore -v:minimal
 ```
 
-The script intentionally does not run DB setup by default, so it will not reseed or change an existing database unless explicitly requested.
+SQL-backed and long-running lanes are selected separately in CI. A passing test is evidence for the behavior it exercised; it is not approval or release authority.
 
----
-
-## Local database setup
-
-For a fresh local environment, run:
+## Repository layout
 
 ```text
-Database/local_dev_setup.sql
+Database/                      SQL schema, migrations, and local setup
+Docs/                          Product, architecture, ADR, testing, and historical evidence
+IronDev.Api/                   ASP.NET Core API
+IronDev.Core/                  Core workflow, governance, agent, and evidence contracts
+IronDev.Infrastructure/        SQL stores, providers, runners, and controlled mutation services
+IronDev.UnitTests/             Fast core tests
+IronDev.IntegrationTests*/     Boundary, API, SQL, and governed-journey tests
+IronDev.TauriShell/            React client and Tauri desktop shell
+Scripts/                       CI, local setup, and compatibility scripts
+tools/                         Contract, LocalTest, replay, and dogfood tooling
 ```
 
-Recommended setup flow:
-
-```text
-1. Create SQL Server database: IronDeveloper
-2. Run Database/local_dev_setup.sql
-3. Update IronDev.Api/appsettings.Development.json connection string
-4. Launch the API
-5. Login with the seeded local dev user
-6. Open the seeded IronDeveloper project
-7. Index the project before using code-aware features
-```
-
-For full instructions, see `Docs/local-development.md`.
-
----
-
-## Optional Weaviate semantic memory
-
-Local Weaviate is used as a rebuildable semantic index. SQL Server remains the source of truth.
-
-Start it with:
-
-```powershell
-.\Scripts\weaviate-dev.ps1 up
-```
-
-If PowerShell blocks local scripts:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Scripts\weaviate-dev.ps1 up
-```
-
-Smoke test it with:
-
-```powershell
-.\Scripts\weaviate-dev.ps1 smoke
-```
-
-For settings and troubleshooting, see `Docs/weaviate-local-setup.md`.
-
----
-
-## AI provider configuration
-
-Configure the AI provider in `IronDev.Api/appsettings.Development.json`.
-
-Supported provider profiles have included:
-
-- `OpenAI`
-- `LocalOpenAI`
-- `Ollama`
-
-Provider setup enables model access. It does not grant tool, workflow, source, approval, memory, or retrieval authority.
-
----
-
-## Current roadmap posture
-
-Near-term work should stay boring and sequential:
-
-1. keep candidate workflows review-material-only;
-2. prove candidate workflow boundaries before adding controlled source apply;
-3. introduce source apply only through explicit approval, dry-run, and review package boundaries;
-4. keep UI/API/CLI surfaces thin consumers of backend truth;
-5. keep SQL as source of truth and retrieval as rebuildable support.
-
-No fake autonomy. No fake receipts. No hidden authority paths.
+Historical receipts and milestone documents retain the language that was true when they were produced. Current capability claims belong in this README and the current product specifications.

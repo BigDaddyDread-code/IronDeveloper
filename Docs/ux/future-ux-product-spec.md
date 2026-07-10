@@ -1,5 +1,7 @@
 # IronDev Future UX Product Spec
 
+> **Status: Superseded as a current product contract.** Retained as historical design input. Use [IronDev Product and UX Specification v2](../product/IRONDEV_PRODUCT_UX_SPEC_V2.md) and [Current Product Capabilities](../product/CURRENT_PRODUCT_CAPABILITIES.md) for current navigation and implementation truth.
+
 **Status:** Committed planning spec (FUTURE-0)
 **Scope:** v0.2+ product and UX direction
 **Audience:** product, engineering, architecture review, future UI implementation, dogfood operators

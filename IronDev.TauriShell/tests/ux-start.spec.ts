@@ -18,7 +18,7 @@ test('an unreachable API gets a named preflight with a retry, not a dead chip', 
   await expect(page.getByTestId('flow.preflight')).toBeVisible();
   await expect(page.getByTestId('flow.preflight.detail')).toContainText('No response from');
   await expect(page.getByTestId('flow.preflight.retry')).toBeEnabled();
-  await expect(page.getByText('start-v0.1-demo.ps1')).toBeVisible();
+  await expect(page.getByText('start-localtest.ps1')).toBeVisible();
 });
 
 test('signed in without a project lands on the chooser; badges are backend readiness truth', async ({ page }) => {

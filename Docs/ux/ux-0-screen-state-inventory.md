@@ -1,5 +1,7 @@
 # UX-0 — Screen/State Inventory Against Backend Truth
 
+> **Status: Historical snapshot from 7 July 2026.** Several missing/partial rows have since shipped. Use [Current Product Capabilities](../product/CURRENT_PRODUCT_CAPABILITIES.md) for current implementation truth; retain this file as UX-0 evidence only.
+
 **Status:** Committed inventory (UX-0)
 **Purpose:** map every surface in `full-ux-map.md` to its existing frontend route/component and
 backing API endpoint, with an honest status. This is the work-list for AFFORDANCE-1, NAV-1,

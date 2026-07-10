@@ -69,7 +69,7 @@ export function ApprovalGate({
       </p>
       <p style={{ fontSize: 12.5, color: 'var(--fl-ink2)' }} data-testid="flow.review.delegatedPolicy">
         Delegated approval: none exists — the default. Every continuation requires explicit human approval; the policy
-        draft in Settings requests future policy, it grants nothing. The local alpha permits the run author to approve;
+        draft in Settings requests future policy, it grants nothing. The current LocalTest policy permits the run author to approve;
         the record names the actor either way.
       </p>
       {hasUndispositionedFindings ? (

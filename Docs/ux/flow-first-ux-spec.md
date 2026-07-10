@@ -1,5 +1,7 @@
 # Flow-First UX Specification
 
+> **Status: Superseded as a current product contract.** Retained for design rationale. Use [IronDev Product and UX Specification v2](../product/IRONDEV_PRODUCT_UX_SPEC_V2.md) and [Current Product Capabilities](../product/CURRENT_PRODUCT_CAPABILITIES.md) for current navigation and implementation truth.
+
 Status: proposed rework of the TauriShell UX. Supersedes the workspace-tab information architecture.
 
 ## Thesis
