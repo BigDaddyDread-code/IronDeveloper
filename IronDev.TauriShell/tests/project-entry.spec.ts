@@ -202,8 +202,7 @@ test('changing projects clears the active work item', async ({ page }) => {
   await page.getByTestId('flow.chooser.project.8').click();
   await expect(page.getByTestId('flow.board.columns')).toBeVisible();
 
-  await page.getByTestId('flow.nav.workitem').click();
-  await expect(page.getByTestId('flow.shape.prompt')).toBeVisible();
+  await expect(page.getByTestId('flow.nav.workitem')).toBeDisabled();
   await expect(page.locator('body')).not.toContainText('BookSeller only ticket');
 });
 

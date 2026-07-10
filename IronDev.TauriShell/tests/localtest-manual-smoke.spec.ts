@@ -46,6 +46,7 @@ test.describe('LocalTest manual flow-shell smoke', () => {
     await expect(page.getByTestId('flow.contract')).toBeVisible();
     notes.push('Work item opens on the spine with the contract rail and real readiness from the API.');
 
+    await page.getByTestId('flow.userMenu').click();
     await page.getByTestId('flow.nav.settings').click();
     await expect(page.getByTestId('flow.settings.banner')).toContainText('never mutation authority');
     await expect(page.getByText('bob@irondev.local')).toBeVisible({ timeout: 15_000 });

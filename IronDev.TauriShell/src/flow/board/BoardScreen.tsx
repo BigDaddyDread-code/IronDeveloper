@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import type { ProjectProvisioningReadinessUi, ProjectTicket } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
+import { BatchScreen } from '../batch/BatchScreen';
 import { WorkItemStage, stageLabels, stageOrder } from '../flowTypes';
 
 interface BoardScreenProps {
   onOpenWorkItem: (ticket: ProjectTicket | null) => void;
-  onOpenBatch: () => void;
   onOpenProvisioning: () => void;
 }
 
@@ -60,7 +60,7 @@ function tagForTicket(ticket: ProjectTicket): { label: string; cls: string } {
   return { label: ticket.priority ?? 'ready to assess', cls: 'fl-tag fl-bluet' };
 }
 
-export function BoardScreen({ onOpenWorkItem, onOpenBatch, onOpenProvisioning }: BoardScreenProps) {
+export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
   const [tickets, setTickets] = useState<ProjectTicket[]>([]);
@@ -70,6 +70,7 @@ export function BoardScreen({ onOpenWorkItem, onOpenBatch, onOpenProvisioning }:
   // truth the run start enforces. Backend truth or a spinner, never inference.
   const [readiness, setReadiness] = useState<ProjectProvisioningReadinessUi | null>(null);
   const [readinessState, setReadinessState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [runQueueOpen, setRunQueueOpen] = useState(false);
 
   useEffect(() => {
     if (project.selectedProjectId === null) {
@@ -150,7 +151,14 @@ export function BoardScreen({ onOpenWorkItem, onOpenBatch, onOpenProvisioning }:
           ) : readinessState === 'error' ? (
             <span className="fl-tag" data-testid="flow.cockpit.badge">readiness unavailable</span>
           ) : null}
-          <button className="fl-btn" onClick={onOpenBatch} data-testid="flow.board.batch">
+          <button
+            className="fl-btn"
+            type="button"
+            aria-expanded={runQueueOpen}
+            aria-controls="flow-run-queue"
+            onClick={() => setRunQueueOpen((open) => !open)}
+            data-testid="flow.board.batch"
+          >
             Run queue
           </button>
           <button className="fl-btn" onClick={() => onOpenWorkItem(null)} data-testid="flow.board.new">
@@ -161,6 +169,12 @@ export function BoardScreen({ onOpenWorkItem, onOpenBatch, onOpenProvisioning }:
           </button>
         </div>
       </div>
+
+      {runQueueOpen ? (
+        <section id="flow-run-queue" className="fl-run-queue" data-testid="flow.board.runQueue">
+          <BatchScreen embedded />
+        </section>
+      ) : null}
 
       {blockedChecks.length > 0 ? (
         <div className="fl-col" style={{ margin: '12px 0', padding: 12 }} data-testid="flow.cockpit.setup">

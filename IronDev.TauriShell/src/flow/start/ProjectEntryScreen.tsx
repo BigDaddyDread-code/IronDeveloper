@@ -11,6 +11,9 @@ interface ProjectEntryScreenProps {
   onOpenBoard: (projectId: number) => void;
   onOpenProvisioning: (projectId: number) => void;
   onOpenSettings: () => void;
+  initialScreen?: 'grid' | 'connect';
+  onOpenConnect?: () => void;
+  onBackFromConnect?: () => void;
 }
 
 function initials(name: string | null | undefined): string {
@@ -31,12 +34,19 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'status unavailable';
 }
 
-export function ProjectEntryScreen({ onOpenBoard, onOpenProvisioning, onOpenSettings }: ProjectEntryScreenProps) {
+export function ProjectEntryScreen({
+  onOpenBoard,
+  onOpenProvisioning,
+  onOpenSettings,
+  initialScreen = 'grid',
+  onOpenConnect,
+  onBackFromConnect
+}: ProjectEntryScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
   const connectTileRef = useRef<HTMLButtonElement | null>(null);
   const readinessRequests = useRef<Record<number, Promise<ProjectTileReadiness>>>({});
-  const [screen, setScreen] = useState<'grid' | 'connect'>('grid');
+  const [screen, setScreen] = useState<'grid' | 'connect'>(initialScreen);
   const [readinessById, setReadinessById] = useState<Record<number, ProjectTileReadiness>>({});
   const [openingProjectId, setOpeningProjectId] = useState<number | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -63,6 +73,10 @@ export function ProjectEntryScreen({ onOpenBoard, onOpenProvisioning, onOpenSett
     },
     [session.client]
   );
+
+  useEffect(() => {
+    setScreen(initialScreen);
+  }, [initialScreen]);
 
   useEffect(() => {
     const projectIds = project.projects
@@ -118,10 +132,12 @@ export function ProjectEntryScreen({ onOpenBoard, onOpenProvisioning, onOpenSett
   const showConnect = () => {
     setPageError(null);
     setScreen('connect');
+    onOpenConnect?.();
   };
 
   const showGrid = () => {
     setScreen('grid');
+    onBackFromConnect?.();
     window.setTimeout(() => connectTileRef.current?.focus(), 0);
   };
 

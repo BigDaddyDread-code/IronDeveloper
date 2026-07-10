@@ -129,6 +129,7 @@ test('settings lists real tenant users and labels the policy draft honestly', as
   });
   await page.goto('/');
 
+  await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await expect(page.getByTestId('flow.settings.banner')).toContainText('Role assignment decides visibility, never mutation authority');
   await expect(page.getByText('Viewer User')).toBeVisible();
@@ -146,9 +147,10 @@ test('settings tolerates the singleton tenant-user response used by LocalTest', 
   });
   await page.goto('/');
 
+  await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
-  await expect(page.getByText('Dev User')).toBeVisible();
-  await expect(page.getByText('dev@iron.dev')).toBeVisible();
+  await expect(page.getByTestId('flow.library').getByText('Dev User', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('flow.library').getByText('dev@iron.dev')).toBeVisible();
 });
 
 test('governance deep link renders the timeline viewer inside the Library', async ({ page }) => {

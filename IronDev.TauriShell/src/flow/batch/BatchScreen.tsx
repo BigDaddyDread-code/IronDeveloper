@@ -24,7 +24,7 @@ function ticketStatusTone(status: string): string {
   return 'var(--fl-ink2)';
 }
 
-export function BatchScreen() {
+export function BatchScreen({ embedded = false }: { embedded?: boolean }) {
   const session = useSessionContext();
   const project = useProjectContext();
 
@@ -170,7 +170,7 @@ export function BatchScreen() {
     <div data-testid="flow.batch">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
         <div>
-          <h1 className="fl-h1">Batch</h1>
+          <h1 className="fl-h1">{embedded ? 'Run queue' : 'Batch'}</h1>
           <p className="fl-sub">
             Define linked work items, hit run — the system works out the order. Every gate stays human, per ticket.
           </p>

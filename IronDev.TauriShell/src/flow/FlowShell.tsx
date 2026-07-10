@@ -1,28 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './flow.css';
+import { IronDevApiError } from '../api/ironDevApi';
 import type { ProjectTicket } from '../api/types';
+import { routeForId } from '../app/routes';
 import { SignInRoute } from '../features/auth/SignInRoute';
+import { ChatRoute } from '../features/chatToBuild/ChatRoute';
 import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
-import { BatchScreen } from './batch/BatchScreen';
 import { BoardScreen } from './board/BoardScreen';
-import { FlowSurface } from './flowTypes';
-import { GovernanceHost } from './library/GovernanceHost';
-import { isGovernancePath } from './library/governanceRoutes';
-import { AdminInviteSection, AuditSection, ProvisioningSection } from './library/PlannedSections';
-import { SolutionExplorer } from './library/SolutionExplorer';
+import { RouteOutcomeScreen, type RouteOutcomeKind } from './components/RouteOutcomeScreen';
+import { LibraryScreen } from './library/LibraryScreen';
+import {
+  libraryPath,
+  navigateProductPath,
+  projectPath,
+  useProductRoute,
+  workItemPath,
+  type ProductRouteKind
+} from './navigation/productRoutes';
+import { ProjectSetupScreen } from './projects/ProjectSetupScreen';
 import { SettingsScreen } from './settings/SettingsScreen';
 import { PreflightGate, ProjectChooser } from './start/StartGate';
 import { TenantChooser } from './start/TenantChooser';
 import { WorkItemScreen } from './workitem/WorkItemScreen';
-import { ProjectSetupScreen } from './projects/ProjectSetupScreen';
 
-type LibrarySection = 'explorer' | 'governance' | 'provisioning' | 'audit' | 'admin';
+type RouteProjectState = 'idle' | 'switching' | 'missing' | 'unavailable';
+type WorkItemLoadState = 'idle' | 'loading' | 'ready' | 'notFound' | 'permission' | 'unavailable';
 
 function initials(name: string | null | undefined): string {
-  if (!name) {
-    return '·';
-  }
+  if (!name) return '.';
   return name
     .split(/\s+/)
     .map((part) => part[0])
@@ -32,226 +38,483 @@ function initials(name: string | null | undefined): string {
     .toUpperCase();
 }
 
+function routeOutcomeForError(error: unknown): WorkItemLoadState {
+  if (error instanceof IronDevApiError) {
+    if (error.status === 403) return 'permission';
+    if (error.status === 404) return 'notFound';
+  }
+  return 'unavailable';
+}
+
+function GlobalOutcome(props: React.ComponentProps<typeof RouteOutcomeScreen>) {
+  return (
+    <main className="fl-root fl-outcome-root">
+      <RouteOutcomeScreen {...props} />
+    </main>
+  );
+}
+
 export function FlowShell() {
   const session = useSessionContext();
   const project = useProjectContext();
-
-  // Deep links into governance viewers (the old shell's URLs) land directly in the
-  // Library's governance section, so bookmarks and existing tests keep working.
-  const [surface, setSurface] = useState<FlowSurface>(() =>
-    isGovernancePath(window.location.pathname) ? 'library' : 'board'
-  );
-  const [librarySection, setLibrarySection] = useState<LibrarySection>(() =>
-    isGovernancePath(window.location.pathname) ? 'governance' : 'explorer'
-  );
+  const currentRoute = useProductRoute();
   const [activeTicket, setActiveTicket] = useState<ProjectTicket | null>(null);
+  const [routeProjectState, setRouteProjectState] = useState<RouteProjectState>('idle');
+  const [workItemLoadState, setWorkItemLoadState] = useState<WorkItemLoadState>('idle');
+  const projectSelectionRequest = useRef<number | null>(null);
+  const previousProjectId = useRef<number | null>(project.selectedProjectId);
+  const healthMenuRef = useRef<HTMLDetailsElement | null>(null);
+  const userMenuRef = useRef<HTMLDetailsElement | null>(null);
 
-  const openProjectBoard = () => {
-    setActiveTicket(null);
-    setSurface('board');
-  };
+  const selectedProjectId = project.selectedProjectId;
+  const hasProjectAccess =
+    selectedProjectId !== null &&
+    ['loadingTickets', 'ready', 'emptyTickets', 'error'].includes(project.accessStatus);
 
-  const openProjectSetup = () => {
-    setActiveTicket(null);
-    setSurface('setup');
+  useEffect(() => {
+    if (previousProjectId.current !== project.selectedProjectId) {
+      setActiveTicket(null);
+      previousProjectId.current = project.selectedProjectId;
+    }
+  }, [project.selectedProjectId]);
+
+  // Canonical URLs follow resolved entry state. Legacy workspace URLs are kept
+  // as redirects, while governance evidence links retain their original paths.
+  useEffect(() => {
+    if (currentRoute.kind === 'root') {
+      if (project.accessStatus === 'authRequired' || project.accessStatus === 'authInvalid') {
+        navigateProductPath('/sign-in', true);
+      } else if (project.accessStatus === 'tenantRequired') {
+        navigateProductPath('/tenants/select', true);
+      } else if (project.accessStatus === 'projectRequired') {
+        navigateProductPath('/projects', true);
+      } else if (hasProjectAccess && selectedProjectId !== null) {
+        navigateProductPath(projectPath(selectedProjectId, 'board'), true);
+      }
+      return;
+    }
+
+    if (currentRoute.kind === 'signIn') {
+      if (project.accessStatus === 'tenantRequired') {
+        navigateProductPath('/tenants/select', true);
+        return;
+      }
+      if (hasProjectAccess && selectedProjectId !== null) {
+        navigateProductPath(projectPath(selectedProjectId, 'board'), true);
+        return;
+      }
+      if (project.accessStatus === 'projectRequired') {
+        navigateProductPath('/projects', true);
+        return;
+      }
+    }
+
+    if (currentRoute.kind === 'tenantSelect' && project.accessStatus !== 'tenantRequired') {
+      navigateProductPath(
+        hasProjectAccess && selectedProjectId !== null ? projectPath(selectedProjectId, 'board') : '/projects',
+        true
+      );
+      return;
+    }
+
+    if (!currentRoute.compatibility || selectedProjectId === null || !hasProjectAccess) return;
+    if (currentRoute.kind === 'chat') navigateProductPath(projectPath(selectedProjectId, 'chat'), true);
+    if (currentRoute.kind === 'board') navigateProductPath(projectPath(selectedProjectId, 'board'), true);
+    if (currentRoute.kind === 'settings') navigateProductPath(libraryPath(selectedProjectId, 'settings'), true);
+    if (currentRoute.kind === 'library' && currentRoute.pathname === '/knowledge') {
+      navigateProductPath(projectPath(selectedProjectId, 'library'), true);
+    }
+  }, [currentRoute, hasProjectAccess, project.accessStatus, selectedProjectId]);
+
+  // A project-scoped deep link selects that project through the existing API.
+  // Missing IDs become an honest route outcome rather than silently opening a
+  // different project's Board.
+  useEffect(() => {
+    const routeProjectId = currentRoute.projectId;
+    if (routeProjectId === null) {
+      projectSelectionRequest.current = null;
+      setRouteProjectState('idle');
+      return;
+    }
+    if (project.selectedProjectId === routeProjectId) {
+      projectSelectionRequest.current = null;
+      setRouteProjectState('idle');
+      return;
+    }
+    if (
+      project.accessStatus === 'loading' ||
+      project.accessStatus === 'authRequired' ||
+      project.accessStatus === 'authInvalid' ||
+      project.accessStatus === 'tenantRequired' ||
+      project.accessStatus === 'apiOffline' ||
+      project.accessStatus === 'apiError' ||
+      project.isRefreshing
+    ) {
+      setRouteProjectState('switching');
+      return;
+    }
+
+    const exists = project.projects.some((candidate) => candidate.id === routeProjectId);
+    if (!exists) {
+      setRouteProjectState('missing');
+      return;
+    }
+    if (projectSelectionRequest.current === routeProjectId) return;
+
+    projectSelectionRequest.current = routeProjectId;
+    setRouteProjectState('switching');
+    void project.selectProjectContext(routeProjectId).catch(() => {
+      projectSelectionRequest.current = null;
+      setRouteProjectState('unavailable');
+    });
+  }, [
+    currentRoute.projectId,
+    project.accessStatus,
+    project.isRefreshing,
+    project.projects,
+    project.selectProjectContext,
+    project.selectedProjectId
+  ]);
+
+  // Work Item URLs hydrate their ticket from backend truth. Board navigation can
+  // pass the ticket it already loaded, avoiding a duplicate request.
+  useEffect(() => {
+    if (currentRoute.kind !== 'workItem') {
+      setWorkItemLoadState('idle');
+      return;
+    }
+    if (currentRoute.workItemId === 'new') {
+      setActiveTicket(null);
+      setWorkItemLoadState('ready');
+      return;
+    }
+    if (
+      currentRoute.projectId === null ||
+      typeof currentRoute.workItemId !== 'number' ||
+      project.selectedProjectId !== currentRoute.projectId
+    ) {
+      setWorkItemLoadState('loading');
+      return;
+    }
+    if (
+      activeTicket?.id === currentRoute.workItemId &&
+      (activeTicket.projectId === undefined || activeTicket.projectId === currentRoute.projectId)
+    ) {
+      setWorkItemLoadState('ready');
+      return;
+    }
+
+    const controller = new AbortController();
+    setWorkItemLoadState('loading');
+    session.client
+      .getProjectTicket(currentRoute.projectId, currentRoute.workItemId, controller.signal)
+      .then((ticket) => {
+        setActiveTicket(ticket);
+        setWorkItemLoadState('ready');
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setWorkItemLoadState(routeOutcomeForError(error));
+      });
+    return () => controller.abort();
+  }, [
+    activeTicket,
+    currentRoute.kind,
+    currentRoute.projectId,
+    currentRoute.workItemId,
+    project.selectedProjectId,
+    session.client
+  ]);
+
+  const openSettings = () => {
+    healthMenuRef.current?.removeAttribute('open');
+    userMenuRef.current?.removeAttribute('open');
+    if (hasProjectAccess && project.selectedProjectId !== null) {
+      navigateProductPath(libraryPath(project.selectedProjectId, 'settings'));
+    } else {
+      navigateProductPath('/settings');
+    }
   };
 
   const openProjectEntry = () => {
+    userMenuRef.current?.removeAttribute('open');
     setActiveTicket(null);
-    setSurface('projects');
+    navigateProductPath('/projects');
   };
 
-  // UX-START-0 — the entry sequence. Order matters: an unreachable API gets a
-  // named preflight (not a mute error chip), auth gets the sign-in route, and a
-  // missing project gets the chooser — no work-item flow exists outside a
-  // selected project. Settings stays reachable as the escape hatch.
-  if (surface !== 'settings') {
-    if (project.accessStatus === 'apiOffline' || project.accessStatus === 'apiError') {
-      return <PreflightGate onOpenSettings={() => setSurface('settings')} />;
-    }
-    if (
-      project.accessStatus === 'authRequired' ||
-      project.accessStatus === 'authInvalid'
-    ) {
-      return <SignInRoute onOpenSettings={() => setSurface('settings')} />;
-    }
-    if (project.accessStatus === 'tenantRequired') {
-      return <TenantChooser onOpenSettings={() => setSurface('settings')} />;
-    }
-    if (surface === 'projects') {
-      return (
-        <ProjectChooser
-          onOpenSettings={() => setSurface('settings')}
-          onOpenBoard={openProjectBoard}
-          onOpenProvisioning={openProjectSetup}
-        />
-      );
-    }
-    if (project.accessStatus === 'projectRequired' || (project.accessStatus !== 'loading' && project.selectedProjectId === null)) {
-      return (
-        <ProjectChooser
-          onOpenSettings={() => setSurface('settings')}
-          onOpenBoard={openProjectBoard}
-          onOpenProvisioning={openProjectSetup}
-        />
-      );
-    }
-    if (surface === 'setup' && project.selectedProjectId !== null) {
-      return (
-        <ProjectSetupScreen
-          projectId={project.selectedProjectId}
-          entryMode
-          onBackToProjects={openProjectEntry}
-          onOpenBoard={openProjectBoard}
-        />
-      );
-    }
+  const openProjectBoard = (projectId = project.selectedProjectId) => {
+    if (projectId === null) return;
+    navigateProductPath(projectPath(projectId, 'board'));
+  };
+
+  const openProjectSetup = (projectId = project.selectedProjectId) => {
+    if (projectId === null) return;
+    navigateProductPath(projectPath(projectId, 'setup'));
+  };
+
+  if (currentRoute.kind === 'settings') {
+    return (
+      <div className="fl-root">
+        <main className="fl-main">
+          <button className="fl-btn" type="button" onClick={() => navigateProductPath('/sign-in')}>
+            Back to sign in
+          </button>
+          <SettingsScreen />
+        </main>
+      </div>
+    );
   }
 
-  const projectName =
-    project.selectedProjectName ??
-    (project.selectedProjectId !== null ? `Project ${project.selectedProjectId}` : 'No project selected');
+  if (project.accessStatus === 'apiOffline' || project.accessStatus === 'apiError') {
+    return <PreflightGate onOpenSettings={openSettings} />;
+  }
+  if (project.accessStatus === 'authRequired' || project.accessStatus === 'authInvalid') {
+    return <SignInRoute onOpenSettings={openSettings} />;
+  }
+  if (project.accessStatus === 'tenantRequired') {
+    return <TenantChooser onOpenSettings={openSettings} />;
+  }
+
+  if (currentRoute.kind === 'notFound') {
+    return (
+      <GlobalOutcome
+        kind="notFound"
+        title="This route does not exist"
+        message={`${currentRoute.pathname} is not an IronDev product route.`}
+        nextSafeAction="Return to the project list and enter through a visible product route."
+        actionLabel="Open projects"
+        onAction={openProjectEntry}
+      />
+    );
+  }
+
+  if (routeProjectState === 'missing') {
+    return (
+      <GlobalOutcome
+        kind="notFound"
+        title="Project not found"
+        message={`Project ${currentRoute.projectId} is not available to this account.`}
+        nextSafeAction="Choose an accessible project. No project context was changed."
+        actionLabel="Open projects"
+        onAction={openProjectEntry}
+      />
+    );
+  }
+  if (routeProjectState === 'unavailable') {
+    return (
+      <GlobalOutcome
+        kind="unavailable"
+        title="Project could not be selected"
+        message="The API did not complete the project-context change."
+        nextSafeAction="Return to the project list and retry the selection."
+        actionLabel="Open projects"
+        onAction={openProjectEntry}
+      />
+    );
+  }
+  if (routeProjectState === 'switching') {
+    return <main className="fl-root fl-route-loading" data-testid="flow.routeLoading">Loading project context...</main>;
+  }
+
+  // Do not render a clickable Board under the transient root URL. Waiting for
+  // the canonical replacement prevents a stale root effect from overwriting a
+  // Work Item navigation performed in the same frame.
+  if (
+    currentRoute.kind === 'root' ||
+    currentRoute.kind === 'signIn' ||
+    currentRoute.kind === 'tenantSelect'
+  ) {
+    return <main className="fl-root fl-route-loading" data-testid="flow.routeLoading">Opening project...</main>;
+  }
+
+  if (currentRoute.kind === 'projects' || currentRoute.kind === 'projectConnect') {
+    return (
+      <ProjectChooser
+        initialScreen={currentRoute.kind === 'projectConnect' ? 'connect' : 'grid'}
+        onOpenConnect={() => navigateProductPath('/projects/connect')}
+        onBackFromConnect={() => navigateProductPath('/projects')}
+        onOpenSettings={openSettings}
+        onOpenBoard={openProjectBoard}
+        onOpenProvisioning={openProjectSetup}
+      />
+    );
+  }
+
+  if (
+    project.accessStatus === 'projectRequired' ||
+    (project.accessStatus !== 'loading' && project.selectedProjectId === null)
+  ) {
+    return (
+      <ProjectChooser
+        onOpenConnect={() => navigateProductPath('/projects/connect')}
+        onBackFromConnect={() => navigateProductPath('/projects')}
+        onOpenSettings={openSettings}
+        onOpenBoard={openProjectBoard}
+        onOpenProvisioning={openProjectSetup}
+      />
+    );
+  }
+
+  if (currentRoute.kind === 'projectSetup' && project.selectedProjectId !== null) {
+    return (
+      <ProjectSetupScreen
+        projectId={project.selectedProjectId}
+        entryMode
+        onBackToProjects={openProjectEntry}
+        onOpenBoard={() => openProjectBoard()}
+      />
+    );
+  }
+
+  const activeProjectId = project.selectedProjectId;
+  if (activeProjectId === null) return null;
+
+  const displayedKind: ProductRouteKind = currentRoute.kind;
+  const projectName = project.selectedProjectName ?? `Project ${activeProjectId}`;
+  const currentTenant = project.tenants.find((tenant) => tenant.id === project.selectedTenantId);
+  const currentWorkItemId = activeTicket?.id;
+  const workItemAvailable = displayedKind === 'workItem' || typeof currentWorkItemId === 'number';
   const modelMode = session.environmentInfo?.isTestEnvironment
-    ? 'Deterministic-only local alpha preview; not a live model run'
-    : 'Backend-reported per run; deterministic fallback is never silent';
+    ? 'Model mode: Deterministic-only local alpha preview; not a live model run'
+    : 'Model mode: Backend-reported per run; deterministic fallback is never silent';
 
   const openWorkItem = (ticket: ProjectTicket | null) => {
     setActiveTicket(ticket);
-    setSurface('workitem');
+    navigateProductPath(workItemPath(activeProjectId, ticket?.id ?? 'new'));
   };
+
+  const renderWorkItemOutcome = (kind: RouteOutcomeKind, title: string, message: string) => (
+    <RouteOutcomeScreen
+      kind={kind}
+      title={title}
+      message={message}
+      nextSafeAction="Return to the Board and select an accessible work item."
+      actionLabel="Back to Board"
+      onAction={() => openProjectBoard()}
+    />
+  );
 
   return (
     <div className="fl-root" data-testid="flow.shell">
       <header className="fl-appbar">
         <div className="fl-brand">
           <span className="fl-brand-mark">I</span>
-          IronDev <span style={{ color: 'var(--fl-line2)' }}>/</span>{' '}
+          IronDev <span className="fl-brand-separator">/</span>
           <button className="fl-project-switcher" data-testid="flow.projectSwitcher" type="button" onClick={openProjectEntry}>
             {projectName}
           </button>
         </div>
-        <nav className="fl-nav" aria-label="Surfaces">
+
+        <nav className="fl-nav fl-product-nav" aria-label="Project">
           <button
-            className={surface === 'board' ? 'fl-on' : ''}
-            onClick={() => setSurface('board')}
+            className={displayedKind === 'board' ? 'fl-on' : ''}
+            type="button"
+            onClick={() => openProjectBoard()}
             data-testid="flow.nav.board"
           >
             Board
           </button>
           <button
-            className={surface === 'workitem' ? 'fl-on' : ''}
-            onClick={() => setSurface('workitem')}
+            className={displayedKind === 'chat' ? 'fl-on' : ''}
+            type="button"
+            onClick={() => navigateProductPath(projectPath(activeProjectId, 'chat'))}
+            data-testid="flow.nav.chat"
+          >
+            Chat
+          </button>
+          <button
+            className={displayedKind === 'workItem' ? 'fl-on' : ''}
+            type="button"
+            disabled={!workItemAvailable}
+            title={workItemAvailable ? 'Open the current work item' : 'Select a work item from the Board first'}
+            onClick={() => {
+              if (typeof currentWorkItemId === 'number') {
+                navigateProductPath(workItemPath(activeProjectId, currentWorkItemId));
+              }
+            }}
             data-testid="flow.nav.workitem"
           >
-            Work item
+            Work Item
           </button>
           <button
-            className={surface === 'batch' ? 'fl-on' : ''}
-            onClick={() => setSurface('batch')}
-            data-testid="flow.nav.batch"
-          >
-            Batch
-          </button>
-          <button
-            className={surface === 'library' ? 'fl-on' : ''}
-            onClick={() => setSurface('library')}
+            className={displayedKind === 'library' ? 'fl-on' : ''}
+            type="button"
+            onClick={() => navigateProductPath(projectPath(activeProjectId, 'library'))}
             data-testid="flow.nav.library"
           >
             Library
           </button>
-          <button
-            className={surface === 'settings' ? 'fl-on' : ''}
-            onClick={() => setSurface('settings')}
-            data-testid="flow.nav.settings"
-          >
-            Settings
-          </button>
         </nav>
+
         <div className="fl-userbit">
-          <span data-testid="flow.modelMode">Model mode: {modelMode}</span>
-          <span>{session.apiStatus.status === 'connected' ? 'API connected' : `API ${session.apiStatus.status}`}</span>
-          <span className="fl-avatar">{initials(project.userProfile?.displayName)}</span>
+          <details ref={healthMenuRef} className="fl-header-menu fl-project-health">
+            <summary data-testid="flow.health">Health</summary>
+            <dl>
+              <div><dt>Status</dt><dd>{session.apiStatus.status}</dd></div>
+              <div><dt>Environment</dt><dd>{session.environmentInfo?.environment ?? 'Unknown'}</dd></div>
+              <div><dt>API</dt><dd>{session.config.apiBaseUrl}</dd></div>
+              <div><dt>Execution</dt><dd data-testid="flow.modelMode">{modelMode}</dd></div>
+            </dl>
+          </details>
+          <details ref={userMenuRef} className="fl-header-menu fl-user-menu">
+            <summary data-testid="flow.userMenu">
+              <span>{project.userProfile?.displayName ?? 'Account'}</span>
+              <span className="fl-avatar">{initials(project.userProfile?.displayName)}</span>
+            </summary>
+            <div className="fl-header-popover">
+              <strong>{project.userProfile?.displayName ?? 'Signed in'}</strong>
+              <span>{project.userProfile?.email}</span>
+              <span>{currentTenant?.name ?? 'No tenant selected'}</span>
+              <button type="button" onClick={openProjectEntry}>Switch project</button>
+              <button type="button" data-testid="flow.nav.settings" onClick={openSettings}>Settings</button>
+              <button
+                type="button"
+                data-testid="flow.signOut"
+                onClick={() => void session.signOut().then(() => navigateProductPath('/sign-in', true))}
+              >
+                Sign out
+              </button>
+            </div>
+          </details>
         </div>
       </header>
 
       <main className="fl-main">
-        {surface === 'board' ? (
-          <BoardScreen
-            onOpenWorkItem={openWorkItem}
-            onOpenBatch={() => setSurface('batch')}
-            onOpenProvisioning={() => {
-              setLibrarySection('provisioning');
-              setSurface('library');
-            }}
-          />
+        {displayedKind === 'board' ? (
+          <BoardScreen onOpenWorkItem={openWorkItem} onOpenProvisioning={() => openProjectSetup()} />
         ) : null}
-        {surface === 'batch' ? <BatchScreen /> : null}
-        {surface === 'workitem' ? (
+        {displayedKind === 'chat' ? <ChatRoute route={routeForId('chat')} /> : null}
+        {displayedKind === 'workItem' && workItemLoadState === 'loading' ? (
+          <p className="fl-empty" data-testid="flow.workItem.loading">Loading work item from the API...</p>
+        ) : null}
+        {displayedKind === 'workItem' && workItemLoadState === 'notFound'
+          ? renderWorkItemOutcome('notFound', 'Work item not found', 'The requested work item no longer exists or is outside this project.')
+          : null}
+        {displayedKind === 'workItem' && workItemLoadState === 'permission'
+          ? renderWorkItemOutcome('permission', 'Work item access denied', 'The backend refused access to this work item.')
+          : null}
+        {displayedKind === 'workItem' && workItemLoadState === 'unavailable'
+          ? renderWorkItemOutcome('unavailable', 'Work item unavailable', 'The work item could not be loaded from the API.')
+          : null}
+        {displayedKind === 'workItem' && (workItemLoadState === 'ready' || workItemLoadState === 'idle') ? (
           <WorkItemScreen
             ticket={activeTicket}
-            onTicketCreated={setActiveTicket}
-            onBackToBoard={() => setSurface('board')}
-            onOpenGovernanceLibrary={() => {
-              setLibrarySection('governance');
-              setSurface('library');
+            onTicketCreated={(ticket) => {
+              setActiveTicket(ticket);
+              if (typeof ticket.id === 'number') navigateProductPath(workItemPath(activeProjectId, ticket.id), true);
             }}
+            onBackToBoard={() => openProjectBoard()}
+            onOpenGovernanceLibrary={() => navigateProductPath(libraryPath(activeProjectId, 'governance'))}
           />
         ) : null}
-        {surface === 'library' ? (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-              <div>
-                <h1 className="fl-h1">Library</h1>
-                <p className="fl-sub">Reference, not workflow. Read-only truth — nothing here grants authority.</p>
-              </div>
-              <div className="fl-nav">
-                <button
-                  className={librarySection === 'explorer' ? 'fl-on' : ''}
-                  onClick={() => setLibrarySection('explorer')}
-                  data-testid="flow.library.explorer"
-                >
-                  Solution explorer
-                </button>
-                <button
-                  className={librarySection === 'governance' ? 'fl-on' : ''}
-                  onClick={() => setLibrarySection('governance')}
-                  data-testid="flow.library.governance"
-                >
-                  Governance
-                </button>
-                <button
-                  className={librarySection === 'provisioning' ? 'fl-on' : ''}
-                  onClick={() => setLibrarySection('provisioning')}
-                  data-testid="flow.library.nav.provisioning"
-                >
-                  Project setup
-                </button>
-                <button
-                  className={librarySection === 'audit' ? 'fl-on' : ''}
-                  onClick={() => setLibrarySection('audit')}
-                  data-testid="flow.library.nav.audit"
-                >
-                  Audit
-                </button>
-                <button
-                  className={librarySection === 'admin' ? 'fl-on' : ''}
-                  onClick={() => setLibrarySection('admin')}
-                  data-testid="flow.library.nav.admin"
-                >
-                  Admin
-                </button>
-              </div>
-            </div>
-            {librarySection === 'explorer' ? <SolutionExplorer /> : null}
-            {librarySection === 'governance' ? <GovernanceHost /> : null}
-            {librarySection === 'provisioning' ? (
-              <ProvisioningSection onBackToProjects={openProjectEntry} onOpenBoard={openProjectBoard} />
-            ) : null}
-            {librarySection === 'audit' ? <AuditSection /> : null}
-            {librarySection === 'admin' ? <AdminInviteSection /> : null}
-          </div>
+        {displayedKind === 'library' ? (
+          <LibraryScreen
+            projectId={activeProjectId}
+            section={currentRoute.librarySection ?? 'settings'}
+            preserveGovernancePath={currentRoute.compatibility && currentRoute.librarySection === 'governance'}
+            onBackToProjects={openProjectEntry}
+            onOpenBoard={() => openProjectBoard()}
+          />
         ) : null}
-        {surface === 'settings' ? <SettingsScreen /> : null}
       </main>
     </div>
   );

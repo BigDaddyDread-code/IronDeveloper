@@ -9,6 +9,7 @@ test('agents panel edits a model and voice and saves through the governed endpoi
   const state = await mockAgentProfiles(page);
 
   await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
 
   await expect(page.getByTestId('flow.settings.agents')).toBeVisible();
@@ -31,6 +32,7 @@ test('the orchestrator card is honest — deterministic, no model to configure',
   await mockAgentProfiles(page);
 
   await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
 
   await expect(page.getByTestId('flow.settings.agent.orchestrator')).toBeVisible();
@@ -48,6 +50,7 @@ test('agents panel accepts numeric backend role values from LocalTest', async ({
   await mockAgentProfiles(page, { numericRoles: true });
 
   await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
 
   await expect(page.getByTestId('flow.settings.agent.orchestrator')).toBeVisible();
@@ -60,6 +63,7 @@ test('a secret in a profile is refused and shown honestly', async ({ page }) => 
   await mockAgentProfiles(page, { refuseSecret: true });
 
   await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
 
   await page.getByTestId('flow.settings.agent.builder.personality').fill('use sk-secret');
