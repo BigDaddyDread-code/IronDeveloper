@@ -398,6 +398,11 @@ try {
             -Database "$($env:IRONDEV_CI_SQL_DATABASE)_Migration"
     }
 
+    Invoke-TimedCommand "Apply migrations to SQL test catalog" {
+        & (Join-Path $script:RepoRoot "Database\apply-migrations.ps1") `
+            -ConnectionString $connectionString
+    }
+
     Invoke-TestLane `
         -Name "In-process API contract" `
         -Project $script:ApiProject `

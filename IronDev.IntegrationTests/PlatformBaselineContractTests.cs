@@ -30,6 +30,8 @@ public sealed class PlatformBaselineContractTests
 
         var fullSql = Read("Scripts", "ci", "run-full-sql-integration-ci.ps1");
         StringAssert.Contains(fullSql, "Clean database migration verification");
+        StringAssert.Contains(fullSql, "Apply migrations to SQL test catalog");
+        AssertOrder(fullSql, "Database\\apply-migrations.ps1", "In-process API contract");
         StringAssert.Contains(fullSql, "In-process API contract");
     }
 
