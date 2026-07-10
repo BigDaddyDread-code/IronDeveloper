@@ -62,6 +62,43 @@ export interface ProjectDocumentProcessingResult {
   nextSafeAction: string;
   boundary: string;
 }
+export interface ProjectToolCatalogueResponse {
+  projectId: number;
+  projectName: string;
+  tools: ProjectToolSummary[];
+  boundary: string;
+}
+export interface ProjectToolSummary {
+  toolId: string;
+  displayName: string;
+  category: string;
+  description: string;
+  registrationStatus: string;
+  connectionStatus: string;
+  projectUseStatus: string;
+  directInvocationStatus: string;
+  healthStatus: string;
+  effectiveScopeSummary: string;
+  boundary: string;
+}
+export interface ProjectToolCapabilities {
+  mutatesState: boolean;
+  allowsNestedCalls: boolean;
+  allowsFileWrites: boolean;
+  allowsProcessExecution: boolean;
+  allowsNetworkAccess: boolean;
+  allowsWorkspaceMutation: boolean;
+}
+export interface ProjectToolDetailResponse extends ProjectToolSummary {
+  projectId: number;
+  projectName: string;
+  definitionVersion: string;
+  capabilities: ProjectToolCapabilities;
+  inputContract: string;
+  outputContract: string;
+  allowedCallers: string[];
+  evidenceKinds: string[];
+}
 export type BuildReadinessResult = components['schemas']['BuildReadinessResult'];
 export type CreateProjectTicketRequest = components['schemas']['CreateProjectTicketRequest'];
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];

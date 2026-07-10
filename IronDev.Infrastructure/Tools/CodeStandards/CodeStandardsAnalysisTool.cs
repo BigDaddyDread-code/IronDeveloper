@@ -12,7 +12,11 @@ public sealed class CodeStandardsAnalysisTool :
     public GovernedToolDefinition Definition { get; } = new()
     {
         Name = ToolName,
+        DisplayName = "Code standards analysis",
+        Category = "Testing and validation",
+        DefinitionVersion = "1",
         Description = "Analyse a proposed patch or changed-file packet for IronDev code-standard risks.",
+        ConnectionRequirement = GovernedToolConnectionRequirement.None,
         InputType = typeof(CodeStandardsAnalysisInput),
         OutputType = typeof(CodeStandardsAnalysisResult),
         AllowedCallers = ["BuilderAgent", "TestingAgent", "TesterAgent"],

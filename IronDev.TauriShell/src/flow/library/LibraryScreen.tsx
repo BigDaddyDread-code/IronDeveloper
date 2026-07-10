@@ -5,6 +5,7 @@ import { AuditSection, ProvisioningSection } from './PlannedSections';
 import { SolutionExplorer } from './SolutionExplorer';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { DocumentsScreen } from './DocumentsScreen';
+import { ToolsScreen } from './ToolsScreen';
 
 interface LibraryScreenProps {
   projectId: number;
@@ -12,6 +13,7 @@ interface LibraryScreenProps {
   documentId?: number | null;
   documentVersionId?: number | null;
   documentAction?: 'upload' | null;
+  toolId?: string | null;
   preserveGovernancePath?: boolean;
   onBackToProjects: () => void;
   onOpenBoard: () => void;
@@ -28,12 +30,7 @@ const sections: Array<{ id: LibrarySection; label: string }> = [
   { id: 'settings', label: 'Settings' }
 ];
 
-const plannedCopy: Record<'tools' | 'members', { title: string; message: string; next: string }> = {
-  tools: {
-    title: 'Project tools are not implemented',
-    message: 'Tenant connections and project enablement need their governed backend contract before this catalogue can operate.',
-    next: 'Return to Library. No tool connection or permission has been created.'
-  },
+const plannedCopy: Record<'members', { title: string; message: string; next: string }> = {
   members: {
     title: 'Project members are not implemented',
     message: 'Tenant users exist, but project visibility and collaboration membership are a separate contract.',
@@ -47,6 +44,7 @@ export function LibraryScreen({
   documentId = null,
   documentVersionId = null,
   documentAction = null,
+  toolId = null,
   preserveGovernancePath = false,
   onBackToProjects,
   onOpenBoard
@@ -90,13 +88,14 @@ export function LibraryScreen({
           action={documentAction}
         />
       ) : null}
+      {section === 'tools' ? <ToolsScreen projectId={projectId} toolId={toolId} /> : null}
       {section === 'governance' ? <GovernanceHost /> : null}
       {section === 'provisioning' ? (
         <ProvisioningSection onBackToProjects={onBackToProjects} onOpenBoard={onOpenBoard} />
       ) : null}
       {section === 'audit' ? <AuditSection /> : null}
       {section === 'settings' ? <SettingsScreen /> : null}
-      {section === 'tools' || section === 'members' ? (
+      {section === 'members' ? (
         <RouteOutcomeScreen
           kind="notImplemented"
           title={plannedCopy[section].title}
