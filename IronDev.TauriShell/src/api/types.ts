@@ -68,6 +68,25 @@ export interface ChatRouteChallenge {
   confidence?: number | null;
   reason?: string | null;
 }
+export interface BaWorkingDraft {
+  candidateTitle?: string | null;
+  problem?: string | null;
+  proposedChange?: string | null;
+  businessRules?: string[] | null;
+  acceptanceCriteria?: string[] | null;
+  assumptions?: string[] | null;
+  openQuestions?: string[] | null;
+  sourceMessageIds?: string[] | null;
+  confidence?: number | null;
+  readyForConfirmation?: boolean | null;
+  potentialConflicts?: string[] | null;
+  suggestedArtifact?: string | null;
+  boundary?: string | null;
+}
+export interface ConfirmBaWorkingDraftRequest {
+  sourceChatSessionId?: number | null;
+  draft: BaWorkingDraft;
+}
 export type ChatAuditSource = 'durable' | 'tags' | 'live' | 'none';
 export interface ChatTurnAuditResponse {
   chatMessageId: number;
@@ -85,6 +104,7 @@ export interface ChatTurnAuditResponse {
   isFallbackEvidence: boolean;
   routeSource?: string | null;
   routeChallenge?: ChatRouteChallenge | null;
+  baDraft?: BaWorkingDraft | null;
 }
 export type ChatCompletionResponse = components['schemas']['ChatCompletionResponse'] & {
   mode?: string | null;
@@ -100,6 +120,7 @@ export type ChatCompletionResponse = components['schemas']['ChatCompletionRespon
   routeTraceId?: string | null;
   routeSource?: string | null;
   routeChallenge?: ChatRouteChallenge | null;
+  baDraft?: BaWorkingDraft | null;
   auditSource?: ChatAuditSource;
   auditFallbackReason?: string | null;
   auditHasFallbackEvidence?: boolean;

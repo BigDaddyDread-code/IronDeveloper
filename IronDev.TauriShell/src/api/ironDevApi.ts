@@ -21,6 +21,7 @@ import type {
   ChatCompletionResponse,
   ChatMessage,
   ChatTurnAuditResponse,
+  ConfirmBaWorkingDraftRequest,
   ControlledActionRequestCreateRequest,
   ControlledActionRequestCreateResponse,
   CreateTenantUserRequest,
@@ -339,6 +340,18 @@ class IronDevApiClient {
     signal?: AbortSignal
   ): Promise<ProjectTicket> {
     return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+  }
+
+  async confirmBaWorkingDraft(
+    projectId: number,
+    request: ConfirmBaWorkingDraftRequest,
+    signal?: AbortSignal
+  ): Promise<ProjectTicket> {
+    return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets/ba-draft/confirm`, {
       method: 'POST',
       body: request,
       signal

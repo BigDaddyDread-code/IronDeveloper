@@ -63,6 +63,9 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
         Assert.IsNotNull(snapshot.RouteChallenge);
         Assert.AreEqual(ChatGovernanceMode.Confirmation, snapshot.RouteChallenge.SuggestedMode);
         Assert.AreEqual(ContextRequestKind.CreateTicket, snapshot.RouteChallenge.SuggestedRequestKind);
+        Assert.IsNotNull(snapshot.BaDraft);
+        Assert.AreEqual("Parcels can be marked Lost", snapshot.BaDraft.CandidateTitle);
+        Assert.AreEqual("101", snapshot.BaDraft.SourceMessageIds.Single());
         Assert.AreEqual("Context summary for persisted trace.", snapshot.ContextSummary);
         Assert.AreEqual("src/App.cs", snapshot.LinkedFilePaths);
         Assert.AreEqual("App", snapshot.LinkedSymbols);
@@ -217,6 +220,8 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
         Assert.AreEqual(ChatClarificationKind.GovernanceIntent, snapshot.Clarification.Kind);
         Assert.AreEqual("ProjectChatContextPipeline", snapshot.RouteSource);
         Assert.IsNotNull(snapshot.RouteChallenge);
+        Assert.IsNotNull(snapshot.BaDraft);
+        Assert.AreEqual("Parcels can be marked Lost", snapshot.BaDraft.CandidateTitle);
         Assert.AreEqual("Fallback context summary.", snapshot.ContextSummary);
         Assert.AreEqual("src/Fallback.cs", snapshot.LinkedFilePaths);
         Assert.AreEqual("Fallback", snapshot.LinkedSymbols);
@@ -526,6 +531,21 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
             "suggestedRequestKind": "CreateTicket",
             "confidence": 0.51,
             "reason": "Classifier advisory differed, but the pipeline route remained final."
+          },
+          "baDraft": {
+            "candidateTitle": "Parcels can be marked Lost",
+            "problem": "Parcels need a controlled way to be marked Lost.",
+            "proposedChange": "Add a Lost parcel state transition.",
+            "businessRules": ["Only dispatched parcels can be marked Lost."],
+            "acceptanceCriteria": ["InTransit parcels can be marked Lost."],
+            "assumptions": [],
+            "openQuestions": ["Should marking a parcel Lost require a reason/comment?"],
+            "sourceMessageIds": ["101"],
+            "confidence": 0.82,
+            "readyForConfirmation": true,
+            "potentialConflicts": [],
+            "suggestedArtifact": "Ticket",
+            "boundary": "A BA draft is shaped evidence, not a ticket."
           }
         }
         """;

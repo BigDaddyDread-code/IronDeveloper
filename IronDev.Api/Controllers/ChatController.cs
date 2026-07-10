@@ -96,7 +96,8 @@ public sealed class ChatController : ControllerBase
             snapshot.LinkedSymbols,
             snapshot.IsFallbackEvidence,
             snapshot.RouteSource,
-            snapshot.RouteChallenge));
+            snapshot.RouteChallenge,
+            snapshot.BaDraft));
     }
 
     [HttpPost("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
@@ -181,7 +182,8 @@ public sealed class ChatController : ControllerBase
             answer.DogfoodTraceId,
             null,
             answer.RouteSource,
-            answer.RouteChallenge));
+            answer.RouteChallenge,
+            answer.BaDraft));
 
     }
 
@@ -219,7 +221,8 @@ public sealed class ChatController : ControllerBase
         string? DogfoodTraceId = null,
         string? DogfoodTracePath = null,
         string? RouteSource = null,
-        ChatRouteChallenge? RouteChallenge = null);
+        ChatRouteChallenge? RouteChallenge = null,
+        BaWorkingDraft? BaDraft = null);
 
     [HttpPost("api/projects/{projectId:int}/chat/feedback")]
     public Task<long> SaveFeedback(ChatMessageFeedback feedback, CancellationToken ct) =>

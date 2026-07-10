@@ -37,4 +37,5 @@ public sealed record ChatCompletionResponse(
     string? DogfoodTraceId = null,
     string? DogfoodTracePath = null,
     string? RouteSource = null,
-    ChatRouteChallenge? RouteChallenge = null);
+    ChatRouteChallenge? RouteChallenge = null,
+    BaWorkingDraft? BaDraft = null);

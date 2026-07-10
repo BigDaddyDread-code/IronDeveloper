@@ -1317,6 +1317,39 @@ p {
   overflow: auto;
 }
 
+.chat-ba-draft {
+  gap: var(--space-2);
+}
+
+.chat-ba-draft__list {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.chat-ba-draft__list h4 {
+  margin: 0;
+}
+
+.chat-ba-draft__list ul,
+.chat-ba-draft__list ol {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.chat-ba-draft__sources,
+.chat-ba-draft__confidence,
+.chat-ba-draft__boundary {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.chat-ba-draft__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
 .chat-context-panel__header {
   min-width: 0;
   display: flex;

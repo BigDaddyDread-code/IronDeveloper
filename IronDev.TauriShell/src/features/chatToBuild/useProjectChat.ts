@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { ChatClarificationKind, ChatCompletionResponse, ChatMessage, ChatTurnAuditResponse } from '../../api/types';
+import type { BaWorkingDraft, ChatClarificationKind, ChatCompletionResponse, ChatMessage, ChatTurnAuditResponse } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { coerceChatGovernanceMode, getChatModeGate } from './chatGovernanceGate';
@@ -196,6 +196,7 @@ export function useProjectChat() {
             routeTraceId: response.routeTraceId ?? null,
             routeSource: response.routeSource ?? null,
             routeChallenge: response.routeChallenge ?? null,
+            baDraft: response.baDraft ?? null,
             auditSource: 'live',
             auditFallbackReason: null,
             auditHasFallbackEvidence: false,
@@ -286,6 +287,60 @@ export function useProjectChat() {
     [disabledReason, messages, projectId, session.client]
   );
 
+  const keepDiscussingBaDraft = useCallback(() => {
+    setDraft('');
+  }, []);
+
+  const askNextBaQuestion = useCallback(
+    (baDraft: BaWorkingDraft) => {
+      const title = baDraft.candidateTitle?.trim() || 'the current BA draft';
+      const question = baDraft.openQuestions?.find(Boolean);
+      void sendMessage({
+        prompt: question
+          ? `Ask the next useful BA question for "${title}". Current top open question: ${question}`
+          : `Ask the next useful BA question for "${title}".`,
+        displayText: 'Ask next question',
+        mode: 'projectQuestion',
+        canContinueInBuild: true
+      });
+    },
+    [sendMessage]
+  );
+
+  const editBaDraft = useCallback((baDraft: BaWorkingDraft) => {
+    setDraft(formatBaDraftForComposer(baDraft));
+  }, []);
+
+  const confirmBaDraft = useCallback(
+    async (baDraft: BaWorkingDraft) => {
+      if (!projectId || !sessionId) {
+        setErrorMessage('Confirm BA draft failed. A project chat session is required.');
+        return;
+      }
+
+      setErrorMessage(null);
+      try {
+        const ticket = await session.client.confirmBaWorkingDraft(projectId, {
+          sourceChatSessionId: sessionId,
+          draft: baDraft
+        });
+
+        setMessages((current) => [
+          ...current,
+          {
+            id: `assistant-ba-confirm-${ticket.id ?? Date.now()}`,
+            role: 'assistant',
+            content: `Confirmed BA draft as ticket #${ticket.id}: ${ticket.title}`,
+            createdUtc: new Date().toISOString()
+          }
+        ]);
+      } catch (error) {
+        setErrorMessage(describeApiError(error, 'Confirm BA draft failed.'));
+      }
+    },
+    [projectId, session.client, sessionId]
+  );
+
   const latestResponse = useMemo(
     () => [...messages].reverse().find((message) => message.role === 'assistant' && message.response)?.response ?? null,
     [messages]
@@ -309,8 +364,39 @@ export function useProjectChat() {
     setDraft,
     sendMessage,
     reviewProjectState,
-    saveDiscussionFromMessage
+    saveDiscussionFromMessage,
+    keepDiscussingBaDraft,
+    askNextBaQuestion,
+    editBaDraft,
+    confirmBaDraft
   };
+}
+
+function formatBaDraftForComposer(baDraft: BaWorkingDraft) {
+  const sections = [
+    `Title: ${baDraft.candidateTitle ?? ''}`,
+    section('Problem', baDraft.problem),
+    section('Proposed change', baDraft.proposedChange),
+    listSection('Rules', baDraft.businessRules),
+    listSection('Acceptance criteria', baDraft.acceptanceCriteria),
+    listSection('Assumptions', baDraft.assumptions),
+    listSection('Open questions', baDraft.openQuestions)
+  ].filter(Boolean);
+
+  return sections.join('\n\n');
+}
+
+function section(title: string, value: string | null | undefined) {
+  return value?.trim() ? `${title}:\n${value.trim()}` : '';
+}
+
+function listSection(title: string, values: string[] | null | undefined) {
+  const items = values?.filter(Boolean) ?? [];
+  if (items.length === 0) {
+    return '';
+  }
+
+  return `${title}:\n${items.map((item) => `- ${item}`).join('\n')}`;
 }
 
 function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
@@ -346,6 +432,7 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
           routeTraceId: null,
           routeSource: metadata.routeSource ?? null,
           routeChallenge: metadata.routeChallenge ?? null,
+          baDraft: metadata.baDraft ?? null,
           auditSource: hasTagReplay ? 'tags' : 'none',
           auditFallbackReason: hasTagReplay
             ? 'Durable audit row was unavailable; restored from ChatMessage.Tags replay envelope.'
@@ -433,6 +520,7 @@ function applyDurableAudit(message: ChatWorkspaceMessage, audit: ChatTurnAuditRe
       routeTraceId: audit.routeTraceId ?? null,
       routeSource: audit.routeSource ?? null,
       routeChallenge: audit.routeChallenge ?? null,
+      baDraft: audit.baDraft ?? null,
       traceId: null,
       reasoningTrace: buildDurableAuditTrace(audit),
       disambiguationQuestion,
@@ -454,6 +542,9 @@ function buildDurableAuditTrace(audit: ChatTurnAuditResponse) {
     audit.routeChallenge
       ? `Route challenge: ${audit.routeChallenge.suggestedMode ?? 'unknown'} / ${audit.routeChallenge.suggestedRequestKind ?? 'unknown'} (${Math.round((audit.routeChallenge.confidence ?? 0) * 100)}%) - ${audit.routeChallenge.reason ?? 'No reason recorded.'}`
       : 'Route challenge: none.',
+    audit.baDraft
+      ? `BA draft: ${audit.baDraft.candidateTitle ?? 'Untitled draft'} (${Math.round((audit.baDraft.confidence ?? 0) * 100)}%).`
+      : 'BA draft: none.',
     clarification?.required
       ? `Clarification: ${clarification.kind} - ${(clarification.questions ?? []).join(' | ')}`
       : 'Clarification: none required.',
@@ -522,6 +613,7 @@ function hasAssistantTagReplayMetadata(metadata: ReturnType<typeof parseAssistan
     metadata.clarification ||
     metadata.reasoningTrace?.length ||
     metadata.reasoningSummary ||
+    metadata.baDraft ||
     metadata.contextSummary ||
     metadata.linkedFilePaths ||
     metadata.linkedSymbols

@@ -1,5 +1,5 @@
 import type { ChatCompletionResponse } from '../../api/types';
-import type { ChatClarificationKind, ChatClarificationState, ChatRouteChallenge } from '../../api/types';
+import type { BaWorkingDraft, ChatClarificationKind, ChatClarificationState, ChatRouteChallenge } from '../../api/types';
 import { coerceChatGovernanceMode, getChatModeGate } from './chatGovernanceGate';
 import type { ChatModeGate } from './chatGovernanceGate';
 import type { ChatResponseMode } from './chatTypes';
@@ -20,6 +20,7 @@ export interface AssistantTagMetadata {
   traceId?: number | null;
   routeSource?: string | null;
   routeChallenge?: ChatRouteChallenge | null;
+  baDraft?: BaWorkingDraft | null;
   contextSummary?: string | null;
   linkedFilePaths?: string | null;
   linkedSymbols?: string | null;
@@ -52,6 +53,7 @@ export function buildAssistantTagEnvelope(response: ChatCompletionResponse, mode
     traceId: response.traceId,
     routeSource: response.routeSource,
     routeChallenge: response.routeChallenge ?? null,
+    baDraft: response.baDraft ?? null,
     contextSummary: response.contextSummary,
     linkedFilePaths: response.linkedFilePaths,
     linkedSymbols: response.linkedSymbols
@@ -89,6 +91,7 @@ export function parseAssistantTagMetadata(rawTags: string | null | undefined) {
       traceId: toNumber(record.traceId),
       routeSource: typeof record.routeSource === 'string' ? record.routeSource : null,
       routeChallenge: parseRouteChallenge(record.routeChallenge),
+      baDraft: parseBaDraft(record.baDraft),
       contextSummary: typeof record.contextSummary === 'string' ? record.contextSummary : null,
       linkedFilePaths: typeof record.linkedFilePaths === 'string' ? record.linkedFilePaths : null,
       linkedSymbols: typeof record.linkedSymbols === 'string' ? record.linkedSymbols : null
@@ -171,6 +174,29 @@ function parseRouteChallenge(value: unknown): ChatRouteChallenge | null {
     suggestedRequestKind: typeof record.suggestedRequestKind === 'string' ? record.suggestedRequestKind : null,
     confidence: toNumber(record.confidence),
     reason: typeof record.reason === 'string' ? record.reason : null
+  };
+}
+
+function parseBaDraft(value: unknown): BaWorkingDraft | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    candidateTitle: typeof record.candidateTitle === 'string' ? record.candidateTitle : null,
+    problem: typeof record.problem === 'string' ? record.problem : null,
+    proposedChange: typeof record.proposedChange === 'string' ? record.proposedChange : null,
+    businessRules: toStringList(record.businessRules),
+    acceptanceCriteria: toStringList(record.acceptanceCriteria),
+    assumptions: toStringList(record.assumptions),
+    openQuestions: toStringList(record.openQuestions),
+    sourceMessageIds: toStringList(record.sourceMessageIds),
+    confidence: toNumber(record.confidence),
+    readyForConfirmation: record.readyForConfirmation === true,
+    potentialConflicts: toStringList(record.potentialConflicts),
+    suggestedArtifact: typeof record.suggestedArtifact === 'string' ? record.suggestedArtifact : null,
+    boundary: typeof record.boundary === 'string' ? record.boundary : null
   };
 }
 

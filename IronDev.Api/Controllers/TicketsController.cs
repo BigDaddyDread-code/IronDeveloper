@@ -1,4 +1,6 @@
 using IronDev.Core.Builder;
+using IronDev.Core.Auth;
+using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
@@ -31,6 +33,8 @@ public sealed class TicketsController : ControllerBase
     private readonly ITicketRunReviewService _runReview;
     private readonly IBuilderProposalService _proposals;
     private readonly IChatHistoryService _chatHistory;
+    private readonly IArtifactSourceReferenceService _sourceReferences;
+    private readonly ICurrentTenantContext _tenant;
 
     public TicketsController(
         ITicketService tickets,
@@ -49,7 +53,9 @@ public sealed class TicketsController : ControllerBase
         ITicketEvidenceSummaryService evidenceSummary,
         ITicketRunReviewService runReview,
         IBuilderProposalService proposals,
-        IChatHistoryService chatHistory)
+        IChatHistoryService chatHistory,
+        IArtifactSourceReferenceService sourceReferences,
+        ICurrentTenantContext tenant)
     {
         _tickets = tickets;
         _drafts = drafts;
@@ -68,6 +74,8 @@ public sealed class TicketsController : ControllerBase
         _runReview = runReview;
         _proposals = proposals;
         _chatHistory = chatHistory;
+        _sourceReferences = sourceReferences;
+        _tenant = tenant;
     }
 
     [HttpGet("api/projects/{projectId:int}/tickets")]
@@ -236,6 +244,72 @@ public sealed class TicketsController : ControllerBase
 
         var ticket = MapDraftTicket(projectId, current, provenance.Provenance);
         ticket.Id = await _tickets.SaveTicketAsync(ticket, ct);
+        return Ok(ticket);
+    }
+
+    [HttpPost("api/projects/{projectId:int}/tickets/ba-draft/confirm")]
+    public async Task<ActionResult<ProjectTicket>> ConfirmBaDraft(
+        int projectId,
+        ConfirmBaWorkingDraftRequest request,
+        CancellationToken ct)
+    {
+        var draft = request.Draft;
+        if (string.IsNullOrWhiteSpace(draft.CandidateTitle))
+            return BadRequest(new { error = "BA draft title is required." });
+
+        if (draft.PotentialConflicts.Count > 0)
+        {
+            return BadRequest(new
+            {
+                error = "Resolve BA draft conflicts before confirming a ticket.",
+                boundary = draft.Boundary
+            });
+        }
+
+        var sourceMessageIds = ParseSourceMessageIds(draft.SourceMessageIds);
+        if (request.SourceChatSessionId is not > 0 || sourceMessageIds.Count == 0)
+        {
+            return BadRequest(new
+            {
+                error = "BA draft confirmation requires a source chat session and at least one source chat message.",
+                boundary = draft.Boundary
+            });
+        }
+
+        var session = await _chatHistory.GetSessionByIdAsync(request.SourceChatSessionId.Value, ct);
+        if (session is null || session.ProjectId != projectId)
+        {
+            return BadRequest(new
+            {
+                error = "The BA draft source chat session was not found for this project.",
+                boundary = draft.Boundary
+            });
+        }
+
+        var verifiedSourceMessageIds = new List<long>();
+        foreach (var sourceMessageId in sourceMessageIds)
+        {
+            var message = await _chatHistory.GetMessageByIdAsync(sourceMessageId, projectId, ct);
+            if (message is null || message.ChatSessionId != request.SourceChatSessionId.Value)
+            {
+                return BadRequest(new
+                {
+                    error = $"BA draft source chat message {sourceMessageId} was not found in the source session.",
+                    boundary = draft.Boundary
+                });
+            }
+
+            verifiedSourceMessageIds.Add(sourceMessageId);
+        }
+
+        var ticket = MapBaDraftTicket(
+            projectId,
+            request.SourceChatSessionId.Value,
+            verifiedSourceMessageIds,
+            draft);
+        ticket.Id = await _tickets.SaveTicketAsync(ticket, ct);
+        await AddBaDraftSourceReferencesAsync(projectId, ticket.Id, verifiedSourceMessageIds, ct);
+
         return Ok(ticket);
     }
 
@@ -650,6 +724,152 @@ public sealed class TicketsController : ControllerBase
 
     public sealed record DraftTicketRequest(string ProjectName, string ProposedTitle, string MessageText, string? LinkedFilePaths, string? LinkedSymbols, long? SessionId, long? MessageId = null);
     public sealed record ProposalRequest(string Request);
+
+    private static ProjectTicket MapBaDraftTicket(
+        int projectId,
+        long sourceChatSessionId,
+        IReadOnlyList<long> sourceMessageIds,
+        BaWorkingDraft draft)
+    {
+        var acceptanceCriteria = FormatAcceptanceCriteria(draft.AcceptanceCriteria);
+        var technicalNotes = BuildBaDraftTechnicalNotes(draft, sourceMessageIds);
+        var generationNote =
+            "Confirmed from a BA working draft. The BA draft shaped evidence only; confirmation created this Draft ticket and did not approve, continue, apply, commit, push, release, or deploy.";
+
+        return new ProjectTicket
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            Title = draft.CandidateTitle!.Trim(),
+            TicketType = "Task",
+            Priority = "Medium",
+            Summary = TrimToNull(draft.Problem),
+            Problem = TrimToNull(draft.Problem),
+            Background = BuildBaDraftBackground(draft),
+            AcceptanceCriteria = acceptanceCriteria,
+            TechnicalNotes = technicalNotes,
+            Status = "Draft",
+            Content = BuildBaDraftContent(draft, acceptanceCriteria, technicalNotes, generationNote),
+            ContextSummary = BuildBaDraftContextSummary(draft),
+            IsGenerated = true,
+            GenerationNote = generationNote,
+            SourceChatSessionId = sourceChatSessionId,
+            SourceChatMessageId = sourceMessageIds.LastOrDefault()
+        };
+    }
+
+    private async Task AddBaDraftSourceReferencesAsync(
+        int projectId,
+        long ticketId,
+        IReadOnlyList<long> sourceMessageIds,
+        CancellationToken ct)
+    {
+        var existing = await _sourceReferences.GetForArtifactAsync(
+            _tenant.TenantId,
+            projectId,
+            "Ticket",
+            ticketId,
+            ct);
+
+        var references = sourceMessageIds
+            .Distinct()
+            .Where(sourceMessageId => !existing.Any(reference =>
+                reference.SourceType == "ChatMessage" &&
+                reference.SourceId == sourceMessageId &&
+                reference.ReferenceType == "CreatedFrom"))
+            .Select(sourceMessageId => new ArtifactSourceReference
+            {
+                TenantId = _tenant.TenantId,
+                ProjectId = projectId,
+                ArtifactType = "Ticket",
+                ArtifactId = ticketId,
+                SourceType = "ChatMessage",
+                SourceId = sourceMessageId,
+                ReferenceType = "CreatedFrom",
+                Summary = "Ticket was confirmed from this BA working draft source chat message.",
+                IsRequired = true,
+                CreatedBy = "IronDev"
+            })
+            .ToArray();
+
+        if (references.Length > 0)
+            await _sourceReferences.AddManyAsync(references, ct);
+    }
+
+    private static IReadOnlyList<long> ParseSourceMessageIds(IEnumerable<string> sourceMessageIds) =>
+        sourceMessageIds
+            .Select(value => long.TryParse(value, out var parsed) && parsed > 0 ? parsed : 0)
+            .Where(value => value > 0)
+            .Distinct()
+            .ToArray();
+
+    private static string? BuildBaDraftBackground(BaWorkingDraft draft)
+    {
+        var sections = new List<string>();
+        AddListSection(sections, "Business rules", draft.BusinessRules);
+        AddListSection(sections, "Assumptions", draft.Assumptions);
+        AddListSection(sections, "Open questions", draft.OpenQuestions);
+        AddListSection(sections, "Potential conflicts", draft.PotentialConflicts);
+
+        return sections.Count == 0 ? null : string.Join($"{Environment.NewLine}{Environment.NewLine}", sections);
+    }
+
+    private static string? BuildBaDraftTechnicalNotes(BaWorkingDraft draft, IReadOnlyList<long> sourceMessageIds)
+    {
+        var sections = new List<string>();
+        AddSection(sections, "Proposed change", draft.ProposedChange);
+        AddSection(sections, "Suggested artifact", draft.SuggestedArtifact);
+        AddSection(sections, "Source chat messages", string.Join(", ", sourceMessageIds));
+        AddSection(sections, "Boundary", draft.Boundary);
+
+        return sections.Count == 0 ? null : string.Join($"{Environment.NewLine}{Environment.NewLine}", sections);
+    }
+
+    private static string BuildBaDraftContent(
+        BaWorkingDraft draft,
+        string? acceptanceCriteria,
+        string? technicalNotes,
+        string generationNote)
+    {
+        var sections = new List<string> { $"# {draft.CandidateTitle!.Trim()}" };
+        AddSection(sections, "Problem", draft.Problem);
+        AddSection(sections, "Proposed change", draft.ProposedChange);
+        AddListSection(sections, "Business rules", draft.BusinessRules);
+        if (!string.IsNullOrWhiteSpace(acceptanceCriteria))
+            sections.Add($"## Acceptance criteria{Environment.NewLine}{acceptanceCriteria}");
+        AddListSection(sections, "Assumptions", draft.Assumptions);
+        AddListSection(sections, "Open questions", draft.OpenQuestions);
+        AddListSection(sections, "Potential conflicts", draft.PotentialConflicts);
+        if (!string.IsNullOrWhiteSpace(technicalNotes))
+            sections.Add(technicalNotes);
+        sections.Add($"## Provenance{Environment.NewLine}{generationNote}");
+
+        return string.Join($"{Environment.NewLine}{Environment.NewLine}", sections);
+    }
+
+    private static string BuildBaDraftContextSummary(BaWorkingDraft draft)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(draft.Problem))
+            parts.Add(draft.Problem.Trim());
+        if (draft.BusinessRules.Count > 0)
+            parts.Add($"Rules: {string.Join(" | ", draft.BusinessRules)}");
+        if (draft.SourceMessageIds.Count > 0)
+            parts.Add($"Source chat messages: {string.Join(", ", draft.SourceMessageIds)}");
+
+        return string.Join(Environment.NewLine, parts);
+    }
+
+    private static void AddListSection(ICollection<string> sections, string heading, IReadOnlyList<string> items)
+    {
+        var normalized = items
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => $"- {item.Trim()}")
+            .ToArray();
+
+        if (normalized.Length > 0)
+            sections.Add($"## {heading}{Environment.NewLine}{string.Join(Environment.NewLine, normalized)}");
+    }
 
     private static ProjectTicket MapCreateRequest(int projectId, CreateProjectTicketRequest request)
     {

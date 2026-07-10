@@ -1,4 +1,4 @@
-import type { ChatCompletionResponse } from '../../api/types';
+import type { BaWorkingDraft, ChatCompletionResponse } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
 import { MetadataRow } from '../../components/MetadataRow';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -12,6 +12,10 @@ interface ChatContextPanelProps {
   projectLabel: string;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
+  onKeepDiscussingBaDraft: () => void;
+  onAskNextBaQuestion: (draft: BaWorkingDraft) => void;
+  onEditBaDraft: (draft: BaWorkingDraft) => void;
+  onConfirmBaDraft: (draft: BaWorkingDraft) => void;
 }
 
 export function ChatContextPanel({
@@ -19,7 +23,11 @@ export function ChatContextPanel({
   latestResponseText,
   projectLabel,
   isCollapsed,
-  onToggleCollapsed
+  onToggleCollapsed,
+  onKeepDiscussingBaDraft,
+  onAskNextBaQuestion,
+  onEditBaDraft,
+  onConfirmBaDraft
 }: ChatContextPanelProps) {
   const gate = getChatModeGate(latestResponse);
   const auditSourceLabel = formatAuditSource(latestResponse?.auditSource);
@@ -159,6 +167,15 @@ export function ChatContextPanel({
           </details>
         ) : null}
       </section>
+      {latestResponse?.baDraft ? (
+        <BaDraftPanel
+          draft={latestResponse.baDraft}
+          onKeepDiscussing={onKeepDiscussingBaDraft}
+          onAskNextQuestion={onAskNextBaQuestion}
+          onEditDraft={onEditBaDraft}
+          onConfirmDraft={onConfirmBaDraft}
+        />
+      ) : null}
       <ChatSourceList response={latestResponse} />
       <ChatSuggestedActions
         hasResponse={Boolean(latestResponse)}
@@ -167,6 +184,121 @@ export function ChatContextPanel({
       />
     </aside>
   );
+}
+
+interface BaDraftPanelProps {
+  draft: BaWorkingDraft;
+  onKeepDiscussing: () => void;
+  onAskNextQuestion: (draft: BaWorkingDraft) => void;
+  onEditDraft: (draft: BaWorkingDraft) => void;
+  onConfirmDraft: (draft: BaWorkingDraft) => void;
+}
+
+function BaDraftPanel({
+  draft,
+  onKeepDiscussing,
+  onAskNextQuestion,
+  onEditDraft,
+  onConfirmDraft
+}: BaDraftPanelProps) {
+  const rules = cleanList(draft.businessRules);
+  const criteria = cleanList(draft.acceptanceCriteria);
+  const assumptions = cleanList(draft.assumptions);
+  const openQuestions = cleanList(draft.openQuestions);
+  const conflicts = cleanList(draft.potentialConflicts);
+  const sourceIds = cleanList(draft.sourceMessageIds);
+  const canConfirm = draft.readyForConfirmation === true && conflicts.length === 0;
+
+  return (
+    <section className="workflow-section chat-ba-draft" data-testid="chat.baDraft.panel">
+      <div className="workflow-section__header">
+        <div>
+          <p className="eyebrow">BA draft</p>
+          <h3>Draft work item</h3>
+        </div>
+        <StatusBadge status={canConfirm ? 'ready' : conflicts.length > 0 ? 'warning' : 'neutral'}>
+          {draft.suggestedArtifact ?? 'Draft'}
+        </StatusBadge>
+      </div>
+      <MetadataRow label="Title" value={draft.candidateTitle ?? 'Untitled'} />
+      {draft.problem ? <p data-testid="chat.baDraft.problem">{draft.problem}</p> : null}
+      {draft.proposedChange ? <p data-testid="chat.baDraft.proposedChange">{draft.proposedChange}</p> : null}
+      <DraftList title="Rules" items={rules} testId="chat.baDraft.rules" />
+      <DraftList title="Acceptance criteria" items={criteria} ordered testId="chat.baDraft.criteria" />
+      <DraftList title="Assumptions" items={assumptions} testId="chat.baDraft.assumptions" />
+      <DraftList title={openQuestions.length === 1 ? 'Open question' : 'Open questions'} items={openQuestions} testId="chat.baDraft.questions" />
+      <DraftList title="Potential conflict" items={conflicts} testId="chat.baDraft.conflicts" />
+      {sourceIds.length > 0 ? (
+        <p className="chat-ba-draft__sources" data-testid="chat.baDraft.sources">
+          <strong>Source messages:</strong> {sourceIds.join(', ')}
+        </p>
+      ) : null}
+      {typeof draft.confidence === 'number' ? (
+        <p className="chat-ba-draft__confidence" data-testid="chat.baDraft.confidence">
+          <strong>Confidence:</strong> {Math.round(draft.confidence * 100)}%
+        </p>
+      ) : null}
+      <div className="chat-ba-draft__actions" data-testid="chat.baDraft.actions">
+        <CommandButton type="button" variant="subtle" testId="chat.baDraft.keepDiscussing" onClick={onKeepDiscussing}>
+          Keep discussing
+        </CommandButton>
+        <CommandButton
+          type="button"
+          variant="secondary"
+          testId="chat.baDraft.askNext"
+          disabled={openQuestions.length === 0}
+          onClick={() => onAskNextQuestion(draft)}
+        >
+          Ask next question
+        </CommandButton>
+        <CommandButton type="button" variant="subtle" testId="chat.baDraft.edit" onClick={() => onEditDraft(draft)}>
+          Edit draft
+        </CommandButton>
+        <CommandButton
+          type="button"
+          variant="primary"
+          testId="chat.baDraft.confirm"
+          disabled={!canConfirm}
+          onClick={() => onConfirmDraft(draft)}
+        >
+          Confirm as ticket
+        </CommandButton>
+      </div>
+      {draft.boundary ? <p className="chat-ba-draft__boundary">{draft.boundary}</p> : null}
+    </section>
+  );
+}
+
+function DraftList({
+  title,
+  items,
+  ordered = false,
+  testId
+}: {
+  title: string;
+  items: string[];
+  ordered?: boolean;
+  testId: string;
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  const ListTag = ordered ? 'ol' : 'ul';
+  return (
+    <div className="chat-ba-draft__list" data-testid={testId}>
+      <h4>{title}</h4>
+      <ListTag>
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ListTag>
+    </div>
+  );
+}
+
+function cleanList(values: string[] | null | undefined) {
+  return values?.map((item) => item.trim()).filter(Boolean) ?? [];
 }
 
 function formatAuditSource(source: ChatCompletionResponse['auditSource'] | undefined) {
