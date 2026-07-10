@@ -66,6 +66,7 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/chat/complete",
             "/api/projects/{projectId}/tools",
             "/api/projects/{projectId}/tools/{toolId}",
+            "/api/projects/{projectId}/members",
             "/api/run-reports",
             "/api/runs/{runId}",
             "/api/runs/{runId}/report",
@@ -87,7 +88,8 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/1/documents",
             "/api/projects/1/memory/search?q=architecture",
             "/api/projects/1/chat/sessions",
-            "/api/projects/1/tools"
+            "/api/projects/1/tools",
+            "/api/projects/1/members"
         })
         {
             var response = await Client.GetAsync(path);
@@ -786,6 +788,40 @@ public sealed class EndpointContractTests : ApiTestBase
             $"/api/projects/{project.Id}/tools/code_standards.analyse_patch",
             new { patch = "not executable from this surface" });
         Assert.AreEqual(HttpStatusCode.MethodNotAllowed, directInvocation.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ProjectMembers_ShouldExposeTenantDirectoryWithoutInventingProjectOrChannelMembership()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+        var project = await CreateProjectAsync(client, "Project Member Directory");
+
+        var response = await client.GetAsync($"/api/projects/{project.Id}/members");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var directory = await response.Content.ReadFromJsonAsync<ProjectMemberDirectoryResponse>();
+        Assert.IsNotNull(directory);
+        Assert.AreEqual(project.Id, directory!.ProjectId);
+        Assert.AreEqual(project.Name, directory.ProjectName);
+        Assert.AreEqual(AssignedTenantId, directory.TenantId);
+        Assert.AreEqual("Owner", directory.CurrentUserTenantRole);
+        Assert.IsTrue(directory.CanAdministerTenantMembership);
+        CollectionAssert.AreEqual(
+            new[] { "Owner", "TenantAdmin", "Approver", "Reviewer", "Operator", "Viewer", "Member" },
+            directory.AvailableTenantRoles.ToArray());
+        Assert.AreEqual("Not implemented", directory.ProjectMembershipStatus);
+        Assert.AreEqual("Not implemented", directory.ChannelMembershipStatus);
+
+        var currentUser = directory.Members.Single(member => member.IsCurrentUser);
+        Assert.AreEqual(AdminEmail, currentUser.Email);
+        Assert.AreEqual("Owner", currentUser.TenantRole);
+        Assert.AreEqual("Tenant scoped", currentUser.ProjectAccessStatus);
+        Assert.AreEqual("Not implemented", currentUser.ChannelMembershipSummary);
+        StringAssert.Contains(directory.Boundary, "It is not project assignment");
+
+        var unknownProject = await client.GetAsync($"/api/projects/{project.Id + 999999}/members");
+        Assert.AreEqual(HttpStatusCode.NotFound, unknownProject.StatusCode);
     }
 
     [TestMethod]
