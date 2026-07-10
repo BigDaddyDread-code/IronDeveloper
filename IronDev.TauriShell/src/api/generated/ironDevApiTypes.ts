@@ -4,6 +4,890 @@
  */
 
 export interface paths {
+    "/api/v1/projects/{projectId}/accepted-approvals/{acceptedApprovalId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    acceptedApprovalId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcceptedApprovalReadModelAcceptedApprovalApiEnvelope"];
+                        "application/json": components["schemas"]["AcceptedApprovalReadModelAcceptedApprovalApiEnvelope"];
+                        "text/json": components["schemas"]["AcceptedApprovalReadModelAcceptedApprovalApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/accepted-approvals/by-target/{approvalTargetKind}/{approvalTargetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    approvalTargetKind: string;
+                    approvalTargetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcceptedApprovalReadModelIReadOnlyListAcceptedApprovalApiEnvelope"];
+                        "application/json": components["schemas"]["AcceptedApprovalReadModelIReadOnlyListAcceptedApprovalApiEnvelope"];
+                        "text/json": components["schemas"]["AcceptedApprovalReadModelIReadOnlyListAcceptedApprovalApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/accepted-approvals/by-correlation/{correlationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    correlationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcceptedApprovalReadModelIReadOnlyListAcceptedApprovalApiEnvelope"];
+                        "application/json": components["schemas"]["AcceptedApprovalReadModelIReadOnlyListAcceptedApprovalApiEnvelope"];
+                        "text/json": components["schemas"]["AcceptedApprovalReadModelIReadOnlyListAcceptedApprovalApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/accepted-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": unknown;
+                    "text/json": unknown;
+                    "application/*+json": unknown;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcceptedApprovalReadModelAcceptedApprovalApiEnvelope"];
+                        "application/json": components["schemas"]["AcceptedApprovalReadModelAcceptedApprovalApiEnvelope"];
+                        "text/json": components["schemas"]["AcceptedApprovalReadModelAcceptedApprovalApiEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfile"][];
+                        "application/json": components["schemas"]["SkeletonAgentProfile"][];
+                        "text/json": components["schemas"]["SkeletonAgentProfile"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-profiles/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    role: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfile"];
+                        "application/json": components["schemas"]["SkeletonAgentProfile"];
+                        "text/json": components["schemas"]["SkeletonAgentProfile"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    role: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SkeletonAgentProfileUpdate"];
+                    "text/json": components["schemas"]["SkeletonAgentProfileUpdate"];
+                    "application/*+json": components["schemas"]["SkeletonAgentProfileUpdate"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfileOutcome"];
+                        "application/json": components["schemas"]["SkeletonAgentProfileOutcome"];
+                        "text/json": components["schemas"]["SkeletonAgentProfileOutcome"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/agent-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    agentId?: string;
+                    agentKind?: components["schemas"]["AgentKind"];
+                    status?: components["schemas"]["AgentRunStatus"];
+                    triggerType?: components["schemas"]["AgentRunTriggerType"];
+                    fromUtc?: string;
+                    toUtc?: string;
+                    take?: number;
+                    skip?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunListResponseDto"];
+                        "application/json": components["schemas"]["AgentRunListResponseDto"];
+                        "text/json": components["schemas"]["AgentRunListResponseDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/agent-runs/{agentRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunDetailResponseDto"];
+                        "application/json": components["schemas"]["AgentRunDetailResponseDto"];
+                        "text/json": components["schemas"]["AgentRunDetailResponseDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/agent-runs/{agentRunId}/thought-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunThoughtLedgerResponseDto"];
+                        "application/json": components["schemas"]["AgentRunThoughtLedgerResponseDto"];
+                        "text/json": components["schemas"]["AgentRunThoughtLedgerResponseDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/agent-runs/{agentRunId}/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunCapabilitiesResponseDto"];
+                        "application/json": components["schemas"]["AgentRunCapabilitiesResponseDto"];
+                        "text/json": components["schemas"]["AgentRunCapabilitiesResponseDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/agent-runs/{agentRunId}/boundaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunBoundariesResponseDto"];
+                        "application/json": components["schemas"]["AgentRunBoundariesResponseDto"];
+                        "text/json": components["schemas"]["AgentRunBoundariesResponseDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/agent-runs/{agentRunId}/outputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunOutputsResponseDto"];
+                        "application/json": components["schemas"]["AgentRunOutputsResponseDto"];
+                        "text/json": components["schemas"]["AgentRunOutputsResponseDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/agent-runs/{agentRunId}/inputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunInputsResponseDto"];
+                        "application/json": components["schemas"]["AgentRunInputsResponseDto"];
+                        "text/json": components["schemas"]["AgentRunInputsResponseDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/runs/health-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                    agentRunId?: string;
+                    correlationId?: string;
+                    workflowRunId?: string;
+                    workflowStepId?: string;
+                    agentId?: string;
+                    agentKind?: string;
+                    fromUtc?: string;
+                    toUtc?: string;
+                    take?: number;
+                    includeGateSignals?: boolean;
+                    includeApprovalSignals?: boolean;
+                    includePolicySignals?: boolean;
+                    includeDogfoodSignals?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunHealthSummaryAgentRunHealthSummaryApiEnvelope"];
+                        "application/json": components["schemas"]["AgentRunHealthSummaryAgentRunHealthSummaryApiEnvelope"];
+                        "text/json": components["schemas"]["AgentRunHealthSummaryAgentRunHealthSummaryApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/runs/{agentRunId}/health-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                    correlationId?: string;
+                    workflowRunId?: string;
+                    workflowStepId?: string;
+                    agentId?: string;
+                    agentKind?: string;
+                    fromUtc?: string;
+                    toUtc?: string;
+                    take?: number;
+                    includeGateSignals?: boolean;
+                    includeApprovalSignals?: boolean;
+                    includePolicySignals?: boolean;
+                    includeDogfoodSignals?: boolean;
+                };
+                header?: never;
+                path: {
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunHealthSummaryAgentRunHealthSummaryApiEnvelope"];
+                        "application/json": components["schemas"]["AgentRunHealthSummaryAgentRunHealthSummaryApiEnvelope"];
+                        "text/json": components["schemas"]["AgentRunHealthSummaryAgentRunHealthSummaryApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                    agentId?: string;
+                    agentKind?: components["schemas"]["AgentKind"];
+                    status?: components["schemas"]["AgentRunStatus"];
+                    triggerType?: components["schemas"]["AgentRunTriggerType"];
+                    createdAfterUtc?: string;
+                    createdBeforeUtc?: string;
+                    runId?: string;
+                    correlationId?: string;
+                    take?: number;
+                    skip?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunListResponseDtoAgentRunApiEnvelope"];
+                        "application/json": components["schemas"]["AgentRunListResponseDtoAgentRunApiEnvelope"];
+                        "text/json": components["schemas"]["AgentRunListResponseDtoAgentRunApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-runs/{agentRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                };
+                header?: never;
+                path: {
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunDetailResponseDtoAgentRunApiEnvelope"];
+                        "application/json": components["schemas"]["AgentRunDetailResponseDtoAgentRunApiEnvelope"];
+                        "text/json": components["schemas"]["AgentRunDetailResponseDtoAgentRunApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-runs/{agentRunId}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                };
+                header?: never;
+                path: {
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentRunAuditSummaryDtoAgentRunApiEnvelope"];
+                        "application/json": components["schemas"]["AgentRunAuditSummaryDtoAgentRunApiEnvelope"];
+                        "text/json": components["schemas"]["AgentRunAuditSummaryDtoAgentRunApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflow/apply-preview/{workflowRunId}/{workflowStepId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    controlledApplyPlanReferenceId?: string;
+                    takeDryRuns?: number;
+                    includeDryRunSummaries?: boolean;
+                };
+                header?: never;
+                path: {
+                    workflowRunId: string;
+                    workflowStepId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/governance/correlation-reports/approval-gate-dogfood": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                    workflowRunId?: string;
+                    workflowStepId?: string;
+                    correlationId?: string;
+                    causationId?: string;
+                    approvalReferenceId?: string;
+                    toolRequestId?: string;
+                    toolGateDecisionId?: string;
+                    dogfoodReceiptId?: string;
+                    fromUtc?: string;
+                    toUtc?: string;
+                    take?: number;
+                    includeTraceReferences?: boolean;
+                    includeMissingEvidence?: boolean;
+                    includeRecommendations?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -109,6 +993,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operations/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                    correlationId?: string;
+                    includeDependencyDetails?: boolean;
+                    includeWarnings?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["BackendOperationalHealthReportBackendOperationalHealthApiEnvelope"];
+                        "application/json": components["schemas"]["BackendOperationalHealthReportBackendOperationalHealthApiEnvelope"];
+                        "text/json": components["schemas"]["BackendOperationalHealthReportBackendOperationalHealthApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/health/backend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                    correlationId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["BackendOperationalHealthReportBackendOperationalHealthApiEnvelope"];
+                        "application/json": components["schemas"]["BackendOperationalHealthReportBackendOperationalHealthApiEnvelope"];
+                        "text/json": components["schemas"]["BackendOperationalHealthReportBackendOperationalHealthApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/health/dependencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                    correlationId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["BackendOperationalHealthReportBackendOperationalHealthApiEnvelope"];
+                        "application/json": components["schemas"]["BackendOperationalHealthReportBackendOperationalHealthApiEnvelope"];
+                        "text/json": components["schemas"]["BackendOperationalHealthReportBackendOperationalHealthApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/chat/sessions": {
         parameters: {
             query?: never;
@@ -148,7 +1154,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -179,7 +1185,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/chat/sessions/{sessionId}": {
+    "/api/projects/{projectId}/chat/sessions/{sessionId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -191,6 +1197,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
+                    projectId: number;
                     sessionId: number;
                 };
                 cookie?: never;
@@ -217,6 +1224,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
+                    projectId: number;
                     sessionId: number;
                 };
                 cookie?: never;
@@ -232,6 +1240,45 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/chat/document-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChatDocumentSource"][];
+                        "application/json": components["schemas"]["ChatDocumentSource"][];
+                        "text/json": components["schemas"]["ChatDocumentSource"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -277,8 +1324,8 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
-                    sessionId: string;
+                    projectId: number;
+                    sessionId: number;
                 };
                 cookie?: never;
             };
@@ -309,6 +1356,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/chat/sessions/{sessionId}/messages/{messageId}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    sessionId: number;
+                    messageId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChatTurnAuditResponse"];
+                        "application/json": components["schemas"]["ChatTurnAuditResponse"];
+                        "text/json": components["schemas"]["ChatTurnAuditResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/chat/complete": {
         parameters: {
             query?: never;
@@ -323,7 +1411,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -483,6 +1571,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/code-index/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    skip?: number;
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectFileSummary"][];
+                        "application/json": components["schemas"]["ProjectFileSummary"][];
+                        "text/json": components["schemas"]["ProjectFileSummary"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/code-index/files/search": {
         parameters: {
             query?: never;
@@ -608,6 +1738,679 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/critic-canary-measurements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonCanaryMeasurementSummary"][];
+                        "application/json": components["schemas"]["SkeletonCanaryMeasurementSummary"][];
+                        "text/json": components["schemas"]["SkeletonCanaryMeasurementSummary"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonCanaryMeasurement"];
+                        "application/json": components["schemas"]["SkeletonCanaryMeasurement"];
+                        "text/json": components["schemas"]["SkeletonCanaryMeasurement"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/critic-canary-measurements/{measurementId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    measurementId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonCanaryMeasurementRecord"];
+                        "application/json": components["schemas"]["SkeletonCanaryMeasurementRecord"];
+                        "text/json": components["schemas"]["SkeletonCanaryMeasurementRecord"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectDecision"][];
+                        "application/json": components["schemas"]["ProjectDecision"][];
+                        "text/json": components["schemas"]["ProjectDecision"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ProjectDecision"];
+                    "text/json": components["schemas"]["ProjectDecision"];
+                    "application/*+json": components["schemas"]["ProjectDecision"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectDecision"];
+                        "application/json": components["schemas"]["ProjectDecision"];
+                        "text/json": components["schemas"]["ProjectDecision"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/decisions/{decisionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    decisionId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectDecision"];
+                        "application/json": components["schemas"]["ProjectDecision"];
+                        "text/json": components["schemas"]["ProjectDecision"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    decisionId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ProjectDecision"];
+                    "text/json": components["schemas"]["ProjectDecision"];
+                    "application/*+json": components["schemas"]["ProjectDecision"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectDecision"];
+                        "application/json": components["schemas"]["ProjectDecision"];
+                        "text/json": components["schemas"]["ProjectDecision"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/projects/{projectId}/decisions/{decisionId}/supersede": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    decisionId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SupersedeDecisionRequest"];
+                    "text/json": components["schemas"]["SupersedeDecisionRequest"];
+                    "application/*+json": components["schemas"]["SupersedeDecisionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectDecision"];
+                        "application/json": components["schemas"]["ProjectDecision"];
+                        "text/json": components["schemas"]["ProjectDecision"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/decisions/{decisionId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    decisionId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/code-scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["BuildScenario"][];
+                        "application/json": components["schemas"]["BuildScenario"][];
+                        "text/json": components["schemas"]["BuildScenario"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/discussions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveDiscussionRequest"];
+                    "text/json": components["schemas"]["SaveDiscussionRequest"];
+                    "application/*+json": components["schemas"]["SaveDiscussionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SaveDiscussionResponse"];
+                        "application/json": components["schemas"]["SaveDiscussionResponse"];
+                        "text/json": components["schemas"]["SaveDiscussionResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/documents/{documentVersionId}/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    documentVersionId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateTicketFromDocumentRequest"];
+                    "text/json": components["schemas"]["CreateTicketFromDocumentRequest"];
+                    "application/*+json": components["schemas"]["CreateTicketFromDocumentRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["CreateTicketFromDocumentResponse"];
+                        "application/json": components["schemas"]["CreateTicketFromDocumentResponse"];
+                        "text/json": components["schemas"]["CreateTicketFromDocumentResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RunTicketReviewRequest"];
+                    "text/json": components["schemas"]["RunTicketReviewRequest"];
+                    "application/*+json": components["schemas"]["RunTicketReviewRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RunTicketReviewResponse"];
+                        "application/json": components["schemas"]["RunTicketReviewResponse"];
+                        "text/json": components["schemas"]["RunTicketReviewResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/disposable-code-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartDisposableCodeRunRequest"];
+                    "text/json": components["schemas"]["StartDisposableCodeRunRequest"];
+                    "application/*+json": components["schemas"]["StartDisposableCodeRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StartDisposableCodeRunResponse"];
+                        "application/json": components["schemas"]["StartDisposableCodeRunResponse"];
+                        "text/json": components["schemas"]["StartDisposableCodeRunResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}/review-package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RunReviewPackage"];
+                        "application/json": components["schemas"]["RunReviewPackage"];
+                        "text/json": components["schemas"]["RunReviewPackage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/documents/{documentId}/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    documentId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectDocumentProcessingResult"];
+                        "application/json": components["schemas"]["ProjectDocumentProcessingResult"];
+                        "text/json": components["schemas"]["ProjectDocumentProcessingResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/documents/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "multipart/form-data": {
+                        /** Format: binary */
+                        File?: string;
+                        DisplayName?: string;
+                        DocumentType?: string;
+                        Description?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectDocumentUploadResult"];
+                        "application/json": components["schemas"]["ProjectDocumentUploadResult"];
+                        "text/json": components["schemas"]["ProjectDocumentUploadResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/documents": {
         parameters: {
             query?: never;
@@ -648,7 +2451,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -774,8 +2577,8 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
+                    projectId: number;
                     documentId: number;
-                    projectId: string;
                 };
                 cookie?: never;
             };
@@ -950,6 +2753,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/documents/{documentId}/versions/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    documentId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectDocumentVersion"];
+                        "application/json": components["schemas"]["ProjectDocumentVersion"];
+                        "text/json": components["schemas"]["ProjectDocumentVersion"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/document-versions/{versionId}": {
         parameters: {
             query?: never;
@@ -977,6 +2820,46 @@ export interface paths {
                         "text/plain": components["schemas"]["ProjectDocumentVersion"];
                         "application/json": components["schemas"]["ProjectDocumentVersion"];
                         "text/json": components["schemas"]["ProjectDocumentVersion"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/documents/{documentId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    documentId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectDocumentVersion"][];
+                        "application/json": components["schemas"]["ProjectDocumentVersion"][];
+                        "text/json": components["schemas"]["ProjectDocumentVersion"][];
                     };
                 };
             };
@@ -1053,6 +2936,897 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/documents/{documentId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    documentId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dogfood-loops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DogfoodLoopCreateRequestDto"];
+                    "text/json": components["schemas"]["DogfoodLoopCreateRequestDto"];
+                    "application/*+json": components["schemas"]["DogfoodLoopCreateRequestDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["DogfoodLoopCreateResponseDtoDogfoodLoopApiEnvelope"];
+                        "application/json": components["schemas"]["DogfoodLoopCreateResponseDtoDogfoodLoopApiEnvelope"];
+                        "text/json": components["schemas"]["DogfoodLoopCreateResponseDtoDogfoodLoopApiEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dogfood-loops/{dogfoodLoopId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                };
+                header?: never;
+                path: {
+                    dogfoodLoopId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["DogfoodLoopReceiptDtoDogfoodLoopApiEnvelope"];
+                        "application/json": components["schemas"]["DogfoodLoopReceiptDtoDogfoodLoopApiEnvelope"];
+                        "text/json": components["schemas"]["DogfoodLoopReceiptDtoDogfoodLoopApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/failures/{workflowRunId}/diagnosis-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                    workflowStepId?: string;
+                    correlationId?: string;
+                    includeTraceTimeline?: boolean;
+                    includeRecommendations?: boolean;
+                    takeTraceItems?: number;
+                };
+                header?: never;
+                path: {
+                    workflowRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/frontend-readiness/operations/{operationId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    compact?: boolean;
+                };
+                header?: never;
+                path: {
+                    operationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendOperationStatusReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendOperationStatusReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendOperationStatusReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendOperationStatusReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendOperationStatusReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendOperationStatusReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendOperationStatusReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendOperationStatusReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendOperationStatusReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/frontend-readiness/operations/{operationId}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    compact?: boolean;
+                };
+                header?: never;
+                path: {
+                    operationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/frontend-readiness/patch-packages/{packageId}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    compact?: boolean;
+                };
+                header?: never;
+                path: {
+                    packageId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/frontend-readiness/patch-packages/{packageId}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    compact?: boolean;
+                };
+                header?: never;
+                path: {
+                    packageId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/frontend-readiness/validation-results/{validationResultId}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    compact?: boolean;
+                };
+                header?: never;
+                path: {
+                    validationResultId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/frontend-readiness/evidence/{evidenceRef}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    compact?: boolean;
+                };
+                header?: never;
+                path: {
+                    evidenceRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/frontend-readiness/receipts/{receiptRef}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    compact?: boolean;
+                };
+                header?: never;
+                path: {
+                    receiptRef: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "application/json": components["schemas"]["FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope"];
+                        "text/json": components["schemas"]["FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/frontend-readiness/action-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ControlledActionRequestCreateRequest"];
+                    "text/json": components["schemas"]["ControlledActionRequestCreateRequest"];
+                    "application/*+json": components["schemas"]["ControlledActionRequestCreateRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ControlledActionRequestCreateResponse"];
+                        "application/json": components["schemas"]["ControlledActionRequestCreateResponse"];
+                        "text/json": components["schemas"]["ControlledActionRequestCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/governance/traces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                    workflowRunId?: string;
+                    workflowStepId?: string;
+                    correlationId?: string;
+                    causationId?: string;
+                    subjectReferenceId?: string;
+                    eventKind?: string;
+                    sourceComponent?: string;
+                    fromUtc?: string;
+                    toUtc?: string;
+                    take?: number;
+                    includeRelated?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/governance/traces/{traceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    traceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/governance/traces/by-correlation/{correlationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                };
+                header?: never;
+                path: {
+                    correlationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/governance/traces/by-workflow-run/{workflowRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectReferenceId?: string;
+                };
+                header?: never;
+                path: {
+                    workflowRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/release-readiness/gate/governed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["GovernedReleaseGateRequest"];
+                    "text/json": components["schemas"]["GovernedReleaseGateRequest"];
+                    "application/*+json": components["schemas"]["GovernedReleaseGateRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedReleaseGateApiEnvelope"];
+                        "application/json": components["schemas"]["GovernedReleaseGateApiEnvelope"];
+                        "text/json": components["schemas"]["GovernedReleaseGateApiEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/workflow-continuation/governed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["GovernedWorkflowContinuationRequest"];
+                    "text/json": components["schemas"]["GovernedWorkflowContinuationRequest"];
+                    "application/*+json": components["schemas"]["GovernedWorkflowContinuationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedWorkflowContinuationApiEnvelope"];
+                        "application/json": components["schemas"]["GovernedWorkflowContinuationApiEnvelope"];
+                        "text/json": components["schemas"]["GovernedWorkflowContinuationApiEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -1061,6 +3835,190 @@ export interface paths {
             cookie?: never;
         };
         get: operations["Health"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/environment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Environment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/manual-critic/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ManualCriticReviewRequestDto"];
+                    "text/json": components["schemas"]["ManualCriticReviewRequestDto"];
+                    "application/*+json": components["schemas"]["ManualCriticReviewRequestDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ManualCriticReviewResponseDtoManualCriticApiEnvelope"];
+                        "application/json": components["schemas"]["ManualCriticReviewResponseDtoManualCriticApiEnvelope"];
+                        "text/json": components["schemas"]["ManualCriticReviewResponseDtoManualCriticApiEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/manual-critic/reviews/{agentRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                };
+                header?: never;
+                path: {
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ManualCriticReviewDetailDtoManualCriticApiEnvelope"];
+                        "application/json": components["schemas"]["ManualCriticReviewDetailDtoManualCriticApiEnvelope"];
+                        "text/json": components["schemas"]["ManualCriticReviewDetailDtoManualCriticApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/manual-memory-improvements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ManualMemoryImprovementRequestDto"];
+                    "text/json": components["schemas"]["ManualMemoryImprovementRequestDto"];
+                    "application/*+json": components["schemas"]["ManualMemoryImprovementRequestDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ManualMemoryImprovementResponseDtoManualMemoryImprovementApiEnvelope"];
+                        "application/json": components["schemas"]["ManualMemoryImprovementResponseDtoManualMemoryImprovementApiEnvelope"];
+                        "text/json": components["schemas"]["ManualMemoryImprovementResponseDtoManualMemoryImprovementApiEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/manual-memory-improvements/{agentRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                };
+                header?: never;
+                path: {
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ManualMemoryImprovementDetailDtoManualMemoryImprovementApiEnvelope"];
+                        "application/json": components["schemas"]["ManualMemoryImprovementDetailDtoManualMemoryImprovementApiEnvelope"];
+                        "text/json": components["schemas"]["ManualMemoryImprovementDetailDtoManualMemoryImprovementApiEnvelope"];
+                    };
+                };
+            };
+        };
         put?: never;
         post?: never;
         delete?: never;
@@ -1315,7 +4273,114 @@ export interface paths {
             };
         };
         put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MemorySearchRequest"];
+                    "text/json": components["schemas"]["MemorySearchRequest"];
+                    "application/*+json": components["schemas"]["MemorySearchRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MemorySearchResponseDto"];
+                        "application/json": components["schemas"]["MemorySearchResponseDto"];
+                        "text/json": components["schemas"]["MemorySearchResponseDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/memory/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MemoryStatusDto"];
+                        "application/json": components["schemas"]["MemoryStatusDto"];
+                        "text/json": components["schemas"]["MemoryStatusDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/memory/reindex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["MemoryReindexResponseDto"];
+                        "application/json": components["schemas"]["MemoryReindexResponseDto"];
+                        "text/json": components["schemas"]["MemoryReindexResponseDto"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -1596,6 +4661,596 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/patch-artifacts/{patchArtifactId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    patchArtifactId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PatchArtifactReadModelPatchArtifactApiEnvelope"];
+                        "application/json": components["schemas"]["PatchArtifactReadModelPatchArtifactApiEnvelope"];
+                        "text/json": components["schemas"]["PatchArtifactReadModelPatchArtifactApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/patch-artifacts/by-dry-run-receipt-hash/{dryRunReceiptHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    dryRunReceiptHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "application/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "text/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/patch-artifacts/by-dry-run-audit-hash/{dryRunAuditHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    dryRunAuditHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "application/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "text/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/patch-artifacts/by-controlled-dry-run-request/{controlledDryRunRequestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    controlledDryRunRequestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "application/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "text/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/patch-artifacts/by-subject/{subjectKind}/{subjectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    subjectKind: string;
+                    subjectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "application/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "text/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/patch-artifacts/by-patch-hash/{patchHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    patchHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "application/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "text/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/patch-artifacts/by-source-baseline-hash/{sourceBaselineHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    sourceBaselineHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "application/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                        "text/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/users/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tenantId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/authority/intervention-dial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/policy-satisfactions/{policySatisfactionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    policySatisfactionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PolicySatisfactionReadModelPolicySatisfactionApiEnvelope"];
+                        "application/json": components["schemas"]["PolicySatisfactionReadModelPolicySatisfactionApiEnvelope"];
+                        "text/json": components["schemas"]["PolicySatisfactionReadModelPolicySatisfactionApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/policy-satisfactions/by-subject/{subjectKind}/{subjectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    subjectKind: string;
+                    subjectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope"];
+                        "application/json": components["schemas"]["PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope"];
+                        "text/json": components["schemas"]["PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/policy-satisfactions/by-accepted-approval/{acceptedApprovalId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    acceptedApprovalId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope"];
+                        "application/json": components["schemas"]["PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope"];
+                        "text/json": components["schemas"]["PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/policy-satisfactions/by-correlation/{correlationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    correlationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope"];
+                        "application/json": components["schemas"]["PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope"];
+                        "text/json": components["schemas"]["PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/policy-satisfactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": unknown;
+                    "text/json": unknown;
+                    "application/*+json": unknown;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PolicySatisfactionReadModelPolicySatisfactionApiEnvelope"];
+                        "application/json": components["schemas"]["PolicySatisfactionReadModelPolicySatisfactionApiEnvelope"];
+                        "text/json": components["schemas"]["PolicySatisfactionReadModelPolicySatisfactionApiEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/profile": {
         parameters: {
             query?: never;
@@ -1697,7 +5352,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -1719,6 +5374,42 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/profile/commands/{projectCommandId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    projectCommandId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -1846,6 +5537,247 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/channels/{channelId}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    channelId: number;
+                    userId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetProjectChannelMembershipRequest"];
+                    "text/json": components["schemas"]["SetProjectChannelMembershipRequest"];
+                    "application/*+json": components["schemas"]["SetProjectChannelMembershipRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    channelId: number;
+                    userId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateProjectChannelRequest"];
+                    "text/json": components["schemas"]["CreateProjectChannelRequest"];
+                    "application/*+json": components["schemas"]["CreateProjectChannelRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/channels/{channelReference}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    channelReference: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/channels/{channelReference}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    channelReference: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PostProjectChannelMessageRequest"];
+                    "text/json": components["schemas"]["PostProjectChannelMessageRequest"];
+                    "application/*+json": components["schemas"]["PostProjectChannelMessageRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectMemberDirectoryResponse"];
+                        "application/json": components["schemas"]["ProjectMemberDirectoryResponse"];
+                        "text/json": components["schemas"]["ProjectMemberDirectoryResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -1946,7 +5878,36 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                    "text/json": components["schemas"]["Project"];
+                    "application/*+json": components["schemas"]["Project"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Project"];
+                        "application/json": components["schemas"]["Project"];
+                        "text/json": components["schemas"]["Project"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/projects/{projectId}/select": {
@@ -2093,6 +6054,610 @@ export interface paths {
                         "text/plain": string;
                         "application/json": string;
                         "text/json": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/services/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectServicesStatusDto"];
+                        "application/json": components["schemas"]["ProjectServicesStatusDto"];
+                        "text/json": components["schemas"]["ProjectServicesStatusDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectToolCatalogueResponse"];
+                        "application/json": components["schemas"]["ProjectToolCatalogueResponse"];
+                        "text/json": components["schemas"]["ProjectToolCatalogueResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tools/{toolId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    toolId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectToolDetailResponse"];
+                        "application/json": components["schemas"]["ProjectToolDetailResponse"];
+                        "text/json": components["schemas"]["ProjectToolDetailResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/provisioning/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectProvisioningReadiness"];
+                        "application/json": components["schemas"]["ProjectProvisioningReadiness"];
+                        "text/json": components["schemas"]["ProjectProvisioningReadiness"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/release-readiness-decision-records/{releaseReadinessDecisionRecordId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    releaseReadinessDecisionRecordId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReleaseReadinessDecisionRecordReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["ReleaseReadinessDecisionRecordReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["ReleaseReadinessDecisionRecordReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/release-readiness-decision-records/by-hash/{releaseReadinessDecisionRecordHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    releaseReadinessDecisionRecordHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReleaseReadinessDecisionRecordReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["ReleaseReadinessDecisionRecordReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["ReleaseReadinessDecisionRecordReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/release-readiness-decision-records/by-report/{releaseReadinessReportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: string;
+                    releaseReadinessReportId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/release-readiness-decision-records/by-workflow-run/{workflowRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: string;
+                    workflowRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/release-readiness-decision-records/by-subject/{subjectKind}/{subjectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: string;
+                    subjectKind: string;
+                    subjectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/rollback-support-receipts/{rollbackSupportReceiptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    rollbackSupportReceiptId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RollbackSupportReceiptReadModelRollbackSupportReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["RollbackSupportReceiptReadModelRollbackSupportReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["RollbackSupportReceiptReadModelRollbackSupportReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/rollback-support-receipts/by-hash/{rollbackSupportReceiptHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    rollbackSupportReceiptHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RollbackSupportReceiptReadModelRollbackSupportReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["RollbackSupportReceiptReadModelRollbackSupportReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["RollbackSupportReceiptReadModelRollbackSupportReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/rollback-support-receipts/by-patch-artifact/{patchArtifactId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    patchArtifactId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/rollback-support-receipts/by-patch-hash/{patchHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    patchHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/rollback-support-receipts/by-rollback-plan/{rollbackPlanId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    rollbackPlanId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/rollback-support-receipts/by-source-baseline/{sourceBaselineHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    sourceBaselineHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope"];
                     };
                 };
             };
@@ -2263,6 +6828,398 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RunStatusDto"];
+                        "application/json": components["schemas"]["RunStatusDto"];
+                        "text/json": components["schemas"]["RunStatusDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RunReportDto"];
+                        "application/json": components["schemas"]["RunReportDto"];
+                        "text/json": components["schemas"]["RunReportDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/screen-contract-metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    screenKey?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ScreenContractMetadataResponse"];
+                        "application/json": components["schemas"]["ScreenContractMetadataResponse"];
+                        "text/json": components["schemas"]["ScreenContractMetadataResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/source-apply-dry-run-receipts/{sourceApplyDryRunReceiptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    sourceApplyDryRunReceiptId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SourceApplyDryRunReceiptReadModelSourceApplyDryRunReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["SourceApplyDryRunReceiptReadModelSourceApplyDryRunReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["SourceApplyDryRunReceiptReadModelSourceApplyDryRunReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/source-apply-dry-run-receipts/by-hash/{sourceApplyDryRunReceiptHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    sourceApplyDryRunReceiptHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SourceApplyDryRunReceiptReadModelSourceApplyDryRunReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["SourceApplyDryRunReceiptReadModelSourceApplyDryRunReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["SourceApplyDryRunReceiptReadModelSourceApplyDryRunReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/source-apply-dry-run-receipts/by-source-apply-request/{sourceApplyRequestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    sourceApplyRequestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/source-apply-dry-run-receipts/by-source-apply-gate/{sourceApplyGateEvaluationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    sourceApplyGateEvaluationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/source-apply-dry-run-receipts/by-patch-artifact/{patchArtifactId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    patchArtifactId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/source-apply-dry-run-receipts/by-rollback-support/{rollbackSupportReceiptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    rollbackSupportReceiptId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                        "application/json": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                        "text/json": components["schemas"]["SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tenants": {
         parameters: {
             query?: never;
@@ -2330,6 +7287,144 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tenantId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tenantId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateTenantUserRequest"];
+                    "text/json": components["schemas"]["CreateTenantUserRequest"];
+                    "application/*+json": components["schemas"]["CreateTenantUserRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/users/{userId}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tenantId: number;
+                    userId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetTenantUserRoleRequest"];
+                    "text/json": components["schemas"]["SetTenantUserRoleRequest"];
+                    "application/*+json": components["schemas"]["SetTenantUserRoleRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{tenantId}/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tenantId: number;
+                    userId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -2500,7 +7595,37 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ProjectTicket"];
+                    "text/json": components["schemas"]["ProjectTicket"];
+                    "application/*+json": components["schemas"]["ProjectTicket"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectTicket"];
+                        "application/json": components["schemas"]["ProjectTicket"];
+                        "text/json": components["schemas"]["ProjectTicket"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/projects/{projectId}/tickets/legacy": {
@@ -2638,6 +7763,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/tickets/{ticketId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/tickets/draft": {
         parameters: {
             query?: never;
@@ -2706,6 +7867,51 @@ export interface paths {
                     "application/json": components["schemas"]["DraftTicket"];
                     "text/json": components["schemas"]["DraftTicket"];
                     "application/*+json": components["schemas"]["DraftTicket"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectTicket"];
+                        "application/json": components["schemas"]["ProjectTicket"];
+                        "text/json": components["schemas"]["ProjectTicket"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/ba-draft/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ConfirmBaWorkingDraftRequest"];
+                    "text/json": components["schemas"]["ConfirmBaWorkingDraftRequest"];
+                    "application/*+json": components["schemas"]["ConfirmBaWorkingDraftRequest"];
                 };
             };
             responses: {
@@ -2897,6 +8103,841 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/tickets/{ticketId}/build-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketBuildRunSummaryDto"][];
+                        "application/json": components["schemas"]["TicketBuildRunSummaryDto"][];
+                        "text/json": components["schemas"]["TicketBuildRunSummaryDto"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartTicketBuildRunRequest"];
+                    "text/json": components["schemas"]["StartTicketBuildRunRequest"];
+                    "application/*+json": components["schemas"]["StartTicketBuildRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketBuildRunDto"];
+                        "application/json": components["schemas"]["TicketBuildRunDto"];
+                        "text/json": components["schemas"]["TicketBuildRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/build-runs/disposable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartTicketBuildRunRequest"];
+                    "text/json": components["schemas"]["StartTicketBuildRunRequest"];
+                    "application/*+json": components["schemas"]["StartTicketBuildRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketBuildRunDto"];
+                        "application/json": components["schemas"]["TicketBuildRunDto"];
+                        "text/json": components["schemas"]["TicketBuildRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketBuildRunDto"];
+                        "application/json": components["schemas"]["TicketBuildRunDto"];
+                        "text/json": components["schemas"]["TicketBuildRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/continue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketBuildRunDto"];
+                        "application/json": components["schemas"]["TicketBuildRunDto"];
+                        "text/json": components["schemas"]["TicketBuildRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SkeletonRevisionBody"];
+                    "text/json": components["schemas"]["SkeletonRevisionBody"];
+                    "application/*+json": components["schemas"]["SkeletonRevisionBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketBuildRunDto"];
+                        "application/json": components["schemas"]["TicketBuildRunDto"];
+                        "text/json": components["schemas"]["TicketBuildRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketBuildRunDto"];
+                        "application/json": components["schemas"]["TicketBuildRunDto"];
+                        "text/json": components["schemas"]["TicketBuildRunDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/critic-package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonCriticPackage"];
+                        "application/json": components["schemas"]["SkeletonCriticPackage"];
+                        "text/json": components["schemas"]["SkeletonCriticPackage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/batch-maps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BatchMapRequestBody"];
+                    "text/json": components["schemas"]["BatchMapRequestBody"];
+                    "application/*+json": components["schemas"]["BatchMapRequestBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonBatchMapOutcome"];
+                        "application/json": components["schemas"]["SkeletonBatchMapOutcome"];
+                        "text/json": components["schemas"]["SkeletonBatchMapOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/batch-maps/{mapId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    mapId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonBatchMapRecord"];
+                        "application/json": components["schemas"]["SkeletonBatchMapRecord"];
+                        "text/json": components["schemas"]["SkeletonBatchMapRecord"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/batch-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BatchPlanRequestBody"];
+                    "text/json": components["schemas"]["BatchPlanRequestBody"];
+                    "application/*+json": components["schemas"]["BatchPlanRequestBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonBatchPlanOutcome"];
+                        "application/json": components["schemas"]["SkeletonBatchPlanOutcome"];
+                        "text/json": components["schemas"]["SkeletonBatchPlanOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/batch-plans/{planId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    planId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonBatchPlanRecord"];
+                        "application/json": components["schemas"]["SkeletonBatchPlanRecord"];
+                        "text/json": components["schemas"]["SkeletonBatchPlanRecord"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/batch-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BatchRunRequestBody"];
+                    "text/json": components["schemas"]["BatchRunRequestBody"];
+                    "application/*+json": components["schemas"]["BatchRunRequestBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonBatchRunOutcome"];
+                        "application/json": components["schemas"]["SkeletonBatchRunOutcome"];
+                        "text/json": components["schemas"]["SkeletonBatchRunOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/batch-runs/{batchId}/advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    batchId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonBatchRunOutcome"];
+                        "application/json": components["schemas"]["SkeletonBatchRunOutcome"];
+                        "text/json": components["schemas"]["SkeletonBatchRunOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/batch-runs/{batchId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    batchId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonBatchRunStatus"];
+                        "application/json": components["schemas"]["SkeletonBatchRunStatus"];
+                        "text/json": components["schemas"]["SkeletonBatchRunStatus"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/critic-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonCriticReviewOutcome"];
+                        "application/json": components["schemas"]["SkeletonCriticReviewOutcome"];
+                        "text/json": components["schemas"]["SkeletonCriticReviewOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/findings/{findingId}/disposition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                    findingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["FindingDispositionBody"];
+                    "text/json": components["schemas"]["FindingDispositionBody"];
+                    "application/*+json": components["schemas"]["FindingDispositionBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonFindingDispositionOutcome"];
+                        "application/json": components["schemas"]["SkeletonFindingDispositionOutcome"];
+                        "text/json": components["schemas"]["SkeletonFindingDispositionOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/gate-recommendation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonGateRecommendation"];
+                        "application/json": components["schemas"]["SkeletonGateRecommendation"];
+                        "text/json": components["schemas"]["SkeletonGateRecommendation"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonRunReport"];
+                        "application/json": components["schemas"]["SkeletonRunReport"];
+                        "text/json": components["schemas"]["SkeletonRunReport"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketBuildRunDetailDto"];
+                        "application/json": components["schemas"]["TicketBuildRunDetailDto"];
+                        "text/json": components["schemas"]["TicketBuildRunDetailDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/tickets/{ticketId}/build-readiness": {
         parameters: {
             query?: never;
@@ -2925,6 +8966,87 @@ export interface paths {
                         "text/plain": components["schemas"]["BuildReadinessResult"];
                         "application/json": components["schemas"]["BuildReadinessResult"];
                         "text/json": components["schemas"]["BuildReadinessResult"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/evidence-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketEvidenceSummaryDto"];
+                        "application/json": components["schemas"]["TicketEvidenceSummaryDto"];
+                        "text/json": components["schemas"]["TicketEvidenceSummaryDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/tickets/{ticketId}/build-runs/{runId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketRunReviewDto"];
+                        "application/json": components["schemas"]["TicketRunReviewDto"];
+                        "text/json": components["schemas"]["TicketRunReviewDto"];
                     };
                 };
             };
@@ -3152,10 +9274,931 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tool-gates/evaluations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ToolGateEvaluationRequestDto"];
+                    "text/json": components["schemas"]["ToolGateEvaluationRequestDto"];
+                    "application/*+json": components["schemas"]["ToolGateEvaluationRequestDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ToolGateEvaluationResponseDtoToolGateApiEnvelope"];
+                        "application/json": components["schemas"]["ToolGateEvaluationResponseDtoToolGateApiEnvelope"];
+                        "text/json": components["schemas"]["ToolGateEvaluationResponseDtoToolGateApiEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tool-gates/evaluations/{gateDecisionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                };
+                header?: never;
+                path: {
+                    gateDecisionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ToolGateDecisionDetailDtoToolGateApiEnvelope"];
+                        "application/json": components["schemas"]["ToolGateDecisionDetailDtoToolGateApiEnvelope"];
+                        "text/json": components["schemas"]["ToolGateDecisionDetailDtoToolGateApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tool-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ToolRequestCreateRequestDto"];
+                    "text/json": components["schemas"]["ToolRequestCreateRequestDto"];
+                    "application/*+json": components["schemas"]["ToolRequestCreateRequestDto"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ToolRequestCreateResponseDtoToolRequestApiEnvelope"];
+                        "application/json": components["schemas"]["ToolRequestCreateResponseDtoToolRequestApiEnvelope"];
+                        "text/json": components["schemas"]["ToolRequestCreateResponseDtoToolRequestApiEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tool-requests/{toolRequestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                };
+                header?: never;
+                path: {
+                    toolRequestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ToolRequestDetailDtoToolRequestApiEnvelope"];
+                        "application/json": components["schemas"]["ToolRequestDetailDtoToolRequestApiEnvelope"];
+                        "text/json": components["schemas"]["ToolRequestDetailDtoToolRequestApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                    take?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/runs/by-correlation/{correlationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    correlationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/runs/by-subject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                    subjectType?: string;
+                    subjectId?: string;
+                    take?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/runs/{workflowRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                };
+                header?: never;
+                path: {
+                    workflowRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowRunReadDtoWorkflowReadOnlyApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowRunReadDtoWorkflowReadOnlyApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowRunReadDtoWorkflowReadOnlyApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/runs/{workflowRunId}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    workflowRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowStepListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowStepListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowStepListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/runs/{workflowRunId}/steps/{workflowRunStepId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                };
+                header?: never;
+                path: {
+                    workflowRunId: string;
+                    workflowRunStepId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowStepReadDtoWorkflowReadOnlyApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowStepReadDtoWorkflowReadOnlyApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowStepReadDtoWorkflowReadOnlyApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/runs/{workflowRunId}/checkpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    workflowRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowCheckpointListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowCheckpointListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowCheckpointListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/runs/{workflowRunId}/steps/{workflowRunStepId}/checkpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    workflowRunId: string;
+                    workflowRunStepId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowCheckpointListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowCheckpointListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowCheckpointListResponseDtoWorkflowReadOnlyApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow/runs/{workflowRunId}/checkpoints/{workflowCheckpointId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: string;
+                };
+                header?: never;
+                path: {
+                    workflowRunId: string;
+                    workflowCheckpointId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowCheckpointReadDtoWorkflowReadOnlyApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowCheckpointReadDtoWorkflowReadOnlyApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowCheckpointReadDtoWorkflowReadOnlyApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/workflow-transition-records/{workflowTransitionRecordId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    workflowTransitionRecordId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowTransitionRecordReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowTransitionRecordReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowTransitionRecordReadModelWorkflowTransitionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/workflow-transition-records/by-hash/{workflowTransitionRecordHash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: string;
+                    workflowTransitionRecordHash: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowTransitionRecordReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowTransitionRecordReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowTransitionRecordReadModelWorkflowTransitionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/workflow-transition-records/by-workflow-run/{workflowRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: string;
+                    workflowRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/workflow-transition-records/by-workflow-step/{workflowRunId}/{workflowStepId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: string;
+                    workflowRunId: string;
+                    workflowStepId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/workflow-transition-records/by-continuation-gate/{workflowContinuationGateEvaluationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: string;
+                    workflowContinuationGateEvaluationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/workflow-transition-records/by-source-apply-receipt/{sourceApplyReceiptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: string;
+                    sourceApplyReceiptId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/workflow-transition-records/by-rollback-execution-receipt/{rollbackExecutionReceiptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: string;
+                    rollbackExecutionReceiptId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "application/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                        "text/json": components["schemas"]["WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptedApprovalApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        AcceptedApprovalReadBoundary: {
+            acceptedApprovalReadIsApprovalCreation?: boolean;
+            acceptedApprovalReadSatisfiesPolicy?: boolean;
+            acceptedApprovalReadRunsDryRun?: boolean;
+            acceptedApprovalReadCreatesPatchArtifact?: boolean;
+            acceptedApprovalReadAppliesSource?: boolean;
+            acceptedApprovalReadContinuesWorkflow?: boolean;
+            acceptedApprovalReadApprovesRelease?: boolean;
+            readingPersistedApprovalAuthorizesExecution?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        AcceptedApprovalReadModel: {
+            /** Format: uuid */
+            acceptedApprovalId?: string;
+            /** Format: uuid */
+            projectId?: string;
+            approvalTargetKind?: string | null;
+            approvalTargetId?: string | null;
+            approvalTargetHash?: string | null;
+            capabilityCode?: string | null;
+            approvalPurpose?: string | null;
+            approvedByActorId?: string | null;
+            approvedByActorDisplayName?: string | null;
+            /** Format: date-time */
+            acceptedAtUtc?: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            correlationId?: string | null;
+            causationId?: string | null;
+            evidenceReferences?: string[] | null;
+            boundaryMaxims?: string[] | null;
+            isExpired?: boolean;
+            authorityBoundary?: string | null;
+            boundary?: components["schemas"]["AcceptedApprovalReadBoundary"];
+            warnings?: string[] | null;
+        };
+        AcceptedApprovalReadModelAcceptedApprovalApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["AcceptedApprovalReadModel"];
+            /** Format: uuid */
+            acceptedApprovalId?: string | null;
+            boundary: unknown;
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["AcceptedApprovalApiErrorDto"][] | null;
+        };
+        AcceptedApprovalReadModelIReadOnlyListAcceptedApprovalApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["AcceptedApprovalReadModel"][] | null;
+            /** Format: uuid */
+            acceptedApprovalId?: string | null;
+            boundary: unknown;
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["AcceptedApprovalApiErrorDto"][] | null;
+        };
+        AcceptedApprovalRecord: {
+            /** Format: uuid */
+            acceptedApprovalId: string;
+            /** Format: uuid */
+            projectId: string;
+            approvalTargetKind: string | null;
+            approvalTargetId: string | null;
+            approvalTargetHash: string | null;
+            capabilityCode: string | null;
+            approvalPurpose: string | null;
+            approvedByActorId: string | null;
+            approvedByActorDisplayName?: string | null;
+            /** Format: date-time */
+            acceptedAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            correlationId: string | null;
+            causationId: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+        };
         AddProjectDocumentVersionRequest: {
             /** Format: int64 */
             documentId?: number;
@@ -3164,6 +10207,573 @@ export interface components {
             createdBy?: string | null;
             incrementMajorVersion?: boolean;
             status?: string | null;
+        };
+        AgentBoundaryDecisionDto: {
+            boundaryDecisionId: string | null;
+            boundaryType: components["schemas"]["AgentBoundaryDecisionType"];
+            decision: string | null;
+            reason: string | null;
+            sourceRefId?: string | null;
+            evidenceRefs?: string[] | null;
+            grantsAuthority?: boolean;
+            grantsHumanApproval?: boolean;
+            grantsPolicyApproval?: boolean;
+            grantsMemoryPromotion?: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentBoundaryDecisionType: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentCapability: 1 | 2 | 3 | 4 | 10 | 11 | 12 | 13 | 20 | 21 | 22 | 30 | 31 | 40 | 41 | 42 | 50 | 51 | 52;
+        AgentCapabilityUseDto: {
+            capabilityUseId: string | null;
+            capability: components["schemas"]["AgentCapability"];
+            outcome: components["schemas"]["AgentCapabilityUseOutcome"];
+            summary?: string | null;
+            boundaryDecisionId?: string | null;
+            evidenceRef?: string | null;
+            wasDeclaredOnAgent?: boolean;
+            wasForbiddenOnAgent?: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentCapabilityUseOutcome: 1 | 2 | 3 | 4;
+        AgentDefinitionSnapshotDto: {
+            agentId: string | null;
+            name: string | null;
+            kind: components["schemas"]["AgentKind"];
+            executionMode: components["schemas"]["AgentExecutionMode"];
+            capabilities?: components["schemas"]["AgentCapability"][] | null;
+            forbiddenCapabilities?: components["schemas"]["AgentCapability"][] | null;
+            personaDisplayName?: string | null;
+            purpose?: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentExecutionMode: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentKind: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+        AgentRunApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            message: string | null;
+            field?: string | null;
+        };
+        AgentRunAuditQueryIssueDto: {
+            code: string | null;
+            severity: string | null;
+            message: string | null;
+        };
+        AgentRunAuditSummaryDto: {
+            projectId: string | null;
+            agentRunId: string | null;
+            /** Format: int32 */
+            inputCount?: number;
+            /** Format: int32 */
+            outputCount?: number;
+            /** Format: int32 */
+            thoughtLedgerCount?: number;
+            /** Format: int32 */
+            capabilityUseCount?: number;
+            /** Format: int32 */
+            boundaryDecisionCount?: number;
+            evidenceReferences?: string[] | null;
+            safetySummary: components["schemas"]["AgentRunSafetySummaryDto"];
+            boundaryStatus: components["schemas"]["AgentRunBoundaryStatusDto"];
+            auditIsApproval?: boolean;
+            evidenceIsPermission?: boolean;
+        };
+        AgentRunAuditSummaryDtoAgentRunApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["AgentRunAuditSummaryDto"];
+            runId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["AgentRunBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["AgentRunApiErrorDto"][] | null;
+        };
+        AgentRunBoundariesResponseDto: {
+            projectId: string | null;
+            agentRunId: string | null;
+            items: components["schemas"]["AgentBoundaryDecisionDto"][] | null;
+            issues?: components["schemas"]["AgentRunAuditQueryIssueDto"][] | null;
+        };
+        AgentRunBoundaryStatusDto: {
+            readOnlyInspection?: boolean;
+            auditIsApproval?: boolean;
+            endpointAccessIsExecutionPermission?: boolean;
+            apiResponseStatusIsGovernance?: boolean;
+            modelOutputIsAuthority?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+            hasBoundaryWarnings?: boolean;
+        };
+        AgentRunCapabilitiesResponseDto: {
+            projectId: string | null;
+            agentRunId: string | null;
+            items: components["schemas"]["AgentCapabilityUseDto"][] | null;
+            issues?: components["schemas"]["AgentRunAuditQueryIssueDto"][] | null;
+        };
+        AgentRunDetailDto: {
+            run: components["schemas"]["AgentRunRecordDto"];
+            agentDefinition: components["schemas"]["AgentDefinitionSnapshotDto"];
+            inputs?: components["schemas"]["AgentRunInputRefDto"][] | null;
+            outputs?: components["schemas"]["AgentRunOutputRefDto"][] | null;
+            capabilityUses?: components["schemas"]["AgentCapabilityUseDto"][] | null;
+            boundaryDecisions?: components["schemas"]["AgentBoundaryDecisionDto"][] | null;
+            thoughtLedger?: components["schemas"]["ThoughtLedgerEntryDto"][] | null;
+            steps?: components["schemas"]["AgentRunStepDto"][] | null;
+            safetySummary: components["schemas"]["AgentRunSafetySummaryDto"];
+        };
+        AgentRunDetailResponseDto: {
+            projectId: string | null;
+            agentRunId: string | null;
+            run?: components["schemas"]["AgentRunDetailDto"];
+            issues?: components["schemas"]["AgentRunAuditQueryIssueDto"][] | null;
+        };
+        AgentRunDetailResponseDtoAgentRunApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["AgentRunDetailResponseDto"];
+            runId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["AgentRunBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["AgentRunApiErrorDto"][] | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentRunHealthCategory: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+        AgentRunHealthMissingEvidence: {
+            evidenceKind: string | null;
+            referenceId: string | null;
+            safeSummary: string | null;
+        };
+        AgentRunHealthSignal: {
+            kind: components["schemas"]["AgentRunHealthSignalKind"];
+            severity: components["schemas"]["AgentRunHealthSignalSeverity"];
+            referenceId: string | null;
+            safeSummary: string | null;
+            /** Format: date-time */
+            recordedUtc: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentRunHealthSignalKind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentRunHealthSignalSeverity: 0 | 1 | 2 | 3;
+        AgentRunHealthSummary: {
+            summaryId: string | null;
+            projectReferenceId: string | null;
+            agentRunId: string | null;
+            correlationId: string | null;
+            workflowRunId: string | null;
+            workflowStepId: string | null;
+            agentId: string | null;
+            agentKind: string | null;
+            /** Format: date-time */
+            generatedUtc: string;
+            healthCategory: components["schemas"]["AgentRunHealthCategory"];
+            /** Format: int32 */
+            traceCount: number;
+            /** Format: int32 */
+            criticalSignalCount: number;
+            /** Format: int32 */
+            warningSignalCount: number;
+            /** Format: int32 */
+            missingEvidenceCount: number;
+            signals: components["schemas"]["AgentRunHealthSignal"][] | null;
+            missingEvidence: components["schemas"]["AgentRunHealthMissingEvidence"][] | null;
+            traceReferences: components["schemas"]["AgentRunHealthTraceReference"][] | null;
+            recommendations: string[] | null;
+            boundary: components["schemas"]["AgentRunHealthSummaryBoundary"];
+        };
+        AgentRunHealthSummaryAgentRunHealthSummaryApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["AgentRunHealthSummary"];
+            runId?: string | null;
+            boundary: components["schemas"]["AgentRunHealthSummaryBoundary"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["AgentRunHealthSummaryApiError"][] | null;
+        };
+        AgentRunHealthSummaryApiError: {
+            category: string | null;
+            code: string | null;
+            message: string | null;
+            field?: string | null;
+        };
+        AgentRunHealthSummaryBoundary: {
+            readOnlySummary?: boolean;
+            summaryIsApproval?: boolean;
+            summaryIsPolicySatisfaction?: boolean;
+            summaryIsExecutionPermission?: boolean;
+            summaryIsReleaseApproval?: boolean;
+            summaryCanStartWorkflow?: boolean;
+            summaryCanResumeWorkflow?: boolean;
+            summaryCanRestartAgent?: boolean;
+            summaryCanRetryAgent?: boolean;
+            summaryCanDispatchAgent?: boolean;
+            summaryCanInvokeTool?: boolean;
+            summaryCanCallModel?: boolean;
+            summaryCanCreateTicket?: boolean;
+            summaryCanMutateSource?: boolean;
+            summaryCanApplyPatch?: boolean;
+            summaryCanPromoteMemory?: boolean;
+            summaryCanActivateRetrieval?: boolean;
+            createsGovernanceEvent?: boolean;
+            createsApprovalDecision?: boolean;
+            createsPolicyDecision?: boolean;
+            createsToolRequest?: boolean;
+            createsDogfoodReceipt?: boolean;
+            exposesRawPayloadJson?: boolean;
+            exposesRawPrompt?: boolean;
+            exposesRawCompletion?: boolean;
+            exposesRawToolOutput?: boolean;
+            exposesSourceContent?: boolean;
+            exposesPatchPayload?: boolean;
+            exposesPrivateReasoning?: boolean;
+        };
+        AgentRunHealthTraceReference: {
+            traceId: string | null;
+            eventKind: string | null;
+            subjectReferenceId: string | null;
+            sourceComponent: string | null;
+            /** Format: date-time */
+            recordedUtc: string;
+        };
+        AgentRunInputRefDto: {
+            inputRefId: string | null;
+            refType: string | null;
+            refId: string | null;
+            source?: string | null;
+            summary?: string | null;
+            evidenceRefs?: string[] | null;
+            isAuthoritativeForAction?: boolean;
+            containsRawPrivateReasoning?: boolean;
+        };
+        AgentRunInputsResponseDto: {
+            projectId: string | null;
+            agentRunId: string | null;
+            items: components["schemas"]["AgentRunInputRefDto"][] | null;
+            issues?: components["schemas"]["AgentRunAuditQueryIssueDto"][] | null;
+        };
+        AgentRunListItemDto: {
+            agentRunId: string | null;
+            agentId: string | null;
+            agentName: string | null;
+            agentKind: components["schemas"]["AgentKind"];
+            executionMode: components["schemas"]["AgentExecutionMode"];
+            status: components["schemas"]["AgentRunStatus"];
+            triggerType: components["schemas"]["AgentRunTriggerType"];
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            completedAtUtc?: string | null;
+            requestedByUserId?: string | null;
+            correlationId?: string | null;
+            /** Format: int32 */
+            inputCount?: number;
+            /** Format: int32 */
+            outputCount?: number;
+            /** Format: int32 */
+            thoughtLedgerCount?: number;
+            /** Format: int32 */
+            capabilityUseCount?: number;
+            /** Format: int32 */
+            boundaryDecisionCount?: number;
+            /** Format: int32 */
+            blockedCapabilityCount?: number;
+            hasBoundaryBlocks?: boolean;
+            hasUnsafeAttempt?: boolean;
+            hasRawPrivateReasoning?: boolean;
+            hasAuthorityClaim?: boolean;
+            hasApprovalClaim?: boolean;
+            hasMemoryPromotionClaim?: boolean;
+        };
+        AgentRunListResponseDto: {
+            projectId: string | null;
+            items: components["schemas"]["AgentRunListItemDto"][] | null;
+            /** Format: int32 */
+            totalCount: number;
+            issues?: components["schemas"]["AgentRunAuditQueryIssueDto"][] | null;
+        };
+        AgentRunListResponseDtoAgentRunApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["AgentRunListResponseDto"];
+            runId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["AgentRunBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["AgentRunApiErrorDto"][] | null;
+        };
+        AgentRunOutputRefDto: {
+            outputRefId: string | null;
+            refType: string | null;
+            refId: string | null;
+            summary?: string | null;
+            evidenceRefs?: string[] | null;
+            isReviewOnly?: boolean;
+            isProposalOnly?: boolean;
+            createsAuthority?: boolean;
+            createsRuntimeAction?: boolean;
+            containsRawPrivateReasoning?: boolean;
+        };
+        AgentRunOutputsResponseDto: {
+            projectId: string | null;
+            agentRunId: string | null;
+            items: components["schemas"]["AgentRunOutputRefDto"][] | null;
+            issues?: components["schemas"]["AgentRunAuditQueryIssueDto"][] | null;
+        };
+        AgentRunRecordDto: {
+            agentRunId: string | null;
+            tenantId: string | null;
+            projectId: string | null;
+            campaignId: string | null;
+            runId: string | null;
+            agentId: string | null;
+            agentName: string | null;
+            status: components["schemas"]["AgentRunStatus"];
+            triggerType: components["schemas"]["AgentRunTriggerType"];
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            startedAtUtc?: string | null;
+            /** Format: date-time */
+            completedAtUtc?: string | null;
+            requestedByUserId?: string | null;
+            requestedByAgentId?: string | null;
+            requestSummary?: string | null;
+            purpose?: string | null;
+        };
+        AgentRunSafetySummaryDto: {
+            containsRawPrivateReasoning?: boolean;
+            hasAuthorityClaim?: boolean;
+            hasApprovalClaim?: boolean;
+            hasMemoryPromotionClaim?: boolean;
+            hasRuntimeActionOutput?: boolean;
+            hasAuthorityCreatingOutput?: boolean;
+            hasBlockedCapabilityAttempt?: boolean;
+            hasBoundaryBlock?: boolean;
+            warnings?: string[] | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentRunStatus: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        AgentRunStepDto: {
+            stepId: string | null;
+            /** Format: int32 */
+            sequence: number;
+            stepType: components["schemas"]["AgentRunStepType"];
+            /** Format: date-time */
+            occurredAtUtc: string;
+            summary: string | null;
+            evidenceRefs?: string[] | null;
+            containsRawPrivateReasoning?: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentRunStepType: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        AgentRunThoughtLedgerResponseDto: {
+            projectId: string | null;
+            agentRunId: string | null;
+            items: components["schemas"]["ThoughtLedgerEntryDto"][] | null;
+            issues?: components["schemas"]["AgentRunAuditQueryIssueDto"][] | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        AgentRunTriggerType: 1 | 2 | 3 | 4;
+        BaWorkingDraft: {
+            candidateTitle?: string | null;
+            problem?: string | null;
+            proposedChange?: string | null;
+            businessRules?: string[] | null;
+            acceptanceCriteria?: string[] | null;
+            assumptions?: string[] | null;
+            openQuestions?: string[] | null;
+            sourceMessageIds?: string[] | null;
+            /** Format: double */
+            confidence?: number;
+            readyForConfirmation?: boolean;
+            potentialConflicts?: string[] | null;
+            suggestedArtifact?: string | null;
+            boundary?: string | null;
+        };
+        BackendDependencyHealthCheck: {
+            checkId: string | null;
+            dependencyKind: components["schemas"]["BackendDependencyKind"];
+            status: components["schemas"]["BackendDependencyHealthStatus"];
+            safeSummary: string | null;
+            /** Format: date-time */
+            checkedUtc: string;
+            isReadOnlyCheck: boolean;
+            isRepairAction: boolean;
+            canMutateDependency: boolean;
+            canRestartDependency: boolean;
+            canRunMigration: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        BackendDependencyHealthStatus: 0 | 1 | 2 | 3 | 4;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        BackendDependencyKind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+        BackendOperationalHealthApiBoundary: {
+            readOnlyHealthCheck?: boolean;
+            healthIsReleaseReadiness?: boolean;
+            healthyIsApproval?: boolean;
+            dependencyStatusIsAuthority?: boolean;
+            recommendationIsExecution?: boolean;
+            reportIsBackendRepair?: boolean;
+            reportIsBackendRestart?: boolean;
+            reportIsMigrationExecution?: boolean;
+            reportIsWorkflowExecution?: boolean;
+            canRestartBackend?: boolean;
+            canRepairBackend?: boolean;
+            canRunMigration?: boolean;
+            canExecuteWorkflow?: boolean;
+            canInvokeTool?: boolean;
+            canDispatchAgent?: boolean;
+            canCallModel?: boolean;
+            canApproveRelease?: boolean;
+            canSatisfyPolicy?: boolean;
+            canPromoteMemory?: boolean;
+            canApplySource?: boolean;
+            canApplyPatch?: boolean;
+            exposesRawPayloads?: boolean;
+            exposesPrivateReasoning?: boolean;
+            exposesSensitiveValues?: boolean;
+        };
+        BackendOperationalHealthApiError: {
+            category: string | null;
+            code: string | null;
+            message: string | null;
+            field?: string | null;
+        };
+        BackendOperationalHealthRecommendation: {
+            recommendationId: string | null;
+            safeSummary: string | null;
+            supportingCheckIds: string[] | null;
+            isInvestigationOnly: boolean;
+            canMutateState: boolean;
+            canRestartBackend: boolean;
+            canRunMigration: boolean;
+            canExecuteWorkflow: boolean;
+            canApproveRelease: boolean;
+        };
+        BackendOperationalHealthReport: {
+            reportId: string | null;
+            status: components["schemas"]["BackendOperationalHealthStatus"];
+            /** Format: date-time */
+            generatedUtc: string;
+            projectReferenceId: string | null;
+            correlationId: string | null;
+            safeSummaryLines: string[] | null;
+            dependencyChecks: components["schemas"]["BackendDependencyHealthCheck"][] | null;
+            warnings: components["schemas"]["BackendOperationalHealthWarning"][] | null;
+            recommendations: components["schemas"]["BackendOperationalHealthRecommendation"][] | null;
+            boundaryWarnings: string[] | null;
+            isHealthReportOnly: boolean;
+            isReleaseReadiness: boolean;
+            isApproval: boolean;
+            isPolicySatisfaction: boolean;
+            isWorkflowExecution: boolean;
+            isBackendRepair: boolean;
+            isMigrationExecution: boolean;
+            canRestartBackend: boolean;
+            canRepairBackend: boolean;
+            canRunMigration: boolean;
+            canExecuteWorkflow: boolean;
+            canTransitionWorkflow: boolean;
+            canDispatchAgent: boolean;
+            canInvokeTool: boolean;
+            canCallModel: boolean;
+            canApproveRelease: boolean;
+            canSatisfyPolicy: boolean;
+            canPromoteMemory: boolean;
+            canApplySource: boolean;
+            canApplyPatch: boolean;
+            createsGovernanceEvent: boolean;
+            createsApprovalDecision: boolean;
+            createsPolicyDecision: boolean;
+            createsToolRequest: boolean;
+            createsDogfoodReceipt: boolean;
+            transitionsWorkflow: boolean;
+            callsModel: boolean;
+            invokesTool: boolean;
+            dispatchesAgent: boolean;
+            promotesMemory: boolean;
+        };
+        BackendOperationalHealthReportBackendOperationalHealthApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["BackendOperationalHealthReport"];
+            boundary: components["schemas"]["BackendOperationalHealthApiBoundary"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["BackendOperationalHealthApiError"][] | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        BackendOperationalHealthStatus: 0 | 1 | 2 | 3 | 4;
+        BackendOperationalHealthWarning: {
+            warningId: string | null;
+            kind: components["schemas"]["BackendOperationalHealthWarningKind"];
+            safeSummary: string | null;
+            isEvidenceOnly: boolean;
+            isFailureProof: boolean;
+            canRepair: boolean;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        BackendOperationalHealthWarningKind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        BatchMapRequestBody: {
+            ticketIds?: number[] | null;
+        };
+        BatchPlanRequestBody: {
+            mapId?: string | null;
+        };
+        BatchRunRequestBody: {
+            planId?: string | null;
         };
         BuildArchitectureReconciliation: {
             failureCategory?: string | null;
@@ -3190,6 +10800,13 @@ export interface components {
          * @enum {integer}
          */
         BuildReadinessStatus: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+        BuildScenario: {
+            scenarioId: string | null;
+            name: string | null;
+            discussionText: string | null;
+            runtimeProfileId: string | null;
+            verifications?: components["schemas"]["ScenarioVerification"][] | null;
+        };
         BuilderProposal: {
             /** Format: int64 */
             ticketId?: number;
@@ -3205,6 +10822,8 @@ export interface components {
             validationWarnings?: string[] | null;
             /** Format: date-time */
             generatedAt?: string;
+            modelProvider?: string | null;
+            modelName?: string | null;
             readonly hasValidationIssues?: boolean;
             readonly hasValidationWarnings?: boolean;
             readonly validationSummary?: string | null;
@@ -3220,6 +10839,16 @@ export interface components {
             testDuration?: string | null;
             reconciliation?: components["schemas"]["BuildArchitectureReconciliation"];
         };
+        /** @enum {string} */
+        ChatAuditSource: "NormalizedRows" | "TagsFallback" | "None";
+        /** @enum {string} */
+        ChatClarificationKind: "None" | "GeneralScope" | "ProductScope" | "MissingProjectContext" | "GovernanceIntent" | "SafetyOrRisk";
+        ChatClarificationState: {
+            required?: boolean;
+            kind?: components["schemas"]["ChatClarificationKind"];
+            questions?: string[] | null;
+            reason?: string | null;
+        };
         ChatCompletionRequest: {
             /** Format: int32 */
             projectId?: number;
@@ -3228,6 +10857,8 @@ export interface components {
             prompt?: string | null;
             activeModel?: string | null;
             mode?: string | null;
+            /** Format: int64 */
+            sourceMessageId?: number | null;
         };
         ChatCompletionResponse: {
             response?: string | null;
@@ -3236,7 +10867,47 @@ export interface components {
             linkedSymbols?: string | null;
             /** Format: int64 */
             traceId?: number | null;
+            mode?: string | null;
+            /** Format: double */
+            modeConfidence?: number | null;
+            modeReason?: string | null;
+            clarification?: components["schemas"]["ChatClarificationState"];
+            gate?: components["schemas"]["ChatGovernanceGate"];
+            reasoningTrace?: string[] | null;
+            disambiguationQuestion?: string | null;
+            reasoningSummary?: string | null;
+            dogfoodTraceId?: string | null;
+            dogfoodTracePath?: string | null;
+            routeSource?: string | null;
+            routeChallenge?: components["schemas"]["ChatRouteChallenge"];
+            baDraft?: components["schemas"]["BaWorkingDraft"];
+            documentSources?: components["schemas"]["ChatDocumentSource"][] | null;
         };
+        ChatDocumentSource: {
+            /** Format: int64 */
+            documentId?: number;
+            /** Format: int64 */
+            documentVersionId?: number;
+            title?: string | null;
+            documentType?: string | null;
+            versionLabel?: string | null;
+            status?: string | null;
+            boundary?: string | null;
+        };
+        ChatGovernanceGate: {
+            mode?: components["schemas"]["ChatGovernanceMode"];
+            canSaveDiscussion?: boolean;
+            canCreateTicket?: boolean;
+            canViewSources?: boolean;
+            canCopyMarkdown?: boolean;
+            reason?: string | null;
+            /** Format: double */
+            confidence?: number;
+            governanceActions?: string[] | null;
+            readonly showGovernanceActions?: boolean;
+        };
+        /** @enum {string} */
+        ChatGovernanceMode: "Exploration" | "Formalization" | "Confirmation";
         ChatMessage: {
             /** Format: int64 */
             id?: number;
@@ -3252,6 +10923,11 @@ export interface components {
             contextSummary?: string | null;
             linkedFilePaths?: string | null;
             linkedSymbols?: string | null;
+            /** Format: int64 */
+            replyToMessageId?: number | null;
+            documentVersionIds?: number[] | null;
+            documentSources?: components["schemas"]["ChatDocumentSource"][] | null;
+            sourceAttachedBy?: string | null;
             /** Format: date-time */
             createdDate?: string;
         };
@@ -3272,6 +10948,33 @@ export interface components {
             /** Format: date-time */
             createdDate?: string;
         };
+        ChatRouteChallenge: {
+            suggestedMode?: components["schemas"]["ChatGovernanceMode"];
+            suggestedRequestKind?: components["schemas"]["ContextRequestKind"];
+            /** Format: double */
+            confidence?: number;
+            reason?: string | null;
+        };
+        ChatTurnAuditResponse: {
+            /** Format: int64 */
+            chatMessageId?: number;
+            source?: components["schemas"]["ChatAuditSource"];
+            mode?: components["schemas"]["ChatGovernanceMode"];
+            /** Format: double */
+            modeConfidence?: number;
+            modeReason?: string | null;
+            clarification?: components["schemas"]["ChatClarificationState"];
+            gate?: components["schemas"]["ChatGovernanceGate"];
+            routeTraceId?: string | null;
+            dogfoodTraceId?: string | null;
+            contextSummary?: string | null;
+            linkedFilePaths?: string | null;
+            linkedSymbols?: string | null;
+            isFallbackEvidence?: boolean;
+            routeSource?: string | null;
+            routeChallenge?: components["schemas"]["ChatRouteChallenge"];
+            baDraft?: components["schemas"]["BaWorkingDraft"];
+        };
         CodeChangeProposal: {
             /** Format: int64 */
             ticketId?: number;
@@ -3282,6 +10985,8 @@ export interface components {
             originalRequest?: string | null;
             standardsCompliance?: string | null;
             fileChanges?: components["schemas"]["FileChangeProposal"][] | null;
+            modelProvider?: string | null;
+            modelName?: string | null;
         };
         CodeIndexEntry: {
             /** Format: int64 */
@@ -3317,6 +11022,11 @@ export interface components {
             directoryNotFound?: boolean;
             errorMessage?: string | null;
             readonly isEmpty?: boolean;
+        };
+        CodeStandardsEvidence: {
+            status?: string | null;
+            summary?: string | null;
+            evidencePath?: string | null;
         };
         CodebaseTicketDraft: {
             title?: string | null;
@@ -3360,6 +11070,75 @@ export interface components {
             indexWarningCount?: number;
             indexWarnings?: string[] | null;
         };
+        CommandEvidence: {
+            command: string | null;
+            exitCode?: string | null;
+            stdoutPath?: string | null;
+            stderrPath?: string | null;
+            durationMs?: string | null;
+        };
+        ConfirmBaWorkingDraftRequest: {
+            /** Format: int64 */
+            sourceChatSessionId?: number | null;
+            draft?: components["schemas"]["BaWorkingDraft"];
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ContextRequestKind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+        ControlledActionRequestCreateRequest: {
+            requestId: string | null;
+            operationId: string | null;
+            requestKind: string | null;
+            repository: string | null;
+            branch: string | null;
+            runId: string | null;
+            patchPackageId?: string | null;
+            patchHash?: string | null;
+            proposedFilePaths?: string[] | null;
+            sourceApplyReceiptRef?: string | null;
+            commitPackageId?: string | null;
+            commitMessageEvidenceRef?: string | null;
+            commitSha?: string | null;
+            remoteTarget?: string | null;
+            pushIntent?: string | null;
+            headBranch?: string | null;
+            baseBranch?: string | null;
+            pushedCommitSha?: string | null;
+            draftPullRequestPackageId?: string | null;
+            pullRequestTextPackageRef?: string | null;
+            rollbackTargetReceiptRef?: string | null;
+            rollbackScopePaths?: string[] | null;
+            humanIntent: string | null;
+            evidenceRefs: string[] | null;
+            receiptRefs: string[] | null;
+            /** Format: date-time */
+            requestedAtUtc: string;
+        };
+        ControlledActionRequestCreateResponse: {
+            requestId: string | null;
+            operationId: string | null;
+            requestKind: string | null;
+            state: string | null;
+            blockedReasons: string[] | null;
+            missingEvidence: string[] | null;
+            nextSafeActions: string[] | null;
+            forbiddenActions: string[] | null;
+            evidenceRefs: string[] | null;
+            receiptRefs: string[] | null;
+            authorityWarnings: string[] | null;
+            boundary: components["schemas"]["FrontendActionRequestBoundary"];
+            requestCreated: boolean;
+            executionStarted: boolean;
+            sourceMutated: boolean;
+            workflowContinued: boolean;
+        };
+        CreateProjectChannelRequest: {
+            name?: string | null;
+            description?: string | null;
+            visibility?: string | null;
+        };
         CreateProjectDocumentRequest: {
             /** Format: int32 */
             projectId?: number;
@@ -3368,6 +11147,7 @@ export interface components {
             contentMarkdown?: string | null;
             changeSummary?: string | null;
             createdBy?: string | null;
+            description?: string | null;
             sourceEntityType?: string | null;
             /** Format: int64 */
             sourceEntityId?: number | null;
@@ -3382,11 +11162,148 @@ export interface components {
             acceptanceCriteria?: string[] | null;
             externalReferences?: components["schemas"]["ExternalReferenceDto"][] | null;
             provenance?: components["schemas"]["TicketProvenanceDto"];
+            linkedFilePaths?: string[] | null;
+        };
+        CreateTenantUserRequest: {
+            email?: string | null;
+            displayName?: string | null;
+            password?: string | null;
+            role?: string | null;
+        };
+        CreateTicketFromDocumentRequest: {
+            requestedTitle?: string | null;
+        };
+        CreateTicketFromDocumentResponse: {
+            /** Format: int64 */
+            ticketId: number;
+            /** Format: int64 */
+            sourceDocumentVersionId: number;
         };
         DetectProfileRequest: {
             projectRoot?: string | null;
             /** Format: int32 */
             projectId?: number;
+        };
+        DogfoodLoopBoundaryStatusDto: {
+            dogfoodReceiptIsReleaseApproval?: boolean;
+            dogfoodLoopIsAutonomousWorkflow?: boolean;
+            toolExecuted?: boolean;
+            requestApproved?: boolean;
+            gateExecuted?: boolean;
+            gateIsExecutor?: boolean;
+            sourceApplied?: boolean;
+            memoryPromoted?: boolean;
+            collectiveMemoryWritten?: boolean;
+            vectorAuthorityWritten?: boolean;
+            auditIsApproval?: boolean;
+            modelOutputIsAuthority?: boolean;
+            endpointAccessIsExecutionPermission?: boolean;
+            apiResponseStatusIsGovernance?: boolean;
+            durable?: boolean;
+            containsNonDurableReferences?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        DogfoodLoopCreateRequestDto: {
+            /** Format: int32 */
+            projectId?: number;
+            summary?: string | null;
+            goal?: string | null;
+            agentRunIds?: string[] | null;
+            criticReviewRunIds?: string[] | null;
+            memoryImprovementRunIds?: string[] | null;
+            toolRequestIds?: string[] | null;
+            toolGateDecisionIds?: string[] | null;
+            evidenceRefs?: components["schemas"]["DogfoodLoopEvidenceReferenceDto"][] | null;
+            observations?: string[] | null;
+            blockedReasons?: string[] | null;
+            correlationId?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        DogfoodLoopCreateResponseDto: {
+            dogfoodLoopId: string | null;
+            runId: string | null;
+            receiptId: string | null;
+            evidenceId: string | null;
+            receiptOnly?: boolean;
+            durable?: boolean;
+            containsNonDurableReferences?: boolean;
+            summary: string | null;
+            goal: string | null;
+            durabilityWarnings?: string[] | null;
+            knownLimitations?: string[] | null;
+            warnings?: string[] | null;
+        };
+        DogfoodLoopCreateResponseDtoDogfoodLoopApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["DogfoodLoopCreateResponseDto"];
+            dogfoodLoopId?: string | null;
+            runId?: string | null;
+            receiptId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["DogfoodLoopBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["DogfoodLoopErrorDto"][] | null;
+        };
+        DogfoodLoopErrorDto: {
+            category: string | null;
+            code: string | null;
+            message: string | null;
+            field?: string | null;
+        };
+        DogfoodLoopEvidenceReferenceDto: {
+            refType?: string | null;
+            refId?: string | null;
+            summary?: string | null;
+            source?: string | null;
+        };
+        DogfoodLoopReceiptDto: {
+            dogfoodLoopId: string | null;
+            runId: string | null;
+            receiptId: string | null;
+            evidenceId: string | null;
+            projectId: string | null;
+            summary: string | null;
+            goal: string | null;
+            observations?: string[] | null;
+            blockedReasons?: string[] | null;
+            referencedAgentRuns?: components["schemas"]["DogfoodLoopReferenceDto"][] | null;
+            referencedCriticReviews?: components["schemas"]["DogfoodLoopReferenceDto"][] | null;
+            referencedMemoryImprovements?: components["schemas"]["DogfoodLoopReferenceDto"][] | null;
+            referencedToolRequests?: components["schemas"]["DogfoodLoopReferenceDto"][] | null;
+            referencedGateDecisions?: components["schemas"]["DogfoodLoopReferenceDto"][] | null;
+            evidenceRefs?: components["schemas"]["DogfoodLoopReferenceDto"][] | null;
+            durable?: boolean;
+            containsNonDurableReferences?: boolean;
+            durabilityWarnings?: string[] | null;
+            knownLimitations?: string[] | null;
+            /** Format: date-time */
+            createdAtUtc?: string;
+            warnings?: string[] | null;
+        };
+        DogfoodLoopReceiptDtoDogfoodLoopApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["DogfoodLoopReceiptDto"];
+            dogfoodLoopId?: string | null;
+            runId?: string | null;
+            receiptId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["DogfoodLoopBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["DogfoodLoopErrorDto"][] | null;
+        };
+        DogfoodLoopReferenceDto: {
+            refType: string | null;
+            refId: string | null;
+            summary: string | null;
+            durable?: boolean;
+            backendRecorded?: boolean;
+            source: string | null;
         };
         DraftTicket: {
             /** Format: int64 */
@@ -3444,12 +11361,490 @@ export interface components {
             message?: string | null;
             resolvedPath?: string | null;
         };
+        FindingDispositionBody: {
+            disposition?: string | null;
+            reason?: string | null;
+        };
+        FrontendActionRequestBoundary: {
+            canCreateRequest?: boolean;
+            canApprove?: boolean;
+            canAcceptApproval?: boolean;
+            canSatisfyPolicy?: boolean;
+            canExecute?: boolean;
+            canMutateSource?: boolean;
+            canRollback?: boolean;
+            canCommit?: boolean;
+            canPush?: boolean;
+            canCreatePullRequest?: boolean;
+            canMarkReadyForReview?: boolean;
+            canMerge?: boolean;
+            canRelease?: boolean;
+            canDeploy?: boolean;
+            canPromoteMemory?: boolean;
+            canContinueWorkflow?: boolean;
+        };
+        FrontendEvidenceMetadataReadModel: {
+            evidenceRef: string | null;
+            evidenceKind: string | null;
+            summary: string | null;
+            referenceOnly?: boolean;
+            containsRawPayload?: boolean;
+            warnings: string[] | null;
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            /** Format: date-time */
+            observedAtUtc?: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            freshnessKnown?: boolean;
+        };
+        FrontendEvidenceMetadataReadModelFrontendReadinessApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["FrontendEvidenceMetadataReadModel"];
+            readState: components["schemas"]["FrontendReadinessReadState"];
+            freshness: components["schemas"]["FrontendReadinessFreshnessState"];
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            mutationOccurred?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["FrontendReadinessApiError"][] | null;
+        };
+        FrontendOperationStatusReadModel: {
+            operationId: string | null;
+            operationKind: string | null;
+            subject: string | null;
+            state: string | null;
+            blockedReasons: string[] | null;
+            missingEvidence: string[] | null;
+            nextSafeActions: string[] | null;
+            forbiddenActions: string[] | null;
+            evidenceRefs: string[] | null;
+            receiptRefs: string[] | null;
+            authorityWarnings: string[] | null;
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            /** Format: date-time */
+            observedAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+        };
+        FrontendOperationStatusReadModelFrontendReadinessApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["FrontendOperationStatusReadModel"];
+            readState: components["schemas"]["FrontendReadinessReadState"];
+            freshness: components["schemas"]["FrontendReadinessFreshnessState"];
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            mutationOccurred?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["FrontendReadinessApiError"][] | null;
+        };
+        FrontendOperationTimelineReadModel: {
+            operationId: string | null;
+            entries: components["schemas"]["FrontendTimelineEntry"][] | null;
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            /** Format: date-time */
+            observedAtUtc?: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            freshnessKnown?: boolean;
+        };
+        FrontendOperationTimelineReadModelFrontendReadinessApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["FrontendOperationTimelineReadModel"];
+            readState: components["schemas"]["FrontendReadinessReadState"];
+            freshness: components["schemas"]["FrontendReadinessFreshnessState"];
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            mutationOccurred?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["FrontendReadinessApiError"][] | null;
+        };
+        FrontendPatchPackageArtifactsReadModel: {
+            packageId: string | null;
+            repository: string | null;
+            branch: string | null;
+            runId: string | null;
+            patchHash: string | null;
+            patchDiffText: string | null;
+            reviewSummaryText: string | null;
+            knownRisksText: string | null;
+            validationSummaryText: string | null;
+            validationOutcome: string | null;
+            whatRan: string[] | null;
+            whatPassed: string[] | null;
+            whatFailed: string[] | null;
+            whatWasSkipped: string[] | null;
+            validationIsStale: boolean;
+            proposedFilePaths: string[] | null;
+            artifactRefs: string[] | null;
+            evidenceRefs: string[] | null;
+            receiptRefs: string[] | null;
+            authorityWarnings: string[] | null;
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            /** Format: date-time */
+            observedAtUtc?: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            freshnessKnown?: boolean;
+        };
+        FrontendPatchPackageArtifactsReadModelFrontendReadinessApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["FrontendPatchPackageArtifactsReadModel"];
+            readState: components["schemas"]["FrontendReadinessReadState"];
+            freshness: components["schemas"]["FrontendReadinessFreshnessState"];
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            mutationOccurred?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["FrontendReadinessApiError"][] | null;
+        };
+        FrontendPatchPackageMetadataReadModel: {
+            packageId: string | null;
+            repository: string | null;
+            branch: string | null;
+            runId: string | null;
+            patchHash: string | null;
+            proposedFilePaths: string[] | null;
+            artifactRefs: string[] | null;
+            evidenceRefs: string[] | null;
+            receiptRefs: string[] | null;
+            reviewSummaryRef: string | null;
+            knownRisksRef: string | null;
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            /** Format: date-time */
+            observedAtUtc?: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            freshnessKnown?: boolean;
+        };
+        FrontendPatchPackageMetadataReadModelFrontendReadinessApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["FrontendPatchPackageMetadataReadModel"];
+            readState: components["schemas"]["FrontendReadinessReadState"];
+            freshness: components["schemas"]["FrontendReadinessFreshnessState"];
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            mutationOccurred?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["FrontendReadinessApiError"][] | null;
+        };
+        FrontendReadBoundary: {
+            readOnly?: boolean;
+            statusOnly?: boolean;
+            canCreateApproval?: boolean;
+            canAcceptApproval?: boolean;
+            canSatisfyPolicy?: boolean;
+            canExecute?: boolean;
+            canMutateSource?: boolean;
+            canRollback?: boolean;
+            canCommit?: boolean;
+            canPush?: boolean;
+            canCreatePullRequest?: boolean;
+            canMarkReadyForReview?: boolean;
+            canMerge?: boolean;
+            canRelease?: boolean;
+            canDeploy?: boolean;
+            canPromoteMemory?: boolean;
+            canContinueWorkflow?: boolean;
+        };
+        FrontendReadinessApiError: {
+            category: string | null;
+            code: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        /** @enum {string} */
+        FrontendReadinessFreshnessKind: "Current" | "Stale" | "Expired" | "Unknown" | "NotApplicable";
+        FrontendReadinessFreshnessState: {
+            kind: components["schemas"]["FrontendReadinessFreshnessKind"];
+            freshnessKnown: boolean;
+            isStale: boolean;
+            isExpired: boolean;
+            /** Format: date-time */
+            observedAtUtc?: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            /** Format: date-time */
+            evaluatedAtUtc: string;
+            reasons: string[] | null;
+            warnings: string[] | null;
+        };
+        FrontendReadinessReadState: {
+            kind: components["schemas"]["FrontendReadinessReadStateKind"];
+            hasData: boolean;
+            isFinal: boolean;
+            isFallback: boolean;
+            isRedacted: boolean;
+            isStale: boolean;
+            isExpired: boolean;
+            isAuthorityGrant: boolean;
+            allowsMutation: boolean;
+            freshness: components["schemas"]["FrontendReadinessFreshnessState"];
+            reasons: string[] | null;
+            missingRefs: string[] | null;
+            warnings: string[] | null;
+            nextSafeActions: string[] | null;
+            boundary: components["schemas"]["FrontendReadBoundary"];
+        };
+        /** @enum {string} */
+        FrontendReadinessReadStateKind: "Available" | "NotFound" | "Empty" | "Redacted" | "Unavailable" | "Invalid" | "Expired" | "Stale" | "NotVisible" | "Unknown";
+        FrontendReceiptMetadataReadModel: {
+            receiptRef: string | null;
+            receiptKind: string | null;
+            summary: string | null;
+            referenceOnly?: boolean;
+            grantsAuthority?: boolean;
+            continuesWorkflow?: boolean;
+            warnings: string[] | null;
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            /** Format: date-time */
+            observedAtUtc?: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            freshnessKnown?: boolean;
+        };
+        FrontendReceiptMetadataReadModelFrontendReadinessApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["FrontendReceiptMetadataReadModel"];
+            readState: components["schemas"]["FrontendReadinessReadState"];
+            freshness: components["schemas"]["FrontendReadinessFreshnessState"];
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            mutationOccurred?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["FrontendReadinessApiError"][] | null;
+        };
+        FrontendTimelineEntry: {
+            entryId: string | null;
+            eventKind: string | null;
+            summary: string | null;
+            evidenceRefs: string[] | null;
+            receiptRefs: string[] | null;
+            /** Format: date-time */
+            observedAtUtc: string;
+        };
+        FrontendValidationResultMetadataReadModel: {
+            validationResultId: string | null;
+            repository: string | null;
+            branch: string | null;
+            runId: string | null;
+            patchHash: string | null;
+            outcome: string | null;
+            whatRan: string[] | null;
+            whatPassed: string[] | null;
+            whatFailed: string[] | null;
+            whatWasSkipped: string[] | null;
+            isStale: boolean;
+            evidenceRefs: string[] | null;
+            receiptRefs: string[] | null;
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            /** Format: date-time */
+            observedAtUtc?: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            freshnessKnown?: boolean;
+        };
+        FrontendValidationResultMetadataReadModelFrontendReadinessApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["FrontendValidationResultMetadataReadModel"];
+            readState: components["schemas"]["FrontendReadinessReadState"];
+            freshness: components["schemas"]["FrontendReadinessFreshnessState"];
+            boundary: components["schemas"]["FrontendReadBoundary"];
+            mutationOccurred?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["FrontendReadinessApiError"][] | null;
+        };
         GenerateTicketFromDiscussionRequest: {
             discussion?: string | null;
             title?: string | null;
             type?: string | null;
             priority?: string | null;
             provenance?: components["schemas"]["TicketProvenanceDto"];
+        };
+        GeneratedCodeFile: {
+            relativePath: string | null;
+            content: string | null;
+            sha256: string | null;
+        };
+        GovernedReleaseGateApiBoundary: {
+            releaseReadinessGateRan?: boolean;
+            decisionRecordStored?: boolean;
+            releaseStateMutated?: boolean;
+            workflowStateMutated?: boolean;
+            sourceStateMutated?: boolean;
+            gitStateMutated?: boolean;
+            releaseApproved?: boolean;
+            deploymentApproved?: boolean;
+            mergeApproved?: boolean;
+            releaseExecuted?: boolean;
+            sourceApplyExecuted?: boolean;
+            rollbackExecuted?: boolean;
+            workflowContinued?: boolean;
+            gitOperationExecuted?: boolean;
+            humanReviewRequired?: boolean;
+            boundary?: string | null;
+        };
+        GovernedReleaseGateApiDecisionRecord: {
+            /** Format: uuid */
+            releaseReadinessDecisionRecordId?: string;
+            /** Format: uuid */
+            projectId?: string;
+            /** Format: uuid */
+            releaseReadinessReportId?: string;
+            releaseReadinessReportHash?: string | null;
+            workflowRunId?: string | null;
+            workflowStepId?: string | null;
+            subjectKind?: string | null;
+            subjectId?: string | null;
+            subjectHash?: string | null;
+            decisionStatus?: string | null;
+            releaseReadinessEvidenceSatisfied?: boolean;
+            releaseApproved?: boolean;
+            deploymentApproved?: boolean;
+            mergeApproved?: boolean;
+            sourceApplyExecutedByDecision?: boolean;
+            rollbackExecutedByDecision?: boolean;
+            workflowMutatedByDecision?: boolean;
+            gitOperationExecutedByDecision?: boolean;
+            releaseExecutedByDecision?: boolean;
+            humanReviewRequiredForReleaseApproval?: boolean;
+            humanReviewRequiredForDeployment?: boolean;
+            humanReviewRequiredForMerge?: boolean;
+            /** Format: date-time */
+            decidedAtUtc?: string;
+            releaseReadinessDecisionRecordHash?: string | null;
+        };
+        GovernedReleaseGateApiEnvelope: {
+            status?: string | null;
+            data?: components["schemas"]["GovernedReleaseGateApiResult"];
+            errors?: components["schemas"]["GovernedReleaseGateApiError"][] | null;
+            warnings?: string[] | null;
+            boundary?: components["schemas"]["GovernedReleaseGateApiBoundary"];
+        };
+        GovernedReleaseGateApiError: {
+            code?: string | null;
+            field?: string | null;
+            message?: string | null;
+        };
+        GovernedReleaseGateApiResult: {
+            /** Format: uuid */
+            governedReleaseGateRequestId?: string;
+            /** Format: uuid */
+            projectId?: string;
+            succeeded?: boolean;
+            status?: string | null;
+            releaseReadinessGateRan?: boolean;
+            decisionRecordStored?: boolean;
+            decisionRecord?: components["schemas"]["GovernedReleaseGateApiDecisionRecord"];
+            releaseReadinessEvidenceSatisfied?: boolean;
+            releaseApproved?: boolean;
+            deploymentApproved?: boolean;
+            mergeApproved?: boolean;
+            releaseExecuted?: boolean;
+            sourceApplyExecuted?: boolean;
+            rollbackExecuted?: boolean;
+            workflowContinued?: boolean;
+            workflowMutated?: boolean;
+            gitOperationExecuted?: boolean;
+            humanReviewRequiredForReleaseApproval?: boolean;
+            humanReviewRequiredForDeployment?: boolean;
+            humanReviewRequiredForMerge?: boolean;
+            /** Format: date-time */
+            completedAtUtc?: string;
+        };
+        GovernedReleaseGateRequest: {
+            /** Format: uuid */
+            governedReleaseGateRequestId: string;
+            /** Format: uuid */
+            projectId: string;
+            releaseReadinessReport: components["schemas"]["ReleaseReadinessReport"];
+            requestedBy: string | null;
+            /** Format: date-time */
+            requestedAtUtc: string;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary?: string | null;
+        };
+        GovernedWorkflowContinuationApiBoundary: {
+            workflowContinuationIsReleaseReadiness?: boolean;
+            workflowContinuationApprovesRelease?: boolean;
+            workflowContinuationExecutesSourceApply?: boolean;
+            workflowContinuationExecutesRollback?: boolean;
+            workflowContinuationSatisfiesPolicy?: boolean;
+            workflowContinuationCallsAgentsModelsToolsGitMemoryOrRetrieval?: boolean;
+            humanReviewRequiredForReleaseReadinessAndApproval?: boolean;
+            boundary?: string | null;
+        };
+        GovernedWorkflowContinuationApiEnvelope: {
+            status?: string | null;
+            data?: components["schemas"]["GovernedWorkflowContinuationApiResult"];
+            errors?: components["schemas"]["GovernedWorkflowContinuationApiError"][] | null;
+            warnings?: string[] | null;
+            boundary?: components["schemas"]["GovernedWorkflowContinuationApiBoundary"];
+        };
+        GovernedWorkflowContinuationApiError: {
+            code?: string | null;
+            field?: string | null;
+            message?: string | null;
+        };
+        GovernedWorkflowContinuationApiResult: {
+            status?: string | null;
+            succeeded?: boolean;
+            workflowStateMutated?: boolean;
+            stepCompleted?: boolean;
+            nextStepStarted?: boolean;
+            releaseReadinessInferred?: boolean;
+            releaseApproved?: boolean;
+            sourceApplyExecuted?: boolean;
+            rollbackExecuted?: boolean;
+            workflowTransitionRecord?: components["schemas"]["GovernedWorkflowContinuationApiTransitionRecord"];
+        };
+        GovernedWorkflowContinuationApiTransitionRecord: {
+            /** Format: uuid */
+            workflowTransitionRecordId?: string;
+            workflowTransitionRecordHash?: string | null;
+            workflowRunId?: string | null;
+            workflowStepId?: string | null;
+            transitionKind?: string | null;
+            /** Format: uuid */
+            workflowContinuationGateEvaluationId?: string;
+            workflowContinuationGateEvaluationHash?: string | null;
+            /** Format: uuid */
+            sourceApplyRequestId?: string;
+            sourceApplyRequestHash?: string | null;
+            /** Format: uuid */
+            sourceApplyReceiptId?: string;
+            sourceApplyReceiptHash?: string | null;
+            /** Format: uuid */
+            rollbackExecutionReceiptId?: string | null;
+            rollbackExecutionReceiptHash?: string | null;
+            workflowStateMutated?: boolean;
+            stepCompleted?: boolean;
+            nextStepStarted?: boolean;
+            releaseReadinessInferred?: boolean;
+            releaseApproved?: boolean;
+            sourceApplyExecuted?: boolean;
+            rollbackExecuted?: boolean;
+            /** Format: date-time */
+            transitionedAtUtc?: string;
+        };
+        GovernedWorkflowContinuationRequest: {
+            /** Format: uuid */
+            governedWorkflowContinuationRequestId: string;
+            /** Format: uuid */
+            projectId: string;
+            workflowRunId: string | null;
+            currentWorkflowStepId: string | null;
+            nextWorkflowStepId?: string | null;
+            transitionKind: string | null;
+            expectedWorkflowStateHash: string | null;
+            expectedCurrentStepStateHash: string | null;
+            workflowContinuationGateEvaluation: components["schemas"]["WorkflowContinuationGateEvaluation"];
+            workflowContinuationGateEvaluationHash: string | null;
+            acceptedApproval: components["schemas"]["AcceptedApprovalRecord"];
+            policySatisfaction: components["schemas"]["PolicySatisfactionRecord"];
+            sourceApplyRequest: components["schemas"]["SourceApplyRequest"];
+            sourceApplyReceipt: components["schemas"]["SourceApplyReceipt"];
+            rollbackExecutionReceipt?: components["schemas"]["RollbackExecutionReceipt"];
+            rollbackExecutionAuditReport?: components["schemas"]["RollbackExecutionAuditReport"];
+            /** Format: date-time */
+            requestedAtUtc?: string;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary?: string | null;
         };
         ImportExternalTicketRequest: {
             title?: string | null;
@@ -3474,17 +11869,530 @@ export interface components {
             linkType?: string | null;
             createdBy?: string | null;
         };
+        LinkedPromotionPackageSummaryDto: {
+            packageId?: string | null;
+            proposedChangeId?: string | null;
+            approvalState?: string | null;
+            recommendation?: string | null;
+            runtimeProfile?: string | null;
+            targetLanguage?: string | null;
+            /** Format: int32 */
+            filesToPromoteCount?: number | null;
+            /** Format: int32 */
+            filesBlockedCount?: number | null;
+            /** Format: int32 */
+            activeRepoMutationCount?: number | null;
+            sourceRunId?: string | null;
+        };
+        LinkedRunSummaryDto: {
+            runId?: string | null;
+            traceId?: string | null;
+            title?: string | null;
+            status?: string | null;
+            recommendation?: string | null;
+            /** Format: date-time */
+            startedUtc?: string | null;
+            /** Format: date-time */
+            completedUtc?: string | null;
+        };
         LoginRequest: {
             email?: string | null;
             password?: string | null;
         };
+        ManualCriticApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            message: string | null;
+            field?: string | null;
+        };
+        ManualCriticBoundaryStatusDto: {
+            criticIsGovernance?: boolean;
+            criticIsApproval?: boolean;
+            auditIsApproval?: boolean;
+            proposalWasApplied?: boolean;
+            sourceApplied?: boolean;
+            memoryPromoted?: boolean;
+            toolExecuted?: boolean;
+            modelOutputIsAuthority?: boolean;
+            endpointAccessIsExecutionPermission?: boolean;
+            apiResponseStatusIsGovernance?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        ManualCriticFindingDto: {
+            findingId: string | null;
+            severity: string | null;
+            title: string | null;
+            problem: string | null;
+            whyItMatters: string | null;
+            requiredFix: string | null;
+            evidenceRefs?: string[] | null;
+            blocksMerge?: boolean;
+            requiresHumanReview?: boolean;
+        };
+        ManualCriticReviewDetailDto: {
+            projectId: string | null;
+            agentRunId: string | null;
+            reviewId: string | null;
+            status: string | null;
+            agentId: string | null;
+            agentName: string | null;
+            requestSummary: string | null;
+            purpose: string | null;
+            /** Format: date-time */
+            createdAtUtc?: string;
+            /** Format: date-time */
+            completedAtUtc?: string | null;
+            inputSummaries?: string[] | null;
+            outputSummaries?: string[] | null;
+            thoughtLedgerSummaries?: string[] | null;
+            evidenceRefs?: string[] | null;
+            reviewOnlyOutput?: boolean;
+            createsAuthority?: boolean;
+            createsRuntimeAction?: boolean;
+            boundaryBlocks?: boolean;
+            safetySummary: components["schemas"]["AgentRunSafetySummaryDto"];
+            advisoryOnly?: boolean;
+            requiresHumanReview?: boolean;
+            warnings?: string[] | null;
+        };
+        ManualCriticReviewDetailDtoManualCriticApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ManualCriticReviewDetailDto"];
+            runId?: string | null;
+            reviewId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["ManualCriticBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ManualCriticApiErrorDto"][] | null;
+        };
+        ManualCriticReviewRequestDto: {
+            /** Format: int32 */
+            projectId?: number;
+            subjectType?: string | null;
+            subjectId?: string | null;
+            summary?: string | null;
+            content?: string | null;
+            evidenceRefs?: string[] | null;
+            context?: string | null;
+            severityHint?: string | null;
+            correlationId?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        ManualCriticReviewResponseDto: {
+            agentRunId: string | null;
+            reviewId: string | null;
+            reviewRequestId: string | null;
+            status: string | null;
+            verdict: string | null;
+            /** Format: date-time */
+            reviewedAtUtc?: string | null;
+            /** Format: int32 */
+            findingCount?: number;
+            findings?: components["schemas"]["ManualCriticFindingDto"][] | null;
+            evidenceRefs?: string[] | null;
+            mutationOccurred?: boolean;
+            advisoryOnly?: boolean;
+            requiresHumanReview?: boolean;
+            warnings?: string[] | null;
+        };
+        ManualCriticReviewResponseDtoManualCriticApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ManualCriticReviewResponseDto"];
+            runId?: string | null;
+            reviewId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["ManualCriticBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ManualCriticApiErrorDto"][] | null;
+        };
+        ManualMemoryImprovementApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            message: string | null;
+            field?: string | null;
+        };
+        ManualMemoryImprovementBoundaryStatusDto: {
+            memoryImprovementIsPromotion?: boolean;
+            memoryProposalIsPromotion?: boolean;
+            memorySafeIsApproval?: boolean;
+            candidateIsMemory?: boolean;
+            retrievalMatchIsMemoryCandidate?: boolean;
+            auditIsApproval?: boolean;
+            sourceApplied?: boolean;
+            memoryPromoted?: boolean;
+            collectiveMemoryWritten?: boolean;
+            vectorAuthorityWritten?: boolean;
+            toolExecuted?: boolean;
+            modelOutputIsAuthority?: boolean;
+            endpointAccessIsExecutionPermission?: boolean;
+            apiResponseStatusIsGovernance?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+        };
+        ManualMemoryImprovementDetailDto: {
+            projectId: string | null;
+            agentRunId: string | null;
+            detectionResultId: string | null;
+            proposalIds?: string[] | null;
+            status: string | null;
+            agentId: string | null;
+            agentName: string | null;
+            requestSummary: string | null;
+            purpose: string | null;
+            /** Format: date-time */
+            createdAtUtc?: string;
+            /** Format: date-time */
+            completedAtUtc?: string | null;
+            inputSummaries?: string[] | null;
+            outputSummaries?: string[] | null;
+            thoughtLedgerSummaries?: string[] | null;
+            evidenceRefs?: string[] | null;
+            proposalOnlyOutput?: boolean;
+            createsAuthority?: boolean;
+            createsRuntimeAction?: boolean;
+            boundaryBlocks?: boolean;
+            safetySummary: components["schemas"]["AgentRunSafetySummaryDto"];
+            proposalOnly?: boolean;
+            requiresHumanReview?: boolean;
+            warnings?: string[] | null;
+        };
+        ManualMemoryImprovementDetailDtoManualMemoryImprovementApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ManualMemoryImprovementDetailDto"];
+            runId?: string | null;
+            proposalId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["ManualMemoryImprovementBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ManualMemoryImprovementApiErrorDto"][] | null;
+        };
+        ManualMemoryImprovementPatternDto: {
+            patternFindingId: string | null;
+            patternType: string | null;
+            summary: string | null;
+            /** Format: double */
+            confidence?: number;
+            evidenceRefs?: string[] | null;
+            relatedMemoryIds?: string[] | null;
+            relatedProposalIds?: string[] | null;
+            isDuplicateCandidate?: boolean;
+            requiresHumanReview?: boolean;
+        };
+        ManualMemoryImprovementProposalDto: {
+            proposalDraftId: string | null;
+            title: string | null;
+            summary: string | null;
+            rationale: string | null;
+            evidenceRefs?: string[] | null;
+            isProposalOnly?: boolean;
+            createsCollectiveMemory?: boolean;
+            promotesMemory?: boolean;
+            requiresHumanReview?: boolean;
+        };
+        ManualMemoryImprovementRequestDto: {
+            /** Format: int32 */
+            projectId?: number;
+            sourceType?: string | null;
+            sourceId?: string | null;
+            summary?: string | null;
+            content?: string | null;
+            evidenceRefs?: string[] | null;
+            context?: string | null;
+            candidateType?: string | null;
+            correlationId?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        ManualMemoryImprovementResponseDto: {
+            agentRunId: string | null;
+            detectionResultId: string | null;
+            status: string | null;
+            /** Format: date-time */
+            detectedAtUtc?: string | null;
+            /** Format: int32 */
+            patternCount?: number;
+            /** Format: int32 */
+            proposalCount?: number;
+            proposalIds?: string[] | null;
+            patterns?: components["schemas"]["ManualMemoryImprovementPatternDto"][] | null;
+            proposals?: components["schemas"]["ManualMemoryImprovementProposalDto"][] | null;
+            evidenceRefs?: string[] | null;
+            mutationOccurred?: boolean;
+            proposalOnly?: boolean;
+            requiresHumanReview?: boolean;
+            warnings?: string[] | null;
+        };
+        ManualMemoryImprovementResponseDtoManualMemoryImprovementApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ManualMemoryImprovementResponseDto"];
+            runId?: string | null;
+            proposalId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["ManualMemoryImprovementBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ManualMemoryImprovementApiErrorDto"][] | null;
+        };
         MarkIndexStaleRequest: {
             reason?: string | null;
+        };
+        MemoryReindexResponseDto: {
+            /** Format: int32 */
+            projectId?: number;
+            status?: string | null;
+            message?: string | null;
+        };
+        MemorySearchRequest: {
+            query?: string | null;
+            /** Format: int32 */
+            take?: number;
+            includeStale?: boolean;
+        };
+        MemorySearchResponseDto: {
+            /** Format: int32 */
+            projectId?: number;
+            query?: string | null;
+            /** Format: uuid */
+            traceId?: string;
+            results?: components["schemas"]["MemorySearchResultDto"][] | null;
+        };
+        MemorySearchResultDto: {
+            resultId?: string | null;
+            sourceType?: string | null;
+            sourceId?: string | null;
+            title?: string | null;
+            excerpt?: string | null;
+            /** Format: double */
+            score?: number;
+            /** Format: double */
+            authorityScore?: number;
+            /** Format: int32 */
+            rawVectorRank?: number;
+            /** Format: int32 */
+            finalRank?: number;
+            matchReason?: string | null;
+            /** Format: uuid */
+            traceId?: string;
+        };
+        MemoryStatusDto: {
+            /** Format: int32 */
+            projectId?: number;
+            providerName?: string | null;
+            providerStatus?: string | null;
+            /** Format: int32 */
+            documentCount?: number;
+            /** Format: int32 */
+            embeddedCount?: number;
+            /** Format: int32 */
+            staleEmbeddingCount?: number;
+            /** Format: date-time */
+            lastEmbeddedAtUtc?: string | null;
+            /** Format: date-time */
+            lastRebuildAtUtc?: string | null;
+        };
+        OutputVerificationEvidence: {
+            expected: string | null;
+            actual?: string | null;
+            verified?: boolean;
+            evidencePath?: string | null;
+        };
+        PatchArtifactApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        PatchArtifactFileChangeReadModel: {
+            path: string | null;
+            previousPath?: string | null;
+            changeKind: string | null;
+            beforeContentHash?: string | null;
+            afterContentHash?: string | null;
+            diffHash: string | null;
+            normalizedDiff: string | null;
+            isBinary?: boolean;
+        };
+        PatchArtifactReadBoundary: {
+            patchArtifactReadIsCreation?: boolean;
+            patchArtifactReadAppliesSource?: boolean;
+            patchArtifactReadExecutesRollback?: boolean;
+            patchArtifactReadContinuesWorkflow?: boolean;
+            patchArtifactReadApprovesRelease?: boolean;
+            patchArtifactReadAuthorizesSourceMutation?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        PatchArtifactReadModel: {
+            /** Format: uuid */
+            patchArtifactId: string;
+            /** Format: uuid */
+            projectId: string;
+            patchArtifactKind: string | null;
+            /** Format: uuid */
+            controlledDryRunRequestId: string;
+            /** Format: uuid */
+            dryRunExecutionAuditId: string;
+            dryRunAuditHash: string | null;
+            dryRunReceiptHash: string | null;
+            /** Format: uuid */
+            policySatisfactionId: string;
+            policySatisfactionHash: string | null;
+            subjectKind: string | null;
+            subjectId: string | null;
+            subjectHash: string | null;
+            sourceSnapshotReference: string | null;
+            sourceBaselineHash: string | null;
+            workspaceBoundaryHash: string | null;
+            validationPlanId: string | null;
+            validationPlanHash: string | null;
+            patchHash: string | null;
+            changeSetHash: string | null;
+            fileChanges: components["schemas"]["PatchArtifactFileChangeReadModel"][] | null;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary: string | null;
+            authorityBoundary: string | null;
+            warnings: string[] | null;
+        };
+        PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["PatchArtifactReadModel"][] | null;
+            items?: components["schemas"]["PatchArtifactReadModel"][] | null;
+            /** Format: uuid */
+            patchArtifactId?: string | null;
+            boundary: components["schemas"]["PatchArtifactReadBoundary"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["PatchArtifactApiErrorDto"][] | null;
+        };
+        PatchArtifactReadModelPatchArtifactApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["PatchArtifactReadModel"];
+            items?: components["schemas"]["PatchArtifactReadModel"][] | null;
+            /** Format: uuid */
+            patchArtifactId?: string | null;
+            boundary: components["schemas"]["PatchArtifactReadBoundary"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["PatchArtifactApiErrorDto"][] | null;
         };
         PatchValidationResult: {
             allValid?: boolean;
             summary?: string | null;
             fileResults?: components["schemas"]["FilePatchValidation"][] | null;
+        };
+        PolicySatisfactionApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        PolicySatisfactionReadBoundary: {
+            policySatisfactionReadIsCreation?: boolean;
+            readingPersistedPolicySatisfactionRunsDryRun?: boolean;
+            readingPersistedPolicySatisfactionCreatesPatchArtifact?: boolean;
+            readingPersistedPolicySatisfactionAppliesSource?: boolean;
+            readingPersistedPolicySatisfactionExecutesRollback?: boolean;
+            readingPersistedPolicySatisfactionContinuesWorkflow?: boolean;
+            readingPersistedPolicySatisfactionApprovesRelease?: boolean;
+            readingPersistedPolicySatisfactionAuthorizesExecution?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        PolicySatisfactionReadModel: {
+            /** Format: uuid */
+            policySatisfactionId?: string;
+            /** Format: uuid */
+            projectId?: string;
+            policyCode?: string | null;
+            policyVersion?: string | null;
+            subjectKind?: string | null;
+            subjectId?: string | null;
+            subjectHash?: string | null;
+            capabilityCode?: string | null;
+            /** Format: uuid */
+            acceptedApprovalId?: string;
+            approvalRequirementHash?: string | null;
+            /** Format: date-time */
+            approvalEvaluatedAtUtc?: string;
+            /** Format: date-time */
+            satisfiedAtUtc?: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            correlationId?: string | null;
+            causationId?: string | null;
+            evidenceReferences?: string[] | null;
+            boundaryMaxims?: string[] | null;
+            isExpired?: boolean;
+            authorityBoundary?: string | null;
+            boundary?: components["schemas"]["PolicySatisfactionReadBoundary"];
+            warnings?: string[] | null;
+        };
+        PolicySatisfactionReadModelIReadOnlyListPolicySatisfactionApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["PolicySatisfactionReadModel"][] | null;
+            /** Format: uuid */
+            policySatisfactionId?: string | null;
+            boundary: unknown;
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["PolicySatisfactionApiErrorDto"][] | null;
+        };
+        PolicySatisfactionReadModelPolicySatisfactionApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["PolicySatisfactionReadModel"];
+            /** Format: uuid */
+            policySatisfactionId?: string | null;
+            boundary: unknown;
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["PolicySatisfactionApiErrorDto"][] | null;
+        };
+        PolicySatisfactionRecord: {
+            /** Format: uuid */
+            policySatisfactionId: string;
+            /** Format: uuid */
+            projectId: string;
+            policyCode: string | null;
+            policyVersion: string | null;
+            subjectKind: string | null;
+            subjectId: string | null;
+            subjectHash: string | null;
+            capabilityCode: string | null;
+            /** Format: uuid */
+            acceptedApprovalId: string;
+            approvalRequirementHash: string | null;
+            /** Format: date-time */
+            approvalEvaluatedAtUtc: string;
+            /** Format: date-time */
+            satisfiedAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            correlationId: string | null;
+            causationId: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary?: string | null;
+        };
+        PostProjectChannelMessageRequest: {
+            message?: string | null;
         };
         Project: {
             /** Format: int32 */
@@ -3503,6 +12411,24 @@ export interface components {
             indexingStatus?: string | null;
             /** Format: int32 */
             indexedFileCount?: number | null;
+        };
+        ProjectChannelDirectoryEntry: {
+            /** Format: int64 */
+            channelId?: number;
+            name?: string | null;
+            description?: string | null;
+            channelKind?: string | null;
+            visibility?: string | null;
+            /** Format: int32 */
+            memberCount?: number;
+            members?: components["schemas"]["ProjectChannelMembershipEntry"][] | null;
+            boundary?: string | null;
+        };
+        ProjectChannelMembershipEntry: {
+            /** Format: int32 */
+            userId?: number;
+            channelRole?: string | null;
+            notificationLevel?: string | null;
         };
         ProjectChatSession: {
             /** Format: int64 */
@@ -3610,6 +12536,19 @@ export interface components {
             /** Format: int64 */
             currentVersionId?: number | null;
             status?: string | null;
+            origin?: string | null;
+            processingStatus?: string | null;
+            description?: string | null;
+            visibility?: string | null;
+            originalFileName?: string | null;
+            mediaType?: string | null;
+            /** Format: int64 */
+            byteSize?: number | null;
+            processingFailureReason?: string | null;
+            /** Format: date-time */
+            processingStartedAtUtc?: string | null;
+            /** Format: date-time */
+            processingCompletedAtUtc?: string | null;
             /** Format: date-time */
             createdAtUtc?: string;
             /** Format: date-time */
@@ -3629,6 +12568,23 @@ export interface components {
             /** Format: date-time */
             createdAtUtc?: string;
             createdBy?: string | null;
+        };
+        ProjectDocumentProcessingResult: {
+            document: components["schemas"]["ProjectDocument"];
+            version: components["schemas"]["ProjectDocumentVersion"];
+            /** Format: int64 */
+            contextDocumentId?: number | null;
+            succeeded?: boolean;
+            status?: string | null;
+            failureReason?: string | null;
+            nextSafeAction?: string | null;
+            boundary?: string | null;
+        };
+        ProjectDocumentUploadResult: {
+            document: components["schemas"]["ProjectDocument"];
+            version: components["schemas"]["ProjectDocumentVersion"];
+            processingStatus?: string | null;
+            boundary?: string | null;
         };
         ProjectDocumentVersion: {
             /** Format: int64 */
@@ -3664,6 +12620,14 @@ export interface components {
             /** Format: date-time */
             lastIndexedDate?: string;
         };
+        ProjectFileSummary: {
+            /** Format: int64 */
+            id?: number;
+            filePath?: string | null;
+            fileExtension?: string | null;
+            /** Format: date-time */
+            lastIndexedDate?: string;
+        };
         ProjectImplementationPlan: {
             /** Format: int64 */
             id?: number;
@@ -3689,6 +12653,35 @@ export interface components {
             createdDate?: string;
             /** Format: date-time */
             updatedDate?: string | null;
+        };
+        ProjectMemberDirectoryEntry: {
+            /** Format: int32 */
+            userId?: number;
+            displayName?: string | null;
+            email?: string | null;
+            tenantRole?: string | null;
+            isActive?: boolean;
+            isCurrentUser?: boolean;
+            projectAccessStatus?: string | null;
+            channelMembershipSummary?: string | null;
+        };
+        ProjectMemberDirectoryResponse: {
+            /** Format: int32 */
+            projectId?: number;
+            projectName?: string | null;
+            /** Format: int32 */
+            tenantId?: number;
+            currentUserTenantRole?: string | null;
+            canAdministerTenantMembership?: boolean;
+            canAdministerChannelMembership?: boolean;
+            availableTenantRoles?: string[] | null;
+            availableChannelRoles?: string[] | null;
+            availableNotificationLevels?: string[] | null;
+            projectMembershipStatus?: string | null;
+            channelMembershipStatus?: string | null;
+            members?: components["schemas"]["ProjectMemberDirectoryEntry"][] | null;
+            channels?: components["schemas"]["ProjectChannelDirectoryEntry"][] | null;
+            boundary?: string | null;
         };
         ProjectProfile: {
             /** Format: int64 */
@@ -3732,6 +12725,18 @@ export interface components {
             sortOrder?: number;
             isActive?: boolean;
         };
+        ProjectProvisioningReadiness: {
+            /** Format: int32 */
+            projectId?: number;
+            isReady?: boolean;
+            /** Format: int32 */
+            blockedCount?: number;
+            blockedStates?: string[] | null;
+            checks?: components["schemas"]["ProvisioningCheck"][] | null;
+            nextAction?: components["schemas"]["ProvisioningNextAction"];
+            proposedProfile?: components["schemas"]["ProjectProfile"];
+            boundary?: string | null;
+        };
         ProjectRule: {
             /** Format: int64 */
             id?: number;
@@ -3749,6 +12754,17 @@ export interface components {
             createdDate?: string;
             /** Format: date-time */
             updatedDate?: string | null;
+        };
+        ProjectServicesStatusDto: {
+            /** Format: int32 */
+            projectId?: number;
+            apiStatus?: string | null;
+            databaseStatus?: string | null;
+            memoryStatus?: string | null;
+            testAgentAvailability?: string | null;
+            configuredModelProfiles?: string[] | null;
+            workspacePaths?: string[] | null;
+            warnings?: string[] | null;
         };
         ProjectSummary: {
             /** Format: int64 */
@@ -3787,6 +12803,7 @@ export interface components {
             linkedFilePaths?: string | null;
             linkedCodeIndexEntryIds?: string | null;
             linkedSymbols?: string | null;
+            blockedByTicketIds?: string | null;
             unitTests?: string | null;
             integrationTests?: string | null;
             manualTests?: string | null;
@@ -3805,6 +12822,56 @@ export interface components {
             /** Format: date-time */
             createdDate?: string;
         };
+        ProjectToolCapabilities: {
+            mutatesState?: boolean;
+            allowsNestedCalls?: boolean;
+            allowsFileWrites?: boolean;
+            allowsProcessExecution?: boolean;
+            allowsNetworkAccess?: boolean;
+            allowsWorkspaceMutation?: boolean;
+        };
+        ProjectToolCatalogueResponse: {
+            /** Format: int32 */
+            projectId?: number;
+            projectName?: string | null;
+            tools?: components["schemas"]["ProjectToolSummary"][] | null;
+            boundary?: string | null;
+        };
+        ProjectToolDetailResponse: {
+            /** Format: int32 */
+            projectId?: number;
+            projectName?: string | null;
+            toolId?: string | null;
+            displayName?: string | null;
+            category?: string | null;
+            description?: string | null;
+            definitionVersion?: string | null;
+            registrationStatus?: string | null;
+            connectionStatus?: string | null;
+            projectUseStatus?: string | null;
+            directInvocationStatus?: string | null;
+            healthStatus?: string | null;
+            effectiveScopeSummary?: string | null;
+            capabilities?: components["schemas"]["ProjectToolCapabilities"];
+            inputContract?: string | null;
+            outputContract?: string | null;
+            allowedCallers?: string[] | null;
+            evidenceKinds?: string[] | null;
+            boundary?: string | null;
+        };
+        ProjectToolSummary: {
+            toolId?: string | null;
+            displayName?: string | null;
+            category?: string | null;
+            description?: string | null;
+            registrationStatus?: string | null;
+            connectionStatus?: string | null;
+            projectUseStatus?: string | null;
+            directInvocationStatus?: string | null;
+            healthStatus?: string | null;
+            effectiveScopeSummary?: string | null;
+            boundary?: string | null;
+        };
         ProposalRequest: {
             request?: string | null;
         };
@@ -3818,10 +12885,444 @@ export interface components {
             validationMessage?: string | null;
             fullContentAfter?: string | null;
         };
+        ProvisioningCheck: {
+            code?: string | null;
+            name?: string | null;
+            readonly label?: string | null;
+            state?: string | null;
+            evidence?: string | null;
+            readonly summary?: string | null;
+            remedy?: string | null;
+            blocking?: boolean;
+            detectedValue?: string | null;
+            readonly actionKind?: string | null;
+        };
+        ProvisioningNextAction: {
+            kind?: string | null;
+            checkCode?: string | null;
+            allowed?: boolean;
+            reasonCode?: string | null;
+            label?: string | null;
+            nextSafeAction?: string | null;
+        };
         ReconciliationAction: {
             title?: string | null;
             description?: string | null;
             actionType?: string | null;
+        };
+        ReleaseReadinessDecisionReasonReadModel: {
+            code: string | null;
+            severity: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        ReleaseReadinessDecisionRecordApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        ReleaseReadinessDecisionRecordListReadModel: {
+            /** Format: uuid */
+            projectId: string;
+            records: components["schemas"]["ReleaseReadinessDecisionRecordReadModel"][] | null;
+            /** Format: int32 */
+            count: number;
+            mutationOccurredInThisApi: boolean;
+            releaseReadinessGateRanByThisApi: boolean;
+            releaseApprovedByThisApi: boolean;
+            deploymentApprovedByThisApi: boolean;
+            mergeApprovedByThisApi: boolean;
+            releaseExecutedByThisApi: boolean;
+            sourceApplyExecutedByThisApi: boolean;
+            rollbackExecutedByThisApi: boolean;
+            workflowContinuedByThisApi: boolean;
+            gitOperationExecutedByThisApi: boolean;
+            humanReviewRequired: boolean;
+        };
+        ReleaseReadinessDecisionRecordListReadModelReleaseReadinessDecisionRecordApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ReleaseReadinessDecisionRecordListReadModel"];
+            boundary: components["schemas"]["ReleaseReadinessDecisionRecordReadBoundary"];
+            mutationOccurredInThisApi?: boolean;
+            releaseReadinessGateRanByThisApi?: boolean;
+            releaseApprovedByThisApi?: boolean;
+            deploymentApprovedByThisApi?: boolean;
+            mergeApprovedByThisApi?: boolean;
+            releaseExecutedByThisApi?: boolean;
+            sourceApplyExecutedByThisApi?: boolean;
+            rollbackExecutedByThisApi?: boolean;
+            workflowContinuedByThisApi?: boolean;
+            gitOperationExecutedByThisApi?: boolean;
+            humanReviewRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ReleaseReadinessDecisionRecordApiErrorDto"][] | null;
+        };
+        ReleaseReadinessDecisionRecordReadBoundary: {
+            readCreatesReleaseReadinessDecisionRecord?: boolean;
+            readRunsReleaseReadinessGate?: boolean;
+            readApprovesRelease?: boolean;
+            readApprovesDeployment?: boolean;
+            readApprovesMerge?: boolean;
+            readExecutesRelease?: boolean;
+            readExecutesSourceApply?: boolean;
+            readExecutesRollback?: boolean;
+            readContinuesWorkflow?: boolean;
+            readRunsGit?: boolean;
+            readCallsAgentsModelsOrTools?: boolean;
+            readPromotesMemory?: boolean;
+            readActivatesRetrieval?: boolean;
+            humanReviewRequired?: boolean;
+            humanReviewRequiredForReleaseApproval?: boolean;
+            humanReviewRequiredForDeployment?: boolean;
+            humanReviewRequiredForMerge?: boolean;
+        };
+        ReleaseReadinessDecisionRecordReadModel: {
+            /** Format: uuid */
+            releaseReadinessDecisionRecordId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            releaseReadinessReportId: string;
+            releaseReadinessReportHash: string | null;
+            workflowRunId: string | null;
+            workflowStepId: string | null;
+            subjectKind: string | null;
+            subjectId: string | null;
+            subjectHash: string | null;
+            decisionStatus: string | null;
+            releaseReadinessEvidenceSatisfied: boolean;
+            releaseApproved: boolean;
+            deploymentApproved: boolean;
+            mergeApproved: boolean;
+            sourceApplyExecutedByDecision: boolean;
+            rollbackExecutedByDecision: boolean;
+            workflowMutatedByDecision: boolean;
+            gitOperationExecutedByDecision: boolean;
+            releaseExecutedByDecision: boolean;
+            humanReviewRequiredForReleaseApproval: boolean;
+            humanReviewRequiredForDeployment: boolean;
+            humanReviewRequiredForMerge: boolean;
+            reasons: components["schemas"]["ReleaseReadinessDecisionReasonReadModel"][] | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            /** Format: date-time */
+            decidedAtUtc: string;
+            releaseReadinessDecisionRecordHash: string | null;
+            boundary: string | null;
+            authorityBoundary: string | null;
+            warnings: string[] | null;
+            mutationOccurredInThisApi: boolean;
+            releaseReadinessGateRanByThisApi: boolean;
+            releaseApprovedByThisApi: boolean;
+            deploymentApprovedByThisApi: boolean;
+            mergeApprovedByThisApi: boolean;
+            releaseExecutedByThisApi: boolean;
+            sourceApplyExecutedByThisApi: boolean;
+            rollbackExecutedByThisApi: boolean;
+            workflowContinuedByThisApi: boolean;
+            gitOperationExecutedByThisApi: boolean;
+            humanReviewRequired: boolean;
+        };
+        ReleaseReadinessDecisionRecordReadModelReleaseReadinessDecisionRecordApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ReleaseReadinessDecisionRecordReadModel"];
+            boundary: components["schemas"]["ReleaseReadinessDecisionRecordReadBoundary"];
+            mutationOccurredInThisApi?: boolean;
+            releaseReadinessGateRanByThisApi?: boolean;
+            releaseApprovedByThisApi?: boolean;
+            deploymentApprovedByThisApi?: boolean;
+            mergeApprovedByThisApi?: boolean;
+            releaseExecutedByThisApi?: boolean;
+            sourceApplyExecutedByThisApi?: boolean;
+            rollbackExecutedByThisApi?: boolean;
+            workflowContinuedByThisApi?: boolean;
+            gitOperationExecutedByThisApi?: boolean;
+            humanReviewRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ReleaseReadinessDecisionRecordApiErrorDto"][] | null;
+        };
+        ReleaseReadinessReport: {
+            /** Format: uuid */
+            releaseReadinessReportId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            releaseReadinessReportRequestId: string;
+            status: string | null;
+            workflowRunId: string | null;
+            workflowStepId: string | null;
+            subjectKind: string | null;
+            subjectId: string | null;
+            subjectHash: string | null;
+            /** Format: uuid */
+            acceptedApprovalId: string;
+            acceptedApprovalHash: string | null;
+            /** Format: uuid */
+            policySatisfactionId: string;
+            policySatisfactionHash: string | null;
+            /** Format: uuid */
+            sourceApplyRequestId: string;
+            sourceApplyRequestHash: string | null;
+            /** Format: uuid */
+            sourceApplyReceiptId: string;
+            sourceApplyReceiptHash: string | null;
+            /** Format: uuid */
+            rollbackExecutionReceiptId?: string | null;
+            rollbackExecutionReceiptHash?: string | null;
+            /** Format: uuid */
+            rollbackExecutionAuditReportId?: string | null;
+            rollbackExecutionAuditReportHash?: string | null;
+            /** Format: uuid */
+            workflowContinuationGateEvaluationId: string;
+            workflowContinuationGateEvaluationHash: string | null;
+            /** Format: uuid */
+            workflowTransitionRecordId: string;
+            workflowTransitionRecordHash: string | null;
+            approvalEvidencePresent: boolean;
+            policyEvidencePresent: boolean;
+            sourceApplySucceeded: boolean;
+            sourceApplyPartial: boolean;
+            rollbackWasExecuted: boolean;
+            rollbackSucceeded: boolean;
+            rollbackPartial: boolean;
+            rollbackAuditConsistent: boolean;
+            workflowContinuationSucceeded: boolean;
+            workflowTransitionRecordValid: boolean;
+            releaseReadinessDecided: boolean;
+            releaseReady: boolean;
+            releaseApproved: boolean;
+            deploymentApproved: boolean;
+            mergeApproved: boolean;
+            sourceApplyExecutedByReport: boolean;
+            rollbackExecutedByReport: boolean;
+            workflowMutatedByReport: boolean;
+            gitOperationExecutedByReport: boolean;
+            humanReviewRequiredForReadiness: boolean;
+            humanReviewRequiredForReleaseApproval: boolean;
+            findings: components["schemas"]["ReleaseReadinessReportFinding"][] | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            /** Format: date-time */
+            reportedAtUtc: string;
+            releaseReadinessReportHash: string | null;
+            boundary?: string | null;
+        };
+        ReleaseReadinessReportFinding: {
+            code: string | null;
+            severity: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        RoleVisibilityMaterialKind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29;
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        RoleVisibilitySurface: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22;
+        RollbackExecutionAuditFileResult: {
+            path: string | null;
+            previousPath?: string | null;
+            operationKind: string | null;
+            rollbackActionHash: string | null;
+            patchArtifactChangeHash: string | null;
+            plannedActionFound: boolean;
+            patchArtifactChangeFound: boolean;
+            fileResultHashValid: boolean;
+            mutationApplied: boolean;
+            flagsConsistentWithOperation: boolean;
+            issues: components["schemas"]["RollbackExecutionAuditIssue"][] | null;
+        };
+        RollbackExecutionAuditIssue: {
+            code?: string | null;
+            field?: string | null;
+            message?: string | null;
+        };
+        RollbackExecutionAuditReport: {
+            /** Format: uuid */
+            rollbackExecutionAuditReportId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            rollbackExecutionReceiptId: string;
+            rollbackExecutionReceiptHash: string | null;
+            /** Format: uuid */
+            sourceApplyReceiptId: string;
+            sourceApplyReceiptHash: string | null;
+            /** Format: uuid */
+            rollbackPlanId: string;
+            rollbackPlanHash: string | null;
+            /** Format: uuid */
+            rollbackSupportReceiptId: string;
+            rollbackSupportReceiptHash: string | null;
+            /** Format: uuid */
+            patchArtifactId: string;
+            patchHash: string | null;
+            changeSetHash: string | null;
+            evidenceConsistent: boolean;
+            receiptHashValid: boolean;
+            fileResultHashesValid: boolean;
+            rollbackSucceeded: boolean;
+            mutationOccurred: boolean;
+            partialRollbackOccurred: boolean;
+            workflowBoundaryAllowsContinuation: boolean;
+            releaseBoundaryInfersReadiness: boolean;
+            humanReviewRequired: boolean;
+            fileResults: components["schemas"]["RollbackExecutionAuditFileResult"][] | null;
+            issues: components["schemas"]["RollbackExecutionAuditIssue"][] | null;
+            /** Format: date-time */
+            auditedAtUtc: string;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary?: string | null;
+        };
+        RollbackExecutionReceipt: {
+            /** Format: uuid */
+            rollbackExecutionReceiptId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            controlledRollbackExecutionRequestId: string;
+            /** Format: uuid */
+            rollbackPlanId: string;
+            rollbackPlanHash: string | null;
+            /** Format: uuid */
+            rollbackSupportReceiptId: string;
+            rollbackSupportReceiptHash: string | null;
+            /** Format: uuid */
+            sourceApplyRequestId: string;
+            sourceApplyRequestHash: string | null;
+            /** Format: uuid */
+            sourceApplyReceiptId: string;
+            sourceApplyReceiptHash: string | null;
+            /** Format: uuid */
+            patchArtifactId: string;
+            patchHash: string | null;
+            changeSetHash: string | null;
+            sourceBaselineHash: string | null;
+            workspaceBoundaryHash: string | null;
+            expectedBranch: string | null;
+            expectedCleanWorktreeHash: string | null;
+            observedBranch: string | null;
+            observedSourceBaselineHash: string | null;
+            observedCleanWorktreeHashBeforeRollback: string | null;
+            observedCleanWorktreeHashAfterRollback: string | null;
+            mutationOccurred: boolean;
+            rollbackSucceeded: boolean;
+            partialRollbackOccurred: boolean;
+            fileResults: components["schemas"]["RollbackExecutionReceiptFileResult"][] | null;
+            issueCodes: string[] | null;
+            /** Format: date-time */
+            rolledBackAtUtc: string;
+            rollbackExecutionReceiptHash: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary?: string | null;
+        };
+        RollbackExecutionReceiptFileResult: {
+            path: string | null;
+            previousPath?: string | null;
+            operationKind: string | null;
+            patchArtifactChangeHash: string | null;
+            rollbackActionHash: string | null;
+            beforeContentHash?: string | null;
+            afterContentHash?: string | null;
+            preconditionsSatisfied: boolean;
+            mutationApplied: boolean;
+            restored: boolean;
+            deleted: boolean;
+            recreated: boolean;
+            renamedBack: boolean;
+            noop: boolean;
+            issueCodes: string[] | null;
+            fileResultHash: string | null;
+        };
+        RollbackSupportReceiptApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        RollbackSupportReceiptReadBoundary: {
+            rollbackReadExecutesRollback?: boolean;
+            rollbackReadMarksRollbackSuccess?: boolean;
+            rollbackReadAppliesSource?: boolean;
+            rollbackReadContinuesWorkflow?: boolean;
+            rollbackReadApprovesRelease?: boolean;
+            rollbackReadInfersReleaseReadiness?: boolean;
+            rollbackReadAuthorizesSourceMutation?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        RollbackSupportReceiptReadModel: {
+            /** Format: uuid */
+            rollbackSupportReceiptId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            rollbackPlanId: string;
+            rollbackPlanHash: string | null;
+            rollbackGateSatisfied: boolean;
+            rollbackGateEvaluationHash: string | null;
+            /** Format: uuid */
+            patchArtifactId: string;
+            patchHash: string | null;
+            changeSetHash: string | null;
+            /** Format: uuid */
+            controlledDryRunRequestId: string;
+            /** Format: uuid */
+            dryRunExecutionAuditId: string;
+            dryRunAuditHash: string | null;
+            dryRunReceiptHash: string | null;
+            /** Format: uuid */
+            policySatisfactionId: string;
+            policySatisfactionHash: string | null;
+            subjectKind: string | null;
+            subjectId: string | null;
+            subjectHash: string | null;
+            sourceSnapshotReference: string | null;
+            sourceBaselineHash: string | null;
+            workspaceBoundaryHash: string | null;
+            expectedBranch: string | null;
+            expectedCleanWorktreeHash: string | null;
+            rollbackSupportReceiptHash: string | null;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary: string | null;
+            authorityBoundary: string | null;
+            warnings: string[] | null;
+        };
+        RollbackSupportReceiptReadModelIReadOnlyListRollbackSupportReceiptApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["RollbackSupportReceiptReadModel"][] | null;
+            items?: components["schemas"]["RollbackSupportReceiptReadModel"][] | null;
+            /** Format: uuid */
+            rollbackSupportReceiptId?: string | null;
+            boundary: components["schemas"]["RollbackSupportReceiptReadBoundary"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["RollbackSupportReceiptApiErrorDto"][] | null;
+        };
+        RollbackSupportReceiptReadModelRollbackSupportReceiptApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["RollbackSupportReceiptReadModel"];
+            items?: components["schemas"]["RollbackSupportReceiptReadModel"][] | null;
+            /** Format: uuid */
+            rollbackSupportReceiptId?: string | null;
+            boundary: components["schemas"]["RollbackSupportReceiptReadBoundary"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["RollbackSupportReceiptApiErrorDto"][] | null;
         };
         RunAdversarialReview: {
             /** Format: int32 */
@@ -3847,6 +13348,24 @@ export interface components {
             title?: string | null;
             evidenceCitation?: string | null;
             suggestedFix?: string | null;
+        };
+        RunEventDto: {
+            /** Format: uuid */
+            eventId?: string;
+            /** Format: date-time */
+            timestampUtc?: string;
+            runId?: string | null;
+            eventType?: string | null;
+            message?: string | null;
+            payload?: {
+                [key: string]: string;
+            } | null;
+        };
+        RunEventSummary: {
+            eventType: string | null;
+            message: string | null;
+            /** Format: date-time */
+            timestampUtc?: string;
         };
         RunEvidenceItem: {
             type?: string | null;
@@ -3937,6 +13456,10 @@ export interface components {
             memoryImprovement?: components["schemas"]["RunMemoryImprovementReview"];
             policy?: components["schemas"]["RunReviewPolicySnapshot"];
         };
+        RunReportDto: {
+            status?: components["schemas"]["RunStatusDto"];
+            report?: components["schemas"]["RunReportDetail"];
+        };
         RunReportSummary: {
             runId?: string | null;
             traceId?: string | null;
@@ -3953,6 +13476,23 @@ export interface components {
             /** Format: int32 */
             disposableFilesChanged?: number;
         };
+        RunReviewPackage: {
+            runId: string | null;
+            /** Format: int32 */
+            projectId: number;
+            /** Format: int64 */
+            ticketId: number;
+            state: string | null;
+            generatedFiles: components["schemas"]["GeneratedCodeFile"][] | null;
+            commandEvidence: components["schemas"]["CommandEvidence"][] | null;
+            outputVerification: components["schemas"]["OutputVerificationEvidence"];
+            outputVerifications?: components["schemas"]["OutputVerificationEvidence"][] | null;
+            codeStandards: components["schemas"]["CodeStandardsEvidence"];
+            fileSetHash: string | null;
+            risks: string[] | null;
+            humanReviewChecklist: string[] | null;
+            events: components["schemas"]["RunEventSummary"][] | null;
+        };
         RunReviewPolicySnapshot: {
             policyId?: string | null;
             configurableSettings?: string[] | null;
@@ -3964,10 +13504,843 @@ export interface components {
             status?: string | null;
             summary?: string | null;
         };
+        RunStatusDto: {
+            runId?: string | null;
+            traceId?: string | null;
+            project?: string | null;
+            title?: string | null;
+            status?: string | null;
+            recommendation?: string | null;
+            /** Format: date-time */
+            startedUtc?: string | null;
+            /** Format: date-time */
+            completedUtc?: string | null;
+            /** Format: int32 */
+            realRepoMutationCount?: number;
+            /** Format: int32 */
+            disposableFilesChanged?: number;
+        };
+        RunTicketReviewRequest: {
+            useLiveModel?: boolean;
+        };
+        RunTicketReviewResponse: {
+            reviewId: string | null;
+            result: components["schemas"]["TicketReviewResult"];
+        };
+        SaveDiscussionRequest: {
+            title: string | null;
+            content: string | null;
+        };
+        SaveDiscussionResponse: {
+            /** Format: int64 */
+            documentId: number;
+            /** Format: int64 */
+            documentVersionId: number;
+        };
+        ScenarioVerification: {
+            kind: string | null;
+            description: string | null;
+            parameters?: {
+                [key: string]: string;
+            } | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ScreenContractKind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+        ScreenContractMetadataEntry: {
+            screenKey: string | null;
+            displayName: string | null;
+            frontendRoutePattern: string | null;
+            owningSubsystem: string | null;
+            screenKind: components["schemas"]["ScreenContractKind"];
+            visibilitySurface: components["schemas"]["RoleVisibilitySurface"];
+            visibilityMaterialKind: components["schemas"]["RoleVisibilityMaterialKind"];
+            sensitivityKind: components["schemas"]["ScreenContractSensitivityKind"];
+            primaryEndpointKey: string | null;
+            relatedEndpointKeys: string[] | null;
+            requiredEvidenceRefs: string[] | null;
+            boundaryStatement: string | null;
+            isReadOnly: boolean;
+            isActionScreen: boolean;
+            isMutationScreen: boolean;
+            isAdminScreen: boolean;
+            isReleaseDeployScreen: boolean;
+            allowsLocalAuthorityState: boolean;
+            allowsClientSidePermissionDecision: boolean;
+            allowsActionInvocation: boolean;
+            allowsMutation: boolean;
+            allowsWorkflowContinuation: boolean;
+            allowsApproval: boolean;
+            allowsPolicySatisfaction: boolean;
+            allowsRedactionBypass: boolean;
+            allowsRawPayloadDisplay: boolean;
+            allowsSecretDisplay: boolean;
+            allowsPrivateReasoningDisplay: boolean;
+            requiresSeparateRoleAssignment: boolean;
+            requiresSeparateVisibilityDecision: boolean;
+            requiresSeparateAccessDecision: boolean;
+            requiresSeparatePolicyDecision: boolean;
+            requiresSeparateRedactionDecision: boolean;
+            requiresTenantBoundaryDecision: boolean;
+            requiresSeparateActionAuthority: boolean;
+            requiresSeparateMutationAuthority: boolean;
+            requiresSeparateWorkflowAuthority: boolean;
+        };
+        ScreenContractMetadataResponse: {
+            catalogId: string | null;
+            catalogVersion: string | null;
+            boundaryStatement: string | null;
+            entries: components["schemas"]["ScreenContractMetadataEntry"][] | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ScreenContractSensitivityKind: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
         SelectTenantRequest: {
             /** Format: int32 */
             tenantId?: number;
         };
+        SetProjectChannelMembershipRequest: {
+            channelRole?: string | null;
+            notificationLevel?: string | null;
+        };
+        SetTenantUserRoleRequest: {
+            role?: string | null;
+        };
+        SkeletonAgentProfile: {
+            role: components["schemas"]["SkeletonAgentRole"];
+            provider?: string | null;
+            model?: string | null;
+            baseUrl?: string | null;
+            /** Format: int32 */
+            timeoutSeconds?: number;
+            skill?: string | null;
+            personality?: string | null;
+            boundary?: string | null;
+        };
+        SkeletonAgentProfileOutcome: {
+            succeeded: boolean;
+            failureReason?: string | null;
+            profile?: components["schemas"]["SkeletonAgentProfile"];
+        };
+        SkeletonAgentProfileUpdate: {
+            provider?: string | null;
+            model?: string | null;
+            /** Format: int32 */
+            timeoutSeconds?: number;
+            skill?: string | null;
+            personality?: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        SkeletonAgentRole: 0 | 1 | 2 | 3;
+        SkeletonAuthoredTest: {
+            relativePath: string | null;
+            content: string | null;
+            coversCriterion?: string | null;
+        };
+        SkeletonBatchCycleBlocker: {
+            ticketIds?: number[] | null;
+            detail: string | null;
+        };
+        SkeletonBatchDependencyEdge: {
+            /** Format: int64 */
+            fromTicketId: number;
+            /** Format: int64 */
+            toTicketId: number;
+            kind: string | null;
+            reason: string | null;
+            sharedPaths?: string[] | null;
+        };
+        SkeletonBatchMap: {
+            /** Format: int32 */
+            projectId: number;
+            ticketIds?: number[] | null;
+            edges?: components["schemas"]["SkeletonBatchDependencyEdge"][] | null;
+            warnings?: string[] | null;
+            boundary?: string | null;
+        };
+        SkeletonBatchMapOutcome: {
+            succeeded: boolean;
+            failureReason?: string | null;
+            mapId?: string | null;
+            /** Format: date-time */
+            detectedAtUtc?: string;
+            map?: components["schemas"]["SkeletonBatchMap"];
+        };
+        SkeletonBatchMapRecord: {
+            mapId: string | null;
+            /** Format: date-time */
+            detectedAtUtc: string;
+            requestedByUserId: string | null;
+            map: components["schemas"]["SkeletonBatchMap"];
+            recordedSha256: string | null;
+            sha256OnDisk: string | null;
+            readonly verified?: boolean;
+        };
+        SkeletonBatchPlan: {
+            /** Format: int32 */
+            projectId: number;
+            mapId: string | null;
+            waves?: components["schemas"]["SkeletonBatchWave"][] | null;
+            cycleBlockers?: components["schemas"]["SkeletonBatchCycleBlocker"][] | null;
+            warnings?: string[] | null;
+            readonly schedulable?: boolean;
+            boundary?: string | null;
+        };
+        SkeletonBatchPlanOutcome: {
+            succeeded: boolean;
+            failureReason?: string | null;
+            planId?: string | null;
+            /** Format: date-time */
+            plannedAtUtc?: string;
+            plan?: components["schemas"]["SkeletonBatchPlan"];
+        };
+        SkeletonBatchPlanRecord: {
+            planId: string | null;
+            /** Format: date-time */
+            plannedAtUtc: string;
+            requestedByUserId: string | null;
+            plan: components["schemas"]["SkeletonBatchPlan"];
+            recordedSha256: string | null;
+            sha256OnDisk: string | null;
+            readonly verified?: boolean;
+        };
+        SkeletonBatchRunOutcome: {
+            succeeded: boolean;
+            failureReason?: string | null;
+            startedRuns?: {
+                [key: string]: string;
+            } | null;
+            status?: components["schemas"]["SkeletonBatchRunStatus"];
+        };
+        SkeletonBatchRunStatus: {
+            batchId: string | null;
+            planId: string | null;
+            /** Format: int32 */
+            projectId: number;
+            requestedByUserId: string | null;
+            /** Format: date-time */
+            startedAtUtc: string;
+            tickets?: components["schemas"]["SkeletonBatchTicketStatus"][] | null;
+            readonly batchComplete?: boolean;
+            boundary?: string | null;
+        };
+        SkeletonBatchTicketStatus: {
+            /** Format: int64 */
+            ticketId: number;
+            /** Format: int32 */
+            wave: number;
+            runId?: string | null;
+            runStatus?: string | null;
+            eligible?: boolean;
+            waitingOn?: string[] | null;
+        };
+        SkeletonBatchWave: {
+            /** Format: int32 */
+            waveNumber: number;
+            ticketIds?: number[] | null;
+        };
+        SkeletonCanaryMeasurement: {
+            measurementId: string | null;
+            /** Format: date-time */
+            measuredAtUtc: string;
+            requestedByUserId: string | null;
+            /** Format: int32 */
+            canaryCount: number;
+            /** Format: int32 */
+            caughtCount: number;
+            /** Format: double */
+            catchRate: number;
+            controlClean: boolean;
+            reExecutionAvailable: boolean;
+            results?: components["schemas"]["SkeletonCanaryResult"][] | null;
+            boundary?: string | null;
+        };
+        SkeletonCanaryMeasurementRecord: {
+            measurement: components["schemas"]["SkeletonCanaryMeasurement"];
+            recordedSha256: string | null;
+            sha256OnDisk: string | null;
+            readonly verified?: boolean;
+        };
+        SkeletonCanaryMeasurementSummary: {
+            measurementId: string | null;
+            /** Format: date-time */
+            measuredAtUtc: string;
+            /** Format: double */
+            catchRate: number;
+            /** Format: int32 */
+            canaryCount: number;
+            /** Format: int32 */
+            caughtCount: number;
+            controlClean: boolean;
+            reExecutionAvailable: boolean;
+            verified: boolean;
+        };
+        SkeletonCanaryResult: {
+            canaryId: string | null;
+            title: string | null;
+            caught: boolean;
+            mustCatch: string | null;
+            expected?: string | null;
+            observed?: string | null;
+            isControl?: boolean;
+        };
+        SkeletonCriterionCoverage: {
+            criterion: string | null;
+            covered: boolean;
+            coveringTests?: string[] | null;
+        };
+        SkeletonCriticPackage: {
+            packageId: string | null;
+            runId: string | null;
+            proposalId: string | null;
+            /** Format: int64 */
+            ticketId: number;
+            /** Format: int32 */
+            projectId: number;
+            ticketTitle: string | null;
+            acceptanceCriteria?: string | null;
+            proposalSummary?: string | null;
+            proposalRationale?: string | null;
+            changes?: components["schemas"]["SkeletonCriticPackageChange"][] | null;
+            authoredTests?: components["schemas"]["SkeletonAuthoredTest"][] | null;
+            criterionCoverage?: components["schemas"]["SkeletonCriterionCoverage"][] | null;
+            commandResults?: components["schemas"]["SkeletonCriticPackageCommandResult"][] | null;
+            evidenceRefs?: string[] | null;
+            workspaceRunSucceeded?: boolean;
+            boundary?: string | null;
+        };
+        SkeletonCriticPackageChange: {
+            filePath: string | null;
+            description?: string | null;
+            isNewFile?: boolean;
+            isDeletion?: boolean;
+            diff?: string | null;
+            fullContentAfter?: string | null;
+        };
+        SkeletonCriticPackageCommandResult: {
+            displayName: string | null;
+            /** Format: int32 */
+            exitCode?: number;
+            timedOut?: boolean;
+            /** Format: int64 */
+            durationMs?: number;
+            standardOutputRef?: string | null;
+            standardErrorRef?: string | null;
+        };
+        SkeletonCriticReviewFindingDto: {
+            findingId: string | null;
+            severity: string | null;
+            title: string | null;
+            problem: string | null;
+            whyItMatters: string | null;
+            requiredFix: string | null;
+            blocksMerge?: boolean;
+        };
+        SkeletonCriticReviewOutcome: {
+            succeeded: boolean;
+            failureReason?: string | null;
+            criticAgentRunId?: string | null;
+            reviewId?: string | null;
+            verdict?: string | null;
+            findings?: components["schemas"]["SkeletonCriticReviewFindingDto"][] | null;
+            groundTruth?: components["schemas"]["SkeletonGroundTruthVerification"];
+            boundary?: string | null;
+        };
+        SkeletonFindingDispositionOutcome: {
+            succeeded: boolean;
+            failureReason?: string | null;
+            findingId?: string | null;
+            disposition?: string | null;
+            boundary?: string | null;
+        };
+        SkeletonGateMeasurementInput: {
+            measurementId?: string | null;
+            /** Format: double */
+            catchRate?: number;
+            controlClean?: boolean;
+            reExecutionAvailable?: boolean;
+            verified?: boolean;
+            /** Format: date-time */
+            measuredAtUtc?: string;
+        };
+        SkeletonGateRecommendation: {
+            runId: string | null;
+            tier: components["schemas"]["SkeletonGateRiskTier"];
+            recommendation: string | null;
+            reasons?: string[] | null;
+            measurementInput?: components["schemas"]["SkeletonGateMeasurementInput"];
+            boundary?: string | null;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        SkeletonGateRiskTier: 0 | 1 | 2;
+        SkeletonGroundTruthCheck: {
+            checkName: string | null;
+            passed: boolean;
+            expected?: string | null;
+            actual?: string | null;
+            detail?: string | null;
+            blocksMerge?: boolean;
+        };
+        SkeletonGroundTruthVerification: {
+            checks?: components["schemas"]["SkeletonGroundTruthCheck"][] | null;
+            readonly mismatches?: components["schemas"]["SkeletonGroundTruthCheck"][] | null;
+            boundary?: string | null;
+        };
+        SkeletonRevisionBody: {
+            findingIds?: string[] | null;
+            reason?: string | null;
+        };
+        SkeletonRunApplyStageTrace: {
+            stage?: string | null;
+            succeeded?: boolean;
+            errors?: string | null;
+        };
+        SkeletonRunApplyTrace: {
+            applied?: boolean;
+            workspacePath?: string | null;
+            refusedReason?: string | null;
+            stages?: components["schemas"]["SkeletonRunApplyStageTrace"][] | null;
+            receipts?: components["schemas"]["SkeletonRunReceiptRef"][] | null;
+        };
+        SkeletonRunApprovalTrace: {
+            targetKind?: string | null;
+            targetId?: string | null;
+            targetHash?: string | null;
+            capabilityCode?: string | null;
+            haltObserved?: boolean;
+            continuationUnblocked?: boolean;
+            acceptedApprovalId?: string | null;
+        };
+        SkeletonRunCriticPackageTrace: {
+            packageId?: string | null;
+            packagePath?: string | null;
+            existsOnDisk?: boolean;
+            announcedSha256?: string | null;
+            sha256OnDisk?: string | null;
+            hashVerified?: boolean;
+            /** Format: int32 */
+            criterionCount?: number;
+            /** Format: int32 */
+            uncoveredCriterionCount?: number;
+        };
+        SkeletonRunCriticReviewTrace: {
+            criticAgentRunId?: string | null;
+            reviewId?: string | null;
+            verdict?: string | null;
+            /** Format: int32 */
+            findingCount?: number;
+            /** Format: int32 */
+            blockingFindingCount?: number;
+            findingIds?: string[] | null;
+            packageSha256?: string | null;
+            /** Format: int32 */
+            groundTruthCheckCount?: number;
+            /** Format: int32 */
+            groundTruthMismatchCount?: number;
+            modelProvider?: string | null;
+            modelName?: string | null;
+        };
+        SkeletonRunFindingDispositionTrace: {
+            findingId?: string | null;
+            disposition?: string | null;
+            reason?: string | null;
+            decidedByUserId?: string | null;
+        };
+        SkeletonRunProposalTrace: {
+            proposalId?: string | null;
+            /** Format: int32 */
+            fileChangeCount?: number;
+            evidenceRef?: string | null;
+            evidenceExistsOnDisk?: boolean;
+            modelProvider?: string | null;
+            modelName?: string | null;
+        };
+        SkeletonRunReceiptRef: {
+            name?: string | null;
+            path?: string | null;
+            existsOnDisk?: boolean;
+        };
+        SkeletonRunRepairAttemptTrace: {
+            /** Format: int32 */
+            attemptNumber?: number;
+            failureKind?: string | null;
+            failedCommand?: string | null;
+            repairProposalId?: string | null;
+            modelProvider?: string | null;
+            modelName?: string | null;
+            repairProposalEvidenceExistsOnDisk?: boolean;
+        };
+        SkeletonRunReport: {
+            runId: string | null;
+            /** Format: int32 */
+            projectId: number;
+            /** Format: int64 */
+            ticketId: number;
+            status?: string | null;
+            summary?: string | null;
+            timeline?: components["schemas"]["SkeletonRunTimelineEntry"][] | null;
+            proposal?: components["schemas"]["SkeletonRunProposalTrace"];
+            initialProposal?: components["schemas"]["SkeletonRunProposalTrace"];
+            testAuthoring?: components["schemas"]["SkeletonRunTestAuthoringTrace"];
+            criticPackage?: components["schemas"]["SkeletonRunCriticPackageTrace"];
+            approval?: components["schemas"]["SkeletonRunApprovalTrace"];
+            criticReviews?: components["schemas"]["SkeletonRunCriticReviewTrace"][] | null;
+            findingDispositions?: components["schemas"]["SkeletonRunFindingDispositionTrace"][] | null;
+            repairAttempts?: components["schemas"]["SkeletonRunRepairAttemptTrace"][] | null;
+            revisionAttempts?: components["schemas"]["SkeletonRunRevisionAttemptTrace"][] | null;
+            apply?: components["schemas"]["SkeletonRunApplyTrace"];
+            gaps?: string[] | null;
+            loopComplete?: boolean;
+            boundary?: string | null;
+        };
+        SkeletonRunRevisionAttemptTrace: {
+            /** Format: int32 */
+            attemptNumber?: number;
+            findingIds?: string[] | null;
+            reason?: string | null;
+            requestedByUserId?: string | null;
+            revisionProposalId?: string | null;
+            modelProvider?: string | null;
+            modelName?: string | null;
+            revisionProposalEvidenceExistsOnDisk?: boolean;
+            failed?: boolean;
+            failureKind?: string | null;
+            failedCommand?: string | null;
+        };
+        SkeletonRunTestAuthoringTrace: {
+            authored?: boolean;
+            /** Format: int32 */
+            authoredTestCount?: number;
+            skippedReason?: string | null;
+            modelProvider?: string | null;
+            modelName?: string | null;
+        };
+        SkeletonRunTimelineEntry: {
+            /** Format: date-time */
+            timestampUtc?: string;
+            eventType?: string | null;
+            message?: string | null;
+        };
+        SourceApplyDryRunReceiptApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        SourceApplyDryRunReceiptFileResultReadModel: {
+            path: string | null;
+            previousPath?: string | null;
+            operationKind: string | null;
+            patchArtifactChangeHash: string | null;
+            operationHash: string | null;
+            expectedBeforeContentHash: string | null;
+            expectedAfterContentHash: string | null;
+            observedCurrentContentHash: string | null;
+            preconditionsSatisfied: boolean;
+            wouldCreate: boolean;
+            wouldModify: boolean;
+            wouldDelete: boolean;
+            wouldRename: boolean;
+            wouldNoop: boolean;
+            issueCodes: string[] | null;
+            fileResultHash: string | null;
+        };
+        SourceApplyDryRunReceiptReadBoundary: {
+            readCreatesSourceApplyDryRunReceipt?: boolean;
+            readPerformsDryRun?: boolean;
+            readAppliesSource?: boolean;
+            readWritesFiles?: boolean;
+            readAppliesPatch?: boolean;
+            readRunsGit?: boolean;
+            readInspectsWorktree?: boolean;
+            readContinuesWorkflow?: boolean;
+            readApprovesRelease?: boolean;
+            readInfersReleaseReadiness?: boolean;
+            readSatisfiesApproval?: boolean;
+            readSatisfiesPolicy?: boolean;
+            readPromotesMemory?: boolean;
+            readActivatesRetrieval?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        SourceApplyDryRunReceiptReadModel: {
+            /** Format: uuid */
+            sourceApplyDryRunReceiptId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            sourceApplyDryRunRequestId: string;
+            sourceApplyDryRunRequestHash: string | null;
+            dryRunSatisfied: boolean;
+            dryRunResultHash: string | null;
+            /** Format: uuid */
+            sourceApplyRequestId: string;
+            sourceApplyRequestHash: string | null;
+            /** Format: uuid */
+            sourceApplyGateEvaluationId: string;
+            sourceApplyGateEvaluationHash: string | null;
+            /** Format: uuid */
+            patchArtifactId: string;
+            patchHash: string | null;
+            changeSetHash: string | null;
+            /** Format: uuid */
+            rollbackSupportReceiptId: string;
+            rollbackSupportReceiptHash: string | null;
+            sourceBaselineHash: string | null;
+            workspaceBoundaryHash: string | null;
+            expectedBranch: string | null;
+            expectedCleanWorktreeHash: string | null;
+            fileResults: components["schemas"]["SourceApplyDryRunReceiptFileResultReadModel"][] | null;
+            /** Format: date-time */
+            createdAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            sourceApplyDryRunReceiptHash: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary: string | null;
+            authorityBoundary: string | null;
+            warnings: string[] | null;
+        };
+        SourceApplyDryRunReceiptReadModelIReadOnlyListSourceApplyDryRunReceiptApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["SourceApplyDryRunReceiptReadModel"][] | null;
+            items?: components["schemas"]["SourceApplyDryRunReceiptReadModel"][] | null;
+            /** Format: uuid */
+            sourceApplyDryRunReceiptId?: string | null;
+            boundary: components["schemas"]["SourceApplyDryRunReceiptReadBoundary"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["SourceApplyDryRunReceiptApiErrorDto"][] | null;
+        };
+        SourceApplyDryRunReceiptReadModelSourceApplyDryRunReceiptApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["SourceApplyDryRunReceiptReadModel"];
+            items?: components["schemas"]["SourceApplyDryRunReceiptReadModel"][] | null;
+            /** Format: uuid */
+            sourceApplyDryRunReceiptId?: string | null;
+            boundary: components["schemas"]["SourceApplyDryRunReceiptReadBoundary"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["SourceApplyDryRunReceiptApiErrorDto"][] | null;
+        };
+        SourceApplyReceipt: {
+            /** Format: uuid */
+            sourceApplyReceiptId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            controlledSourceApplyRequestId: string;
+            /** Format: uuid */
+            sourceApplyRequestId: string;
+            sourceApplyRequestHash: string | null;
+            /** Format: uuid */
+            sourceApplyDryRunReceiptId: string;
+            sourceApplyDryRunReceiptHash: string | null;
+            /** Format: uuid */
+            sourceApplyGateEvaluationId: string;
+            sourceApplyGateEvaluationHash: string | null;
+            /** Format: uuid */
+            patchArtifactId: string;
+            patchHash: string | null;
+            changeSetHash: string | null;
+            /** Format: uuid */
+            rollbackSupportReceiptId: string;
+            rollbackSupportReceiptHash: string | null;
+            sourceBaselineHash: string | null;
+            workspaceBoundaryHash: string | null;
+            expectedBranch: string | null;
+            expectedCleanWorktreeHash: string | null;
+            observedBranch: string | null;
+            observedCleanWorktreeHashBeforeApply: string | null;
+            observedCleanWorktreeHashAfterApply: string | null;
+            mutationOccurred: boolean;
+            applySucceeded: boolean;
+            partialApplyOccurred: boolean;
+            fileResults: components["schemas"]["SourceApplyReceiptFileResult"][] | null;
+            issueCodes: string[] | null;
+            /** Format: date-time */
+            appliedAtUtc: string;
+            sourceApplyReceiptHash: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary?: string | null;
+        };
+        SourceApplyReceiptFileResult: {
+            path: string | null;
+            previousPath?: string | null;
+            operationKind: string | null;
+            patchArtifactChangeHash: string | null;
+            operationHash: string | null;
+            beforeContentHash?: string | null;
+            afterContentHash?: string | null;
+            preconditionsSatisfied: boolean;
+            mutationApplied: boolean;
+            created: boolean;
+            modified: boolean;
+            deleted: boolean;
+            renamed: boolean;
+            noop: boolean;
+            issueCodes: string[] | null;
+            fileResultHash: string | null;
+        };
+        SourceApplyRequest: {
+            /** Format: uuid */
+            sourceApplyRequestId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            sourceApplyGateEvaluationId: string;
+            sourceApplyGateEvaluationHash: string | null;
+            sourceApplyGateSatisfied: boolean;
+            sourceApplyGateEvaluation: components["schemas"]["SourceApplyRequestGateEvaluationEvidence"];
+            /** Format: uuid */
+            acceptedApprovalId: string;
+            acceptedApprovalHash: string | null;
+            /** Format: uuid */
+            policySatisfactionId: string;
+            policySatisfactionHash: string | null;
+            /** Format: uuid */
+            controlledDryRunRequestId: string;
+            /** Format: uuid */
+            dryRunExecutionAuditId: string;
+            dryRunAuditHash: string | null;
+            dryRunReceiptHash: string | null;
+            /** Format: uuid */
+            patchArtifactId: string;
+            patchHash: string | null;
+            changeSetHash: string | null;
+            /** Format: uuid */
+            rollbackSupportReceiptId: string;
+            rollbackSupportReceiptHash: string | null;
+            /** Format: uuid */
+            rollbackPlanId: string;
+            rollbackPlanHash: string | null;
+            rollbackGateEvaluationHash: string | null;
+            subjectKind: string | null;
+            subjectId: string | null;
+            subjectHash: string | null;
+            sourceSnapshotReference: string | null;
+            sourceBaselineHash: string | null;
+            workspaceBoundaryHash: string | null;
+            expectedBranch: string | null;
+            expectedCleanWorktreeHash: string | null;
+            fileOperations: components["schemas"]["SourceApplyRequestFileOperation"][] | null;
+            /** Format: date-time */
+            requestedAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            sourceApplyRequestHash: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary?: string | null;
+        };
+        SourceApplyRequestFileOperation: {
+            path: string | null;
+            operationKind: string | null;
+            previousPath?: string | null;
+            beforeContentHash?: string | null;
+            afterContentHash?: string | null;
+            diffHash?: string | null;
+            patchArtifactChangeHash: string | null;
+            operationHash: string | null;
+        };
+        SourceApplyRequestGateEvaluationEvidence: {
+            /** Format: uuid */
+            sourceApplyGateEvaluationId: string;
+            sourceApplyGateEvaluationHash: string | null;
+            satisfied: boolean;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            acceptedApprovalId: string;
+            acceptedApprovalHash: string | null;
+            /** Format: uuid */
+            policySatisfactionId: string;
+            policySatisfactionHash: string | null;
+            /** Format: uuid */
+            controlledDryRunRequestId: string;
+            /** Format: uuid */
+            dryRunExecutionAuditId: string;
+            dryRunAuditHash: string | null;
+            dryRunReceiptHash: string | null;
+            /** Format: uuid */
+            patchArtifactId: string;
+            patchHash: string | null;
+            changeSetHash: string | null;
+            /** Format: uuid */
+            rollbackSupportReceiptId: string;
+            rollbackSupportReceiptHash: string | null;
+            /** Format: uuid */
+            rollbackPlanId: string;
+            rollbackPlanHash: string | null;
+            rollbackGateEvaluationHash: string | null;
+            subjectKind: string | null;
+            subjectId: string | null;
+            subjectHash: string | null;
+            sourceSnapshotReference: string | null;
+            sourceBaselineHash: string | null;
+            workspaceBoundaryHash: string | null;
+            expectedBranch: string | null;
+            expectedCleanWorktreeHash: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary?: string | null;
+        };
+        StartDisposableCodeRunRequest: {
+            reviewId: string | null;
+            scenarioId?: string | null;
+            expectedOutput?: string | null;
+        };
+        StartDisposableCodeRunResponse: {
+            runId: string | null;
+            state: string | null;
+            isDisposable: boolean;
+        };
+        StartTicketBuildRunRequest: {
+            /** Format: uuid */
+            workflowRunId?: string | null;
+            /** Format: int32 */
+            maxRetries?: number;
+        };
+        SupersedeDecisionRequest: {
+            replacement?: components["schemas"]["ProjectDecision"];
+        };
+        ThoughtLedgerEntryDto: {
+            thoughtLedgerEntryId: string | null;
+            entryType: components["schemas"]["ThoughtLedgerEntryType"];
+            summary: string | null;
+            evidenceRefs?: string[] | null;
+            assumptions?: string[] | null;
+            rejectedAlternatives?: string[] | null;
+            risks?: string[] | null;
+            requiredFollowUps?: string[] | null;
+            containsRawPrivateReasoning?: boolean;
+            grantsAuthority?: boolean;
+            grantsApproval?: boolean;
+            grantsMemoryPromotion?: boolean;
+            /** Format: date-time */
+            recordedAtUtc?: string;
+        };
+        /**
+         * Format: int32
+         * @enum {integer}
+         */
+        ThoughtLedgerEntryType: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
         TicketBuildApproval: {
             /** Format: int32 */
             projectId?: number;
@@ -4000,13 +14373,855 @@ export interface components {
             /** Format: date-time */
             completedUtc?: string;
         };
+        TicketBuildRunDetailDto: {
+            runId?: string | null;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            ticketId?: number;
+            status?: string | null;
+            currentNode?: string | null;
+            requiresHumanApproval?: boolean;
+            isDisposable?: boolean;
+            /** Format: date-time */
+            startedUtc?: string | null;
+            /** Format: date-time */
+            completedUtc?: string | null;
+            summary?: string | null;
+            failureReason?: string | null;
+            reportPath?: string | null;
+            tracePath?: string | null;
+            logPath?: string | null;
+            events?: components["schemas"]["RunEventDto"][] | null;
+            evidence?: components["schemas"]["RunEvidenceItem"][] | null;
+        };
+        TicketBuildRunDto: {
+            runId?: string | null;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            ticketId?: number;
+            status?: string | null;
+            currentNode?: string | null;
+            requiresHumanApproval?: boolean;
+            message?: string | null;
+        };
+        TicketBuildRunSummaryDto: {
+            runId?: string | null;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            ticketId?: number;
+            status?: string | null;
+            currentNode?: string | null;
+            requiresHumanApproval?: boolean;
+            isDisposable?: boolean;
+            /** Format: date-time */
+            startedUtc?: string | null;
+            /** Format: date-time */
+            completedUtc?: string | null;
+            summary?: string | null;
+            failureReason?: string | null;
+        };
+        TicketEvidenceSummaryDto: {
+            /** Format: int64 */
+            ticketId?: number;
+            status?: string | null;
+            message?: string | null;
+            latestRun?: components["schemas"]["LinkedRunSummaryDto"];
+            latestPromotionPackage?: components["schemas"]["LinkedPromotionPackageSummaryDto"];
+            /** Format: int32 */
+            linkedTraceCount?: number;
+            /** Format: int32 */
+            linkedDocumentCount?: number;
+            /** Format: int32 */
+            linkedDecisionCount?: number;
+            /** Format: int32 */
+            linkedRunCount?: number;
+            hasBlockingWarnings?: boolean;
+            blockedActions?: string[] | null;
+            nextSafeAction?: string | null;
+        };
         TicketProvenanceDto: {
             source?: string | null;
             createdBy?: string | null;
             notes?: string | null;
         };
+        TicketReviewContribution: {
+            role: string | null;
+            summary: string | null;
+            concerns?: string[] | null;
+            recommendations?: string[] | null;
+        };
+        TicketReviewDecision: {
+            proceed: boolean;
+            recommendedNextStep: string | null;
+            guardrails?: string[] | null;
+        };
+        TicketReviewResult: {
+            reviewId: string | null;
+            /** Format: int32 */
+            projectId: number;
+            /** Format: int64 */
+            ticketId: number;
+            scenarioId: string | null;
+            contributions: components["schemas"]["TicketReviewContribution"][] | null;
+            decision: components["schemas"]["TicketReviewDecision"];
+            /** Format: date-time */
+            createdUtc?: string;
+        };
+        TicketRunReviewDto: {
+            runId?: string | null;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            ticketId?: number;
+            ticketTitle?: string | null;
+            status?: string | null;
+            /** Format: date-time */
+            startedUtc?: string | null;
+            /** Format: date-time */
+            completedUtc?: string | null;
+            isDisposableRun?: boolean;
+            traceId?: string | null;
+            evidenceSummary?: string | null;
+            outputSummary?: string | null;
+            failureReason?: string | null;
+            reportPath?: string | null;
+            tracePath?: string | null;
+            logPath?: string | null;
+            evidence?: components["schemas"]["RunEvidenceItem"][] | null;
+            events?: components["schemas"]["RunEventDto"][] | null;
+        };
+        ToolGateApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            message: string | null;
+            field?: string | null;
+        };
+        ToolGateBoundaryStatusDto: {
+            gateIsExecutor?: boolean;
+            gateDecisionIsApproval?: boolean;
+            gatePassIsHumanApproval?: boolean;
+            toolRequestIsExecutionPermission?: boolean;
+            toolExecuted?: boolean;
+            requestApproved?: boolean;
+            auditIsApproval?: boolean;
+            sourceApplied?: boolean;
+            memoryPromoted?: boolean;
+            modelOutputIsAuthority?: boolean;
+            endpointAccessIsExecutionPermission?: boolean;
+            apiResponseStatusIsGovernance?: boolean;
+            durable?: boolean;
+            requestDurable?: boolean;
+            gateDecisionDurable?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        ToolGateDecisionDetailDto: {
+            gateDecisionId: string | null;
+            toolRequestId: string | null;
+            projectId: string | null;
+            decision: string | null;
+            toolKind: string | null;
+            requestKind: string | null;
+            riskLevel: string | null;
+            evidenceId: string | null;
+            reasons?: components["schemas"]["ToolGateDecisionReasonDto"][] | null;
+            blockedReasons?: components["schemas"]["ToolGateDecisionReasonDto"][] | null;
+            requiredApprovals?: components["schemas"]["ToolGateRequiredApprovalDto"][] | null;
+            requiredEvidence?: string[] | null;
+            requiresHumanApproval?: boolean;
+            requiresPolicyApproval?: boolean;
+            requiresDryRun?: boolean;
+            requiresGovernanceGate?: boolean;
+            requiresSeparateExecutor?: boolean;
+            durable?: boolean;
+            requestDurable?: boolean;
+            gateDecisionDurable?: boolean;
+            /** Format: date-time */
+            evaluatedAtUtc?: string;
+            warnings?: string[] | null;
+        };
+        ToolGateDecisionDetailDtoToolGateApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ToolGateDecisionDetailDto"];
+            toolRequestId?: string | null;
+            gateDecisionId?: string | null;
+            runId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["ToolGateBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ToolGateApiErrorDto"][] | null;
+        };
+        ToolGateDecisionReasonDto: {
+            code: string | null;
+            severity: string | null;
+            message: string | null;
+            evidenceRefs?: string[] | null;
+        };
+        ToolGateEvaluationRequestDto: {
+            /** Format: int32 */
+            projectId?: number;
+            toolRequestId?: string | null;
+            evidenceRefs?: string[] | null;
+            correlationId?: string | null;
+            reason?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        ToolGateEvaluationResponseDto: {
+            gateDecisionId: string | null;
+            toolRequestId: string | null;
+            decision: string | null;
+            toolKind: string | null;
+            requestKind: string | null;
+            riskLevel: string | null;
+            evidenceId: string | null;
+            reasons?: components["schemas"]["ToolGateDecisionReasonDto"][] | null;
+            blockedReasons?: components["schemas"]["ToolGateDecisionReasonDto"][] | null;
+            requiredApprovals?: components["schemas"]["ToolGateRequiredApprovalDto"][] | null;
+            requiredEvidence?: string[] | null;
+            requiresHumanApproval?: boolean;
+            requiresPolicyApproval?: boolean;
+            requiresDryRun?: boolean;
+            requiresGovernanceGate?: boolean;
+            requiresSeparateExecutor?: boolean;
+            durable?: boolean;
+            requestDurable?: boolean;
+            gateDecisionDurable?: boolean;
+            /** Format: date-time */
+            evaluatedAtUtc?: string;
+            warnings?: string[] | null;
+        };
+        ToolGateEvaluationResponseDtoToolGateApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ToolGateEvaluationResponseDto"];
+            toolRequestId?: string | null;
+            gateDecisionId?: string | null;
+            runId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["ToolGateBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ToolGateApiErrorDto"][] | null;
+        };
+        ToolGateRequiredApprovalDto: {
+            approvalType: string | null;
+            reason: string | null;
+            satisfied?: boolean;
+        };
+        ToolRequestApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            message: string | null;
+            field?: string | null;
+        };
+        ToolRequestBoundaryStatusDto: {
+            toolRequestIsExecutionPermission?: boolean;
+            durable?: boolean;
+            toolExecuted?: boolean;
+            requestApproved?: boolean;
+            auditIsApproval?: boolean;
+            gateIsExecutor?: boolean;
+            sourceApplied?: boolean;
+            memoryPromoted?: boolean;
+            modelOutputIsAuthority?: boolean;
+            endpointAccessIsExecutionPermission?: boolean;
+            apiResponseStatusIsGovernance?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        ToolRequestCreateRequestDto: {
+            /** Format: int32 */
+            projectId?: number;
+            requestedTool?: string | null;
+            requestKind?: string | null;
+            summary?: string | null;
+            payload?: unknown;
+            evidenceRefs?: string[] | null;
+            correlationId?: string | null;
+            reason?: string | null;
+            requestedByAgentRunId?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        ToolRequestCreateResponseDto: {
+            toolRequestId: string | null;
+            status: string | null;
+            requestedTool: string | null;
+            requestKind: string | null;
+            riskLevel: string | null;
+            runId: string | null;
+            evidenceId: string | null;
+            requestedByAgentRunId: string | null;
+            payloadSummary: string | null;
+            evidenceRefs?: string[] | null;
+            requestOnly?: boolean;
+            requiresGovernanceGate?: boolean;
+            requiresHumanApproval?: boolean;
+            requiresPolicyApproval?: boolean;
+            requiresDryRunFirst?: boolean;
+            requiresMemoryGovernance?: boolean;
+            warnings?: string[] | null;
+        };
+        ToolRequestCreateResponseDtoToolRequestApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ToolRequestCreateResponseDto"];
+            toolRequestId?: string | null;
+            runId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["ToolRequestBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ToolRequestApiErrorDto"][] | null;
+        };
+        ToolRequestDetailDto: {
+            toolRequestId: string | null;
+            projectId: string | null;
+            status: string | null;
+            requestedTool: string | null;
+            requestKind: string | null;
+            riskLevel: string | null;
+            runId: string | null;
+            requestedByAgentRunId: string | null;
+            purpose: string | null;
+            payloadSummary: string | null;
+            inputs?: components["schemas"]["ToolRequestReferenceDto"][] | null;
+            evidence?: components["schemas"]["ToolRequestEvidenceReferenceDto"][] | null;
+            requestOnly?: boolean;
+            claimsApproval?: boolean;
+            claimsExecutionPermission?: boolean;
+            containsExecutionResult?: boolean;
+            isExecutableWithoutGate?: boolean;
+            requiresGovernanceGate?: boolean;
+            requiresHumanApproval?: boolean;
+            requiresPolicyApproval?: boolean;
+            requiresDryRunFirst?: boolean;
+            requiresMemoryGovernance?: boolean;
+            /** Format: date-time */
+            createdAtUtc?: string;
+            warnings?: string[] | null;
+        };
+        ToolRequestDetailDtoToolRequestApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["ToolRequestDetailDto"];
+            toolRequestId?: string | null;
+            runId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["ToolRequestBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["ToolRequestApiErrorDto"][] | null;
+        };
+        ToolRequestEvidenceReferenceDto: {
+            evidenceId: string | null;
+            refType: string | null;
+            refId: string | null;
+            summary: string | null;
+            supportsNeedForTool?: boolean;
+            isAuthorityGrant?: boolean;
+        };
+        ToolRequestReferenceDto: {
+            refType: string | null;
+            refId: string | null;
+            summary: string | null;
+            evidenceRefs?: string[] | null;
+        };
         UpdateLocalPathRequest: {
             localPath?: string | null;
+        };
+        WorkflowAuthorityFlagsDto: {
+            grantsApproval?: boolean;
+            grantsExecution?: boolean;
+            mutatesSource?: boolean;
+            promotesMemory?: boolean;
+            startsWorkflow?: boolean;
+            continuesWorkflow?: boolean;
+            resumesWorkflow?: boolean;
+            retriesWorkflow?: boolean;
+            satisfiesPolicy?: boolean;
+            transfersAuthority?: boolean;
+            approvesRelease?: boolean;
+            createsAcceptedMemory?: boolean;
+        };
+        WorkflowCheckpointListResponseDto: {
+            items: components["schemas"]["WorkflowCheckpointSummaryReadDto"][] | null;
+            /** Format: int32 */
+            take: number;
+        };
+        WorkflowCheckpointListResponseDtoWorkflowReadOnlyApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["WorkflowCheckpointListResponseDto"];
+            workflowRunId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["WorkflowReadOnlyBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["WorkflowReadOnlyApiErrorDto"][] | null;
+        };
+        WorkflowCheckpointReadDto: {
+            /** Format: uuid */
+            workflowCheckpointId: string;
+            /** Format: uuid */
+            workflowRunId: string;
+            /** Format: uuid */
+            workflowRunStepId?: string | null;
+            /** Format: uuid */
+            projectId: string;
+            checkpointKey: string | null;
+            checkpointName: string | null;
+            checkpointType: string | null;
+            status: string | null;
+            subjectType?: string | null;
+            subjectId?: string | null;
+            safeSummary?: string | null;
+            /** Format: int32 */
+            stateVersion?: number;
+            stateHashSha256?: string | null;
+            /** Format: uuid */
+            correlationId?: string | null;
+            /** Format: uuid */
+            causationId?: string | null;
+            evidenceReferences: components["schemas"]["WorkflowEvidenceReferenceReadDto"][] | null;
+            groundingReferences: components["schemas"]["WorkflowGroundingReferenceReadDto"][] | null;
+            authorityFlags: components["schemas"]["WorkflowAuthorityFlagsDto"];
+            /** Format: date-time */
+            createdUtc: string;
+        };
+        WorkflowCheckpointReadDtoWorkflowReadOnlyApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["WorkflowCheckpointReadDto"];
+            workflowRunId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["WorkflowReadOnlyBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["WorkflowReadOnlyApiErrorDto"][] | null;
+        };
+        WorkflowCheckpointSummaryReadDto: {
+            /** Format: uuid */
+            workflowCheckpointId: string;
+            /** Format: uuid */
+            workflowRunId: string;
+            /** Format: uuid */
+            workflowRunStepId?: string | null;
+            /** Format: uuid */
+            projectId: string;
+            checkpointKey: string | null;
+            checkpointName: string | null;
+            checkpointType: string | null;
+            status: string | null;
+            subjectType?: string | null;
+            subjectId?: string | null;
+            stateHashSha256?: string | null;
+            /** Format: uuid */
+            correlationId?: string | null;
+            /** Format: uuid */
+            causationId?: string | null;
+            /** Format: int32 */
+            evidenceReferenceCount?: number;
+            /** Format: int32 */
+            groundingReferenceCount?: number;
+            authorityFlags: components["schemas"]["WorkflowAuthorityFlagsDto"];
+            /** Format: date-time */
+            createdUtc: string;
+        };
+        WorkflowContinuationGateEvaluation: {
+            /** Format: uuid */
+            workflowContinuationGateEvaluationId: string;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            workflowContinuationGateRequestId: string;
+            status: string | null;
+            satisfied: boolean;
+            workflowRunId: string | null;
+            workflowStepId: string | null;
+            expectedWorkflowStateHash: string | null;
+            /** Format: uuid */
+            sourceApplyRequestId: string;
+            sourceApplyRequestHash: string | null;
+            /** Format: uuid */
+            sourceApplyReceiptId: string;
+            sourceApplyReceiptHash: string | null;
+            /** Format: uuid */
+            rollbackExecutionReceiptId?: string | null;
+            rollbackExecutionReceiptHash?: string | null;
+            /** Format: uuid */
+            rollbackExecutionAuditReportId?: string | null;
+            sourceApplySucceeded: boolean;
+            sourceApplyPartial: boolean;
+            rollbackWasExecuted: boolean;
+            rollbackSucceeded: boolean;
+            rollbackPartial: boolean;
+            rollbackAuditConsistent: boolean;
+            workflowStateMutated: boolean;
+            workflowContinuationExecuted: boolean;
+            releaseReadinessInferred: boolean;
+            releaseApproved: boolean;
+            humanReviewRequired: boolean;
+            issues: components["schemas"]["WorkflowContinuationGateIssue"][] | null;
+            /** Format: date-time */
+            evaluatedAtUtc: string;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary?: string | null;
+        };
+        WorkflowContinuationGateIssue: {
+            code?: string | null;
+            field?: string | null;
+            message?: string | null;
+        };
+        WorkflowEvidenceReferenceReadDto: {
+            /** Format: uuid */
+            evidenceReferenceId: string;
+            /** Format: uuid */
+            workflowRunId: string;
+            /** Format: uuid */
+            workflowRunStepId?: string | null;
+            /** Format: uuid */
+            workflowCheckpointId?: string | null;
+            stepKey?: string | null;
+            /** Format: uuid */
+            projectId: string;
+            evidenceType: string | null;
+            evidenceId: string | null;
+            evidenceLabel?: string | null;
+            safeSummary?: string | null;
+            allowedUse?: string | null;
+            /** Format: uuid */
+            governanceEventId?: string | null;
+            /** Format: uuid */
+            agentHandoffId?: string | null;
+            /** Format: uuid */
+            thoughtLedgerEntryId?: string | null;
+            /** Format: uuid */
+            groundingEvidenceReferenceId?: string | null;
+            /** Format: uuid */
+            workflowRunEvidenceReferenceId?: string | null;
+            evidenceIsPermission?: boolean;
+            /** Format: date-time */
+            createdUtc: string;
+        };
+        WorkflowGroundingReferenceReadDto: {
+            /** Format: uuid */
+            groundingReferenceId: string;
+            /** Format: uuid */
+            workflowRunId: string;
+            /** Format: uuid */
+            workflowRunStepId?: string | null;
+            /** Format: uuid */
+            workflowCheckpointId?: string | null;
+            stepKey?: string | null;
+            /** Format: uuid */
+            projectId: string;
+            /** Format: uuid */
+            groundingEvidenceReferenceId: string;
+            claimType: string | null;
+            claimId: string | null;
+            safeSummary?: string | null;
+            groundingIsAuthority?: boolean;
+            /** Format: date-time */
+            createdUtc: string;
+        };
+        WorkflowReadOnlyApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            message: string | null;
+            field?: string | null;
+        };
+        WorkflowReadOnlyBoundaryStatusDto: {
+            readOnlyInspection?: boolean;
+            workflowStatusIsAction?: boolean;
+            evidenceIsPermission?: boolean;
+            groundingIsAuthority?: boolean;
+            endpointAccessIsExecutionPermission?: boolean;
+            apiResponseStatusIsGovernance?: boolean;
+            modelOutputIsAuthority?: boolean;
+            sourceApplied?: boolean;
+            memoryPromoted?: boolean;
+            releaseApproved?: boolean;
+            approvalSatisfied?: boolean;
+            humanReviewRequiredForSourceApply?: boolean;
+            humanReviewRequiredForMemoryPromotion?: boolean;
+        };
+        WorkflowRunListResponseDto: {
+            items: components["schemas"]["WorkflowRunSummaryReadDto"][] | null;
+            /** Format: int32 */
+            take: number;
+        };
+        WorkflowRunListResponseDtoWorkflowReadOnlyApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["WorkflowRunListResponseDto"];
+            workflowRunId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["WorkflowReadOnlyBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["WorkflowReadOnlyApiErrorDto"][] | null;
+        };
+        WorkflowRunReadDto: {
+            /** Format: uuid */
+            workflowRunId: string;
+            /** Format: uuid */
+            projectId: string;
+            workflowType: string | null;
+            workflowName: string | null;
+            status: string | null;
+            subjectType: string | null;
+            subjectId: string | null;
+            subjectSummary?: string | null;
+            /** Format: uuid */
+            correlationId?: string | null;
+            /** Format: uuid */
+            causationId?: string | null;
+            steps: components["schemas"]["WorkflowStepReadDto"][] | null;
+            evidenceReferences: components["schemas"]["WorkflowEvidenceReferenceReadDto"][] | null;
+            groundingReferences: components["schemas"]["WorkflowGroundingReferenceReadDto"][] | null;
+            authorityFlags: components["schemas"]["WorkflowAuthorityFlagsDto"];
+            /** Format: date-time */
+            createdUtc: string;
+        };
+        WorkflowRunReadDtoWorkflowReadOnlyApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["WorkflowRunReadDto"];
+            workflowRunId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["WorkflowReadOnlyBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["WorkflowReadOnlyApiErrorDto"][] | null;
+        };
+        WorkflowRunSummaryReadDto: {
+            /** Format: uuid */
+            workflowRunId: string;
+            /** Format: uuid */
+            projectId: string;
+            workflowType: string | null;
+            workflowName: string | null;
+            status: string | null;
+            subjectType: string | null;
+            subjectId: string | null;
+            /** Format: uuid */
+            correlationId?: string | null;
+            /** Format: uuid */
+            causationId?: string | null;
+            /** Format: int32 */
+            stepCount?: number;
+            /** Format: int32 */
+            evidenceReferenceCount?: number;
+            /** Format: int32 */
+            groundingReferenceCount?: number;
+            authorityFlags: components["schemas"]["WorkflowAuthorityFlagsDto"];
+            /** Format: date-time */
+            createdUtc: string;
+        };
+        WorkflowStepListResponseDto: {
+            items: components["schemas"]["WorkflowStepSummaryReadDto"][] | null;
+            /** Format: int32 */
+            take: number;
+        };
+        WorkflowStepListResponseDtoWorkflowReadOnlyApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["WorkflowStepListResponseDto"];
+            workflowRunId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["WorkflowReadOnlyBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["WorkflowReadOnlyApiErrorDto"][] | null;
+        };
+        WorkflowStepReadDto: {
+            /** Format: uuid */
+            workflowRunStepId: string;
+            /** Format: uuid */
+            workflowRunId: string;
+            /** Format: uuid */
+            projectId: string;
+            stepKey: string | null;
+            stepName: string | null;
+            stepType: string | null;
+            status: string | null;
+            /** Format: int32 */
+            sequenceNumber?: number | null;
+            agentRole?: string | null;
+            agentId?: string | null;
+            subjectType?: string | null;
+            subjectId?: string | null;
+            safeSummary?: string | null;
+            /** Format: uuid */
+            correlationId?: string | null;
+            /** Format: uuid */
+            causationId?: string | null;
+            evidenceReferences: components["schemas"]["WorkflowEvidenceReferenceReadDto"][] | null;
+            groundingReferences: components["schemas"]["WorkflowGroundingReferenceReadDto"][] | null;
+            authorityFlags: components["schemas"]["WorkflowAuthorityFlagsDto"];
+            /** Format: date-time */
+            createdUtc: string;
+        };
+        WorkflowStepReadDtoWorkflowReadOnlyApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["WorkflowStepReadDto"];
+            workflowRunId?: string | null;
+            evidenceId?: string | null;
+            boundary: components["schemas"]["WorkflowReadOnlyBoundaryStatusDto"];
+            mutationOccurred?: boolean;
+            humanApprovalRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["WorkflowReadOnlyApiErrorDto"][] | null;
+        };
+        WorkflowStepSummaryReadDto: {
+            /** Format: uuid */
+            workflowRunStepId: string;
+            /** Format: uuid */
+            workflowRunId: string;
+            /** Format: uuid */
+            projectId: string;
+            stepKey: string | null;
+            stepName: string | null;
+            stepType: string | null;
+            status: string | null;
+            /** Format: int32 */
+            sequenceNumber?: number | null;
+            agentRole?: string | null;
+            agentId?: string | null;
+            subjectType?: string | null;
+            subjectId?: string | null;
+            /** Format: uuid */
+            correlationId?: string | null;
+            /** Format: uuid */
+            causationId?: string | null;
+            /** Format: int32 */
+            evidenceReferenceCount?: number;
+            /** Format: int32 */
+            groundingReferenceCount?: number;
+            authorityFlags: components["schemas"]["WorkflowAuthorityFlagsDto"];
+            /** Format: date-time */
+            createdUtc: string;
+        };
+        WorkflowTransitionRecordApiErrorDto: {
+            category: string | null;
+            code: string | null;
+            field: string | null;
+            message: string | null;
+        };
+        WorkflowTransitionRecordListReadModel: {
+            /** Format: uuid */
+            projectId: string;
+            records: components["schemas"]["WorkflowTransitionRecordReadModel"][] | null;
+            /** Format: int32 */
+            count: number;
+            mutationOccurredInThisApi: boolean;
+            workflowContinuationExecutedByThisApi: boolean;
+            releaseReadinessInferredByThisApi: boolean;
+            releaseApprovedByThisApi: boolean;
+            humanReviewRequired: boolean;
+        };
+        WorkflowTransitionRecordListReadModelWorkflowTransitionRecordApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["WorkflowTransitionRecordListReadModel"];
+            boundary: components["schemas"]["WorkflowTransitionRecordReadBoundary"];
+            mutationOccurredInThisApi?: boolean;
+            workflowContinuationExecutedByThisApi?: boolean;
+            releaseReadinessInferredByThisApi?: boolean;
+            releaseApprovedByThisApi?: boolean;
+            humanReviewRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["WorkflowTransitionRecordApiErrorDto"][] | null;
+        };
+        WorkflowTransitionRecordReadBoundary: {
+            readCreatesWorkflowTransitionRecord?: boolean;
+            readMutatesWorkflowState?: boolean;
+            readContinuesWorkflow?: boolean;
+            readTransitionsWorkflow?: boolean;
+            readCompletesWorkflowStep?: boolean;
+            readStartsNextWorkflowStep?: boolean;
+            readEvaluatesContinuationGate?: boolean;
+            readSatisfiesContinuationGate?: boolean;
+            readInfersReleaseReadiness?: boolean;
+            readApprovesRelease?: boolean;
+            readExecutesSourceApply?: boolean;
+            readExecutesRollback?: boolean;
+            readRunsGit?: boolean;
+            readCallsAgentsModelsOrTools?: boolean;
+            readPromotesMemory?: boolean;
+            readActivatesRetrieval?: boolean;
+            humanReviewRequired?: boolean;
+            humanReviewRequiredForReleaseReadiness?: boolean;
+            humanReviewRequiredForReleaseApproval?: boolean;
+        };
+        WorkflowTransitionRecordReadModel: {
+            /** Format: uuid */
+            workflowTransitionRecordId: string;
+            /** Format: uuid */
+            projectId: string;
+            workflowRunId: string | null;
+            workflowStepId: string | null;
+            transitionKind: string | null;
+            previousWorkflowStateHash: string | null;
+            newWorkflowStateHash: string | null;
+            previousStepStateHash: string | null;
+            newStepStateHash: string | null;
+            previousStepId?: string | null;
+            nextStepId?: string | null;
+            /** Format: uuid */
+            workflowContinuationGateEvaluationId: string;
+            workflowContinuationGateEvaluationHash: string | null;
+            /** Format: uuid */
+            sourceApplyRequestId: string;
+            sourceApplyRequestHash: string | null;
+            /** Format: uuid */
+            sourceApplyReceiptId: string;
+            sourceApplyReceiptHash: string | null;
+            /** Format: uuid */
+            rollbackExecutionReceiptId?: string | null;
+            rollbackExecutionReceiptHash?: string | null;
+            /** Format: uuid */
+            rollbackExecutionAuditReportId?: string | null;
+            rollbackExecutionAuditReportHash?: string | null;
+            workflowStateMutated: boolean;
+            stepCompleted: boolean;
+            nextStepStarted: boolean;
+            releaseReadinessInferred: boolean;
+            releaseApproved: boolean;
+            sourceApplyExecuted: boolean;
+            rollbackExecuted: boolean;
+            /** Format: date-time */
+            transitionedAtUtc: string;
+            workflowTransitionRecordHash: string | null;
+            evidenceReferences: string[] | null;
+            boundaryMaxims: string[] | null;
+            boundary: string | null;
+            authorityBoundary: string | null;
+            warnings: string[] | null;
+            mutationOccurredInThisApi: boolean;
+            workflowContinuationExecutedByThisApi: boolean;
+            releaseReadinessInferredByThisApi: boolean;
+            releaseApprovedByThisApi: boolean;
+            humanReviewRequired: boolean;
+        };
+        WorkflowTransitionRecordReadModelWorkflowTransitionRecordApiEnvelope: {
+            status: string | null;
+            data?: components["schemas"]["WorkflowTransitionRecordReadModel"];
+            boundary: components["schemas"]["WorkflowTransitionRecordReadBoundary"];
+            mutationOccurredInThisApi?: boolean;
+            workflowContinuationExecutedByThisApi?: boolean;
+            releaseReadinessInferredByThisApi?: boolean;
+            releaseApprovedByThisApi?: boolean;
+            humanReviewRequired?: boolean;
+            warnings?: string[] | null;
+            errors?: components["schemas"]["WorkflowTransitionRecordApiErrorDto"][] | null;
         };
     };
     responses: never;
@@ -4018,6 +15233,24 @@ export interface components {
 export type $defs = Record<string, never>;
 export interface operations {
     Health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    Environment: {
         parameters: {
             query?: never;
             header?: never;

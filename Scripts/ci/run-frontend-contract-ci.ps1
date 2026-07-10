@@ -106,6 +106,16 @@ try {
     }
 
     Add-Content -LiteralPath $script:OpenApiDriftSummary -Value "Committed generated API client matches the OpenAPI snapshot."
+
+    Invoke-LoggedNativeCommand `
+        -Name "Live OpenAPI regeneration and dirty-tree check" `
+        -OutputPath $script:OpenApiDriftSummary `
+        -Command {
+            & (Join-Path $script:RepoRoot "tools\contracts\update-openapi-contract.ps1") -Check
+            git -C $script:RepoRoot diff --exit-code -- `
+                IronDev.TauriShell/openapi/irondev-api.openapi.json `
+                IronDev.TauriShell/src/api/generated/ironDevApiTypes.ts
+        }
 }
 finally {
     Pop-Location
