@@ -392,21 +392,11 @@ try {
         -Attempts 30 `
         -DelaySeconds 2
 
-    Invoke-TimedCommand "Clean database migration verification" {
-        & (Join-Path $script:RepoRoot "Database\verify-clean-database.ps1") `
+    Invoke-TimedCommand "Isolated platform baseline" {
+        & (Join-Path $script:RepoRoot "Scripts\ci\run-platform-baseline-ci.ps1") `
             -ConnectionString $connectionString `
-            -Database "$($env:IRONDEV_CI_SQL_DATABASE)_Migration"
+            -SkipFrontend
     }
-
-    Invoke-TimedCommand "Apply migrations to SQL test catalog" {
-        & (Join-Path $script:RepoRoot "Database\apply-migrations.ps1") `
-            -ConnectionString $connectionString
-    }
-
-    Invoke-TestLane `
-        -Name "In-process API contract" `
-        -Project $script:ApiProject `
-        -Filter "(FullyQualifiedName~EndpointContractTests&TestCategory!=ProcessExecution)|FullyQualifiedName~ApiTestBaseCatalogGuardContractTests"
 
     $sqlStoreFilter = @(
         "FullyQualifiedName~AcceptedApprovalSqlStoreTests",

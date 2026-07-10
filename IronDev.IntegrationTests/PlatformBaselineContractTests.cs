@@ -32,11 +32,9 @@ public sealed class PlatformBaselineContractTests
         StringAssert.Contains(script, "Open-SqlConnection");
 
         var fullSql = Read("Scripts", "ci", "run-full-sql-integration-ci.ps1");
-        StringAssert.Contains(fullSql, "Clean database migration verification");
-        StringAssert.Contains(fullSql, "Apply migrations to SQL test catalog");
-        AssertOrder(fullSql, "Database\\apply-migrations.ps1", "In-process API contract");
-        StringAssert.Contains(fullSql, "TestCategory!=ProcessExecution");
-        StringAssert.Contains(fullSql, "In-process API contract");
+        StringAssert.Contains(fullSql, "Isolated platform baseline");
+        StringAssert.Contains(fullSql, "Scripts\\ci\\run-platform-baseline-ci.ps1");
+        AssertOrder(fullSql, "Isolated platform baseline", "SQL-backed governance stores");
     }
 
     [TestMethod]
