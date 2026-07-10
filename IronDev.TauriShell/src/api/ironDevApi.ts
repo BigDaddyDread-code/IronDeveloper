@@ -54,6 +54,8 @@ import type {
   ProjectDocumentProcessingResult,
   ProjectDocumentUploadResult,
   ProjectDocumentVersion,
+  ProjectToolCatalogueResponse,
+  ProjectToolDetailResponse,
   ProjectChatSession,
   ProjectImplementationPlan,
   ProjectFileSummary,
@@ -456,6 +458,20 @@ class IronDevApiClient {
       method: 'GET',
       signal
     });
+  }
+
+  async getProjectTools(projectId: number, signal?: AbortSignal): Promise<ProjectToolCatalogueResponse> {
+    return this.request<ProjectToolCatalogueResponse>(`/api/projects/${projectId}/tools`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getProjectTool(projectId: number, toolId: string, signal?: AbortSignal): Promise<ProjectToolDetailResponse> {
+    return this.request<ProjectToolDetailResponse>(
+      `/api/projects/${projectId}/tools/${encodeURIComponent(toolId)}`,
+      { method: 'GET', signal }
+    );
   }
 
   async getDocument(documentId: number, signal?: AbortSignal): Promise<ProjectDocument | null> {

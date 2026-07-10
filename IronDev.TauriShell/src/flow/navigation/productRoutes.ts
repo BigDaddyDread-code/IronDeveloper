@@ -36,6 +36,7 @@ export interface ProductRoute {
   libraryDocumentId: number | null;
   libraryDocumentVersionId: number | null;
   libraryDocumentAction: 'upload' | null;
+  libraryToolId: string | null;
   compatibility: boolean;
 }
 
@@ -57,6 +58,7 @@ function route(
     libraryDocumentId: options.libraryDocumentId ?? null,
     libraryDocumentVersionId: options.libraryDocumentVersionId ?? null,
     libraryDocumentAction: options.libraryDocumentAction ?? null,
+    libraryToolId: options.libraryToolId ?? null,
     compatibility: options.compatibility ?? false
   };
 }
@@ -145,6 +147,15 @@ export function parseProductRoute(pathname: string): ProductRoute {
     });
   }
 
+  const toolDetailMatch = normalized.match(/^\/projects\/(\d+)\/library\/tools\/([^/]+)$/);
+  if (toolDetailMatch) {
+    return route(normalized, 'library', {
+      projectId: Number(toolDetailMatch[1]),
+      librarySection: 'tools',
+      libraryToolId: decodeURIComponent(toolDetailMatch[2])
+    });
+  }
+
   const libraryMatch = normalized.match(/^\/projects\/(\d+)\/library(?:\/(explorer|documents|tools|members|provisioning|audit|settings))?$/);
   if (libraryMatch) {
     return route(normalized, 'library', {
@@ -195,6 +206,10 @@ export function documentUploadPath(projectId: number): string {
 
 export function documentVersionPath(projectId: number, documentId: number, versionId: number): string {
   return `${documentPath(projectId, documentId)}/versions/${versionId}`;
+}
+
+export function toolPath(projectId: number, toolId: string): string {
+  return `${libraryPath(projectId, 'tools')}/${encodeURIComponent(toolId)}`;
 }
 
 export function navigateProductPath(pathname: string, replace = false): void {

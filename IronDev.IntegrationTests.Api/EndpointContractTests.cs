@@ -64,6 +64,8 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/services/status",
             "/api/projects/{projectId}/chat/document-sources",
             "/api/projects/{projectId}/chat/complete",
+            "/api/projects/{projectId}/tools",
+            "/api/projects/{projectId}/tools/{toolId}",
             "/api/run-reports",
             "/api/runs/{runId}",
             "/api/runs/{runId}/report",
@@ -84,7 +86,8 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/1/tickets",
             "/api/projects/1/documents",
             "/api/projects/1/memory/search?q=architecture",
-            "/api/projects/1/chat/sessions"
+            "/api/projects/1/chat/sessions",
+            "/api/projects/1/tools"
         })
         {
             var response = await Client.GetAsync(path);
@@ -725,6 +728,64 @@ public sealed class EndpointContractTests : ApiTestBase
             "SELECT COUNT(1) FROM dbo.ChatMessages WHERE ChatSessionId = @SessionId;",
             new { SessionId = sessionId });
         Assert.AreEqual(messageCountBeforeRefusal, messageCountAfterRefusal);
+    }
+
+    [TestMethod]
+    public async Task ProjectTools_ShouldExposeRegisteredDefinitionWithoutGrantingDirectInvocation()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+        var project = await CreateProjectAsync(client, "Governed Tool Catalogue Project");
+
+        var catalogueResponse = await client.GetAsync($"/api/projects/{project.Id}/tools");
+        Assert.AreEqual(HttpStatusCode.OK, catalogueResponse.StatusCode);
+        var catalogue = await catalogueResponse.Content.ReadFromJsonAsync<ProjectToolCatalogueResponse>();
+        Assert.IsNotNull(catalogue);
+        Assert.AreEqual(project.Id, catalogue!.ProjectId);
+        Assert.AreEqual(project.Name, catalogue.ProjectName);
+        Assert.AreEqual(1, catalogue.Tools.Count);
+
+        var summary = catalogue.Tools.Single();
+        Assert.AreEqual("code_standards.analyse_patch", summary.ToolId);
+        Assert.AreEqual("Code standards analysis", summary.DisplayName);
+        Assert.AreEqual("Testing and validation", summary.Category);
+        Assert.AreEqual("Registered", summary.RegistrationStatus);
+        Assert.AreEqual("Not required", summary.ConnectionStatus);
+        Assert.AreEqual("Governed workflows only", summary.ProjectUseStatus);
+        Assert.AreEqual("Not implemented", summary.DirectInvocationStatus);
+        Assert.AreEqual("Not checked", summary.HealthStatus);
+        StringAssert.Contains(summary.EffectiveScopeSummary, "Read-only");
+        StringAssert.Contains(catalogue.Boundary, "Registration is not project enablement");
+
+        var detailResponse = await client.GetAsync(
+            $"/api/projects/{project.Id}/tools/code_standards.analyse_patch");
+        Assert.AreEqual(HttpStatusCode.OK, detailResponse.StatusCode);
+        var detail = await detailResponse.Content.ReadFromJsonAsync<ProjectToolDetailResponse>();
+        Assert.IsNotNull(detail);
+        Assert.AreEqual("1", detail!.DefinitionVersion);
+        Assert.AreEqual("CodeStandardsAnalysisInput", detail.InputContract);
+        Assert.AreEqual("CodeStandardsAnalysisResult", detail.OutputContract);
+        CollectionAssert.AreEquivalent(
+            new[] { "BuilderAgent", "TestingAgent", "TesterAgent" },
+            detail.AllowedCallers.ToArray());
+        CollectionAssert.AreEqual(new[] { "CodeStandardsFinding" }, detail.EvidenceKinds.ToArray());
+        Assert.IsFalse(detail.Capabilities.MutatesState);
+        Assert.IsFalse(detail.Capabilities.AllowsNestedCalls);
+        Assert.IsFalse(detail.Capabilities.AllowsFileWrites);
+        Assert.IsFalse(detail.Capabilities.AllowsProcessExecution);
+        Assert.IsFalse(detail.Capabilities.AllowsNetworkAccess);
+        Assert.IsFalse(detail.Capabilities.AllowsWorkspaceMutation);
+
+        var unknownProject = await client.GetAsync($"/api/projects/{project.Id + 999999}/tools");
+        Assert.AreEqual(HttpStatusCode.NotFound, unknownProject.StatusCode);
+        var unknownTool = await client.GetAsync($"/api/projects/{project.Id}/tools/not.registered");
+        Assert.AreEqual(HttpStatusCode.NotFound, unknownTool.StatusCode);
+
+        var directInvocation = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/tools/code_standards.analyse_patch",
+            new { patch = "not executable from this surface" });
+        Assert.AreEqual(HttpStatusCode.MethodNotAllowed, directInvocation.StatusCode);
     }
 
     [TestMethod]

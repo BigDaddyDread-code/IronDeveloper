@@ -7,10 +7,20 @@ public enum GovernedToolStatus
     Failed
 }
 
+public enum GovernedToolConnectionRequirement
+{
+    None,
+    Tenant
+}
+
 public sealed record GovernedToolDefinition
 {
     public required string Name { get; init; }
+    public required string DisplayName { get; init; }
+    public required string Category { get; init; }
+    public required string DefinitionVersion { get; init; }
     public required string Description { get; init; }
+    public required GovernedToolConnectionRequirement ConnectionRequirement { get; init; }
     public required Type InputType { get; init; }
     public required Type OutputType { get; init; }
     public IReadOnlyList<string> AllowedCallers { get; init; } = [];

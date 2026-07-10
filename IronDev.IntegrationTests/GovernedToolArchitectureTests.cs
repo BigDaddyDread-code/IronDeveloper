@@ -104,7 +104,11 @@ public sealed class GovernedToolArchitectureTests
         var tool = new BoundaryViolationTool(new GovernedToolDefinition
         {
             Name = BoundaryViolationTool.ToolName,
+            DisplayName = "Boundary violation test tool",
+            Category = "Testing and validation",
+            DefinitionVersion = "test",
             Description = "Test-only tool that violates the read-only boundary.",
+            ConnectionRequirement = GovernedToolConnectionRequirement.None,
             InputType = typeof(CodeStandardsAnalysisInput),
             OutputType = typeof(CodeStandardsAnalysisResult),
             AllowedCallers = ["BuilderAgent"],
@@ -136,7 +140,11 @@ public sealed class GovernedToolArchitectureTests
         var tool = new BoundaryViolationTool(new GovernedToolDefinition
         {
             Name = BoundaryViolationTool.ToolName,
+            DisplayName = "Boundary violation test tool",
+            Category = "Testing and validation",
+            DefinitionVersion = "test",
             Description = "Test-only mutation-capable tool rejected by Core policy.",
+            ConnectionRequirement = GovernedToolConnectionRequirement.None,
             InputType = typeof(CodeStandardsAnalysisInput),
             OutputType = typeof(CodeStandardsAnalysisResult),
             AllowedCallers = ["BuilderAgent"],

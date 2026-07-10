@@ -160,7 +160,11 @@ public sealed class GovernedToolPolicyEvaluatorExtractionTests
         new()
         {
             Name = name,
+            DisplayName = name,
+            Category = "Test fixture",
+            DefinitionVersion = "test-1",
             Description = "Read-only test policy fixture.",
+            ConnectionRequirement = GovernedToolConnectionRequirement.None,
             InputType = typeof(TestInput),
             OutputType = typeof(TestOutput),
             AllowedCallers = allowedCallers ?? ["planner"],
