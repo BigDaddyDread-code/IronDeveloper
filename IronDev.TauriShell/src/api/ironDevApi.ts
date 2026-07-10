@@ -209,6 +209,10 @@ class IronDevApiClient {
     });
   }
 
+  async logout(signal?: AbortSignal): Promise<void> {
+    await this.request<unknown>('/api/auth/logout', { method: 'POST', signal });
+  }
+
   async getCurrentUser(signal?: AbortSignal): Promise<UserProfile> {
     return this.request<UserProfile>('/api/auth/me', { method: 'GET', signal });
   }

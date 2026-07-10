@@ -23,6 +23,7 @@ interface SessionContextState {
   checkApiConnection: () => Promise<ApiStatus>;
   saveToken: () => void;
   signIn: (request: LoginRequest) => Promise<void>;
+  signOut: () => Promise<void>;
   setTokenDraft: (value: string) => void;
   setEmail: (value: string) => void;
   setPassword: (value: string) => void;
@@ -163,6 +164,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [client, environmentInfo?.isTestEnvironment, refreshConfig]
   );
 
+  const signOut = useCallback(async () => {
+    try {
+      if (config.token) {
+        await client.logout();
+      }
+    } catch {
+      // Logout is stateless. Local session removal remains the safe outcome
+      // when the API is unavailable.
+    } finally {
+      window.localStorage.removeItem('irondev.token');
+      window.localStorage.removeItem('irondev.tenantId');
+      window.localStorage.removeItem('irondev.selectedProjectId');
+      setTokenDraft('');
+      setPassword('');
+      setTokenEditorOpen(false);
+      refreshConfig();
+    }
+  }, [client, config.token, refreshConfig]);
+
   const tokenConfigured = Boolean(config.token);
 
   const value: SessionContextState = useMemo(
@@ -187,6 +207,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       checkApiConnection,
       saveToken,
       signIn,
+      signOut,
       setTokenDraft,
       setEmail,
       setPassword,
@@ -209,6 +230,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       refreshConfig,
       saveToken,
       signIn,
+      signOut,
       sessionMessage,
       tokenConfigured,
       tokenDraft
