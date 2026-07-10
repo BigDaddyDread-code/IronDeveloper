@@ -1,11 +1,11 @@
-import { RouteOutcomeScreen } from '../components/RouteOutcomeScreen';
-import { libraryPath, navigateProductPath, projectPath, type LibrarySection } from '../navigation/productRoutes';
+import { libraryPath, navigateProductPath, type LibrarySection } from '../navigation/productRoutes';
 import { GovernanceHost } from './GovernanceHost';
 import { AuditSection, ProvisioningSection } from './PlannedSections';
 import { SolutionExplorer } from './SolutionExplorer';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { DocumentsScreen } from './DocumentsScreen';
 import { ToolsScreen } from './ToolsScreen';
+import { MembersScreen } from './MembersScreen';
 
 interface LibraryScreenProps {
   projectId: number;
@@ -29,14 +29,6 @@ const sections: Array<{ id: LibrarySection; label: string }> = [
   { id: 'audit', label: 'Audit' },
   { id: 'settings', label: 'Settings' }
 ];
-
-const plannedCopy: Record<'members', { title: string; message: string; next: string }> = {
-  members: {
-    title: 'Project members are not implemented',
-    message: 'Tenant users exist, but project visibility and collaboration membership are a separate contract.',
-    next: 'Open Settings for tenant users, or return to Library.'
-  }
-};
 
 export function LibraryScreen({
   projectId,
@@ -89,23 +81,13 @@ export function LibraryScreen({
         />
       ) : null}
       {section === 'tools' ? <ToolsScreen projectId={projectId} toolId={toolId} /> : null}
+      {section === 'members' ? <MembersScreen projectId={projectId} /> : null}
       {section === 'governance' ? <GovernanceHost /> : null}
       {section === 'provisioning' ? (
         <ProvisioningSection onBackToProjects={onBackToProjects} onOpenBoard={onOpenBoard} />
       ) : null}
       {section === 'audit' ? <AuditSection /> : null}
       {section === 'settings' ? <SettingsScreen /> : null}
-      {section === 'members' ? (
-        <RouteOutcomeScreen
-          kind="notImplemented"
-          title={plannedCopy[section].title}
-          message={plannedCopy[section].message}
-          nextSafeAction={plannedCopy[section].next}
-          actionLabel="Back to Library"
-          onAction={() => navigateProductPath(projectPath(projectId, 'library'))}
-        />
-      ) : null}
-
       {preserveGovernancePath ? (
         <span className="fl-visually-hidden" data-testid="flow.library.compatibilityPath">
           Legacy governance deep link preserved

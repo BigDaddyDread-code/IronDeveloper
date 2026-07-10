@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
+using IronDev.Data.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Api;
@@ -173,6 +174,40 @@ public class TenantUsersAdminApiTests : ApiTestBase
 
         var removeAttempt = await viewerClient.DeleteAsync($"/api/tenants/{AssignedTenantId}/users/{createdId}");
         Assert.AreEqual(HttpStatusCode.Forbidden, removeAttempt.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ProjectMemberDirectory_ShouldExposeViewerAsReadOnly()
+    {
+        var ownerBaseToken = await LoginAsync();
+        var ownerTenantToken = await SelectTenantAsync(ownerBaseToken);
+        using var ownerClient = GetAuthedClient(ownerTenantToken);
+
+        var projectResponse = await ownerClient.PostAsJsonAsync("/api/projects", new Project
+        {
+            Name = "Viewer Member Directory",
+            Description = "Project-scoped member directory permission test.",
+            LocalPath = @"C:\Temp\ViewerMemberDirectory"
+        });
+        Assert.AreEqual(HttpStatusCode.Created, projectResponse.StatusCode);
+        var project = await projectResponse.Content.ReadFromJsonAsync<Project>();
+        Assert.IsNotNull(project);
+
+        var createResponse = await ownerClient.PostAsJsonAsync($"/api/tenants/{AssignedTenantId}/users",
+            new { email = NewUserEmail, displayName = "Viewer User", password = NewUserPassword, role = "Viewer" });
+        Assert.AreEqual(HttpStatusCode.OK, createResponse.StatusCode);
+
+        var viewerBaseToken = await LoginAsync(NewUserEmail, NewUserPassword);
+        var viewerTenantToken = await SelectTenantAsync(viewerBaseToken);
+        using var viewerClient = GetAuthedClient(viewerTenantToken);
+        var directoryResponse = await viewerClient.GetAsync($"/api/projects/{project!.Id}/members");
+
+        Assert.AreEqual(HttpStatusCode.OK, directoryResponse.StatusCode);
+        var directory = await directoryResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.AreEqual("Viewer", directory.GetProperty("currentUserTenantRole").GetString());
+        Assert.IsFalse(directory.GetProperty("canAdministerTenantMembership").GetBoolean());
+        Assert.AreEqual("Not implemented", directory.GetProperty("projectMembershipStatus").GetString());
+        Assert.AreEqual("Not implemented", directory.GetProperty("channelMembershipStatus").GetString());
     }
 
     // ── Last-owner protection ─────────────────────────────────────────────────

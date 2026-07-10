@@ -56,6 +56,7 @@ import type {
   ProjectDocumentVersion,
   ProjectToolCatalogueResponse,
   ProjectToolDetailResponse,
+  ProjectMemberDirectoryResponse,
   ProjectChatSession,
   ProjectImplementationPlan,
   ProjectFileSummary,
@@ -472,6 +473,13 @@ class IronDevApiClient {
       `/api/projects/${projectId}/tools/${encodeURIComponent(toolId)}`,
       { method: 'GET', signal }
     );
+  }
+
+  async getProjectMembers(projectId: number, signal?: AbortSignal): Promise<ProjectMemberDirectoryResponse> {
+    return this.request<ProjectMemberDirectoryResponse>(`/api/projects/${projectId}/members`, {
+      method: 'GET',
+      signal
+    });
   }
 
   async getDocument(documentId: number, signal?: AbortSignal): Promise<ProjectDocument | null> {

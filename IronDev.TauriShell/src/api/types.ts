@@ -829,6 +829,30 @@ export interface TenantUser {
   isActive: boolean;
 }
 
+export interface ProjectMemberDirectoryEntry {
+  userId: number;
+  displayName: string;
+  email: string;
+  tenantRole: string;
+  isActive: boolean;
+  isCurrentUser: boolean;
+  projectAccessStatus: string;
+  channelMembershipSummary: string;
+}
+
+export interface ProjectMemberDirectoryResponse {
+  projectId: number;
+  projectName: string;
+  tenantId: number;
+  currentUserTenantRole: string;
+  canAdministerTenantMembership: boolean;
+  availableTenantRoles: string[];
+  projectMembershipStatus: string;
+  channelMembershipStatus: string;
+  members: ProjectMemberDirectoryEntry[];
+  boundary: string;
+}
+
 export interface CreateTenantUserRequest {
   email: string;
   displayName: string;
