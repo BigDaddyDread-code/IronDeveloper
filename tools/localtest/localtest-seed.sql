@@ -163,6 +163,16 @@ VALUES
     (1, 2, 103, 1, 'Owner', 'All', 'Active', 1);
 GO
 
+SET IDENTITY_INSERT dbo.ProjectChannelMessages ON;
+INSERT INTO dbo.ProjectChannelMessages
+    (Id, TenantId, ProjectId, ChannelId, AuthorUserId, Role, Message, MessageFormat, Status)
+VALUES
+    (10001, 1, 1, 101, 1, 'User', 'Shared channels keep human collaboration visible without creating authority.', 'Markdown', 'Active'),
+    (10002, 1, 1, 102, 1, 'User', 'Keep channel visibility separate from workflow authority.', 'Markdown', 'Active'),
+    (10003, 1, 2, 103, 1, 'User', 'BookSeller planning belongs here; governed execution still belongs to the work item.', 'Markdown', 'Active');
+SET IDENTITY_INSERT dbo.ProjectChannelMessages OFF;
+GO
+
 INSERT INTO dbo.ProjectProfiles
     (TenantId, ProjectId, IsExternalProject, ApplicationType, PrimaryLanguage, Framework, DatabaseEngine, DataAccessStyle, TestFramework, SolutionFile, SafeWriteRoot, AllowBuilderApply, AllowWritesOutsideProjectRoot, ProfileNotes)
 VALUES

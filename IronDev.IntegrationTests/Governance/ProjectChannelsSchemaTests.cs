@@ -356,11 +356,22 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
     }
 
     [TestMethod]
-    public void ProjectChannelSchema_DoesNotIntroduceReactionsUiApiOrAssistantAutoAnswerSurface()
+    public void ProjectChannelSchema_DoesNotIntroduceReactionsOrAssistantAutoAnswerSurface()
     {
         var root = RepositoryRoot();
-        Assert.IsFalse(File.Exists(Path.Combine(root, "IronDev.Api", "Controllers", "ProjectChannelsController.cs")), "M02 must not add channel API.");
         Assert.IsFalse(File.Exists(Path.Combine(root, "IronDev.TauriShell", "src", "screens", "Channels.tsx")), "M02 must not add channel UI.");
+
+        var channelController = File.ReadAllText(Path.Combine(root, "IronDev.Api", "Controllers", "ProjectChannelsController.cs"));
+        StringAssert.Contains(channelController, "Shared project conversation");
+        StringAssert.Contains(channelController, "messages never grant approval");
+        StringAssert.Contains(channelController, "AssistantInvocationNotImplemented");
+        AssertDoesNotContainAny(
+            channelController,
+            "ApproveFromChannel",
+            "AutoApprove",
+            "AutoContinue",
+            "AutoApply",
+            "ReleaseReadyFromChat");
 
         var migration = File.ReadAllText(Path.Combine(root, MigrationPath));
         AssertDoesNotContainAny(

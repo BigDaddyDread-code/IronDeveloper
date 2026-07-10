@@ -156,6 +156,7 @@ builder.Services.AddScoped<IProjectChatDocumentSourceService, ProjectChatDocumen
 builder.Services.AddScoped<IProjectToolCatalogueService, ProjectToolCatalogueService>();
 builder.Services.AddScoped<IProjectMemberDirectoryService, ProjectMemberDirectoryService>();
 builder.Services.AddScoped<IProjectChannelMembershipService, ProjectChannelMembershipService>();
+builder.Services.AddScoped<IProjectChannelChatService, ProjectChannelChatService>();
 builder.Services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
 builder.Services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
 builder.Services.AddScoped<IContextAgentRouteJudge, ContextAgentRouteJudgeService>();

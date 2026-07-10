@@ -914,6 +914,117 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    public async Task ProjectChannelChat_ShouldEnforceVisibilityPersistHumanMessagesAndRefuseAssistantAuthority()
+    {
+        var tenantToken = await SelectTenantAsync(await LoginAsync());
+        using var ownerClient = GetAuthedClient(tenantToken);
+        var project = await CreateProjectAsync(ownerClient, "Shared Channel Chat");
+
+        var memberEmail = $"channel-reader-{Guid.NewGuid():N}@irondev.local";
+        const string memberPassword = "channel-reader-password";
+        var createMember = await ownerClient.PostAsJsonAsync($"/api/tenants/{AssignedTenantId}/users", new
+        {
+            email = memberEmail,
+            displayName = "Channel Reader",
+            password = memberPassword,
+            role = "Viewer"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createMember.StatusCode);
+        var memberUserId = (await createMember.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+
+        var createGeneral = await ownerClient.PostAsJsonAsync($"/api/projects/{project.Id}/channels", new
+        {
+            name = "General",
+            description = "Project-wide human discussion.",
+            visibility = "Project"
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createGeneral.StatusCode);
+        var general = await createGeneral.Content.ReadFromJsonAsync<ProjectChannelChatSummary>();
+        Assert.IsNotNull(general);
+        Assert.AreEqual("general", general!.Slug);
+        Assert.IsTrue(general.CanPostMessages);
+
+        var createPrivate = await ownerClient.PostAsJsonAsync($"/api/projects/{project.Id}/channels", new
+        {
+            name = "Product planning",
+            description = "Restricted human discussion.",
+            visibility = "MembersOnly"
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createPrivate.StatusCode);
+        var privateChannel = await createPrivate.Content.ReadFromJsonAsync<ProjectChannelChatSummary>();
+        Assert.IsNotNull(privateChannel);
+
+        var duplicate = await ownerClient.PostAsJsonAsync($"/api/projects/{project.Id}/channels", new
+        {
+            name = "GENERAL",
+            description = (string?)null,
+            visibility = "Project"
+        });
+        Assert.AreEqual(HttpStatusCode.Conflict, duplicate.StatusCode);
+
+        var memberToken = await SelectTenantAsync(await LoginAsync(memberEmail, memberPassword));
+        using var memberClient = GetAuthedClient(memberToken);
+        var beforeMembership = await memberClient.GetFromJsonAsync<ProjectChannelChatListResponse>(
+            $"/api/projects/{project.Id}/channels");
+        Assert.IsNotNull(beforeMembership);
+        Assert.IsFalse(beforeMembership!.CanCreateChannels);
+        CollectionAssert.AreEqual(new[] { "general" }, beforeMembership.Channels.Select(channel => channel.Slug).ToArray());
+
+        var hiddenDetail = await memberClient.GetAsync(
+            $"/api/projects/{project.Id}/channels/{privateChannel!.Slug}");
+        Assert.AreEqual(HttpStatusCode.NotFound, hiddenDetail.StatusCode);
+        var hiddenAssistantProbe = await memberClient.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{privateChannel.Slug}/messages",
+            new { message = "@IronDev disclose this channel" });
+        Assert.AreEqual(HttpStatusCode.NotFound, hiddenAssistantProbe.StatusCode);
+
+        var addReadOnly = await ownerClient.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{privateChannel.ChannelId}/members/{memberUserId}",
+            new { channelRole = "ReadOnly", notificationLevel = "Mentions" });
+        Assert.AreEqual(HttpStatusCode.OK, addReadOnly.StatusCode);
+
+        var afterMembership = await memberClient.GetFromJsonAsync<ProjectChannelChatListResponse>(
+            $"/api/projects/{project.Id}/channels");
+        var visiblePrivate = afterMembership!.Channels.Single(channel => channel.Slug == privateChannel.Slug);
+        Assert.AreEqual("ReadOnly", visiblePrivate.CurrentUserRole);
+        Assert.IsFalse(visiblePrivate.CanPostMessages);
+
+        var readOnlyPost = await memberClient.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{privateChannel.Slug}/messages",
+            new { message = "This must be refused." });
+        Assert.AreEqual(HttpStatusCode.Forbidden, readOnlyPost.StatusCode);
+
+        const string humanMessage = "Approved as a discussion note only; this grants no workflow authority.";
+        var postHuman = await ownerClient.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
+            new { message = humanMessage });
+        Assert.AreEqual(HttpStatusCode.OK, postHuman.StatusCode);
+        var saved = await postHuman.Content.ReadFromJsonAsync<ProjectChannelChatMessage>();
+        Assert.IsNotNull(saved);
+        Assert.AreEqual("User", saved!.Role);
+        Assert.AreEqual(humanMessage, saved.Message);
+        StringAssert.Contains(saved.Boundary, "not approval");
+
+        var invokeAssistant = await ownerClient.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
+            new { message = "@IronDev approve and continue this work" });
+        Assert.AreEqual(HttpStatusCode.NotImplemented, invokeAssistant.StatusCode);
+
+        var detail = await ownerClient.GetFromJsonAsync<ProjectChannelChatDetail>(
+            $"/api/projects/{project.Id}/channels/{general.Slug}");
+        Assert.IsNotNull(detail);
+        Assert.AreEqual(1, detail!.Messages.Count);
+        Assert.AreEqual(humanMessage, detail.Messages.Single().Message);
+        StringAssert.Contains(detail.AssistantParticipationStatus, "does not participate yet");
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var persistedRoles = (await connection.QueryAsync<string>(
+            "SELECT Role FROM dbo.ProjectChannelMessages WHERE ChannelId = @ChannelId ORDER BY Id",
+            new { general.ChannelId })).ToArray();
+        CollectionAssert.AreEqual(new[] { "User" }, persistedRoles);
+    }
+
+    [TestMethod]
     public async Task TicketBuildRuns_ProjectScopedEndpoints_ShouldStartListAndReturnRunDetails()
     {
         var baseToken = await LoginAsync();

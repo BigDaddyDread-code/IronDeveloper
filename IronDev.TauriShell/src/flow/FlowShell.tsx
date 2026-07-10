@@ -5,12 +5,14 @@ import type { ProjectTicket } from '../api/types';
 import { routeForId } from '../app/routes';
 import { SignInRoute } from '../features/auth/SignInRoute';
 import { ChatRoute } from '../features/chatToBuild/ChatRoute';
+import { SharedChannelRoute } from '../features/chatToBuild/SharedChannelRoute';
 import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
 import { BoardScreen } from './board/BoardScreen';
 import { RouteOutcomeScreen, type RouteOutcomeKind } from './components/RouteOutcomeScreen';
 import { LibraryScreen } from './library/LibraryScreen';
 import {
+  chatChannelPath,
   chatSessionPath,
   libraryPath,
   navigateProductPath,
@@ -484,13 +486,12 @@ export function FlowShell() {
           <BoardScreen onOpenWorkItem={openWorkItem} onOpenProvisioning={() => openProjectSetup()} />
         ) : null}
         {displayedKind === 'chat' && currentRoute.chatChannelId ? (
-          <RouteOutcomeScreen
-            kind="notImplemented"
-            title="Project channels are not implemented"
-            message="This route names a shared project channel, but the current Chat API only supports direct IronDev sessions."
-            nextSafeAction="Return to direct Chat. No channel messages or membership state have been inferred."
-            actionLabel="Open direct Chat"
-            onAction={() => navigateProductPath(projectPath(activeProjectId, 'chat'))}
+          <SharedChannelRoute
+            projectId={activeProjectId}
+            channelReference={currentRoute.chatChannelId}
+            onOpenChannel={(slug) => navigateProductPath(chatChannelPath(activeProjectId, slug))}
+            onOpenSession={(sessionId) => navigateProductPath(chatSessionPath(activeProjectId, sessionId))}
+            onOpenDirect={() => navigateProductPath(projectPath(activeProjectId, 'chat'))}
           />
         ) : null}
         {displayedKind === 'chat' && !currentRoute.chatChannelId ? (
@@ -498,6 +499,7 @@ export function FlowShell() {
             route={routeForId('chat')}
             requestedSessionId={currentRoute.chatSessionId}
             onOpenSession={(sessionId) => navigateProductPath(chatSessionPath(activeProjectId, sessionId))}
+            onOpenChannel={(slug) => navigateProductPath(chatChannelPath(activeProjectId, slug))}
             onOpenLanding={() => navigateProductPath(projectPath(activeProjectId, 'chat'))}
             onOpenWorkItem={openWorkItem}
           />
