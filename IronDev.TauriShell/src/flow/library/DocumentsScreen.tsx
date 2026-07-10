@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { ProjectDocument, ProjectDocumentUploadResult, ProjectDocumentVersion } from '../../api/types';
+import type {
+  ProjectDocument,
+  ProjectDocumentProcessingResult,
+  ProjectDocumentUploadResult,
+  ProjectDocumentVersion
+} from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useSessionContext } from '../../state/useSessionContext';
 import { RouteOutcomeScreen, type RouteOutcomeKind } from '../components/RouteOutcomeScreen';
@@ -23,6 +28,7 @@ interface DocumentsScreenProps {
 type DocumentLoadState = 'loading' | 'ready' | 'notFound' | 'permission' | 'unavailable';
 type StatusFilter = 'all' | 'active' | 'archived';
 type UploadState = 'idle' | 'uploading' | 'uploaded';
+type ProcessingActionState = 'idle' | 'processing';
 
 const maximumUploadBytes = 1024 * 1024;
 const supportedDocumentExtensions = ['.md', '.markdown', '.txt'];
@@ -414,6 +420,9 @@ function DocumentDetail({
   const [loadState, setLoadState] = useState<DocumentLoadState>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [processingActionState, setProcessingActionState] = useState<ProcessingActionState>('idle');
+  const [processingResult, setProcessingResult] = useState<ProjectDocumentProcessingResult | null>(null);
+  const [processingError, setProcessingError] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -444,6 +453,23 @@ function DocumentDetail({
   const selectedVersion = requestedVersionId === null
     ? versions.find((version) => version.id === document?.currentVersionId) ?? versions[0] ?? null
     : versions.find((version) => version.id === requestedVersionId) ?? null;
+
+  const processDocument = async () => {
+    setProcessingActionState('processing');
+    setProcessingResult(null);
+    setProcessingError('');
+    try {
+      const result = await session.client.processProjectDocument(projectId, documentId);
+      setDocument(result.document);
+      setProcessingResult(result);
+    } catch (error) {
+      setProcessingError(error instanceof IronDevApiError
+        ? readApiErrorMessage(error)
+        : error instanceof Error ? error.message : 'Document processing did not complete.');
+    } finally {
+      setProcessingActionState('idle');
+    }
+  };
 
   if (loadState === 'loading') {
     return <p className="fl-documents-loading" data-testid="flow.documents.detailLoading">Loading document...</p>;
@@ -513,6 +539,16 @@ function DocumentDetail({
         </div>
       </header>
 
+      {selectedVersion.id === document.currentVersionId ? (
+        <DocumentProcessingPanel
+          document={document}
+          result={processingResult}
+          requestError={processingError}
+          actionState={processingActionState}
+          onProcess={() => void processDocument()}
+        />
+      ) : null}
+
       <details className="fl-document-metadata">
         <summary>Document details</summary>
         <dl>
@@ -522,6 +558,11 @@ function DocumentDetail({
           <div><dt>Original file</dt><dd>{document.originalFileName || 'Not uploaded from a file'}</dd></div>
           <div><dt>Media type</dt><dd>{document.mediaType || 'Unavailable'}</dd></div>
           <div><dt>File size</dt><dd>{formatByteSize(document.byteSize)}</dd></div>
+          <div><dt>Processing started</dt><dd>{formatOptionalDate(document.processingStartedAtUtc)}</dd></div>
+          <div><dt>Processing completed</dt><dd>{formatOptionalDate(document.processingCompletedAtUtc)}</dd></div>
+          {document.processingFailureReason ? (
+            <div className="fl-document-metadata__description"><dt>Processing failure</dt><dd>{document.processingFailureReason}</dd></div>
+          ) : null}
           <div className="fl-document-metadata__description"><dt>Description</dt><dd>{document.description || 'No description recorded.'}</dd></div>
         </dl>
       </details>
@@ -570,12 +611,77 @@ function DocumentDetail({
   );
 }
 
+function DocumentProcessingPanel({
+  document,
+  result,
+  requestError,
+  actionState,
+  onProcess
+}: {
+  document: ProjectDocument;
+  result: ProjectDocumentProcessingResult | null;
+  requestError: string;
+  actionState: ProcessingActionState;
+  onProcess: () => void;
+}) {
+  const status = document.processingStatus?.trim() || 'Draft';
+  const normalized = status.toLowerCase();
+  const processingStarted = document.processingStartedAtUtc ? Date.parse(document.processingStartedAtUtc) : Number.NaN;
+  const interrupted = normalized === 'processing'
+    && (!Number.isFinite(processingStarted) || processingStarted <= Date.now() - 10 * 60 * 1000);
+  const isProcessing = actionState === 'processing' || (normalized === 'processing' && !interrupted);
+  const failed = normalized === 'processingfailed' || interrupted || (result !== null && !result.succeeded);
+  const ready = normalized === 'ready' && !failed;
+  const failureReason = result?.failureReason
+    || document.processingFailureReason
+    || requestError
+    || (interrupted ? 'The previous processing attempt did not complete.' : 'Document processing did not complete.');
+  const nextSafeAction = result?.nextSafeAction || (requestError ? 'Retry when the Documents API is available.' : 'Retry processing this exact immutable version.');
+
+  return (
+    <section
+      className={`fl-document-processing fl-document-processing--${ready ? 'ready' : failed || requestError ? 'failed' : 'pending'}`}
+      data-testid="flow.documents.processing"
+      aria-live="polite"
+    >
+      <div>
+        <p className="fl-plabel">Project retrieval</p>
+        <h3>{ready
+          ? 'Ready for project retrieval'
+          : failed || requestError
+            ? 'Document processing failed'
+            : isProcessing ? 'Processing this version' : 'Process this Draft version'}</h3>
+        <p>{ready
+          ? 'The backend published and indexed this exact immutable version as project context.'
+          : failed || requestError
+            ? failureReason
+            : isProcessing
+              ? 'The backend is publishing and indexing this exact immutable version.'
+              : 'Publish and index this exact immutable version before it can support project retrieval.'}</p>
+        {failed || requestError ? <small>{nextSafeAction}</small> : null}
+        {result?.boundary ? <small>{result.boundary}</small> : null}
+      </div>
+      {!ready ? (
+        <button
+          className="fl-btn fl-pri"
+          type="button"
+          disabled={isProcessing}
+          onClick={onProcess}
+          data-testid="flow.documents.process"
+        >
+          {isProcessing ? 'Processing...' : failed || requestError ? 'Retry processing' : 'Process document'}
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
 function DocumentStatus({ status }: { status: string | null | undefined }) {
   const label = status?.trim() || 'Unknown';
   const normalized = label.toLowerCase();
   const tone = normalized === 'active' || normalized === 'approved' || normalized === 'ready'
     ? 'ready'
-    : normalized === 'archived' || normalized === 'superseded'
+    : normalized === 'archived' || normalized === 'superseded' || normalized === 'processingfailed'
       ? 'warning'
       : 'neutral';
   return <StatusBadge status={tone}>{label}</StatusBadge>;
@@ -653,6 +759,10 @@ function formatByteSize(value: number | null | undefined) {
   if (value === null || value === undefined) return 'Unavailable';
   if (value < 1024) return `${value} bytes`;
   return `${(value / 1024).toFixed(value < 10 * 1024 ? 1 : 0)} KiB`;
+}
+
+function formatOptionalDate(value: string | null | undefined) {
+  return value ? formatDate(value) : 'Not recorded';
 }
 
 function titleFromFileName(fileName: string) {

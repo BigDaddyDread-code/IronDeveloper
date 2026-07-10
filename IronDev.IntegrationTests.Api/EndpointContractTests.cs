@@ -50,6 +50,7 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/documents/upload",
             "/api/projects/{projectId}/documents/{documentId}",
             "/api/projects/{projectId}/documents/{documentId}/archive",
+            "/api/projects/{projectId}/documents/{documentId}/process",
             "/api/projects/{projectId}/documents/{documentId}/resolve",
             "/api/projects/{projectId}/documents/{documentId}/versions",
             "/api/projects/{projectId}/documents/{documentId}/versions/current",
@@ -512,6 +513,87 @@ public sealed class EndpointContractTests : ApiTestBase
         unsupported.Add(new StringContent("Unsupported Payload"), "displayName");
         var unsupportedResponse = await client.PostAsync($"/api/projects/{project.Id}/documents/upload", unsupported);
         Assert.AreEqual(HttpStatusCode.UnsupportedMediaType, unsupportedResponse.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ProjectDocumentProcessing_ShouldPublishOnlyTheExactReadyVersionToRetrieval()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+        var project = await CreateProjectAsync(client, "Document Processing Project");
+        var uniqueTerm = $"processing-{Guid.NewGuid():N}";
+
+        using var upload = new MultipartFormDataContent();
+        var file = new ByteArrayContent(Encoding.UTF8.GetBytes($"# Processing contract\n\n{uniqueTerm}"));
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/markdown");
+        upload.Add(file, "file", "processing-contract.md");
+        upload.Add(new StringContent("Processing Contract"), "displayName");
+        upload.Add(new StringContent("Architecture"), "documentType");
+
+        var uploadResponse = await client.PostAsync($"/api/projects/{project.Id}/documents/upload", upload);
+        Assert.AreEqual(HttpStatusCode.Created, uploadResponse.StatusCode);
+        var uploaded = await uploadResponse.Content.ReadFromJsonAsync<ProjectDocumentUploadResult>();
+        Assert.IsNotNull(uploaded);
+
+        var beforeSearch = await client.PostAsJsonAsync($"/api/projects/{project.Id}/memory/search", new MemorySearchRequest
+        {
+            Query = uniqueTerm,
+            Take = 100,
+            IncludeStale = true
+        });
+        var before = await beforeSearch.Content.ReadFromJsonAsync<MemorySearchResponseDto>();
+        Assert.IsNotNull(before);
+        Assert.IsFalse(before!.Results.Any(result => result.SourceId == uploaded!.Version.Id.ToString()));
+
+        var processResponse = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/documents/{uploaded.Document.Id}/process",
+            new { });
+        Assert.AreEqual(HttpStatusCode.OK, processResponse.StatusCode);
+        var processed = await processResponse.Content.ReadFromJsonAsync<ProjectDocumentProcessingResult>();
+        Assert.IsNotNull(processed);
+        Assert.IsTrue(processed!.Succeeded);
+        Assert.AreEqual("Ready", processed.Status);
+        Assert.AreEqual(uploaded.Version.Id, processed.Version.Id);
+        Assert.IsTrue(processed.ContextDocumentId > 0);
+        Assert.IsNotNull(processed.Document.ProcessingStartedAtUtc);
+        Assert.IsNotNull(processed.Document.ProcessingCompletedAtUtc);
+        Assert.IsNull(processed.Document.ProcessingFailureReason);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var context = await connection.QuerySingleAsync<(long Id, string Source, string Status)>(
+            """
+            SELECT Id, Source, Status
+            FROM dbo.ProjectContextDocuments
+            WHERE Id = @ContextDocumentId AND ProjectId = @ProjectId;
+            """,
+            new { processed.ContextDocumentId, ProjectId = project.Id });
+        Assert.AreEqual($"ProjectDocumentVersion:{uploaded.Version.Id}", context.Source);
+        Assert.AreEqual("Active", context.Status);
+
+        var linkCount = await connection.QuerySingleAsync<int>(
+            """
+            SELECT COUNT(1)
+            FROM dbo.ProjectDocumentLinks
+            WHERE DocumentVersionId = @VersionId
+              AND LinkedEntityType = 'ProjectContextDocument'
+              AND LinkedEntityId = @ContextDocumentId
+              AND LinkType = 'IndexedAs';
+            """,
+            new { VersionId = uploaded.Version.Id, processed.ContextDocumentId });
+        Assert.AreEqual(1, linkCount);
+
+        var afterSearch = await client.PostAsJsonAsync($"/api/projects/{project.Id}/memory/search", new MemorySearchRequest
+        {
+            Query = uniqueTerm,
+            Take = 100,
+            IncludeStale = true
+        });
+        var after = await afterSearch.Content.ReadFromJsonAsync<MemorySearchResponseDto>();
+        Assert.IsNotNull(after);
+        Assert.IsTrue(after!.Results.Any(result =>
+            result.SourceType == "ProjectDocumentVersion"
+            && result.SourceId == uploaded.Version.Id.ToString()));
     }
 
     [TestMethod]

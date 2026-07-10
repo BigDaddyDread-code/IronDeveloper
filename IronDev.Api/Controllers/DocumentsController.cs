@@ -14,11 +14,44 @@ public sealed class DocumentsController : ControllerBase
 {
     private readonly IProjectDocumentService _documents;
     private readonly IProjectDocumentUploadService _uploads;
+    private readonly IProjectDocumentProcessingService _processing;
 
-    public DocumentsController(IProjectDocumentService documents, IProjectDocumentUploadService uploads)
+    public DocumentsController(
+        IProjectDocumentService documents,
+        IProjectDocumentUploadService uploads,
+        IProjectDocumentProcessingService processing)
     {
         _documents = documents;
         _uploads = uploads;
+        _processing = processing;
+    }
+
+    [HttpPost("api/projects/{projectId:int}/documents/{documentId:long}/process")]
+    public async Task<ActionResult<ProjectDocumentProcessingResult>> ProcessDocument(
+        int projectId,
+        long documentId,
+        CancellationToken ct)
+    {
+        try
+        {
+            return Ok(await _processing.ProcessAsync(new ProjectDocumentProcessingRequest
+            {
+                ProjectId = projectId,
+                DocumentId = documentId,
+                ProcessedBy = User.FindFirst(ClaimTypes.Email)?.Value
+                    ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("sub")?.Value
+            }, ct));
+        }
+        catch (ProjectDocumentProcessingException error)
+        {
+            return error.Kind switch
+            {
+                ProjectDocumentProcessingFailureKind.ProjectNotFound => NotFound(new { error = error.Message }),
+                ProjectDocumentProcessingFailureKind.AlreadyProcessing => Conflict(new { error = error.Message }),
+                _ => Conflict(new { error = error.Message })
+            };
+        }
     }
 
     [HttpPost("api/projects/{projectId:int}/documents/upload")]

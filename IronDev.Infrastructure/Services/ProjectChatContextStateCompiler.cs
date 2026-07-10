@@ -1,4 +1,5 @@
 using IronDev.Core.Chat;
+using IronDev.Core.KnowledgeCompiler;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 using System.Collections.Generic;
@@ -135,9 +136,10 @@ public sealed class ProjectChatContextStateCompiler
         foreach (var document in context.Documents.Take(5))
         {
             var currentness = MemoryCurrentnessNormalizer.FromDocumentStatus(document.Status);
+            var isProjectDocumentVersion = ProjectDocumentContextSource.TryGetVersionId(document.Source, out var versionId);
             evidence.Add(new MemoryEvidence(
-                SourceId: $"document-{document.Id}",
-                SourceType: "Document",
+                SourceId: isProjectDocumentVersion ? $"project-document-version-{versionId}" : $"document-{document.Id}",
+                SourceType: isProjectDocumentVersion ? ProjectDocumentContextSource.EntityType : "Document",
                 Title: document.Title,
                 Excerpt: TruncateText(string.Join(" ", document.Summary, document.Content), 260),
                 IsCurrent: currentness.IsCurrent,

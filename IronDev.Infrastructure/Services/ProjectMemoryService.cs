@@ -201,7 +201,7 @@ public sealed class ProjectMemoryService : IProjectMemoryService
             FROM dbo.ProjectContextDocuments
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
-              AND Status NOT IN ('Archived', 'Superseded')
+              AND Status NOT IN ('Archived', 'Superseded', 'Processing', 'ProcessingFailed')
               AND (
                   Title LIKE @Pattern OR Content LIKE @Pattern OR Summary LIKE @Pattern
                   OR Tags LIKE @Pattern OR AppliesToCapability LIKE @Pattern OR AppliesToArea LIKE @Pattern

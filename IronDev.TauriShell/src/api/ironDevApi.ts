@@ -50,6 +50,7 @@ import type {
   PlannedSurfaceEnvelope,
   ProjectProvisioningReadinessUi,
   ProjectDocument,
+  ProjectDocumentProcessingResult,
   ProjectDocumentUploadResult,
   ProjectDocumentVersion,
   ProjectChatSession,
@@ -421,6 +422,17 @@ class IronDevApiClient {
       method: 'GET',
       signal
     });
+  }
+
+  async processProjectDocument(
+    projectId: number,
+    documentId: number,
+    signal?: AbortSignal
+  ): Promise<ProjectDocumentProcessingResult> {
+    return this.request<ProjectDocumentProcessingResult>(
+      `/api/projects/${projectId}/documents/${documentId}/process`,
+      { method: 'POST', body: {}, signal }
+    );
   }
 
   async getProjectDocumentCurrentVersion(

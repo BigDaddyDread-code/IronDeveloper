@@ -36,6 +36,9 @@ export type ProjectSummary = components['schemas']['Project'];
 export type ProjectDocument = components['schemas']['ProjectDocument'] & {
   origin?: string | null;
   processingStatus?: string | null;
+  processingFailureReason?: string | null;
+  processingStartedAtUtc?: string | null;
+  processingCompletedAtUtc?: string | null;
   description?: string | null;
   visibility?: string | null;
   originalFileName?: string | null;
@@ -47,6 +50,16 @@ export interface ProjectDocumentUploadResult {
   document: ProjectDocument;
   version: ProjectDocumentVersion;
   processingStatus: string;
+  boundary: string;
+}
+export interface ProjectDocumentProcessingResult {
+  document: ProjectDocument;
+  version: ProjectDocumentVersion;
+  contextDocumentId?: number | null;
+  succeeded: boolean;
+  status: string;
+  failureReason?: string | null;
+  nextSafeAction: string;
   boundary: string;
 }
 export type BuildReadinessResult = components['schemas']['BuildReadinessResult'];

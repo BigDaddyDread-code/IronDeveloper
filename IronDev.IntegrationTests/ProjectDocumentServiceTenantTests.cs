@@ -114,6 +114,9 @@ public sealed class ProjectDocumentServiceTenantTests : IntegrationTestBase
                     OriginalFileName NVARCHAR(260) NULL,
                     MediaType NVARCHAR(100) NULL,
                     ByteSize BIGINT NULL,
+                    ProcessingFailureReason NVARCHAR(1000) NULL,
+                    ProcessingStartedAtUtc DATETIME2(7) NULL,
+                    ProcessingCompletedAtUtc DATETIME2(7) NULL,
                     CreatedAtUtc DATETIME2 NOT NULL,
                     UpdatedAtUtc DATETIME2 NULL,
                     CreatedBy NVARCHAR(200) NULL,
@@ -135,6 +138,12 @@ public sealed class ProjectDocumentServiceTenantTests : IntegrationTestBase
                 ALTER TABLE dbo.ProjectDocuments ADD MediaType NVARCHAR(100) NULL;
             IF COL_LENGTH('dbo.ProjectDocuments', 'ByteSize') IS NULL
                 ALTER TABLE dbo.ProjectDocuments ADD ByteSize BIGINT NULL;
+            IF COL_LENGTH('dbo.ProjectDocuments', 'ProcessingFailureReason') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ProcessingFailureReason NVARCHAR(1000) NULL;
+            IF COL_LENGTH('dbo.ProjectDocuments', 'ProcessingStartedAtUtc') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ProcessingStartedAtUtc DATETIME2(7) NULL;
+            IF COL_LENGTH('dbo.ProjectDocuments', 'ProcessingCompletedAtUtc') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ProcessingCompletedAtUtc DATETIME2(7) NULL;
 
             IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NULL
             BEGIN

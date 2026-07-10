@@ -78,6 +78,32 @@ public class ProjectMemoryServiceIntegrationTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task GetRelevantContextDocumentsAsync_ExcludesProcessingAndFailedDocuments()
+    {
+        using var scope = ServiceProvider.CreateScope();
+        var memoryService = scope.ServiceProvider.GetRequiredService<IProjectMemoryService>();
+        var projectId = await SeedProjectAsync(name: "Processing visibility");
+
+        foreach (var status in new[] { "Active", "Processing", "ProcessingFailed" })
+        {
+            await memoryService.SaveContextDocumentAsync(new ProjectContextDocument
+            {
+                ProjectId = projectId,
+                DocumentType = "Architecture",
+                AuthorityLevel = "ContextOnly",
+                Status = status,
+                Title = $"{status} retrieval sentinel",
+                Content = "retrieval-sentinel-content"
+            });
+        }
+
+        var documents = await memoryService.GetRelevantContextDocumentsAsync(projectId, "retrieval-sentinel-content", 10);
+
+        Assert.HasCount(1, documents);
+        Assert.AreEqual("Active", documents[0].Status);
+    }
+
+    [TestMethod]
     public async Task SaveObservableStateAsync_And_GetObservableStateAsync_ShouldReturnLatestState()
     {
         using var scope = ServiceProvider.CreateScope();

@@ -40,6 +40,9 @@ BEGIN
         OriginalFileName NVARCHAR(260) NULL,
         MediaType       NVARCHAR(100) NULL,
         ByteSize        BIGINT NULL,
+        ProcessingFailureReason NVARCHAR(1000) NULL,
+        ProcessingStartedAtUtc DATETIME2(7) NULL,
+        ProcessingCompletedAtUtc DATETIME2(7) NULL,
 
         CreatedAtUtc    DATETIME2(7) NOT NULL CONSTRAINT DF_ProjectDocuments_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
         UpdatedAtUtc    DATETIME2(7) NULL,
@@ -106,6 +109,18 @@ IF COL_LENGTH('dbo.ProjectDocuments', 'ByteSize') IS NULL
     ALTER TABLE dbo.ProjectDocuments ADD ByteSize BIGINT NULL;
 GO
 
+IF COL_LENGTH('dbo.ProjectDocuments', 'ProcessingFailureReason') IS NULL
+    ALTER TABLE dbo.ProjectDocuments ADD ProcessingFailureReason NVARCHAR(1000) NULL;
+GO
+
+IF COL_LENGTH('dbo.ProjectDocuments', 'ProcessingStartedAtUtc') IS NULL
+    ALTER TABLE dbo.ProjectDocuments ADD ProcessingStartedAtUtc DATETIME2(7) NULL;
+GO
+
+IF COL_LENGTH('dbo.ProjectDocuments', 'ProcessingCompletedAtUtc') IS NULL
+    ALTER TABLE dbo.ProjectDocuments ADD ProcessingCompletedAtUtc DATETIME2(7) NULL;
+GO
+
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_ProjectDocuments_Origin_Allowed')
 BEGIN
     ALTER TABLE dbo.ProjectDocuments WITH CHECK ADD CONSTRAINT CK_ProjectDocuments_Origin_Allowed
@@ -132,6 +147,30 @@ BEGIN
     ALTER TABLE dbo.ProjectDocuments WITH CHECK ADD CONSTRAINT CK_ProjectDocuments_ByteSize_NonNegative
         CHECK (ByteSize IS NULL OR ByteSize >= 0);
 END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_ProjectDocuments_ProcessingTimeline_Ordered')
+BEGIN
+    ALTER TABLE dbo.ProjectDocuments WITH CHECK ADD CONSTRAINT CK_ProjectDocuments_ProcessingTimeline_Ordered
+        CHECK (ProcessingCompletedAtUtc IS NULL OR ProcessingStartedAtUtc IS NULL OR ProcessingCompletedAtUtc >= ProcessingStartedAtUtc);
+END
+GO
+
+UPDATE dbo.ProjectDocuments
+SET ProcessingFailureReason = N'Document processing did not complete.'
+WHERE ProcessingStatus = 'ProcessingFailed'
+  AND ProcessingFailureReason IS NULL;
+GO
+
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_ProjectDocuments_ProcessingFailure_State')
+    ALTER TABLE dbo.ProjectDocuments DROP CONSTRAINT CK_ProjectDocuments_ProcessingFailure_State;
+GO
+
+ALTER TABLE dbo.ProjectDocuments WITH CHECK ADD CONSTRAINT CK_ProjectDocuments_ProcessingFailure_State
+    CHECK (
+        (ProcessingStatus = 'ProcessingFailed' AND ProcessingFailureReason IS NOT NULL)
+        OR (ProcessingStatus <> 'ProcessingFailed' AND ProcessingFailureReason IS NULL)
+    );
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.ProjectDocuments') AND name = 'IX_ProjectDocuments_Project_Origin_Processing')

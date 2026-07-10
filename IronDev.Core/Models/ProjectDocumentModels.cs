@@ -51,6 +51,9 @@ public sealed class ProjectDocument
     public string? OriginalFileName { get; set; }
     public string? MediaType { get; set; }
     public long? ByteSize { get; set; }
+    public string? ProcessingFailureReason { get; set; }
+    public DateTime? ProcessingStartedAtUtc { get; set; }
+    public DateTime? ProcessingCompletedAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }
@@ -197,6 +200,52 @@ public sealed class ProjectDocumentUploadException : Exception
     }
 
     public ProjectDocumentUploadFailureKind Kind { get; }
+}
+
+public sealed class ProjectDocumentProcessingRequest
+{
+    public int ProjectId { get; set; }
+    public long DocumentId { get; set; }
+    public string? ProcessedBy { get; set; }
+}
+
+public sealed class ProjectDocumentProcessingResult
+{
+    public required ProjectDocument Document { get; init; }
+    public required ProjectDocumentVersion Version { get; init; }
+    public long? ContextDocumentId { get; init; }
+    public bool Succeeded { get; init; }
+    public string Status { get; init; } = "ProcessingFailed";
+    public string? FailureReason { get; init; }
+    public string NextSafeAction { get; init; } = string.Empty;
+    public string Boundary { get; init; } =
+        "Ready means this exact immutable version completed backend retrieval processing. It is project context, not approval or source-mutation authority.";
+}
+
+public sealed class ProjectDocumentProcessingStateUpdate
+{
+    public long DocumentId { get; set; }
+    public string Status { get; set; } = "Draft";
+    public string? FailureReason { get; set; }
+    public string? UpdatedBy { get; set; }
+}
+
+public enum ProjectDocumentProcessingFailureKind
+{
+    ProjectNotFound,
+    InvalidState,
+    AlreadyProcessing
+}
+
+public sealed class ProjectDocumentProcessingException : Exception
+{
+    public ProjectDocumentProcessingException(ProjectDocumentProcessingFailureKind kind, string message)
+        : base(message)
+    {
+        Kind = kind;
+    }
+
+    public ProjectDocumentProcessingFailureKind Kind { get; }
 }
 
 public sealed class AddProjectDocumentVersionRequest
