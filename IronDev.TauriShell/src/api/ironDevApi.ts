@@ -57,6 +57,7 @@ import type {
   ProjectToolCatalogueResponse,
   ProjectToolDetailResponse,
   ProjectMemberDirectoryResponse,
+  SetProjectChannelMembershipRequest,
   ProjectChatSession,
   ProjectImplementationPlan,
   ProjectFileSummary,
@@ -479,6 +480,24 @@ class IronDevApiClient {
     return this.request<ProjectMemberDirectoryResponse>(`/api/projects/${projectId}/members`, {
       method: 'GET',
       signal
+    });
+  }
+
+  async setProjectChannelMembership(
+    projectId: number,
+    channelId: number,
+    userId: number,
+    request: SetProjectChannelMembershipRequest
+  ): Promise<void> {
+    await this.request(`/api/projects/${projectId}/channels/${channelId}/members/${userId}`, {
+      method: 'PUT',
+      body: request
+    });
+  }
+
+  async removeProjectChannelMembership(projectId: number, channelId: number, userId: number): Promise<void> {
+    await this.request(`/api/projects/${projectId}/channels/${channelId}/members/${userId}`, {
+      method: 'DELETE'
     });
   }
 

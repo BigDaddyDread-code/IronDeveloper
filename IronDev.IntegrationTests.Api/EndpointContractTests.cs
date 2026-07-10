@@ -791,7 +791,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
-    public async Task ProjectMembers_ShouldExposeTenantDirectoryWithoutInventingProjectOrChannelMembership()
+    public async Task ProjectMembers_ShouldExposeTenantDirectoryWithoutInventingProjectMembership()
     {
         var baseToken = await LoginAsync();
         var tenantToken = await SelectTenantAsync(baseToken);
@@ -811,17 +811,106 @@ public sealed class EndpointContractTests : ApiTestBase
             new[] { "Owner", "TenantAdmin", "Approver", "Reviewer", "Operator", "Viewer", "Member" },
             directory.AvailableTenantRoles.ToArray());
         Assert.AreEqual("Not implemented", directory.ProjectMembershipStatus);
-        Assert.AreEqual("Not implemented", directory.ChannelMembershipStatus);
+        Assert.AreEqual("No active channels", directory.ChannelMembershipStatus);
+        Assert.IsTrue(directory.CanAdministerChannelMembership);
+        Assert.AreEqual(0, directory.Channels.Count);
 
         var currentUser = directory.Members.Single(member => member.IsCurrentUser);
         Assert.AreEqual(AdminEmail, currentUser.Email);
         Assert.AreEqual("Owner", currentUser.TenantRole);
         Assert.AreEqual("Tenant scoped", currentUser.ProjectAccessStatus);
-        Assert.AreEqual("Not implemented", currentUser.ChannelMembershipSummary);
-        StringAssert.Contains(directory.Boundary, "It is not project assignment");
+        Assert.AreEqual("No explicit memberships", currentUser.ChannelMembershipSummary);
+        StringAssert.Contains(directory.Boundary, "Neither is project assignment");
 
         var unknownProject = await client.GetAsync($"/api/projects/{project.Id + 999999}/members");
         Assert.AreEqual(HttpStatusCode.NotFound, unknownProject.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ProjectChannelMembership_ShouldPersistRoleAndNotificationWithoutGrantingAuthority()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+        var project = await CreateProjectAsync(client, "Project Channel Membership");
+
+        var memberEmail = $"channel-member-{Guid.NewGuid():N}@irondev.local";
+        const string memberPassword = "channel-test-password";
+        var createMember = await client.PostAsJsonAsync($"/api/tenants/{AssignedTenantId}/users", new
+        {
+            email = memberEmail,
+            displayName = "Channel Member",
+            password = memberPassword,
+            role = "Viewer"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createMember.StatusCode);
+        var createdMember = await createMember.Content.ReadFromJsonAsync<JsonElement>();
+        var memberUserId = createdMember.GetProperty("id").GetInt32();
+
+        long channelId;
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            channelId = await connection.QuerySingleAsync<long>("""
+                INSERT INTO dbo.ProjectChannels
+                    (TenantId, ProjectId, Name, Slug, Description, ChannelKind, Visibility, Status, CreatedByUserId)
+                OUTPUT inserted.Id
+                VALUES
+                    (@TenantId, @ProjectId, 'Architecture', 'architecture', 'Restricted architecture discussion.', 'Architecture', 'MembersOnly', 'Active', 1);
+                """, new { TenantId = AssignedTenantId, ProjectId = project.Id });
+            await connection.ExecuteAsync("""
+                INSERT INTO dbo.ProjectChannelMembers
+                    (TenantId, ProjectId, ChannelId, UserId, ChannelRole, NotificationLevel, Status, AddedByUserId)
+                VALUES
+                    (@TenantId, @ProjectId, @ChannelId, 1, 'Owner', 'All', 'Active', 1);
+                """, new { TenantId = AssignedTenantId, ProjectId = project.Id, ChannelId = channelId });
+        }
+
+        var initialResponse = await client.GetAsync($"/api/projects/{project.Id}/members");
+        Assert.AreEqual(HttpStatusCode.OK, initialResponse.StatusCode);
+        var initial = await initialResponse.Content.ReadFromJsonAsync<ProjectMemberDirectoryResponse>();
+        Assert.IsNotNull(initial);
+        Assert.AreEqual("1 active channel", initial!.ChannelMembershipStatus);
+        var channel = initial.Channels.Single();
+        Assert.AreEqual("MembersOnly", channel.Visibility);
+        Assert.AreEqual("Owner", channel.Members.Single().ChannelRole);
+
+        var addMembership = await client.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}",
+            new { channelRole = "Moderator", notificationLevel = "Mentions" });
+        Assert.AreEqual(HttpStatusCode.OK, addMembership.StatusCode);
+
+        var memberToken = await SelectTenantAsync(await LoginAsync(memberEmail, memberPassword));
+        using var memberClient = GetAuthedClient(memberToken);
+        var denied = await memberClient.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}",
+            new { channelRole = "Owner", notificationLevel = "All" });
+        Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        var lastOwnerRefusal = await client.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{channelId}/members/1",
+            new { channelRole = "Member", notificationLevel = "All" });
+        Assert.AreEqual(HttpStatusCode.Conflict, lastOwnerRefusal.StatusCode);
+
+        var promoteMember = await client.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}",
+            new { channelRole = "Owner", notificationLevel = "All" });
+        Assert.AreEqual(HttpStatusCode.OK, promoteMember.StatusCode);
+        var demoteOriginalOwner = await client.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{channelId}/members/1",
+            new { channelRole = "Member", notificationLevel = "None" });
+        Assert.AreEqual(HttpStatusCode.OK, demoteOriginalOwner.StatusCode);
+
+        var removeLastOwner = await client.DeleteAsync(
+            $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}");
+        Assert.AreEqual(HttpStatusCode.Conflict, removeLastOwner.StatusCode);
+
+        var finalResponse = await client.GetAsync($"/api/projects/{project.Id}/members");
+        var final = await finalResponse.Content.ReadFromJsonAsync<ProjectMemberDirectoryResponse>();
+        var finalChannel = final!.Channels.Single();
+        Assert.AreEqual("Owner", finalChannel.Members.Single(member => member.UserId == memberUserId).ChannelRole);
+        Assert.AreEqual("Member", finalChannel.Members.Single(member => member.UserId == 1).ChannelRole);
+        Assert.AreEqual("None", finalChannel.Members.Single(member => member.UserId == 1).NotificationLevel);
+        StringAssert.Contains(finalChannel.Boundary, "not approval");
     }
 
     [TestMethod]

@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Dapper;
 using IronDev.Data.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -32,7 +33,13 @@ public class TenantUsersAdminApiTests : ApiTestBase
         // would otherwise leak between tests and turn creates into AlreadyMember conflicts.
         await using var connection = new Microsoft.Data.SqlClient.SqlConnection(ConnectionString);
         await connection.OpenAsync();
-        await Dapper.SqlMapper.ExecuteAsync(connection, """
+        await connection.ExecuteAsync("""
+            IF OBJECT_ID(N'dbo.ProjectChannelMembers', N'U') IS NOT NULL
+            BEGIN
+                DELETE pcm FROM dbo.ProjectChannelMembers pcm
+                INNER JOIN dbo.Users u ON u.Id = pcm.UserId
+                WHERE u.Email IN (@NewUserEmail, @SecondUserEmail);
+            END;
             DELETE tu FROM dbo.TenantUsers tu
             INNER JOIN dbo.Users u ON u.Id = tu.UserId
             WHERE u.Email IN (@NewUserEmail, @SecondUserEmail);
@@ -206,8 +213,9 @@ public class TenantUsersAdminApiTests : ApiTestBase
         var directory = await directoryResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.AreEqual("Viewer", directory.GetProperty("currentUserTenantRole").GetString());
         Assert.IsFalse(directory.GetProperty("canAdministerTenantMembership").GetBoolean());
+        Assert.IsFalse(directory.GetProperty("canAdministerChannelMembership").GetBoolean());
         Assert.AreEqual("Not implemented", directory.GetProperty("projectMembershipStatus").GetString());
-        Assert.AreEqual("Not implemented", directory.GetProperty("channelMembershipStatus").GetString());
+        Assert.AreEqual("No active channels", directory.GetProperty("channelMembershipStatus").GetString());
     }
 
     // ── Last-owner protection ─────────────────────────────────────────────────
@@ -268,6 +276,56 @@ public class TenantUsersAdminApiTests : ApiTestBase
     }
 
     [TestMethod]
+    public async Task RemovingMembership_ShouldRetireActiveChannelMemberships()
+    {
+        var tenantToken = await SelectTenantAsync(await LoginAsync());
+        using var client = GetAuthedClient(tenantToken);
+        var projectResponse = await client.PostAsJsonAsync("/api/projects", new Project
+        {
+            Name = "Channel Retirement",
+            Description = "Tenant membership removal lifecycle test.",
+            LocalPath = @"C:\Temp\ChannelRetirement"
+        });
+        var project = await projectResponse.Content.ReadFromJsonAsync<Project>();
+        Assert.IsNotNull(project);
+
+        var createResponse = await client.PostAsJsonAsync($"/api/tenants/{AssignedTenantId}/users",
+            new { email = NewUserEmail, displayName = "Viewer User", password = NewUserPassword, role = "Viewer" });
+        var created = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var createdId = created.GetProperty("id").GetInt32();
+
+        long channelId;
+        await using (var connection = new Microsoft.Data.SqlClient.SqlConnection(ConnectionString))
+        {
+            channelId = await connection.QuerySingleAsync<long>("""
+                INSERT INTO dbo.ProjectChannels
+                    (TenantId, ProjectId, Name, Slug, ChannelKind, Visibility, Status, CreatedByUserId)
+                OUTPUT inserted.Id
+                VALUES
+                    (@TenantId, @ProjectId, 'Members only', 'members-only', 'Custom', 'MembersOnly', 'Active', 1);
+                """, new { TenantId = AssignedTenantId, ProjectId = project!.Id });
+            await connection.ExecuteAsync("""
+                INSERT INTO dbo.ProjectChannelMembers
+                    (TenantId, ProjectId, ChannelId, UserId, ChannelRole, NotificationLevel, Status, AddedByUserId)
+                VALUES
+                    (@TenantId, @ProjectId, @ChannelId, @UserId, 'Member', 'Mentions', 'Active', 1);
+                """, new { TenantId = AssignedTenantId, ProjectId = project.Id, ChannelId = channelId, UserId = createdId });
+        }
+
+        var removeResponse = await client.DeleteAsync($"/api/tenants/{AssignedTenantId}/users/{createdId}");
+        Assert.AreEqual(HttpStatusCode.OK, removeResponse.StatusCode);
+
+        await using var verifyConnection = new Microsoft.Data.SqlClient.SqlConnection(ConnectionString);
+        var membership = await verifyConnection.QuerySingleAsync<ChannelMembershipState>("""
+            SELECT Status, RemovedUtc
+            FROM dbo.ProjectChannelMembers
+            WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND ChannelId = @ChannelId AND UserId = @UserId;
+            """, new { TenantId = AssignedTenantId, ProjectId = project.Id, ChannelId = channelId, UserId = createdId });
+        Assert.AreEqual("Removed", membership.Status);
+        Assert.IsNotNull(membership.RemovedUtc);
+    }
+
+    [TestMethod]
     public async Task RoleChange_ByOwner_OnNonOwnerMember_ShouldSucceed()
     {
         var token = await LoginAsync();
@@ -295,5 +353,11 @@ public class TenantUsersAdminApiTests : ApiTestBase
         }
 
         Assert.IsTrue(verified, "The updated member should appear in the list with the new role.");
+    }
+
+    private sealed class ChannelMembershipState
+    {
+        public string Status { get; init; } = string.Empty;
+        public DateTime? RemovedUtc { get; init; }
     }
 }

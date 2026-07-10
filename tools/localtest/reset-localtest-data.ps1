@@ -388,6 +388,7 @@ GO
         Invoke-SqlFile -DatabaseName $database -Path $documentMigrationPath
         Invoke-SqlFile -DatabaseName $database -Path $profileMigrationPath
         Invoke-SqlFile -DatabaseName $database -Path (Join-Path $repoRoot "Database\migrate_chat_document_sources.sql")
+        Invoke-SqlFile -DatabaseName $database -Path (Join-Path $repoRoot "Database\migrate_project_channels.sql")
     }
     finally {
         Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

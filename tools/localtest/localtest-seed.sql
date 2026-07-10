@@ -61,6 +61,13 @@ END
 GO
 
 -- Reset the LocalTest world. The database guard above keeps this fenced.
+IF OBJECT_ID('dbo.ProjectChannelPins', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelPins;
+IF OBJECT_ID('dbo.ProjectChannelMessageReads', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessageReads;
+IF OBJECT_ID('dbo.ProjectChannelAssistantTurns', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelAssistantTurns;
+IF OBJECT_ID('dbo.ProjectChannelMessageContextLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessageContextLinks;
+IF OBJECT_ID('dbo.ProjectChannelMessages', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessages;
+IF OBJECT_ID('dbo.ProjectChannelMembers', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMembers;
+IF OBJECT_ID('dbo.ProjectChannels', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannels;
 IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;
 IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentVersions;
 IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocuments;
@@ -137,6 +144,23 @@ VALUES
     2
 );
 SET IDENTITY_INSERT dbo.Projects OFF;
+GO
+
+SET IDENTITY_INSERT dbo.ProjectChannels ON;
+INSERT INTO dbo.ProjectChannels
+    (Id, TenantId, ProjectId, Name, Slug, Description, ChannelKind, Visibility, Status, CreatedByUserId)
+VALUES
+    (101, 1, 1, 'General', 'general', 'Project-wide engineering discussion.', 'General', 'Project', 'Active', 1),
+    (102, 1, 1, 'Product planning', 'product-planning', 'Restricted product and UX discussion.', 'Custom', 'MembersOnly', 'Active', 1),
+    (103, 1, 2, 'General', 'general', 'BookSeller fixture discussion.', 'General', 'Project', 'Active', 1);
+SET IDENTITY_INSERT dbo.ProjectChannels OFF;
+
+INSERT INTO dbo.ProjectChannelMembers
+    (TenantId, ProjectId, ChannelId, UserId, ChannelRole, NotificationLevel, Status, AddedByUserId)
+VALUES
+    (1, 1, 101, 1, 'Owner', 'All', 'Active', 1),
+    (1, 1, 102, 1, 'Owner', 'Mentions', 'Active', 1),
+    (1, 2, 103, 1, 'Owner', 'All', 'Active', 1);
 GO
 
 INSERT INTO dbo.ProjectProfiles
