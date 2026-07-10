@@ -17,7 +17,8 @@ public sealed record ProjectChatContextPipelineResult(
     ContextAgentRouteDecision RouteDecision,
     IReadOnlyList<string> RouteSignals,
     ContextAgentResult ContextAgentResult,
-    EffectiveChatRoute? EffectiveRoute = null);
+    EffectiveChatRoute? EffectiveRoute = null,
+    IReadOnlyList<ChatDocumentSource>? AttachedDocumentSources = null);
 
 public sealed class ProjectChatContextPipeline
 {
@@ -51,7 +52,8 @@ public sealed class ProjectChatContextPipeline
         string recentConversationSummary,
         string traceGroupId,
         CancellationToken cancellationToken,
-        ChatGovernanceMode? explicitMode = null)
+        ChatGovernanceMode? explicitMode = null,
+        IReadOnlyList<AttachedChatDocumentContext>? attachedDocumentContexts = null)
     {
         var project = await _projects.GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
         if (project is null)
@@ -62,7 +64,14 @@ public sealed class ProjectChatContextPipeline
         var summaryTickets = contextAgentTickets.Take(5).ToList();
         var summaryDecisions = contextAgentDecisions.Take(5).ToList();
         var rules = await _memory.GetProjectRulesAsync(projectId, cancellationToken).ConfigureAwait(false);
-        var documents = await _memory.GetContextDocumentsAsync(projectId, status: "Active", take: 5, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var projectDocuments = await _memory.GetContextDocumentsAsync(projectId, status: "Active", take: 5, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var attachedContexts = attachedDocumentContexts ?? [];
+        var documents = attachedContexts
+            .Select(item => item.ContextDocument)
+            .Concat(projectDocuments)
+            .GroupBy(document => document.Id)
+            .Select(group => group.First())
+            .ToList();
         var semanticMemoryEvidence = await _semanticMemoryEvidenceProvider.GetEvidenceAsync(
             projectId,
             prompt,
@@ -106,7 +115,8 @@ public sealed class ProjectChatContextPipeline
             routeDecision,
             routeSignals,
             contextAgentResult,
-            effectiveRoute);
+            effectiveRoute,
+            attachedContexts.Select(item => item.Source).ToList());
     }
 
     private async Task<ContextAgentRouteDecision> ResolveContextRouteAsync(

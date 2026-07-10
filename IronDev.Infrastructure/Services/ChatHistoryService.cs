@@ -8,6 +8,7 @@ using Dapper;
 using IronDev.Core.Auth;
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Data;
 using IronDev.Data.Models;
 
@@ -261,7 +262,19 @@ public sealed class ChatHistoryService : IChatHistoryService
         if (_connectionFactory == null)
             throw new InvalidOperationException("Database connection factory is not available.");
 
-        const string ownerSql = "SELECT COUNT(1) FROM dbo.Projects WHERE Id = @ProjectId AND TenantId = @TenantId";
+        var documentVersionIds = (message.DocumentVersionIds ?? []).Where(id => id > 0).Distinct().ToArray();
+        if (documentVersionIds.Length > 1)
+            throw new ChatDocumentSourceUnavailableException("This Chat slice accepts one exact document version per message.");
+        if (documentVersionIds.Length > 0 && !string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase))
+            throw new ChatDocumentSourceUnavailableException("Only a user request can attach document context.");
+
+        const string ownerSql = """
+            SELECT COUNT(1)
+            FROM dbo.ProjectChatSessions
+            WHERE Id = @ChatSessionId
+              AND ProjectId = @ProjectId
+              AND TenantId = @TenantId;
+            """;
         using var connection = _connectionFactory.CreateConnection();
         connection.Open();
         using var transaction = connection.BeginTransaction();
@@ -270,19 +283,88 @@ public sealed class ChatHistoryService : IChatHistoryService
         {
             var owns = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
                 ownerSql,
-                new { message.ProjectId, TenantId = _tenant.TenantId },
+                new { message.ChatSessionId, message.ProjectId, TenantId = _tenant.TenantId },
                 transaction,
                 cancellationToken: cancellationToken));
 
             if (owns == 0)
-                throw new UnauthorizedAccessException($"Project {message.ProjectId} does not belong to tenant {_tenant.TenantId}.");
+                throw new UnauthorizedAccessException("The Chat session is not available in this project.");
+
+            if (message.ReplyToMessageId.HasValue)
+            {
+                if (!string.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase))
+                    throw new ChatDocumentSourceUnavailableException(
+                        "Only an assistant response can identify the user request it answers.");
+
+                var replyExists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                    """
+                    SELECT COUNT(1)
+                    FROM dbo.ChatMessages
+                    WHERE Id = @ReplyToMessageId
+                      AND TenantId = @TenantId
+                      AND ProjectId = @ProjectId
+                      AND ChatSessionId = @ChatSessionId
+                      AND Role = 'user';
+                    """,
+                    new
+                    {
+                        message.ReplyToMessageId,
+                        TenantId = _tenant.TenantId,
+                        message.ProjectId,
+                        message.ChatSessionId
+                    },
+                    transaction,
+                    cancellationToken: cancellationToken));
+                if (replyExists == 0)
+                    throw new UnauthorizedAccessException("The replied-to Chat message is not available in this project session.");
+            }
+
+            if (documentVersionIds.Length == 1)
+            {
+                var sourceIsAvailable = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                    """
+                    SELECT COUNT(1)
+                    FROM dbo.ProjectDocuments d
+                    INNER JOIN dbo.ProjectDocumentVersions v ON v.Id = d.CurrentVersionId AND v.DocumentId = d.Id
+                    WHERE d.TenantId = @TenantId
+                      AND d.ProjectId = @ProjectId
+                      AND d.Status = 'Active'
+                      AND d.ProcessingStatus = 'Ready'
+                      AND v.Id = @DocumentVersionId
+                      AND EXISTS
+                      (
+                          SELECT 1
+                          FROM dbo.ProjectDocumentLinks sourceLink
+                          INNER JOIN dbo.ProjectContextDocuments contextDocument
+                              ON contextDocument.Id = sourceLink.LinkedEntityId
+                             AND contextDocument.TenantId = d.TenantId
+                             AND contextDocument.ProjectId = d.ProjectId
+                          WHERE sourceLink.DocumentVersionId = v.Id
+                            AND sourceLink.LinkedEntityType = 'ProjectContextDocument'
+                            AND sourceLink.LinkType = 'IndexedAs'
+                            AND contextDocument.Status = 'Active'
+                            AND contextDocument.Source = CONCAT('ProjectDocumentVersion:', v.Id)
+                      );
+                    """,
+                    new
+                    {
+                        TenantId = _tenant.TenantId,
+                        message.ProjectId,
+                        DocumentVersionId = documentVersionIds[0]
+                    },
+                    transaction,
+                    cancellationToken: cancellationToken));
+                if (sourceIsAvailable == 0)
+                    throw new ChatDocumentSourceUnavailableException(
+                        "The selected document version is not available as Ready context in this project.");
+            }
 
             const string sql = """
                 INSERT INTO dbo.ChatMessages
-                    (TenantId, ProjectId, ChatSessionId, Role, Message, Tags, ContextSummary, LinkedFilePaths, LinkedSymbols)
+                    (TenantId, ProjectId, ChatSessionId, Role, Message, Tags, ContextSummary, LinkedFilePaths, LinkedSymbols, ReplyToMessageId)
                 OUTPUT inserted.Id
                 VALUES
-                    (@TenantId, @ProjectId, @ChatSessionId, @Role, @Message, @Tags, @ContextSummary, @LinkedFilePaths, @LinkedSymbols);
+                    (@TenantId, @ProjectId, @ChatSessionId, @Role, @Message, @Tags, @ContextSummary, @LinkedFilePaths, @LinkedSymbols, @ReplyToMessageId);
                 """;
 
             var id = await connection.QuerySingleAsync<long>(new CommandDefinition(
@@ -297,10 +379,30 @@ public sealed class ChatHistoryService : IChatHistoryService
                     message.Tags,
                     message.ContextSummary,
                     message.LinkedFilePaths,
-                    message.LinkedSymbols
+                    message.LinkedSymbols,
+                    message.ReplyToMessageId
                 },
                 transaction,
                 cancellationToken: cancellationToken));
+
+            if (documentVersionIds.Length == 1)
+            {
+                await connection.ExecuteAsync(new CommandDefinition(
+                    """
+                    INSERT INTO dbo.ProjectDocumentLinks
+                        (DocumentVersionId, LinkedEntityType, LinkedEntityId, LinkType, CreatedBy)
+                    VALUES
+                        (@DocumentVersionId, 'ChatMessage', @ChatMessageId, 'ChatContext', @CreatedBy);
+                    """,
+                    new
+                    {
+                        DocumentVersionId = documentVersionIds[0],
+                        ChatMessageId = id,
+                        CreatedBy = message.SourceAttachedBy
+                    },
+                    transaction,
+                    cancellationToken: cancellationToken));
+            }
 
             // Update session's UpdatedDate
             const string updateSessionSql = "UPDATE dbo.ProjectChatSessions SET UpdatedDate = SYSUTCDATETIME() WHERE Id = @ChatSessionId";
@@ -342,7 +444,7 @@ public sealed class ChatHistoryService : IChatHistoryService
     {
         const string sql = """
             SELECT
-                Id, TenantId, ProjectId, ChatSessionId, Role, Message, Tags, ContextSummary, LinkedFilePaths, LinkedSymbols, CreatedDate
+                Id, TenantId, ProjectId, ChatSessionId, Role, Message, Tags, ContextSummary, LinkedFilePaths, LinkedSymbols, ReplyToMessageId, CreatedDate
             FROM dbo.ChatMessages
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
@@ -365,7 +467,7 @@ public sealed class ChatHistoryService : IChatHistoryService
     {
         const string sql = """
             SELECT TOP (@Take)
-                Id, TenantId, ProjectId, ChatSessionId, Role, Message, Tags, ContextSummary, LinkedFilePaths, LinkedSymbols, CreatedDate
+                Id, TenantId, ProjectId, ChatSessionId, Role, Message, Tags, ContextSummary, LinkedFilePaths, LinkedSymbols, ReplyToMessageId, CreatedDate
             FROM dbo.ChatMessages
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId

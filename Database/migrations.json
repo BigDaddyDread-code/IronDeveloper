@@ -139,6 +139,11 @@
                            "id":  "2026-07-product-document-upload-draft",
                            "path":  "Database/migrate_project_documents.sql",
                            "description":  "Creates versioned project documents and adds backend-owned upload origin, processing, visibility, and file metadata required by DOCS-UPLOAD-1."
+                       },
+                       {
+                           "id":  "2026-07-product-chat-document-context",
+                           "path":  "Database/migrate_chat_document_sources.sql",
+                           "description":  "Adds durable Chat reply linkage so exact Ready document versions linked through ProjectDocumentLinks can be replayed against the assistant answer that used them."
                        }
                    ]
 }

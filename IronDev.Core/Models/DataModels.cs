@@ -1,5 +1,6 @@
 using System;
 using CommunityToolkit.Mvvm.ComponentModel;
+using IronDev.Core.Models;
 
 namespace IronDev.Data.Models;
 
@@ -59,6 +60,10 @@ public sealed class ChatMessage
     public string? ContextSummary { get; set; }
     public string? LinkedFilePaths { get; set; }
     public string? LinkedSymbols { get; set; }
+    public long? ReplyToMessageId { get; set; }
+    public IReadOnlyList<long> DocumentVersionIds { get; set; } = [];
+    public IReadOnlyList<ChatDocumentSource> DocumentSources { get; set; } = [];
+    public string? SourceAttachedBy { get; set; }
     public DateTime CreatedDate { get; set; }
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { BaWorkingDraft, ChatCompletionResponse, ProjectChatSession, ProjectTicket } from '../../api/types';
+import type { BaWorkingDraft, ChatCompletionResponse, ChatDocumentSource, ProjectChatSession, ProjectTicket } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
 import { ChatComposer } from './ChatComposer';
 import { ChatContextPanel } from './ChatContextPanel';
@@ -16,6 +16,10 @@ interface ChatWorkspaceProps {
   isSending: boolean;
   disabledReason: string | null;
   sendDisabledReason: string | null;
+  documentSources: ChatDocumentSource[];
+  documentSourceLoadState: 'idle' | 'loading' | 'ready' | 'error';
+  documentSourceError: string | null;
+  selectedDocumentSource: ChatDocumentSource | null;
   errorMessage: string | null;
   latestResponse: ChatCompletionResponse | null;
   latestResponseText: string | null;
@@ -24,6 +28,8 @@ interface ChatWorkspaceProps {
   onStartNewConversation: () => void;
   onComposerChange: (value: string) => void;
   onSend: (request?: ChatSendRequest) => void;
+  onLoadDocumentSources: () => void;
+  onSelectDocumentSource: (source: ChatDocumentSource | null) => void;
   onReviewProjectState: () => void;
   onSaveDiscussion: (messageId: string) => void;
   onKeepDiscussingBaDraft: () => void;
@@ -41,6 +47,10 @@ export function ChatWorkspace({
   isSending,
   disabledReason,
   sendDisabledReason,
+  documentSources,
+  documentSourceLoadState,
+  documentSourceError,
+  selectedDocumentSource,
   errorMessage,
   latestResponse,
   latestResponseText,
@@ -49,6 +59,8 @@ export function ChatWorkspace({
   onStartNewConversation,
   onComposerChange,
   onSend,
+  onLoadDocumentSources,
+  onSelectDocumentSource,
   onReviewProjectState,
   onSaveDiscussion,
   onKeepDiscussingBaDraft,
@@ -135,8 +147,14 @@ export function ChatWorkspace({
               isSending={isSending}
               disabledReason={disabledReason}
               sendDisabledReason={sendDisabledReason}
+              documentSources={documentSources}
+              documentSourceLoadState={documentSourceLoadState}
+              documentSourceError={documentSourceError}
+              selectedDocumentSource={selectedDocumentSource}
               onChange={onComposerChange}
               onSend={() => onSend()}
+              onLoadDocumentSources={onLoadDocumentSources}
+              onSelectDocumentSource={onSelectDocumentSource}
             />
           </div>
           <ChatContextPanel

@@ -1991,6 +1991,28 @@
                         "appliedByManifest":  false,
                         "verifiedByScript":  false,
                         "notes":  "Runtime store validates supplied ReleaseReadinessDecisionRecord records and calls stored procedures only; no readiness gate, release decision creation, release approval, deployment approval, merge approval, release execution, source apply, rollback execution, workflow continuation, git, API, CLI, UI, agent, model, tool, memory, or retrieval path."
+                    },
+                    {
+                        "id":  "database.migrate-chat-document-sources",
+                        "path":  "Database/migrate_chat_document_sources.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "chat",
+                        "objectsCreated":  [
+                                               "dbo.ChatMessages.ReplyToMessageId",
+                                               "dbo.FK_ChatMessages_ReplyToMessage",
+                                               "dbo.IX_ChatMessages_ReplyToMessageId"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.ChatMessages",
+                                              "dbo.ProjectDocumentLinks"
+                                          ],
+                        "referencedBy":  [
+                                             "DOCS-CHAT-1"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Adds reply linkage for durable exact-version Chat source replay. It grants no document access, workflow authority, approval, execution, or source mutation."
                     }
                 ]
 }

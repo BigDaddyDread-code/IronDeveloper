@@ -89,6 +89,10 @@ export function ChatRoute({
         isSending={chat.isSending}
         disabledReason={chat.disabledReason}
         sendDisabledReason={chat.sendDisabledReason}
+        documentSources={chat.documentSources}
+        documentSourceLoadState={chat.documentSourceLoadState}
+        documentSourceError={chat.documentSourceError}
+        selectedDocumentSource={chat.selectedDocumentSource}
         errorMessage={chat.errorMessage}
         latestResponse={chat.latestResponse}
         latestResponseText={chat.latestResponseText}
@@ -100,6 +104,8 @@ export function ChatRoute({
         }}
         onComposerChange={chat.setDraft}
         onSend={chat.sendMessage}
+        onLoadDocumentSources={chat.loadDocumentSources}
+        onSelectDocumentSource={chat.setSelectedDocumentSource}
         onReviewProjectState={chat.reviewProjectState}
         onSaveDiscussion={chat.saveDiscussionFromMessage}
         onKeepDiscussingBaDraft={chat.keepDiscussingBaDraft}

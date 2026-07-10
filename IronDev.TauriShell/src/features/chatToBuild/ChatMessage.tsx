@@ -14,7 +14,9 @@ interface ChatMessageProps {
 export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMessageProps) {
   const gate = getChatModeGate(message.response);
   const mode = gate.mode;
+  const documentSources = message.documentSources ?? message.response?.documentSources ?? [];
   const hasSources = Boolean(
+    documentSources.length > 0 ||
     message.response?.contextSummary ||
     message.response?.linkedFilePaths ||
     message.response?.linkedSymbols ||
@@ -40,6 +42,16 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
         </div>
       </header>
       <MarkdownRenderer markdown={message.content} testId={`chat.message.${message.role}.markdown`} />
+      {documentSources.length > 0 ? (
+        <div className="chat-message__document-sources" data-testid="chat.message.documentSources">
+          {documentSources.map((source) => (
+            <span key={source.documentVersionId}>
+              <strong>{source.title}</strong>
+              <small>{source.versionLabel}</small>
+            </span>
+          ))}
+        </div>
+      ) : null}
       {reasoningTrace.length > 0 ||
       auditSourceLabel ||
       message.response?.auditFallbackReason ||

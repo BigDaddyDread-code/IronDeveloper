@@ -4,6 +4,7 @@ import type {
   BaWorkingDraft,
   ChatClarificationKind,
   ChatCompletionResponse,
+  ChatDocumentSource,
   ChatMessage,
   ChatTurnAuditResponse,
   ProjectChatSession,
@@ -24,6 +25,7 @@ const projectReviewPrompt = [
 const chatAuditHydrationLimit = 50;
 
 type SessionLoadState = 'loading' | 'ready' | 'notFound' | 'unavailable';
+type DocumentSourceLoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 interface UseProjectChatOptions {
   requestedSessionId: number | null;
@@ -43,6 +45,10 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const [sessionLoadRequest, setSessionLoadRequest] = useState(0);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [documentSources, setDocumentSources] = useState<ChatDocumentSource[]>([]);
+  const [documentSourceLoadState, setDocumentSourceLoadState] = useState<DocumentSourceLoadState>('idle');
+  const [documentSourceError, setDocumentSourceError] = useState<string | null>(null);
+  const [selectedDocumentSource, setSelectedDocumentSource] = useState<ChatDocumentSource | null>(null);
   const freshConversationRef = useRef(false);
   const errorSessionIdRef = useRef<number | null>(null);
 
@@ -179,11 +185,33 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     setSessionLoadRequest((current) => current + 1);
   }, []);
 
+  const loadDocumentSources = useCallback(async () => {
+    if (!projectId || !session.tokenConfigured || session.apiStatus.status !== 'connected') {
+      setDocumentSources([]);
+      setDocumentSourceLoadState('error');
+      setDocumentSourceError('Project document sources are unavailable until Chat is connected.');
+      return;
+    }
+
+    setDocumentSourceLoadState('loading');
+    setDocumentSourceError(null);
+    try {
+      const sources = await session.client.getProjectChatDocumentSources(projectId);
+      setDocumentSources(sources);
+      setDocumentSourceLoadState('ready');
+    } catch (error) {
+      setDocumentSources([]);
+      setDocumentSourceLoadState('error');
+      setDocumentSourceError(describeApiError(error, 'Project document sources failed to load.'));
+    }
+  }, [projectId, session.apiStatus.status, session.client, session.tokenConfigured]);
+
   const startNewConversation = useCallback(() => {
     freshConversationRef.current = true;
     setSessionId(null);
     setMessages([]);
     setDraft('');
+    setSelectedDocumentSource(null);
     errorSessionIdRef.current = null;
     setErrorMessage(null);
     setSessionLoadState('ready');
@@ -222,12 +250,15 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
         return;
       }
 
+      const attachedSource = request ? null : selectedDocumentSource;
+
       const userMessage: ChatWorkspaceMessage = {
         id: `user-${Date.now()}`,
         role: 'user',
         content: displayText,
         canContinueInBuild: request?.canContinueInBuild ?? true,
-        createdUtc: new Date().toISOString()
+        createdUtc: new Date().toISOString(),
+        documentSources: attachedSource ? [attachedSource] : []
       };
 
       setMessages((current) => [...current, userMessage]);
@@ -245,7 +276,8 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           chatSessionId: activeSessionId,
           role: 'user',
           message: displayText,
-          tags: request?.mode ?? 'projectQuestion'
+          tags: request?.mode ?? 'projectQuestion',
+          documentVersionIds: attachedSource ? [attachedSource.documentVersionId] : []
         });
 
         setMessages((current) =>
@@ -261,7 +293,8 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           prompt,
           sessionId: activeSessionId,
           activeModel: null,
-          mode: request?.mode ?? 'projectQuestion'
+          mode: request?.mode ?? 'projectQuestion',
+          sourceMessageId: savedUserMessageId
         });
         const responseMode = coerceChatGovernanceMode(response.mode);
         const responseGate = getChatModeGate({ ...response, mode: responseMode });
@@ -276,7 +309,8 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           tags: savedAssistantTags,
           contextSummary: response.contextSummary ?? null,
           linkedFilePaths: response.linkedFilePaths ?? null,
-          linkedSymbols: response.linkedSymbols ?? null
+          linkedSymbols: response.linkedSymbols ?? null,
+          replyToMessageId: savedUserMessageId
         });
 
         const assistantMessage: ChatWorkspaceMessage = {
@@ -306,14 +340,17 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
             linkedFilePaths: response.linkedFilePaths ?? null,
             linkedSymbols: response.linkedSymbols ?? null,
             contextSummary: response.contextSummary ?? null,
-            traceId: response.traceId ?? null
+            traceId: response.traceId ?? null,
+            documentSources: response.documentSources ?? (attachedSource ? [attachedSource] : [])
           },
-          createdUtc: new Date().toISOString()
+          createdUtc: new Date().toISOString(),
+          documentSources: response.documentSources ?? (attachedSource ? [attachedSource] : [])
         };
 
         setMessages((current) => [...current, assistantMessage]);
         if (!request) {
           setDraft('');
+          setSelectedDocumentSource(null);
         }
       } catch (error) {
         errorSessionIdRef.current = createdSessionId ?? sessionId;
@@ -325,7 +362,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
         }
       }
     },
-    [disabledReason, draft, ensureChatSession, isSending, onSessionCreated, projectId, session.client, sessionId]
+    [disabledReason, draft, ensureChatSession, isSending, onSessionCreated, projectId, selectedDocumentSource, session.client, sessionId]
   );
 
   const reviewProjectState = useCallback(() => {
@@ -464,10 +501,16 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     errorMessage,
     latestResponse: latestResponse as ChatCompletionResponse | null,
     latestResponseText,
+    documentSources,
+    documentSourceLoadState,
+    documentSourceError,
+    selectedDocumentSource,
     projectLabel,
     retrySessionLoad,
     startNewConversation,
     setDraft,
+    loadDocumentSources,
+    setSelectedDocumentSource,
     sendMessage,
     reviewProjectState,
     saveDiscussionFromMessage,
@@ -543,9 +586,11 @@ function mapApiMessage(message: ChatMessage): ChatWorkspaceMessage {
           auditFallbackReason: hasTagReplay
             ? 'Durable audit row was unavailable; restored from ChatMessage.Tags replay envelope.'
             : null,
-          auditHasFallbackEvidence: false
+          auditHasFallbackEvidence: false,
+          documentSources: message.documentSources ?? []
         }
-      : null
+      : null,
+    documentSources: message.documentSources ?? []
   };
 }
 

@@ -112,7 +112,8 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
             ServiceProvider.GetRequiredService<IChatFeedbackService>(),
             turnPersistence,
             responseService,
-            new StubProjectStateReviewService());
+            new StubProjectStateReviewService(),
+            new StubProjectChatDocumentSourceService());
         var auditResult = await controller.GetMessageAudit(projectId, sessionId, messageId);
         var ok = auditResult.Result as OkObjectResult
             ?? throw new AssertFailedException("Audit controller did not return OK.");
@@ -146,7 +147,8 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
             clarificationClassifier,
             ServiceProvider.GetRequiredService<IChatBaDraftService>(),
             new ProjectChatResponseComposer(new StubPromptTemplateProvider(), new StubLlmService()),
-            new ProjectChatResponseMetadataBuilder());
+            new ProjectChatResponseMetadataBuilder(),
+            new StubProjectChatDocumentSourceService());
     }
 
     private async Task AssertPersistedAuditRowsAsync(long messageId)
@@ -289,5 +291,28 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
             int projectId,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class StubProjectChatDocumentSourceService : IProjectChatDocumentSourceService
+    {
+        public Task<IReadOnlyList<ChatDocumentSource>> GetAvailableSourcesAsync(
+            int projectId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ChatDocumentSource>>([]);
+
+        public Task<IReadOnlyDictionary<long, IReadOnlyList<ChatDocumentSource>>> GetSourcesForMessagesAsync(
+            int projectId,
+            long sessionId,
+            IReadOnlyList<ChatMessage> messages,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<long, IReadOnlyList<ChatDocumentSource>>>(
+                new Dictionary<long, IReadOnlyList<ChatDocumentSource>>());
+
+        public Task<IReadOnlyList<AttachedChatDocumentContext>> GetAttachedContextsAsync(
+            int projectId,
+            long sessionId,
+            long sourceMessageId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<AttachedChatDocumentContext>>([]);
     }
 }

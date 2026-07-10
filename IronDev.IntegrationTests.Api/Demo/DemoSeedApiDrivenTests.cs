@@ -1423,6 +1423,7 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             string? dogfoodTraceId = null,
             string? recentConversationSummary = null,
             long? sessionId = null,
+            long? sourceMessageId = null,
             CancellationToken cancellationToken = default)
         {
             var decision = new ChatModeDecision(
