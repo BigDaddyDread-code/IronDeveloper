@@ -144,6 +144,11 @@
                            "id":  "2026-07-product-chat-document-context",
                            "path":  "Database/migrate_chat_document_sources.sql",
                            "description":  "Adds durable Chat reply linkage so exact Ready document versions linked through ProjectDocumentLinks can be replayed against the assistant answer that used them."
+                       },
+                       {
+                           "id":  "2026-07-product-project-channels",
+                           "path":  "Database/migrate_project_channels.sql",
+                           "description":  "Promotes the bounded project-channel schema into the runtime migration manifest for channel membership administration."
                        }
                    ]
 }

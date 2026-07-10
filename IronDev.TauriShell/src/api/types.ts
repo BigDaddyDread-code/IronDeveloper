@@ -846,11 +846,37 @@ export interface ProjectMemberDirectoryResponse {
   tenantId: number;
   currentUserTenantRole: string;
   canAdministerTenantMembership: boolean;
+  canAdministerChannelMembership: boolean;
   availableTenantRoles: string[];
+  availableChannelRoles: string[];
+  availableNotificationLevels: string[];
   projectMembershipStatus: string;
   channelMembershipStatus: string;
   members: ProjectMemberDirectoryEntry[];
+  channels: ProjectChannelDirectoryEntry[];
   boundary: string;
+}
+
+export interface ProjectChannelMembershipEntry {
+  userId: number;
+  channelRole: string;
+  notificationLevel: string;
+}
+
+export interface ProjectChannelDirectoryEntry {
+  channelId: number;
+  name: string;
+  description: string | null;
+  channelKind: string;
+  visibility: 'Project' | 'MembersOnly';
+  memberCount: number;
+  members: ProjectChannelMembershipEntry[];
+  boundary: string;
+}
+
+export interface SetProjectChannelMembershipRequest {
+  channelRole: string;
+  notificationLevel: string;
 }
 
 export interface CreateTenantUserRequest {

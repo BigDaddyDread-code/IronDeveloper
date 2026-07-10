@@ -384,6 +384,17 @@ public sealed class UserService : IUserService
             }
 
             await connection.ExecuteAsync(new CommandDefinition(
+                """
+                IF OBJECT_ID(N'dbo.ProjectChannelMembers', N'U') IS NOT NULL
+                BEGIN
+                    UPDATE dbo.ProjectChannelMembers
+                    SET Status = 'Removed', RemovedUtc = SYSUTCDATETIME()
+                    WHERE TenantId = @TenantId AND UserId = @UserId AND Status = 'Active';
+                END;
+                """,
+                new { TenantId = tenantId, UserId = userId }, transaction, cancellationToken: ct));
+
+            await connection.ExecuteAsync(new CommandDefinition(
                 "DELETE FROM dbo.TenantUsers WHERE TenantId = @TenantId AND UserId = @UserId;",
                 new { TenantId = tenantId, UserId = userId }, transaction, cancellationToken: ct));
 

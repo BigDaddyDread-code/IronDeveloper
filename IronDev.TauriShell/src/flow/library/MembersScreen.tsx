@@ -1,6 +1,11 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { ProjectMemberDirectoryEntry, ProjectMemberDirectoryResponse } from '../../api/types';
+import type {
+  ProjectChannelDirectoryEntry,
+  ProjectChannelMembershipEntry,
+  ProjectMemberDirectoryEntry,
+  ProjectMemberDirectoryResponse
+} from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useSessionContext } from '../../state/useSessionContext';
 import { RouteOutcomeScreen } from '../components/RouteOutcomeScreen';
@@ -11,6 +16,8 @@ interface MembersScreenProps {
 }
 
 type MemberLoadState = 'loading' | 'ready' | 'empty' | 'notFound' | 'unavailable';
+type ChannelMembershipDraft = { channelRole: string; notificationLevel: string };
+type ChannelAddDraft = ChannelMembershipDraft & { userId: string };
 
 export function MembersScreen({ projectId }: MembersScreenProps) {
   const session = useSessionContext();
@@ -19,6 +26,8 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const [roleDrafts, setRoleDrafts] = useState<Record<number, string>>({});
+  const [channelDrafts, setChannelDrafts] = useState<Record<string, ChannelMembershipDraft>>({});
+  const [channelAddDrafts, setChannelAddDrafts] = useState<Record<number, ChannelAddDraft>>({});
   const [mutationError, setMutationError] = useState('');
   const [notice, setNotice] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -28,10 +37,22 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('Viewer');
   const [removeCandidateId, setRemoveCandidateId] = useState<number | null>(null);
+  const [channelRemoveCandidate, setChannelRemoveCandidate] = useState<{ channelId: number; userId: number } | null>(null);
 
   const applyDirectory = useCallback((loaded: ProjectMemberDirectoryResponse) => {
     setDirectory(loaded);
     setRoleDrafts(Object.fromEntries(loaded.members.map((member) => [member.userId, member.tenantRole])));
+    setChannelDrafts(Object.fromEntries(loaded.channels.flatMap((channel) =>
+      channel.members.map((member) => [channelDraftKey(channel.channelId, member.userId), {
+        channelRole: member.channelRole,
+        notificationLevel: member.notificationLevel
+      }])
+    )));
+    setChannelAddDrafts(Object.fromEntries(loaded.channels.map((channel) => [channel.channelId, {
+      userId: '',
+      channelRole: 'Member',
+      notificationLevel: 'Mentions'
+    }])));
     setLoadState(loaded.members.length === 0 ? 'empty' : 'ready');
   }, []);
 
@@ -79,6 +100,12 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
       );
       if (directory) {
         setRoleDrafts(Object.fromEntries(directory.members.map((member) => [member.userId, member.tenantRole])));
+        setChannelDrafts(Object.fromEntries(directory.channels.flatMap((channel) =>
+          channel.members.map((member) => [channelDraftKey(channel.channelId, member.userId), {
+            channelRole: member.channelRole,
+            notificationLevel: member.notificationLevel
+          }])
+        )));
       }
       return false;
     } finally {
@@ -90,6 +117,12 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
     () => directory?.members.find((member) => member.userId === removeCandidateId) ?? null,
     [directory?.members, removeCandidateId]
   );
+  const channelRemoval = useMemo(() => {
+    if (!channelRemoveCandidate || !directory) return null;
+    const channel = directory.channels.find((candidate) => candidate.channelId === channelRemoveCandidate.channelId);
+    const member = directory.members.find((candidate) => candidate.userId === channelRemoveCandidate.userId);
+    return channel && member ? { channel, member } : null;
+  }, [channelRemoveCandidate, directory]);
 
   if (loadState === 'loading') {
     return <p className="fl-empty" data-testid="flow.members.loading">Loading members...</p>;
@@ -165,6 +198,39 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
       `${removeCandidate.displayName} was removed from the tenant.`
     );
     if (removed) setRemoveCandidateId(null);
+  };
+
+  const saveChannelMembership = (channel: ProjectChannelDirectoryEntry, membership: ProjectChannelMembershipEntry) => {
+    const draft = channelDrafts[channelDraftKey(channel.channelId, membership.userId)] ?? membership;
+    void runMutation(
+      `channel-${channel.channelId}-${membership.userId}`,
+      () => session.client.setProjectChannelMembership(projectId, channel.channelId, membership.userId, draft),
+      `${memberName(directory, membership.userId)}'s ${channel.name} membership was saved.`
+    );
+  };
+
+  const addChannelMembership = (channel: ProjectChannelDirectoryEntry) => {
+    const draft = channelAddDrafts[channel.channelId];
+    const userId = Number(draft?.userId);
+    if (!draft || !Number.isInteger(userId) || userId <= 0) return;
+    void runMutation(
+      `channel-add-${channel.channelId}`,
+      () => session.client.setProjectChannelMembership(projectId, channel.channelId, userId, {
+        channelRole: draft.channelRole,
+        notificationLevel: draft.notificationLevel
+      }),
+      `${memberName(directory, userId)} was added to ${channel.name}.`
+    );
+  };
+
+  const removeChannelMembership = async () => {
+    if (!channelRemoval) return;
+    const removed = await runMutation(
+      `channel-remove-${channelRemoval.channel.channelId}-${channelRemoval.member.userId}`,
+      () => session.client.removeProjectChannelMembership(projectId, channelRemoval.channel.channelId, channelRemoval.member.userId),
+      `${channelRemoval.member.displayName} was removed from ${channelRemoval.channel.name}.`
+    );
+    if (removed) setChannelRemoveCandidate(null);
   };
 
   return (
@@ -257,6 +323,48 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
         <p className="fl-member-permission">No additional tenant members are present.</p>
       ) : null}
 
+      <section className="fl-channel-admin" aria-labelledby="channel-membership-heading" data-testid="flow.members.channels">
+        <header className="fl-channel-admin__heading">
+          <div>
+            <p className="fl-plabel">Channel access</p>
+            <h3 id="channel-membership-heading">Channel memberships</h3>
+            <p>Explicit visibility, moderation role, and notification preference from the backend.</p>
+          </div>
+          <StatusBadge status={directory.channels.length > 0 ? 'ready' : 'neutral'}>{directory.channelMembershipStatus}</StatusBadge>
+        </header>
+
+        {directory.channels.length === 0 ? (
+          <div className="fl-members__empty" data-testid="flow.members.channels.empty">
+            <h4>No active channels</h4>
+            <p>No channel membership has been inferred. Channel creation belongs to a later Chat slice.</p>
+          </div>
+        ) : (
+          <div className="fl-channel-list">
+            {directory.channels.map((channel) => (
+              <ChannelMembershipPanel
+                key={channel.channelId}
+                channel={channel}
+                members={directory.members}
+                canAdminister={directory.canAdministerChannelMembership}
+                roles={directory.availableChannelRoles}
+                notificationLevels={directory.availableNotificationLevels}
+                drafts={channelDrafts}
+                addDraft={channelAddDrafts[channel.channelId] ?? { userId: '', channelRole: 'Member', notificationLevel: 'Mentions' }}
+                busyAction={busyAction}
+                onDraftChange={(userId, draft) => setChannelDrafts((current) => ({
+                  ...current,
+                  [channelDraftKey(channel.channelId, userId)]: draft
+                }))}
+                onAddDraftChange={(draft) => setChannelAddDrafts((current) => ({ ...current, [channel.channelId]: draft }))}
+                onSave={(membership) => saveChannelMembership(channel, membership)}
+                onAdd={() => addChannelMembership(channel)}
+                onRemove={(userId) => setChannelRemoveCandidate({ channelId: channel.channelId, userId })}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
       {removeCandidate ? (
         <div className="fl-member-remove" role="alertdialog" aria-labelledby="remove-member-heading" data-testid="flow.members.remove.confirm">
           <div>
@@ -272,8 +380,107 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
         </div>
       ) : null}
 
+      {channelRemoval ? (
+        <div className="fl-member-remove" role="alertdialog" aria-labelledby="remove-channel-member-heading" data-testid="flow.members.channel.remove.confirm">
+          <div>
+            <h3 id="remove-channel-member-heading">Remove {channelRemoval.member.displayName} from {channelRemoval.channel.name}?</h3>
+            <p>This removes channel visibility or moderation membership only. It does not alter tenant access or authored history.</p>
+          </div>
+          <div>
+            <button className="fl-btn" type="button" onClick={() => setChannelRemoveCandidate(null)}>Cancel</button>
+            <button className="fl-btn fl-danger" type="button" onClick={() => void removeChannelMembership()} disabled={busyAction !== null} data-testid="flow.members.channel.remove.submit">
+              {busyAction?.startsWith('channel-remove-') ? 'Removing...' : 'Remove channel membership'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <p className="fl-member-boundary">{directory.boundary}</p>
     </section>
+  );
+}
+
+function ChannelMembershipPanel({
+  channel,
+  members,
+  canAdminister,
+  roles,
+  notificationLevels,
+  drafts,
+  addDraft,
+  busyAction,
+  onDraftChange,
+  onAddDraftChange,
+  onSave,
+  onAdd,
+  onRemove
+}: {
+  channel: ProjectChannelDirectoryEntry;
+  members: ProjectMemberDirectoryEntry[];
+  canAdminister: boolean;
+  roles: string[];
+  notificationLevels: string[];
+  drafts: Record<string, ChannelMembershipDraft>;
+  addDraft: ChannelAddDraft;
+  busyAction: string | null;
+  onDraftChange: (userId: number, draft: ChannelMembershipDraft) => void;
+  onAddDraftChange: (draft: ChannelAddDraft) => void;
+  onSave: (membership: ProjectChannelMembershipEntry) => void;
+  onAdd: () => void;
+  onRemove: (userId: number) => void;
+}) {
+  const availableMembers = members.filter((member) => member.isActive && !channel.members.some((membership) => membership.userId === member.userId));
+  return (
+    <article className="fl-channel-row" data-testid={`flow.members.channel.${channel.channelId}`}>
+      <header>
+        <div>
+          <h4>{channel.name}</h4>
+          <p>{channel.description || `${channel.channelKind} project conversation.`}</p>
+        </div>
+        <StatusBadge status={channel.visibility === 'MembersOnly' ? 'warning' : 'neutral'}>
+          {channel.visibility === 'MembersOnly' ? 'Members only' : 'Project visible'}
+        </StatusBadge>
+      </header>
+      <p className="fl-channel-scope">
+        {channel.visibility === 'MembersOnly'
+          ? 'Only listed members can discover and open this channel.'
+          : 'Tenant project users can discover this channel; explicit membership sets moderation and notifications.'}
+      </p>
+
+      <div className="fl-channel-members">
+        {channel.members.length === 0 ? <p className="fl-member-permission">No explicit channel members.</p> : null}
+        {channel.members.map((membership) => {
+          const member = members.find((candidate) => candidate.userId === membership.userId);
+          const draft = drafts[channelDraftKey(channel.channelId, membership.userId)] ?? membership;
+          const changed = draft.channelRole !== membership.channelRole || draft.notificationLevel !== membership.notificationLevel;
+          return (
+            <div className="fl-channel-member" key={membership.userId} data-testid={`flow.members.channel.${channel.channelId}.member.${membership.userId}`}>
+              <strong>{member?.displayName ?? `User ${membership.userId}`}</strong>
+              {canAdminister ? (
+                <>
+                  <label>Role<select value={draft.channelRole} disabled={busyAction !== null} onChange={(event) => onDraftChange(membership.userId, { ...draft, channelRole: event.target.value })} data-testid={`flow.members.channel.${channel.channelId}.role.${membership.userId}`}>{roles.map(channelOption)}</select></label>
+                  <label>Notifications<select value={draft.notificationLevel} disabled={busyAction !== null} onChange={(event) => onDraftChange(membership.userId, { ...draft, notificationLevel: event.target.value })} data-testid={`flow.members.channel.${channel.channelId}.notifications.${membership.userId}`}>{notificationLevels.map(channelOption)}</select></label>
+                  <button className="fl-btn" type="button" disabled={!changed || busyAction !== null} onClick={() => onSave(membership)} data-testid={`flow.members.channel.${channel.channelId}.save.${membership.userId}`}>Save</button>
+                  <button className="fl-btn" type="button" disabled={busyAction !== null} onClick={() => onRemove(membership.userId)} data-testid={`flow.members.channel.${channel.channelId}.remove.${membership.userId}`}>Remove</button>
+                </>
+              ) : (
+                <span>{formatChannelRole(membership.channelRole)} / {formatNotificationLevel(membership.notificationLevel)}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {canAdminister && availableMembers.length > 0 ? (
+        <div className="fl-channel-add" data-testid={`flow.members.channel.${channel.channelId}.add`}>
+          <label>Member<select value={addDraft.userId} onChange={(event) => onAddDraftChange({ ...addDraft, userId: event.target.value })} data-testid={`flow.members.channel.${channel.channelId}.add.member`}><option value="">Select tenant member</option>{availableMembers.map((member) => <option key={member.userId} value={member.userId}>{member.displayName}</option>)}</select></label>
+          <label>Role<select value={addDraft.channelRole} onChange={(event) => onAddDraftChange({ ...addDraft, channelRole: event.target.value })} data-testid={`flow.members.channel.${channel.channelId}.add.role`}>{roles.map(channelOption)}</select></label>
+          <label>Notifications<select value={addDraft.notificationLevel} onChange={(event) => onAddDraftChange({ ...addDraft, notificationLevel: event.target.value })} data-testid={`flow.members.channel.${channel.channelId}.add.notifications`}>{notificationLevels.map(channelOption)}</select></label>
+          <button className="fl-btn fl-pri" type="button" disabled={!addDraft.userId || busyAction !== null} onClick={onAdd} data-testid={`flow.members.channel.${channel.channelId}.add.submit`}>Add to channel</button>
+        </div>
+      ) : null}
+      <p className="fl-member-boundary">{channel.boundary}</p>
+    </article>
   );
 }
 
@@ -339,6 +546,26 @@ function roleOption(role: string) {
 
 function formatRole(role: string) {
   return role === 'TenantAdmin' ? 'Tenant admin' : role;
+}
+
+function channelOption(value: string) {
+  return <option key={value} value={value}>{value === 'ReadOnly' ? 'Read only' : value}</option>;
+}
+
+function formatChannelRole(role: string) {
+  return role === 'ReadOnly' ? 'Read only' : role;
+}
+
+function formatNotificationLevel(level: string) {
+  return level === 'None' ? 'Notifications off' : `${level} notifications`;
+}
+
+function channelDraftKey(channelId: number, userId: number) {
+  return `${channelId}-${userId}`;
+}
+
+function memberName(directory: ProjectMemberDirectoryResponse, userId: number) {
+  return directory.members.find((member) => member.userId === userId)?.displayName ?? `User ${userId}`;
 }
 
 function roleDescription(role: string) {

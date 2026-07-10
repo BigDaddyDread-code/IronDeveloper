@@ -427,9 +427,9 @@
                         "referencedBy":  [
                                              "SQL inventory discovery"
                                          ],
-                        "appliedByManifest":  false,
-                        "verifiedByScript":  false,
-                        "notes":  "Project collaboration schema is inventoried but remains outside the active migration manifest until its service and API slice is implemented."
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Manifest-managed project channel schema with tenant/project-scoped membership and collaboration-only authority boundaries."
                     },
                     {
                         "id":  "database.migrate-project-profiles",

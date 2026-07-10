@@ -389,6 +389,13 @@ try {
             ,@{ Name = "Projects IndexingStatus column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.Projects', N'IndexingStatus') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "agent.AgentRunAuditEnvelope table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'agent.AgentRunAuditEnvelope', N'U') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "AgentRunAuditEnvelope no private reasoning constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'agent.AgentRunAuditEnvelope') AND name = N'CK_AgentRunAuditEnvelope_NoRawPrivateReasoning'" }
+            ,@{ Name = "dbo.ProjectChannels table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectChannels', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "dbo.ProjectChannelMembers table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectChannelMembers', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "ProjectChannels active slug unique index"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.ProjectChannels') AND name = N'UX_ProjectChannels_TenantProjectSlug_Active'" }
+            ,@{ Name = "ProjectChannelMembers active user unique index"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.ProjectChannelMembers') AND name = N'UX_ProjectChannelMembers_ChannelUser_Active'" }
+            ,@{ Name = "ProjectChannelMembers scoped channel foreign key"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'dbo.ProjectChannelMembers') AND name = N'FK_ProjectChannelMembers_Channels'" }
+            ,@{ Name = "ProjectChannelMembers role check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.ProjectChannelMembers') AND name = N'CK_ProjectChannelMembers_ChannelRole'" }
+            ,@{ Name = "ProjectChannelMembers notification check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.ProjectChannelMembers') AND name = N'CK_ProjectChannelMembers_NotificationLevel'" }
         )
 
         foreach ($check in $checks) {

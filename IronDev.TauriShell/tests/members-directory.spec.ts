@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
-test('Members shows tenant identities and honest project and channel scope', async ({ page }) => {
+test('Members shows tenant identities and backend-owned channel scope', async ({ page }) => {
   await mockMembersWorkspace(page);
   await page.goto('/projects/7/library/members');
 
@@ -8,11 +8,49 @@ test('Members shows tenant identities and honest project and channel scope', asy
   await expect(directory).toBeVisible();
   await expect(directory).toContainText('Your tenant roleOwner');
   await expect(directory).toContainText('Project membershipNot implemented');
-  await expect(directory).toContainText('Channel membershipNot implemented');
+  await expect(directory).toContainText('Channel membership2 active channels');
   await expect(page.getByTestId('flow.members.row.7')).toContainText('Bob Developer (you)');
   await expect(page.getByTestId('flow.members.row.7')).toContainText('Tenant scoped');
   await expect(page.getByTestId('flow.members.row.8')).toContainText('Alice Reviewer');
   await expect(page.getByTestId('flow.members.add.toggle')).toBeVisible();
+  await expect(page.getByTestId('flow.members.channel.101')).toContainText('General');
+  await expect(page.getByTestId('flow.members.channel.101')).toContainText('Project visible');
+  await expect(page.getByTestId('flow.members.channel.102')).toContainText('Members only');
+});
+
+test('channel role, notification, add, and removal use explicit backend mutations', async ({ page }) => {
+  const state = await mockMembersWorkspace(page);
+  await page.goto('/projects/7/library/members');
+
+  await page.getByTestId('flow.members.channel.101.role.8').selectOption('Moderator');
+  await page.getByTestId('flow.members.channel.101.notifications.8').selectOption('All');
+  await page.getByTestId('flow.members.channel.101.save.8').click();
+  await expect(page.getByTestId('flow.members.notice')).toContainText("Alice Reviewer's General membership was saved.");
+
+  await page.getByTestId('flow.members.channel.102.add.member').selectOption('8');
+  await page.getByTestId('flow.members.channel.102.add.role').selectOption('Member');
+  await page.getByTestId('flow.members.channel.102.add.notifications').selectOption('Mentions');
+  await page.getByTestId('flow.members.channel.102.add.submit').click();
+  await expect(page.getByTestId('flow.members.channel.102.member.8')).toContainText('Alice Reviewer');
+
+  await page.getByTestId('flow.members.channel.102.remove.8').click();
+  await expect(page.getByTestId('flow.members.channel.remove.confirm')).toContainText('does not alter tenant access');
+  await page.getByTestId('flow.members.channel.remove.submit').click();
+  await expect(page.getByTestId('flow.members.channel.102.member.8')).toHaveCount(0);
+  expect(state.channelPutRequests).toBe(2);
+  expect(state.channelDeleteRequests).toBe(1);
+});
+
+test('the last channel owner refusal restores backend membership truth', async ({ page }) => {
+  await mockMembersWorkspace(page, { refuseLastChannelOwnerChange: true });
+  await page.goto('/projects/7/library/members');
+
+  await page.getByTestId('flow.members.channel.102.role.7').selectOption('Member');
+  await page.getByTestId('flow.members.channel.102.save.7').click();
+
+  await expect(page.getByTestId('flow.members.error')).toContainText("The channel's last owner cannot be demoted or removed.");
+  await expect(page.getByTestId('flow.members.channel.102.role.7')).toHaveValue('Owner');
+  await expect(page.getByTestId('flow.members.notice')).toHaveCount(0);
 });
 
 test('an eligible owner adds a tenant member through an explicit form', async ({ page }) => {
@@ -141,6 +179,7 @@ interface MembersMockOptions {
   directoryErrorStatus?: number;
   refuseLastOwnerDemotion?: boolean;
   failRefreshAfterMutation?: boolean;
+  refuseLastChannelOwnerChange?: boolean;
 }
 
 interface MembersMockState {
@@ -148,6 +187,8 @@ interface MembersMockState {
   addRequests: number;
   roleRequests: number;
   removeRequests: number;
+  channelPutRequests: number;
+  channelDeleteRequests: number;
   lastAddBody: Record<string, unknown> | null;
 }
 
@@ -159,6 +200,8 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
     addRequests: 0,
     roleRequests: 0,
     removeRequests: 0,
+    channelPutRequests: 0,
+    channelDeleteRequests: 0,
     lastAddBody: null
   };
   let failuresRemaining = options.directoryFailures ?? 0;
@@ -173,7 +216,7 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       isActive: true,
       isCurrentUser: currentUserId === 7,
       projectAccessStatus: 'Tenant scoped',
-      channelMembershipSummary: 'Not implemented'
+      channelMembershipSummary: 'General, Product planning'
     },
     {
       userId: 8,
@@ -183,7 +226,32 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       isActive: true,
       isCurrentUser: currentUserId === 8,
       projectAccessStatus: 'Tenant scoped',
-      channelMembershipSummary: 'Not implemented'
+      channelMembershipSummary: 'General'
+    }
+  ];
+  const channels = [
+    {
+      channelId: 101,
+      name: 'General',
+      description: 'Project-wide engineering discussion.',
+      channelKind: 'General',
+      visibility: 'Project',
+      memberCount: 2,
+      members: [
+        { userId: 7, channelRole: 'Owner', notificationLevel: 'All' },
+        { userId: 8, channelRole: 'Member', notificationLevel: 'Mentions' }
+      ],
+      boundary: 'Channel membership controls visibility and moderation only.'
+    },
+    {
+      channelId: 102,
+      name: 'Product planning',
+      description: 'Restricted product and UX discussion.',
+      channelKind: 'Custom',
+      visibility: 'MembersOnly',
+      memberCount: 1,
+      members: [{ userId: 7, channelRole: 'Owner', notificationLevel: 'Mentions' }],
+      boundary: 'Channel membership controls visibility and moderation only.'
     }
   ];
 
@@ -241,9 +309,42 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       isActive: true,
       isCurrentUser: false,
       projectAccessStatus: 'Tenant scoped',
-      channelMembershipSummary: 'Not implemented'
+      channelMembershipSummary: 'No explicit memberships'
     });
     return json(route, { id: 9, ...body, isActive: true });
+  });
+  await page.route(/\/irondev-api\/api\/projects\/7\/channels\/(\d+)\/members\/(\d+)$/, (route) => {
+    const match = route.request().url().match(/channels\/(\d+)\/members\/(\d+)$/);
+    const channelId = Number(match?.[1]);
+    const userId = Number(match?.[2]);
+    const channel = channels.find((candidate) => candidate.channelId === channelId);
+    if (!channel) return json(route, { error: 'Channel not found in this project.' }, 404);
+
+    if (route.request().method() === 'DELETE') {
+      state.channelDeleteRequests += 1;
+      const index = channel.members.findIndex((membership) => membership.userId === userId);
+      if (index >= 0) channel.members.splice(index, 1);
+      channel.memberCount = channel.members.length;
+      return json(route, { message: 'Channel membership removed.' });
+    }
+
+    state.channelPutRequests += 1;
+    const body = route.request().postDataJSON() as { channelRole: string; notificationLevel: string };
+    if (!body || typeof body !== 'object' || typeof body.channelRole !== 'string' || typeof body.notificationLevel !== 'string') {
+      return json(route, { error: 'Malformed channel membership body.' }, 400);
+    }
+    const existing = channel.members.find((membership) => membership.userId === userId);
+    if (options.refuseLastChannelOwnerChange && channelId === 102 && userId === 7 && body.channelRole !== 'Owner') {
+      return json(route, { error: "The channel's last owner cannot be demoted or removed." }, 409);
+    }
+    if (existing) {
+      existing.channelRole = body.channelRole;
+      existing.notificationLevel = body.notificationLevel;
+    } else {
+      channel.members.push({ userId, ...body });
+      channel.memberCount = channel.members.length;
+    }
+    return json(route, { message: 'Channel membership saved.' });
   });
   await page.route(/\/irondev-api\/api\/projects\/7\/members(?:\?[^#]*)?$/, (route) => {
     state.directoryRequests += 1;
@@ -258,17 +359,28 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       failuresRemaining -= 1;
       return json(route, { error: 'Member directory unavailable.' }, 503);
     }
+    const visibleChannels = options.canAdminister === false
+      ? channels.filter((channel) => channel.visibility === 'Project' || channel.members.some((member) => member.userId === currentUserId))
+      : channels;
+    for (const member of members) {
+      const names = visibleChannels.filter((channel) => channel.members.some((membership) => membership.userId === member.userId)).map((channel) => channel.name);
+      member.channelMembershipSummary = names.length > 0 ? names.join(', ') : 'No explicit memberships';
+    }
     return json(route, {
       projectId: 7,
       projectName: 'BookSeller',
       tenantId: 3,
       currentUserTenantRole: options.currentRole ?? 'Owner',
       canAdministerTenantMembership: options.canAdminister ?? true,
+      canAdministerChannelMembership: options.canAdminister ?? true,
       availableTenantRoles,
+      availableChannelRoles: ['Owner', 'Moderator', 'Member', 'ReadOnly'],
+      availableNotificationLevels: ['All', 'Mentions', 'None'],
       projectMembershipStatus: 'Not implemented',
-      channelMembershipStatus: 'Not implemented',
+      channelMembershipStatus: `${visibleChannels.length} active channels`,
       members,
-      boundary: 'Tenant membership is not project assignment, channel membership, approval, workflow authority, tool authority, or source mutation permission.'
+      channels: visibleChannels,
+      boundary: 'Channel membership controls visibility and moderation only. It is not project assignment, approval, workflow authority, tool authority, or source mutation permission.'
     });
   });
 
