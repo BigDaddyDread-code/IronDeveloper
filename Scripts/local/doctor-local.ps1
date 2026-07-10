@@ -429,7 +429,7 @@ function Get-PrimaryNextSafeAction {
         return $candidate.NextSafeAction
     }
 
-    return New-LocalCommand @("powershell", "-ExecutionPolicy", "Bypass", "-File", ".\tools\localtest\start-alpha-localtest.ps1", "-Reset", "-BrowserOnly")
+    return New-LocalCommand @("powershell", "-ExecutionPolicy", "Bypass", "-File", ".\tools\localtest\start-pr-manual-test.ps1", "-Reset", "-BrowserOnly")
 }
 
 function Get-DoctorStatus {
@@ -541,7 +541,7 @@ try {
         "Scripts/local/bootstrap-local.ps1",
         "Scripts/local/sql-local.ps1",
         "tools/localtest/reset-localtest-data.ps1",
-        "tools/localtest/start-alpha-localtest.ps1",
+        "tools/localtest/start-pr-manual-test.ps1",
         "tools/localtest/Invoke-LocalTestSmoke.ps1"
     )
 
@@ -726,7 +726,7 @@ try {
     $localTestRequiredFiles = @(
         "IronDev.Api/appsettings.LocalTest.json",
         "tools/localtest/reset-localtest-data.ps1",
-        "tools/localtest/start-alpha-localtest.ps1",
+        "tools/localtest/start-pr-manual-test.ps1",
         "tools/localtest/Invoke-LocalTestSmoke.ps1",
         "IronDev.TauriShell/tests/localtest-manual-smoke.spec.ts"
     )
@@ -781,7 +781,7 @@ try {
             Add-DoctorCheck "Api" "Pass" "Info" "ApiGetProbeResponded" "" "GetOnlyProbe"
         }
         else {
-            Add-DoctorCheck "Api" "Unavailable" "Warning" "ApiUnavailableNoServiceStarted" (New-LocalCommand @("powershell", "-ExecutionPolicy", "Bypass", "-File", ".\tools\localtest\start-alpha-localtest.ps1", (New-SwitchText "Reset"), (New-SwitchText "BrowserOnly"))) "GetOnlyProbe" $DefaultBoundary 10
+            Add-DoctorCheck "Api" "Unavailable" "Warning" "ApiUnavailableNoServiceStarted" (New-LocalCommand @("powershell", "-ExecutionPolicy", "Bypass", "-File", ".\tools\localtest\start-pr-manual-test.ps1", (New-SwitchText "Reset"), (New-SwitchText "BrowserOnly"))) "GetOnlyProbe" $DefaultBoundary 10
         }
     }
 
@@ -794,7 +794,7 @@ try {
             Add-DoctorCheck "Ui" "Pass" "Info" "UiGetProbeResponded" "" "GetOnlyProbe"
         }
         else {
-            Add-DoctorCheck "Ui" "Unavailable" "Warning" "UiUnavailableNoServiceStarted" (New-LocalCommand @("powershell", "-ExecutionPolicy", "Bypass", "-File", ".\tools\localtest\start-alpha-localtest.ps1", (New-SwitchText "Reset"), (New-SwitchText "BrowserOnly"))) "GetOnlyProbe" $DefaultBoundary 10
+            Add-DoctorCheck "Ui" "Unavailable" "Warning" "UiUnavailableNoServiceStarted" (New-LocalCommand @("powershell", "-ExecutionPolicy", "Bypass", "-File", ".\tools\localtest\start-pr-manual-test.ps1", (New-SwitchText "Reset"), (New-SwitchText "BrowserOnly"))) "GetOnlyProbe" $DefaultBoundary 10
         }
     }
 

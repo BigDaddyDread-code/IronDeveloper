@@ -537,7 +537,7 @@ public sealed class BlockJ07DeveloperEnvironmentDoctorTests
             File.WriteAllText(Path.Combine(root, "IronDev.slnx"), string.Empty);
             File.WriteAllText(Path.Combine(root, "Scripts", "local", "bootstrap-local.ps1"), "Write-Host 'bootstrap placeholder'");
             File.WriteAllText(Path.Combine(root, "tools", "localtest", "reset-localtest-data.ps1"), "Write-Host 'reset placeholder'");
-            File.WriteAllText(Path.Combine(root, "tools", "localtest", "start-alpha-localtest.ps1"), "Write-Host 'start placeholder'");
+            File.WriteAllText(Path.Combine(root, "tools", "localtest", "start-pr-manual-test.ps1"), "Write-Host 'start placeholder'");
             File.WriteAllText(Path.Combine(root, "tools", "localtest", "Invoke-LocalTestSmoke.ps1"), "Write-Host 'smoke placeholder'");
             File.WriteAllText(Path.Combine(root, "IronDev.TauriShell", "tests", "localtest-manual-smoke.spec.ts"), "test('placeholder', () => {});");
             File.WriteAllText(Path.Combine(root, "IronDev.Core", "Configuration", "RedactedConfigSummaryModels.cs"), string.Empty);

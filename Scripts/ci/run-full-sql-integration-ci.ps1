@@ -392,6 +392,17 @@ try {
         -Attempts 30 `
         -DelaySeconds 2
 
+    Invoke-TimedCommand "Clean database migration verification" {
+        & (Join-Path $script:RepoRoot "Database\verify-clean-database.ps1") `
+            -ConnectionString $connectionString `
+            -Database "$($env:IRONDEV_CI_SQL_DATABASE)_Migration"
+    }
+
+    Invoke-TestLane `
+        -Name "In-process API contract" `
+        -Project $script:ApiProject `
+        -Filter "FullyQualifiedName~EndpointContractTests|FullyQualifiedName~ApiTestBaseCatalogGuardContractTests"
+
     $sqlStoreFilter = @(
         "FullyQualifiedName~AcceptedApprovalSqlStoreTests",
         "FullyQualifiedName~PolicySatisfactionSqlStoreTests",

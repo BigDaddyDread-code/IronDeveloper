@@ -48,6 +48,14 @@ The script:
 
 The verifier checks the governance schema, governance event table/procedures/trigger, tool request, tool gate decision, approval decision, policy decision event, dogfood receipt, and ThoughtLedger governance reference tables/procedures/triggers/foreign keys plus key JSON/version constraints.
 
+For a clean supported baseline, create an isolated test-shaped database, build the base schema, apply every migration twice, run the verifier, and remove the database:
+
+```powershell
+.\Database\verify-clean-database.ps1
+```
+
+CI supplies its SQL connection and a unique `IronDev_CI_*` database name. The script refuses any target that does not end in `_Test` or start with `IronDev_CI_`. `IRONDEV_MIGRATION_CONNECTION_STRING` is the non-command-line connection seam used by the clean verifier so credentials are not passed to child process arguments.
+
 ## Migration state decision
 
 `Docs/decisions/ADR-017-migration-state-tracking.md` defines the migration-state tracking contract before any durable migration-state table exists. Migration state is evidence, not database authority. A recorded migration is not a safe database, and migration state does not replace `verify-migrations.ps1`.

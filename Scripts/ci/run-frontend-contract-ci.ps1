@@ -82,7 +82,17 @@ try {
     Invoke-LoggedNativeCommand `
         -Name "Install frontend dependencies" `
         -OutputPath $script:FrontendOutput `
-        -Command { npm ci }
+        -Command {
+            if ($env:CI -eq "true") {
+                npm ci
+            }
+            else {
+                # A running Vite process holds esbuild.exe on Windows. Local
+                # validation keeps the lockfile authoritative without deleting
+                # the live node_modules tree out from under that process.
+                npm install --no-audit --no-fund
+            }
+        }
 
     Invoke-LoggedNativeCommand `
         -Name "Tauri frontend type-check" `
