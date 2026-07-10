@@ -1,5 +1,7 @@
 # IronDev Full UX Map
 
+> **Status: Superseded as a current product contract.** Retained as historical synthesis. Use [IronDev Product and UX Specification v2](../product/IRONDEV_PRODUCT_UX_SPEC_V2.md) and [Current Product Capabilities](../product/CURRENT_PRODUCT_CAPABILITIES.md) for current navigation and implementation truth.
+
 **Status:** Draft — full-experience design pass, revised for multi-user project teams.
 Uncommitted working draft for review.
 

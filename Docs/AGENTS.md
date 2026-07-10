@@ -6,7 +6,7 @@ This document is the current source of truth for the IronDev/IDA agent layer.
 
 IronDev uses governed autonomy, not free autonomy.
 
-Agents may reason, package evidence, run bounded plans, and write inside explicit disposable workspaces when the cage is proven. Agents must not write the real repository, mutate accepted memory, create live tickets, or approve themselves unless a future reviewed control path explicitly grants that capability.
+Agents may reason, package evidence, run bounded plans, and write inside explicit disposable workspaces when the cage is proven. Agents must not write the active repository as autonomous authority, mutate accepted memory, create live tickets, or approve themselves. Separate governed services may apply an approved, hash-bound package into a disposable or isolated non-main worktree after live policy and approval checks.
 
 ## Current Agent Roles
 
@@ -21,7 +21,7 @@ Agents may reason, package evidence, run bounded plans, and write inside explici
 | RetrieverAgent | Opt-in live governed weighted context packer | cheap-runner | Packages accepted project memory, rankings, rejected context, and trace evidence. May call a configured model only when explicitly enabled. Does not decide implementation or override ranking. |
 | CriticAgent | Opt-in live governed failure/evidence reviewer | strong-reviewer | Reviews failure packages and risks. May call a configured model only when explicitly enabled. Does not patch. |
 | DoubtAgent | Adversarial review path with deterministic fallback | strong-reviewer | Stress-tests plans, promotion packages, and proposed changes for hidden risk. High/Critical findings require explicit Killjoy rebuttal. Does not patch, block forever, mutate memory, or approve writes. |
-| MemoryImprovementAgent | Level 1 proposal-only memory improvement path | standard-reasoner | Reviews completed-run evidence and proposes memory improvements with evidence bundles and token/proposal budgets. Does not write staging memory, mutate accepted memory, create tickets, or receive accepted-memory keys in Alpha. |
+| MemoryImprovementAgent | Level 1 proposal-only memory improvement path | standard-reasoner | Reviews completed-run evidence and proposes memory improvements with evidence bundles and token/proposal budgets. Does not write staging memory, mutate accepted memory, create tickets, or receive accepted-memory keys. |
 | SentinelAgent | Opt-in live governed internal observation | cheap-runner | Emits advisory insight artefacts. May call a configured model only when explicitly enabled. Does not create tickets or mutate memory. |
 | ResearchAgent | Opt-in live governed external evidence packer | cheap-runner | Packages explicit external evidence only. May call a configured model only when explicitly enabled. Project memory remains authority. |
 | ConscienceAgent | Governance gate | cheap-runner | Returns Allow, Block, or NeedsMoreEvidence. Does not execute. |
@@ -43,7 +43,8 @@ Live model calls are opt-in per governed command. If the provider is unavailable
 
 ## Governance Rules
 
-- Real repository writes remain blocked.
+- Autonomous writes to the active repository remain blocked.
+- Governed apply may write an approved package only to a disposable workspace or isolated non-main worktree; it does not grant the participating agent write authority.
 - Disposable workspace writes require explicit cage evidence.
 - ConscienceAgent and ThoughtLedger are required before write-capable workflows.
 - TesterAgent executes only.
@@ -52,7 +53,7 @@ Live model calls are opt-in per governed command. If the provider is unavailable
 - DoubtAgent can require rebuttal/revision but cannot mutate state or create infinite review loops.
 - MemoryImprovementAgent starts at Level 1 ProposalOnly. It can recommend memory improvements with governed evidence bundles, but it cannot write staging memory or accepted memory until MemoryKeyGate evidence proves it deserves a higher key.
 - BuilderAgent may repair only inside the disposable workspace.
-- Human approval is still required before any future real repository apply path.
+- Human approval is required before the current governed apply paths can mutate an eligible workspace.
 
 ## Workflow Boundary Governance (Discussion, Chat, Proposal, Build, Run)
 
@@ -118,8 +119,8 @@ IRONDEV-170 consumes a `PromotionPackage` and applies only its promotable files 
 
 IRONDEV-171 hardens the Run Reports viewer into a promotion review cockpit. The shared run report services now expose promotion package id, proposed change id, approval state, runtime profile, promotable files, blocked files, configurable policy settings, and hard safety invariants. This is review visibility only; it does not grant approval or write authority.
 
-IRONDEV-172 defines the controlled real-repository write path before implementing it. The future path is settings-first for runtime adapters, commands, branch naming, worktree roots, reviewer roles, evidence retention, and policy thresholds, but hard invariants still win: no direct `main` writes, no active developer working tree writes, no self-approval, no ConscienceAgent/ThoughtLedger bypass, no accepted memory mutation, and no promotion of blocked files. This is design only; no branch apply command or PR creation authority exists yet.
+IRONDEV-172 defined the controlled real-repository write path before implementation. The design is settings-first for runtime adapters, commands, branch naming, worktree roots, reviewer roles, evidence retention, and policy thresholds, with hard invariants: no direct `main` writes, no active developer working tree writes, no self-approval, no ConscienceAgent/ThoughtLedger bypass, no accepted memory mutation, and no promotion of blocked files.
 
-IRONDEV-173 through IRONDEV-175 add the first controlled-write gates without performing the write. IRONDEV-173 resolves layered policy settings into an effective policy while proving hard invariants cannot be configured away. IRONDEV-174 creates a scoped human approval record valid only for one promotion package and `ControlledWorktreeDryRun`. IRONDEV-175 validates a future worktree apply as a dry-run: target path explicit, target outside active repo, branch not main/master, approval/package/policy match, promotable files identified, blocked files rejected, active repo mutation count zero, and no worktree created. These slices still do not grant real repo write, PR creation, memory mutation, ticket acceptance, or self-approval authority.
+IRONDEV-173 through IRONDEV-175 added the first controlled-write gates before mutation: effective policy, a package- and hash-scoped human approval, and a worktree dry-run. The current `ControlledWorktreeApplyService` now creates an isolated non-main worktree and applies the approved patch only after those checks pass. It still does not mutate the active working tree, commit, push, open a PR, merge, mutate accepted memory, accept tickets, or grant self-approval authority.
 
-IRONDEV-183 adds the first advanced adversarial and self-improving memory agents. `DoubtAgent` is the formal Adversarial Review Agent and may be referred to internally as the AssholeAgent nickname, but product/docs use DoubtAgent. `MemoryImprovementAgent` analyses completed-run evidence, Doubt findings, Killjoy rebuttals, and promotion outcomes to propose memory improvements. It starts at Level 1 ProposalOnly and includes evidence bundles plus a MemoryKeyGate review. The gate currently returns `NeedsMoreEvidence` for Level 2 staging-area write; accepted-memory key readiness remains false during Alpha. No staging write, accepted memory mutation, ticket creation, patching, or self-approval authority is granted.
+IRONDEV-183 adds the first advanced adversarial and self-improving memory agents. `DoubtAgent` is the formal Adversarial Review Agent and may be referred to internally as the AssholeAgent nickname, but product/docs use DoubtAgent. `MemoryImprovementAgent` analyses completed-run evidence, Doubt findings, Killjoy rebuttals, and promotion outcomes to propose memory improvements. It starts at Level 1 ProposalOnly and includes evidence bundles plus a MemoryKeyGate review. The gate currently returns `NeedsMoreEvidence` for Level 2 staging-area write; accepted-memory key readiness is not granted. No staging write, accepted memory mutation, ticket creation, patching, or self-approval authority is granted.

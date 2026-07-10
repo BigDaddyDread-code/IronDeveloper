@@ -377,7 +377,7 @@ export function FlowShell() {
   const currentWorkItemId = activeTicket?.id;
   const workItemAvailable = displayedKind === 'workItem' || typeof currentWorkItemId === 'number';
   const modelMode = session.environmentInfo?.isTestEnvironment
-    ? 'Model mode: Deterministic-only local alpha preview; not a live model run'
+    ? 'Model mode: Deterministic LocalTest; not a live model run'
     : 'Model mode: Backend-reported per run; deterministic fallback is never silent';
 
   const openWorkItem = (ticket: ProjectTicket | null) => {
