@@ -88,12 +88,30 @@ function Resolve-LocalDbDataSource {
     $instance = $Matches.instance
     $localDb = Get-Command sqllocaldb -ErrorAction SilentlyContinue
     if ($null -ne $localDb) {
-        & $localDb.Source start $instance | Out-Null
-        if ($LASTEXITCODE -ne 0) {
+        $startExitCode = 0
+        $startOutput = @()
+        try {
+            $startOutput = & $localDb.Source start $instance 2>&1
+            $startExitCode = $LASTEXITCODE
+        }
+        catch {
+            $startOutput += $_.Exception.Message
+            $startExitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 1 }
+        }
+        if ($startExitCode -ne 0) {
             Write-Warning "Could not start LocalDB instance '$instance' through sqllocaldb; attempting to resolve an existing named pipe."
+            if ($startOutput.Count -gt 0) {
+                Write-Warning (($startOutput | Out-String).Trim())
+            }
         }
 
-        $info = & $localDb.Source info $instance 2>$null
+        $info = @()
+        try {
+            $info = & $localDb.Source info $instance 2>$null
+        }
+        catch {
+            $info = @()
+        }
         foreach ($line in $info) {
             $match = [regex]::Match($line, '^\s*Instance pipe name:\s*(?<pipe>.+?)\s*$')
             if ($match.Success -and -not [string]::IsNullOrWhiteSpace($match.Groups['pipe'].Value)) {
