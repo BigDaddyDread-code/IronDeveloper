@@ -12,6 +12,7 @@ $runId = [Guid]::NewGuid().ToString("N")
 $database = "IronDev_Platform_$($runId.Substring(0, 12))_Test"
 $artifactRoot = Join-Path $repoRoot "artifacts\platform-baseline\$runId"
 $previousConnectionString = $env:ConnectionStrings__IronDeveloperDb
+$validationPassed = $false
 
 function Resolve-LocalDbDataSource {
     param([Parameter(Mandatory = $true)][string]$DataSource)
@@ -43,7 +44,11 @@ function Resolve-LocalDbDataSource {
         foreach ($line in $info) {
             $match = [Regex]::Match($line, '^\s*Instance pipe name:\s*(?<pipe>.+?)\s*$')
             if ($match.Success -and -not [string]::IsNullOrWhiteSpace($match.Groups['pipe'].Value)) {
-                return "np:$($match.Groups['pipe'].Value.Trim())"
+                $pipe = $match.Groups['pipe'].Value.Trim()
+                if ($pipe.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase)) {
+                    return $pipe
+                }
+                return "np:$pipe"
             }
         }
     }
@@ -130,7 +135,7 @@ try {
     dotnet test (Join-Path $repoRoot "IronDev.IntegrationTests.Api\IronDev.IntegrationTests.Api.csproj") `
         --artifacts-path $artifactRoot `
         --logger "console;verbosity=minimal" `
-        --filter "FullyQualifiedName~EndpointContractTests|FullyQualifiedName~ApiTestBaseCatalogGuardContractTests"
+        --filter "(FullyQualifiedName~EndpointContractTests&TestCategory!=ProcessExecution)|FullyQualifiedName~ApiTestBaseCatalogGuardContractTests"
     if ($LASTEXITCODE -ne 0) {
         throw "In-process API contract tests failed."
     }
@@ -143,12 +148,22 @@ try {
     Write-Host "  Clean migrations: passed"
     Write-Host "  In-process API contract: passed"
     Write-Host "  Frontend/API contract: $(if ($SkipFrontend) { 'skipped by request' } else { 'passed' })"
+    $validationPassed = $true
 }
 finally {
     $env:ConnectionStrings__IronDeveloperDb = $previousConnectionString
 
     if (-not $KeepDatabase) {
-        Remove-TestDatabase -TargetBuilder $targetBuilder -Name $database
+        try {
+            Remove-TestDatabase -TargetBuilder $targetBuilder -Name $database
+        }
+        catch {
+            if ($validationPassed) {
+                throw
+            }
+
+            Write-Warning "Could not remove the isolated database after validation failed: $($_.Exception.Message)"
+        }
     }
 
     $resolvedArtifactRoot = [System.IO.Path]::GetFullPath($artifactRoot)

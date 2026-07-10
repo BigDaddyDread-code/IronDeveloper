@@ -406,7 +406,7 @@ try {
     Invoke-TestLane `
         -Name "In-process API contract" `
         -Project $script:ApiProject `
-        -Filter "FullyQualifiedName~EndpointContractTests|FullyQualifiedName~ApiTestBaseCatalogGuardContractTests"
+        -Filter "(FullyQualifiedName~EndpointContractTests&TestCategory!=ProcessExecution)|FullyQualifiedName~ApiTestBaseCatalogGuardContractTests"
 
     $sqlStoreFilter = @(
         "FullyQualifiedName~AcceptedApprovalSqlStoreTests",

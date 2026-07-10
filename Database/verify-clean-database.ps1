@@ -78,6 +78,24 @@ function Invoke-SqlBatch {
     }
 }
 
+function Open-SqlConnection {
+    param([Parameter(Mandatory = $true)][System.Data.SqlClient.SqlConnection]$Connection)
+
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try {
+            $Connection.Open()
+            return
+        }
+        catch {
+            if ($attempt -ge 10) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
 function Invoke-DatabaseCommand {
     param(
         [Parameter(Mandatory = $true)][System.Data.SqlClient.SqlConnectionStringBuilder]$MasterBuilder,
@@ -86,7 +104,7 @@ function Invoke-DatabaseCommand {
 
     $connection = [System.Data.SqlClient.SqlConnection]::new($MasterBuilder.ConnectionString)
     try {
-        $connection.Open()
+        Open-SqlConnection -Connection $connection
         $command = $connection.CreateCommand()
         $command.CommandText = $Sql
         $command.CommandTimeout = $CommandTimeoutSeconds
@@ -147,7 +165,7 @@ try {
     $schemaBatches = @(Split-SqlBatches -Sql (Get-Content -LiteralPath $schemaPath -Raw))
     $targetConnection = [System.Data.SqlClient.SqlConnection]::new($targetBuilder.ConnectionString)
     try {
-        $targetConnection.Open()
+        Open-SqlConnection -Connection $targetConnection
         $batchNumber = 0
         foreach ($batch in $schemaBatches) {
             if ($batch.IndexOf("master.sys.databases", [StringComparison]::OrdinalIgnoreCase) -ge 0 -or

@@ -24,7 +24,7 @@ Use `-SkipFrontend` only when diagnosing the SQL/API half. Use `-KeepDatabase` o
 
 ## CI enforcement
 
-The full SQL lane runs clean-database migration verification, applies that verified migration manifest to its API test catalog, and then runs the in-process endpoint contract. The frontend workflow runs the live Swagger regeneration and dirty-tree gate. Together they reject migration, API, generated-contract, or TypeScript drift without requiring a developer stack.
+The full SQL lane runs clean-database migration verification, applies that verified migration manifest to its API test catalog, and then runs the in-process endpoint contract. Process-executing endpoint scenarios remain in the governed-loop lanes; they are not part of the deterministic API/database baseline. The frontend workflow runs the live Swagger regeneration and dirty-tree gate. Together they reject migration, API, generated-contract, or TypeScript drift without requiring a developer stack.
 
 ## Process isolation
 

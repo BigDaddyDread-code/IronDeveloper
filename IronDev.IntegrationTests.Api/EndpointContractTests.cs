@@ -1388,6 +1388,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    [TestCategory("ProcessExecution")]
     public async Task DiscussionCodeLoop_ShouldUseGenericProposalRunAndReviewPackagePipeline()
     {
         var baseToken = await LoginAsync();
@@ -1514,6 +1515,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    [TestCategory("ProcessExecution")]
     public async Task DiscussionCodeLoop_CalculatorScenario_ShouldUseSameProposalRunPipeline()
     {
         var baseToken = await LoginAsync();
@@ -1582,6 +1584,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    [TestCategory("ProcessExecution")]
     public async Task DiscussionCodeLoop_HealthApiScenario_ShouldUseSameProposalRunPipeline()
     {
         var baseToken = await LoginAsync();
@@ -1693,6 +1696,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    [TestCategory("ProcessExecution")]
     public async Task DiscussionCodeLoop_FailedCommand_ShouldPersistFailedRunAndEvidence()
     {
         var baseToken = await LoginAsync();

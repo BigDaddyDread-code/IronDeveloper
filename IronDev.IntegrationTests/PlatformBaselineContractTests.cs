@@ -11,10 +11,12 @@ public sealed class PlatformBaselineContractTests
         StringAssert.Contains(script, "Database\\verify-clean-database.ps1");
         StringAssert.Contains(script, "EndpointContractTests");
         StringAssert.Contains(script, "ApiTestBaseCatalogGuardContractTests");
+        StringAssert.Contains(script, "TestCategory!=ProcessExecution");
         StringAssert.Contains(script, "--artifacts-path $artifactRoot");
         StringAssert.Contains(script, "run-frontend-contract-ci.ps1");
         StringAssert.Contains(script, "Remove-TestDatabase");
         StringAssert.Contains(script, "Refusing to remove non-test database");
+        StringAssert.Contains(script, "Could not remove the isolated database after validation failed");
     }
 
     [TestMethod]
@@ -27,11 +29,13 @@ public sealed class PlatformBaselineContractTests
         StringAssert.Contains(script, "The database must end in '_Test' or start with 'IronDev_CI_'");
         StringAssert.Contains(script, "SET SINGLE_USER WITH ROLLBACK IMMEDIATE");
         StringAssert.Contains(script, "PASS clean database migration verification");
+        StringAssert.Contains(script, "Open-SqlConnection");
 
         var fullSql = Read("Scripts", "ci", "run-full-sql-integration-ci.ps1");
         StringAssert.Contains(fullSql, "Clean database migration verification");
         StringAssert.Contains(fullSql, "Apply migrations to SQL test catalog");
         AssertOrder(fullSql, "Database\\apply-migrations.ps1", "In-process API contract");
+        StringAssert.Contains(fullSql, "TestCategory!=ProcessExecution");
         StringAssert.Contains(fullSql, "In-process API contract");
     }
 
