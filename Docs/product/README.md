@@ -1,0 +1,18 @@
+# IronDev Product Specifications
+
+This folder contains product-facing contracts for the IronDev desktop experience.
+
+## Current specifications
+
+- [IronDev Product and UX Specification v2](IRONDEV_PRODUCT_UX_SPEC_V2.md) - master information architecture, entry journey, Board, Chat, Work Item, Library, Documents, Tools, multi-user behavior, states, accessibility, and developer handoff.
+- [Multi-User Chat and Collaboration](IRONDEV_MULTI_USER_CHAT_SPEC.md) - channels, direct IronDev sessions, source inspection, mentions, shared drafts, concurrency, and artifact handoff.
+- [Project Documents and Tools](IRONDEV_DOCUMENTS_AND_TOOLS_SPEC.md) - uploads, processing, versions, tool connection, project enablement, scopes, and Chat integration.
+- [Chat, Discussion, Ticket, and Build boundaries](CHAT_DISCUSSION_TICKET_BUILD_BOUNDARIES.md) - existing artifact and workspace boundaries retained by the new UX specification.
+
+## Product honesty rule
+
+Working capabilities receive real routes and complete states. Intended but unimplemented destinations return **Not implemented** and are not presented as demo, alpha, preview, or coming-soon functionality.
+
+## Governance rule
+
+The client displays backend truth and requests actions. It never grants readiness, authority, approval, continuation, tool access, or source mutation on its own.
