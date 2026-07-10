@@ -15,7 +15,7 @@ interface ChatContextPanelProps {
   onKeepDiscussingBaDraft: () => void;
   onAskNextBaQuestion: (draft: BaWorkingDraft) => void;
   onEditBaDraft: (draft: BaWorkingDraft) => void;
-  onConfirmBaDraft: (draft: BaWorkingDraft) => void;
+  onReviewBaDraft: (draft: BaWorkingDraft) => void;
 }
 
 export function ChatContextPanel({
@@ -27,7 +27,7 @@ export function ChatContextPanel({
   onKeepDiscussingBaDraft,
   onAskNextBaQuestion,
   onEditBaDraft,
-  onConfirmBaDraft
+  onReviewBaDraft
 }: ChatContextPanelProps) {
   const gate = getChatModeGate(latestResponse);
   const auditSourceLabel = formatAuditSource(latestResponse?.auditSource);
@@ -173,7 +173,7 @@ export function ChatContextPanel({
           onKeepDiscussing={onKeepDiscussingBaDraft}
           onAskNextQuestion={onAskNextBaQuestion}
           onEditDraft={onEditBaDraft}
-          onConfirmDraft={onConfirmBaDraft}
+          onReviewDraft={onReviewBaDraft}
         />
       ) : null}
       <ChatSourceList response={latestResponse} />
@@ -191,7 +191,7 @@ interface BaDraftPanelProps {
   onKeepDiscussing: () => void;
   onAskNextQuestion: (draft: BaWorkingDraft) => void;
   onEditDraft: (draft: BaWorkingDraft) => void;
-  onConfirmDraft: (draft: BaWorkingDraft) => void;
+  onReviewDraft: (draft: BaWorkingDraft) => void;
 }
 
 function BaDraftPanel({
@@ -199,7 +199,7 @@ function BaDraftPanel({
   onKeepDiscussing,
   onAskNextQuestion,
   onEditDraft,
-  onConfirmDraft
+  onReviewDraft
 }: BaDraftPanelProps) {
   const rules = cleanList(draft.businessRules);
   const criteria = cleanList(draft.acceptanceCriteria);
@@ -207,7 +207,7 @@ function BaDraftPanel({
   const openQuestions = cleanList(draft.openQuestions);
   const conflicts = cleanList(draft.potentialConflicts);
   const sourceIds = cleanList(draft.sourceMessageIds);
-  const canConfirm = draft.readyForConfirmation === true && conflicts.length === 0;
+  const readyForCreation = draft.readyForConfirmation === true && conflicts.length === 0;
 
   return (
     <section className="workflow-section chat-ba-draft" data-testid="chat.baDraft.panel">
@@ -216,7 +216,7 @@ function BaDraftPanel({
           <p className="eyebrow">BA draft</p>
           <h3>Draft work item</h3>
         </div>
-        <StatusBadge status={canConfirm ? 'ready' : conflicts.length > 0 ? 'warning' : 'neutral'}>
+        <StatusBadge status={readyForCreation ? 'ready' : conflicts.length > 0 ? 'warning' : 'neutral'}>
           {draft.suggestedArtifact ?? 'Draft'}
         </StatusBadge>
       </div>
@@ -257,11 +257,10 @@ function BaDraftPanel({
         <CommandButton
           type="button"
           variant="primary"
-          testId="chat.baDraft.confirm"
-          disabled={!canConfirm}
-          onClick={() => onConfirmDraft(draft)}
+          testId="chat.baDraft.review"
+          onClick={() => onReviewDraft(draft)}
         >
-          Confirm as ticket
+          Review ticket draft
         </CommandButton>
       </div>
       {draft.boundary ? <p className="chat-ba-draft__boundary">{draft.boundary}</p> : null}

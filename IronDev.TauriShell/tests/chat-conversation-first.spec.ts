@@ -94,7 +94,9 @@ test('a backend-returned ticket draft opens its decision material without changi
 
   await expect(page.getByTestId('chat.contextPanel')).toBeVisible();
   await expect(page.getByTestId('chat.baDraft.panel')).toContainText('Improve catalog sorting');
-  await expect(page.getByTestId('chat.baDraft.confirm')).toBeDisabled();
+  await page.getByTestId('chat.baDraft.review').click();
+  await expect(page.getByRole('dialog', { name: 'Review ticket draft' })).toBeVisible();
+  await expect(page.getByTestId('chat.ticketDraft.create')).toBeDisabled();
 });
 
 test('a failed response stays in the conversation and leaves the composer usable', async ({ page }) => {

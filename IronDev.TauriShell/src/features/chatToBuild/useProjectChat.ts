@@ -6,7 +6,8 @@ import type {
   ChatCompletionResponse,
   ChatMessage,
   ChatTurnAuditResponse,
-  ProjectChatSession
+  ProjectChatSession,
+  ProjectTicket
 } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
@@ -417,32 +418,25 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     setDraft(formatBaDraftForComposer(baDraft));
   }, []);
 
-  const confirmBaDraft = useCallback(
-    async (baDraft: BaWorkingDraft) => {
+  const createTicketFromBaDraft = useCallback(
+    async (baDraft: BaWorkingDraft): Promise<ProjectTicket> => {
       if (!projectId || !sessionId) {
-        setErrorMessage('Confirm BA draft failed. A project chat session is required.');
-        return;
+        throw new Error('Create ticket failed. A project Chat session is required.');
       }
 
-      setErrorMessage(null);
+      let ticket: ProjectTicket;
       try {
-        const ticket = await session.client.confirmBaWorkingDraft(projectId, {
+        ticket = await session.client.confirmBaWorkingDraft(projectId, {
           sourceChatSessionId: sessionId,
           draft: baDraft
         });
-
-        setMessages((current) => [
-          ...current,
-          {
-            id: `assistant-ba-confirm-${ticket.id ?? Date.now()}`,
-            role: 'assistant',
-            content: `Confirmed BA draft as ticket #${ticket.id}: ${ticket.title}`,
-            createdUtc: new Date().toISOString()
-          }
-        ]);
       } catch (error) {
-        setErrorMessage(describeApiError(error, 'Confirm BA draft failed.'));
+        throw new Error(describeApiError(error, 'Create ticket failed.'));
       }
+      if (!ticket.id) {
+        throw new Error('Create ticket failed. Backend response did not include a ticket identifier.');
+      }
+      return ticket;
     },
     [projectId, session.client, sessionId]
   );
@@ -480,7 +474,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     keepDiscussingBaDraft,
     askNextBaQuestion,
     editBaDraft,
-    confirmBaDraft
+    createTicketFromBaDraft
   };
 }
 
