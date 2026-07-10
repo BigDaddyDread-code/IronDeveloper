@@ -16,8 +16,10 @@ interface SessionContextState {
   email: string;
   password: string;
   errorMessage: string | null;
+  sessionMessage: string | null;
   refreshConfig: () => void;
   clearError: () => void;
+  clearRejectedSession: () => void;
   checkApiConnection: () => Promise<ApiStatus>;
   saveToken: () => void;
   signIn: (request: LoginRequest) => Promise<void>;
@@ -53,6 +55,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [tokenDraft, setTokenDraft] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [sessionMessage, setSessionMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setApiStatus(createInitialStatus(config));
@@ -87,7 +90,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refreshConfig();
   }, [refreshConfig, tokenDraft]);
 
-  const clearError = useCallback(() => setErrorMessage(null), []);
+  const clearError = useCallback(() => {
+    setErrorMessage(null);
+    setSessionMessage(null);
+  }, []);
+
+  const clearRejectedSession = useCallback(() => {
+    window.localStorage.removeItem('irondev.token');
+    window.localStorage.removeItem('irondev.tenantId');
+    window.localStorage.removeItem('irondev.selectedProjectId');
+    setTokenDraft('');
+    setTokenEditorOpen(false);
+    setSessionMessage('Your session has expired. Sign in again.');
+    refreshConfig();
+  }, [refreshConfig]);
 
   const checkApiConnection = useCallback(async () => {
     setIsConnectionBusy(true);
@@ -115,27 +131,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (request: LoginRequest) => {
       setIsAuthBusy(true);
       setErrorMessage(null);
+      setSessionMessage(null);
 
       try {
         const response = await client.login(request);
         window.localStorage.setItem('irondev.token', response.token);
         window.localStorage.removeItem('irondev.tenantId');
         window.localStorage.removeItem('irondev.selectedProjectId');
+        setTokenDraft('');
+        setTokenEditorOpen(false);
+        setPassword('');
         refreshConfig();
       } catch (error) {
         if (error instanceof IronDevApiError) {
           if (environmentInfo?.isTestEnvironment) {
-            setErrorMessage(
-              'LocalTest sign-in failed. The seed data may not match this database. Run tools/localtest/reset-localtest-data.ps1 and retry.'
-            );
+            setErrorMessage('LocalTest sign in failed. Reset the LocalTest data and retry.');
           } else {
-            setErrorMessage('Sign in failed. Check credentials and retry.');
+            setErrorMessage('Sign in failed. Check the email and password and try again.');
           }
         } else {
           setErrorMessage(
             environmentInfo?.isTestEnvironment
-              ? 'LocalTest sign-in failed. The seed data may not match this database. Run tools/localtest/reset-localtest-data.ps1 and retry.'
-              : 'Sign in failed.'
+              ? 'LocalTest sign in failed. Reset the LocalTest data and retry.'
+              : 'Sign in failed. Check the email and password and try again.'
           );
         }
       } finally {
@@ -162,8 +180,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       email,
       password,
       errorMessage,
+      sessionMessage,
       refreshConfig,
       clearError,
+      clearRejectedSession,
       checkApiConnection,
       saveToken,
       signIn,
@@ -176,6 +196,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       apiStatus,
       checkApiConnection,
       clearError,
+      clearRejectedSession,
       client,
       config,
       email,
@@ -188,6 +209,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       refreshConfig,
       saveToken,
       signIn,
+      sessionMessage,
       tokenConfigured,
       tokenDraft
     ]

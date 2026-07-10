@@ -13,6 +13,7 @@ import { AdminInviteSection, AuditSection, ProvisioningSection } from './library
 import { SolutionExplorer } from './library/SolutionExplorer';
 import { SettingsScreen } from './settings/SettingsScreen';
 import { PreflightGate, ProjectChooser } from './start/StartGate';
+import { TenantChooser } from './start/TenantChooser';
 import { WorkItemScreen } from './workitem/WorkItemScreen';
 
 type LibrarySection = 'explorer' | 'governance' | 'provisioning' | 'audit' | 'admin';
@@ -54,10 +55,12 @@ export function FlowShell() {
     }
     if (
       project.accessStatus === 'authRequired' ||
-      project.accessStatus === 'authInvalid' ||
-      project.accessStatus === 'tenantRequired'
+      project.accessStatus === 'authInvalid'
     ) {
-      return <SignInRoute />;
+      return <SignInRoute onOpenSettings={() => setSurface('settings')} />;
+    }
+    if (project.accessStatus === 'tenantRequired') {
+      return <TenantChooser onOpenSettings={() => setSurface('settings')} />;
     }
     if (project.accessStatus === 'projectRequired' || (project.accessStatus !== 'loading' && project.selectedProjectId === null)) {
       return (

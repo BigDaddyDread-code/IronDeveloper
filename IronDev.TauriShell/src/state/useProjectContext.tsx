@@ -27,6 +27,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const {
     checkApiConnection,
     client,
+    clearRejectedSession,
     config,
     refreshConfig,
     setTokenEditorOpen,
@@ -102,7 +103,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         const response = await client.selectTenant(tenantId);
         window.localStorage.setItem('irondev.token', response.token);
         window.localStorage.setItem('irondev.tenantId', `${tenantId}`);
-        if (Number.isFinite(config.fallbackProjectId)) {
+        if (config.fallbackProjectId !== null) {
           window.localStorage.setItem('irondev.selectedProjectId', `${config.fallbackProjectId}`);
         } else {
           window.localStorage.removeItem('irondev.selectedProjectId');
@@ -134,6 +135,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       clearWorkspace();
       if (error instanceof IronDevApiError) {
         if (error.isAuthFailure) {
+          clearRejectedSession();
           setAccessStatus('authInvalid');
         } else {
           setAccessStatus('apiError');
@@ -145,7 +147,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setIsRefreshing(false);
       setTokenEditorOpen(false);
     }
-  }, [checkApiConnection, clearWorkspace, client, config.fallbackProjectId, config.selectedProjectId, config.selectedTenantId, refreshConfig, setTokenEditorOpen, tokenConfigured]);
+  }, [checkApiConnection, clearRejectedSession, clearWorkspace, client, config.fallbackProjectId, config.selectedProjectId, config.selectedTenantId, refreshConfig, setTokenEditorOpen, tokenConfigured]);
 
   const refreshTicketsContext = useCallback(() => {
     if (accessStatus === 'ready' || accessStatus === 'emptyTickets') {
@@ -262,7 +264,7 @@ export function useProjectContext() {
 function getSelectedProject(
   projects: ProjectSummary[],
   selectedProjectId?: number,
-  fallbackProjectId?: number
+  fallbackProjectId?: number | null
 ): (ProjectSummary & { mode: 'api' | 'fallback-config' }) | null {
   const configuredProject = projects.find((project) => project.id === selectedProjectId);
 
@@ -270,7 +272,7 @@ function getSelectedProject(
     return { ...configuredProject, mode: 'api' };
   }
 
-  if (!selectedProjectId) {
+  if (!selectedProjectId && fallbackProjectId !== null && fallbackProjectId !== undefined) {
     const fallbackProject = projects.find((project) => project.id === fallbackProjectId);
     return fallbackProject ? { ...fallbackProject, mode: 'fallback-config' } : null;
   }
