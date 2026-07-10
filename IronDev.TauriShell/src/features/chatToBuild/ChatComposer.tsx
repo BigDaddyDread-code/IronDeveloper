@@ -7,7 +7,6 @@ interface ChatComposerProps {
   sendDisabledReason: string | null;
   onChange: (value: string) => void;
   onSend: () => void;
-  onReviewProjectState: () => void;
 }
 
 export function ChatComposer({
@@ -16,35 +15,20 @@ export function ChatComposer({
   disabledReason,
   sendDisabledReason,
   onChange,
-  onSend,
-  onReviewProjectState
+  onSend
 }: ChatComposerProps) {
   const sendBlockedReason = sendDisabledReason ?? disabledReason;
 
   return (
     <section className="chat-composer" data-testid="chat.composer">
-      <div className="chat-composer__header">
-        <div>
-          <p className="eyebrow">Message</p>
-          <h3>Ask IronDev</h3>
-        </div>
-        <CommandButton
-          type="button"
-          variant="secondary"
-          onClick={onReviewProjectState}
-          disabled={Boolean(disabledReason || isSending)}
-          title={disabledReason ?? undefined}
-          testId="chat.command.reviewProjectState"
-        >
-          Review Project State
-        </CommandButton>
-      </div>
-      <label className="chat-composer__field">
-        <span>Ask about this project</span>
+      <label className="chat-composer__field" htmlFor="chat-composer-input">
+        <span className="fl-visually-hidden">Message IronDev</span>
         <textarea
+          id="chat-composer-input"
           value={value}
-          placeholder="Ask IronDev about this project, or draft work to continue into Build."
+          placeholder="Ask about this project or describe work..."
           disabled={Boolean(disabledReason)}
+          aria-describedby={disabledReason ? 'chat-composer-blocked' : undefined}
           data-testid="chat.composer.input"
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
@@ -58,7 +42,9 @@ export function ChatComposer({
         />
       </label>
       <div className="chat-composer__actions">
-        <p data-testid="chat.composer.disabledReason">{sendBlockedReason ?? 'Ready to send. Shift+Enter inserts a new line.'}</p>
+        {disabledReason ? (
+          <p id="chat-composer-blocked" data-testid="chat.composer.disabledReason">{disabledReason}</p>
+        ) : <span />}
         <CommandButton
           type="button"
           variant="primary"

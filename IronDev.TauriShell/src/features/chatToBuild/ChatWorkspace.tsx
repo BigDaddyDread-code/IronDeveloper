@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { BaWorkingDraft, ChatCompletionResponse } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
-import { Surface } from '../../design-system/Surface';
 import { ChatComposer } from './ChatComposer';
 import { ChatContextPanel } from './ChatContextPanel';
 import { ChatThread } from './ChatThread';
@@ -46,10 +45,37 @@ export function ChatWorkspace({
   onEditBaDraft,
   onConfirmBaDraft
 }: ChatWorkspaceProps) {
-  const [isContextOpen, setIsContextOpen] = useState(true);
+  const [isContextOpen, setIsContextOpen] = useState(false);
+
+  useEffect(() => {
+    if (latestResponse?.baDraft) {
+      setIsContextOpen(true);
+    }
+  }, [latestResponse?.baDraft]);
+
+  const startDraft = (prompt: string) => {
+    onComposerChange(prompt);
+    window.setTimeout(() => document.getElementById('chat-composer-input')?.focus(), 0);
+  };
 
   return (
-    <Surface className="chat-workspace-panel" testId="chat.workspace">
+    <section className="chat-workspace-panel" data-testid="chat.workspace">
+      <header className="chat-page-header">
+        <div>
+          <h1>Chat</h1>
+          <p>
+            {projectLabel} <span aria-hidden="true">/</span> Direct with IronDev
+          </p>
+        </div>
+        <CommandButton
+          type="button"
+          variant="subtle"
+          testId="chat.contextPanel.show"
+          onClick={() => setIsContextOpen((current) => !current)}
+        >
+          {isContextOpen ? 'Close details' : 'Conversation details'}
+        </CommandButton>
+      </header>
       <div className={`chat-workspace-layout ${isContextOpen ? '' : 'chat-workspace-layout--context-collapsed'}`.trim()}>
         <div className="chat-workspace-layout__thread">
           <ChatThread
@@ -57,6 +83,8 @@ export function ChatWorkspace({
             isSending={isSending}
             onSaveDiscussion={onSaveDiscussion}
             onViewSources={() => setIsContextOpen(true)}
+            onReviewProjectState={onReviewProjectState}
+            onStartDraft={startDraft}
           />
           {errorMessage ? <p className="state-error" data-testid="chat.error">{errorMessage}</p> : null}
           <ChatComposer
@@ -66,7 +94,6 @@ export function ChatWorkspace({
             sendDisabledReason={sendDisabledReason}
             onChange={onComposerChange}
             onSend={() => onSend()}
-            onReviewProjectState={onReviewProjectState}
           />
         </div>
         <ChatContextPanel
@@ -80,17 +107,7 @@ export function ChatWorkspace({
           onEditBaDraft={onEditBaDraft}
           onConfirmBaDraft={onConfirmBaDraft}
         />
-        {!isContextOpen ? (
-          <CommandButton
-            type="button"
-            variant="secondary"
-            testId="chat.contextPanel.show"
-            onClick={() => setIsContextOpen(true)}
-          >
-            Show Context
-          </CommandButton>
-        ) : null}
       </div>
-    </Surface>
+    </section>
   );
 }
