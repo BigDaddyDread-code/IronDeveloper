@@ -152,6 +152,7 @@ builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
+builder.Services.AddScoped<IProjectChatDocumentSourceService, ProjectChatDocumentSourceService>();
 builder.Services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
 builder.Services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
 builder.Services.AddScoped<IContextAgentRouteJudge, ContextAgentRouteJudgeService>();

@@ -62,6 +62,7 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/memory/status",
             "/api/projects/{projectId}/memory/reindex",
             "/api/projects/{projectId}/services/status",
+            "/api/projects/{projectId}/chat/document-sources",
             "/api/projects/{projectId}/chat/complete",
             "/api/run-reports",
             "/api/runs/{runId}",
@@ -594,6 +595,136 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.IsTrue(after!.Results.Any(result =>
             result.SourceType == "ProjectDocumentVersion"
             && result.SourceId == uploaded.Version.Id.ToString()));
+    }
+
+    [TestMethod]
+    public async Task ChatDocumentContext_ShouldAttachReadyExactVersionAndReplayWithoutCrossProjectLeak()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+        var project = await CreateProjectAsync(client, "Chat Document Context Project");
+        var otherProject = await CreateProjectAsync(client, "Other Chat Document Context Project");
+
+        var ready = await UploadDocumentAsync(client, project.Id, "Chat Context Contract", "chat-context-contract.md");
+        var draft = await UploadDocumentAsync(client, project.Id, "Draft Must Stay Hidden", "draft-hidden.md");
+        var otherReady = await UploadDocumentAsync(client, otherProject.Id, "Other Project Secret", "other-secret.md");
+
+        var processReady = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/documents/{ready.Document.Id}/process",
+            new { });
+        Assert.AreEqual(HttpStatusCode.OK, processReady.StatusCode);
+        var processOther = await client.PostAsJsonAsync(
+            $"/api/projects/{otherProject.Id}/documents/{otherReady.Document.Id}/process",
+            new { });
+        Assert.AreEqual(HttpStatusCode.OK, processOther.StatusCode);
+
+        var available = await client.GetFromJsonAsync<ChatDocumentSource[]>(
+            $"/api/projects/{project.Id}/chat/document-sources");
+        Assert.IsNotNull(available);
+        Assert.AreEqual(1, available!.Length);
+        Assert.AreEqual(ready.Version.Id, available[0].DocumentVersionId);
+        Assert.AreEqual("v0.1", available[0].VersionLabel);
+        Assert.AreEqual("Ready", available[0].Status);
+        Assert.IsFalse(available.Any(source => source.DocumentVersionId == draft.Version.Id));
+        Assert.IsFalse(available.Any(source => source.DocumentVersionId == otherReady.Version.Id));
+
+        var sessionResponse = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/chat/sessions",
+            new ProjectChatSession
+            {
+                ProjectId = project.Id,
+                Title = "Exact document context"
+            });
+        Assert.AreEqual(HttpStatusCode.OK, sessionResponse.StatusCode);
+        var sessionId = await sessionResponse.Content.ReadFromJsonAsync<long>();
+
+        const string prompt = "Use the attached contract as exact context.";
+        var userResponse = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/chat/sessions/{sessionId}/messages",
+            new ChatMessage
+            {
+                ProjectId = project.Id,
+                ChatSessionId = sessionId,
+                Role = "user",
+                Message = prompt,
+                DocumentVersionIds = [ready.Version.Id]
+            });
+        Assert.AreEqual(HttpStatusCode.OK, userResponse.StatusCode);
+        var userMessageId = await userResponse.Content.ReadFromJsonAsync<long>();
+
+        var completionResponse = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/chat/complete",
+            new
+            {
+                projectId = project.Id,
+                sessionId,
+                prompt,
+                activeModel = "test",
+                mode = "projectQuestion",
+                sourceMessageId = userMessageId
+            });
+        Assert.AreEqual(HttpStatusCode.OK, completionResponse.StatusCode);
+        using var completionBody = JsonDocument.Parse(await completionResponse.Content.ReadAsStringAsync());
+        var completionSource = completionBody.RootElement.GetProperty("documentSources")[0];
+        Assert.AreEqual(ready.Version.Id, completionSource.GetProperty("documentVersionId").GetInt64());
+        Assert.AreEqual("v0.1", completionSource.GetProperty("versionLabel").GetString());
+
+        var assistantResponse = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/chat/sessions/{sessionId}/messages",
+            new ChatMessage
+            {
+                ProjectId = project.Id,
+                ChatSessionId = sessionId,
+                Role = "assistant",
+                Message = completionBody.RootElement.GetProperty("response").GetString() ?? "Response",
+                ReplyToMessageId = userMessageId
+            });
+        Assert.AreEqual(HttpStatusCode.OK, assistantResponse.StatusCode);
+
+        var replay = await client.GetFromJsonAsync<ChatMessage[]>(
+            $"/api/projects/{project.Id}/chat/sessions/{sessionId}/messages");
+        Assert.IsNotNull(replay);
+        Assert.AreEqual(2, replay!.Length);
+        Assert.IsTrue(replay.All(message => message.DocumentSources.Count == 1));
+        Assert.IsTrue(replay.All(message => message.DocumentSources[0].DocumentVersionId == ready.Version.Id));
+        Assert.AreEqual(userMessageId, replay.Single(message => message.Role == "assistant").ReplyToMessageId);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var durableLink = await connection.QuerySingleAsync<(long DocumentVersionId, string CreatedBy)>(
+            """
+            SELECT DocumentVersionId, CreatedBy
+            FROM dbo.ProjectDocumentLinks
+            WHERE LinkedEntityType = 'ChatMessage'
+              AND LinkedEntityId = @UserMessageId
+              AND LinkType = 'ChatContext';
+            """,
+            new { UserMessageId = userMessageId });
+        Assert.AreEqual(ready.Version.Id, durableLink.DocumentVersionId);
+        Assert.AreEqual(AdminEmail, durableLink.CreatedBy);
+
+        var messageCountBeforeRefusal = await connection.QuerySingleAsync<int>(
+            "SELECT COUNT(1) FROM dbo.ChatMessages WHERE ChatSessionId = @SessionId;",
+            new { SessionId = sessionId });
+        var crossProjectAttachment = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/chat/sessions/{sessionId}/messages",
+            new ChatMessage
+            {
+                ProjectId = project.Id,
+                ChatSessionId = sessionId,
+                Role = "user",
+                Message = "Do not persist this turn.",
+                DocumentVersionIds = [otherReady.Version.Id]
+            });
+        Assert.AreEqual(HttpStatusCode.Conflict, crossProjectAttachment.StatusCode);
+        Assert.IsFalse(
+            (await crossProjectAttachment.Content.ReadAsStringAsync()).Contains(
+                otherReady.Document.Title,
+                StringComparison.OrdinalIgnoreCase));
+        var messageCountAfterRefusal = await connection.QuerySingleAsync<int>(
+            "SELECT COUNT(1) FROM dbo.ChatMessages WHERE ChatSessionId = @SessionId;",
+            new { SessionId = sessionId });
+        Assert.AreEqual(messageCountBeforeRefusal, messageCountAfterRefusal);
     }
 
     [TestMethod]
@@ -1306,6 +1437,26 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.IsNotNull(package);
         Assert.AreEqual("Failed", package!.State);
         Assert.IsTrue(package.Risks.Any(item => item.Contains("failed", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static async Task<ProjectDocumentUploadResult> UploadDocumentAsync(
+        HttpClient client,
+        int projectId,
+        string title,
+        string fileName)
+    {
+        using var upload = new MultipartFormDataContent();
+        var file = new ByteArrayContent(Encoding.UTF8.GetBytes($"# {title}\n\nExact immutable context for Chat."));
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/markdown");
+        upload.Add(file, "file", fileName);
+        upload.Add(new StringContent(title), "displayName");
+        upload.Add(new StringContent("Architecture"), "documentType");
+
+        var response = await client.PostAsync($"/api/projects/{projectId}/documents/upload", upload);
+        Assert.AreEqual(HttpStatusCode.Created, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<ProjectDocumentUploadResult>();
+        Assert.IsNotNull(result);
+        return result!;
     }
 
     private static async Task<Project> CreateProjectAsync(HttpClient client, string name, string? localPath = null)

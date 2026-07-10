@@ -98,8 +98,10 @@ function Resolve-SqlCmdDataSource {
 
     $errorLog = Join-Path $env:LOCALAPPDATA "Microsoft\Microsoft SQL Server Local DB\Instances\$instance\error.log"
     if (Test-Path -LiteralPath $errorLog -PathType Leaf) {
-        foreach ($line in (Get-Content -LiteralPath $errorLog | Select-Object -Last 200)) {
-            $match = [regex]::Match($line, 'Server local connection provider is ready to accept connection on \[(?<pipe>[^\]]+)\]')
+        $pipeAnnouncement = Select-String -LiteralPath $errorLog -Pattern 'Server local connection provider is ready to accept connection on' |
+            Select-Object -Last 1
+        if ($null -ne $pipeAnnouncement) {
+            $match = [regex]::Match($pipeAnnouncement.Line, 'Server local connection provider is ready to accept connection on \[(?<pipe>[^\]]+)\]')
             if ($match.Success) {
                 $pipe = $match.Groups['pipe'].Value.Trim()
                 if ($pipe -like '\\.\pipe\*\tsql\query') {
@@ -308,7 +310,7 @@ function Invoke-SqlFile {
         [Parameter(Mandatory = $true)][string]$Path
     )
 
-    $args = @("-S", $sqlCmdServer, "-d", $DatabaseName, "-b", "-i", $Path)
+    $args = @("-S", $sqlCmdServer, "-d", $DatabaseName, "-b", "-I", "-i", $Path)
 
     if ($builder.IntegratedSecurity) {
         $args += "-E"
@@ -385,6 +387,7 @@ GO
         Invoke-SqlFile -DatabaseName "master" -Path $schemaPath
         Invoke-SqlFile -DatabaseName $database -Path $documentMigrationPath
         Invoke-SqlFile -DatabaseName $database -Path $profileMigrationPath
+        Invoke-SqlFile -DatabaseName $database -Path (Join-Path $repoRoot "Database\migrate_chat_document_sources.sql")
     }
     finally {
         Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

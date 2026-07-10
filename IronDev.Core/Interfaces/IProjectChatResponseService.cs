@@ -13,5 +13,6 @@ public interface IProjectChatResponseService
         string? dogfoodTraceId = null,
         string? recentConversationSummary = null,
         long? sessionId = null,
+        long? sourceMessageId = null,
         CancellationToken cancellationToken = default);
 }

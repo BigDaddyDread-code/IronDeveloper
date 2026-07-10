@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using IronDev.Core.Models;
 
 namespace IronDev.Core.Chat;
 
@@ -349,4 +350,5 @@ public sealed record ProjectChatResponseResult(
     long? TraceId = null,
     string? RouteSource = null,
     ChatRouteChallenge? RouteChallenge = null,
-    BaWorkingDraft? BaDraft = null);
+    BaWorkingDraft? BaDraft = null,
+    IReadOnlyList<ChatDocumentSource>? DocumentSources = null);

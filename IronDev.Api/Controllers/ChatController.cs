@@ -7,6 +7,7 @@ using IronDev.Services;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace IronDev.Api.Controllers;
 
@@ -23,19 +24,22 @@ public sealed class ChatController : ControllerBase
     private readonly IChatTurnPersistenceService _turnPersistence;
     private readonly IProjectChatResponseService _projectChat;
     private readonly IProjectStateReviewService _projectStateReview;
+    private readonly IProjectChatDocumentSourceService _documentSources;
 
     public ChatController(
         IChatHistoryService chat,
         IChatFeedbackService feedback,
         IChatTurnPersistenceService turnPersistence,
         IProjectChatResponseService projectChat,
-        IProjectStateReviewService projectStateReview)
+        IProjectStateReviewService projectStateReview,
+        IProjectChatDocumentSourceService documentSources)
     {
         _chat = chat;
         _feedback = feedback;
         _turnPersistence = turnPersistence;
         _projectChat = projectChat;
         _projectStateReview = projectStateReview;
+        _documentSources = documentSources;
     }
 
     [HttpGet("api/projects/{projectId:int}/chat/sessions")]
@@ -62,9 +66,31 @@ public sealed class ChatController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("api/projects/{projectId:int}/chat/document-sources")]
+    public Task<IReadOnlyList<ChatDocumentSource>> GetDocumentSources(int projectId, CancellationToken ct) =>
+        _documentSources.GetAvailableSourcesAsync(projectId, ct);
+
     [HttpGet("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
-    public Task<IReadOnlyList<ChatMessage>> GetMessages(int projectId, long sessionId, [FromQuery] int take = 50, CancellationToken ct = default) =>
-        _chat.GetRecentMessagesAsync(projectId, sessionId, take, ct);
+    public async Task<IReadOnlyList<ChatMessage>> GetMessages(
+        int projectId,
+        long sessionId,
+        [FromQuery] int take = 50,
+        CancellationToken ct = default)
+    {
+        var messages = await _chat.GetRecentMessagesAsync(projectId, sessionId, take, ct);
+        var sources = await _documentSources.GetSourcesForMessagesAsync(projectId, sessionId, messages, ct);
+        foreach (var message in messages)
+        {
+            var sourceMessageId = string.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+                ? message.ReplyToMessageId
+                : message.Id;
+            message.DocumentSources = sourceMessageId.HasValue && sources.TryGetValue(sourceMessageId.Value, out var linked)
+                ? linked
+                : [];
+        }
+
+        return messages;
+    }
 
     [HttpGet("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages/{messageId:long}/audit")]
     public async Task<ActionResult<ChatTurnAuditResponse>> GetMessageAudit(
@@ -109,7 +135,22 @@ public sealed class ChatController : ControllerBase
         if (message.ChatSessionId != 0 && message.ChatSessionId != sessionId)
             return BadRequest(new { message = "Message chat session id must match route session id." });
 
-        return await _chat.SaveMessageAsync(message, ct);
+        message.SourceAttachedBy = User.FindFirst(ClaimTypes.Email)?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+
+        try
+        {
+            return await _chat.SaveMessageAsync(message, ct);
+        }
+        catch (ChatDocumentSourceUnavailableException error)
+        {
+            return Conflict(new { error = error.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound(new { error = "The Chat message target is not available in this project." });
+        }
     }
 
     [HttpPost("api/projects/{projectId:int}/chat/complete")]
@@ -155,13 +196,22 @@ public sealed class ChatController : ControllerBase
             return BadRequest(new { message = "Unsupported chat mode. Use projectQuestion or projectStateReview." });
 
         var recentConversationSummary = await BuildRecentConversationSummaryAsync(projectId, request.SessionId, ct);
-        var answer = await _projectChat.RespondAsync(
-            projectId,
-            request.Prompt,
-            null,
-            recentConversationSummary: recentConversationSummary,
-            sessionId: request.SessionId,
-            cancellationToken: ct);
+        ProjectChatResponseResult? answer;
+        try
+        {
+            answer = await _projectChat.RespondAsync(
+                projectId,
+                request.Prompt,
+                null,
+                recentConversationSummary: recentConversationSummary,
+                sessionId: request.SessionId,
+                sourceMessageId: request.SourceMessageId,
+                cancellationToken: ct);
+        }
+        catch (ChatDocumentSourceUnavailableException error)
+        {
+            return Conflict(new { error = error.Message });
+        }
         if (answer is null)
             return NotFound();
 
@@ -183,7 +233,8 @@ public sealed class ChatController : ControllerBase
             null,
             answer.RouteSource,
             answer.RouteChallenge,
-            answer.BaDraft));
+            answer.BaDraft,
+            answer.DocumentSources));
 
     }
 
@@ -203,7 +254,13 @@ public sealed class ChatController : ControllerBase
         return string.Join(Environment.NewLine, pairs);
     }
 
-    public sealed record ChatCompletionRequest(int ProjectId, long? SessionId, string Prompt, string? ActiveModel, string? Mode);
+    public sealed record ChatCompletionRequest(
+        int ProjectId,
+        long? SessionId,
+        string Prompt,
+        string? ActiveModel,
+        string? Mode,
+        long? SourceMessageId = null);
     public sealed record ChatCompletionResponse(
         string Response,
         string? ContextSummary,
@@ -222,7 +279,8 @@ public sealed class ChatController : ControllerBase
         string? DogfoodTracePath = null,
         string? RouteSource = null,
         ChatRouteChallenge? RouteChallenge = null,
-        BaWorkingDraft? BaDraft = null);
+        BaWorkingDraft? BaDraft = null,
+        IReadOnlyList<ChatDocumentSource>? DocumentSources = null);
 
     [HttpPost("api/projects/{projectId:int}/chat/feedback")]
     public Task<long> SaveFeedback(ChatMessageFeedback feedback, CancellationToken ct) =>

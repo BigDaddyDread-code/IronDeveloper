@@ -24,7 +24,8 @@ public sealed class ChatControllerAuditTests
             new UnusedChatFeedbackService(),
             new ScopedTurnPersistenceService(7, 9701, 9001, snapshot),
             new UnusedProjectChatResponseService(),
-            new UnusedProjectStateReviewService());
+            new UnusedProjectStateReviewService(),
+            new UnusedProjectChatDocumentSourceService());
 
         var result = await controller.GetMessageAudit(7, 9701, 9001);
 
@@ -53,7 +54,8 @@ public sealed class ChatControllerAuditTests
             new UnusedChatFeedbackService(),
             new ScopedTurnPersistenceService(7, 9701, 9001, snapshot),
             new UnusedProjectChatResponseService(),
-            new UnusedProjectStateReviewService());
+            new UnusedProjectStateReviewService(),
+            new UnusedProjectChatDocumentSourceService());
 
         var result = await controller.GetMessageAudit(7, 9701, 9001);
 
@@ -74,7 +76,8 @@ public sealed class ChatControllerAuditTests
             new UnusedChatFeedbackService(),
             new ScopedTurnPersistenceService(7, 9701, 9001, snapshot),
             new UnusedProjectChatResponseService(),
-            new UnusedProjectStateReviewService());
+            new UnusedProjectStateReviewService(),
+            new UnusedProjectChatDocumentSourceService());
 
         var result = await controller.GetMessageAudit(7, 9701, 9001);
         var ok = result.Result as OkObjectResult;
@@ -102,7 +105,8 @@ public sealed class ChatControllerAuditTests
             new UnusedChatFeedbackService(),
             new ScopedTurnPersistenceService(7, 9701, 9001, BuildSnapshot(messageId: 9001)),
             new UnusedProjectChatResponseService(),
-            new UnusedProjectStateReviewService());
+            new UnusedProjectStateReviewService(),
+            new UnusedProjectChatDocumentSourceService());
 
         var wrongProject = await controller.GetMessageAudit(8, 9701, 9001);
         var wrongSession = await controller.GetMessageAudit(7, 9702, 9001);
@@ -240,6 +244,7 @@ public sealed class ChatControllerAuditTests
             string? dogfoodTraceId = null,
             string? recentConversationSummary = null,
             long? sessionId = null,
+            long? sourceMessageId = null,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
@@ -247,6 +252,28 @@ public sealed class ChatControllerAuditTests
     private sealed class UnusedProjectStateReviewService : IProjectStateReviewService
     {
         public Task<ProjectStateReviewResult?> ReviewAsync(int projectId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class UnusedProjectChatDocumentSourceService : IProjectChatDocumentSourceService
+    {
+        public Task<IReadOnlyList<ChatDocumentSource>> GetAvailableSourcesAsync(
+            int projectId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyDictionary<long, IReadOnlyList<ChatDocumentSource>>> GetSourcesForMessagesAsync(
+            int projectId,
+            long sessionId,
+            IReadOnlyList<ChatMessage> messages,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AttachedChatDocumentContext>> GetAttachedContextsAsync(
+            int projectId,
+            long sessionId,
+            long sourceMessageId,
+            CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 }

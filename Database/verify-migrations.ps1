@@ -366,6 +366,9 @@ try {
             ,@{ Name = "dbo.ProjectDocuments table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectDocuments', N'U') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "dbo.ProjectDocumentVersions table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectDocumentVersions', N'U') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "dbo.ProjectDocumentLinks table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectDocumentLinks', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "ChatMessages ReplyToMessageId column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ChatMessages', N'ReplyToMessageId') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "ChatMessages reply foreign key"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'dbo.ChatMessages') AND name = N'FK_ChatMessages_ReplyToMessage'" }
+            ,@{ Name = "ChatMessages reply index"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.ChatMessages') AND name = N'IX_ChatMessages_ReplyToMessageId'" }
             ,@{ Name = "ProjectDocuments Origin column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ProjectDocuments', N'Origin') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "ProjectDocuments ProcessingStatus column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ProjectDocuments', N'ProcessingStatus') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "ProjectDocuments Visibility column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ProjectDocuments', N'Visibility') IS NULL THEN 0 ELSE 1 END" }

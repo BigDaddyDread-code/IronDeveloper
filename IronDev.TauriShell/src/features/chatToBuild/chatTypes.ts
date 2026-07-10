@@ -1,4 +1,4 @@
-import type { ChatCompletionResponse } from '../../api/types';
+import type { ChatCompletionResponse, ChatDocumentSource } from '../../api/types';
 
 export type ChatMessageRole = 'user' | 'assistant';
 export type ChatSendMode = 'projectQuestion' | 'projectStateReview';
@@ -17,6 +17,7 @@ export interface ChatWorkspaceMessage {
     documentId: number;
     documentVersionId: number;
   } | null;
+  documentSources?: ChatDocumentSource[];
 }
 
 export interface ChatSendRequest {

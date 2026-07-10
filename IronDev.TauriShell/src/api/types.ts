@@ -65,7 +65,9 @@ export interface ProjectDocumentProcessingResult {
 export type BuildReadinessResult = components['schemas']['BuildReadinessResult'];
 export type CreateProjectTicketRequest = components['schemas']['CreateProjectTicketRequest'];
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];
-export type ChatCompletionRequest = components['schemas']['ChatCompletionRequest'];
+export type ChatCompletionRequest = components['schemas']['ChatCompletionRequest'] & {
+  sourceMessageId?: number | null;
+};
 export type ChatClarificationKind =
   | 'None'
   | 'GeneralScope'
@@ -151,9 +153,22 @@ export type ChatCompletionResponse = components['schemas']['ChatCompletionRespon
   auditSource?: ChatAuditSource;
   auditFallbackReason?: string | null;
   auditHasFallbackEvidence?: boolean;
+  documentSources?: ChatDocumentSource[] | null;
 };
 export type ProjectChatSession = components['schemas']['ProjectChatSession'];
-export type ChatMessage = components['schemas']['ChatMessage'];
+export interface ChatDocumentSource {
+  documentId: number;
+  documentVersionId: number;
+  title: string;
+  documentType: string;
+  versionLabel: string;
+  status: string;
+  boundary: string;
+}
+export type ChatMessage = components['schemas']['ChatMessage'] & {
+  replyToMessageId?: number | null;
+  documentSources?: ChatDocumentSource[] | null;
+};
 
 export interface SaveProjectChatSessionRequest {
   id?: number;
@@ -171,6 +186,8 @@ export interface SaveProjectChatMessageRequest {
   contextSummary?: string | null;
   linkedFilePaths?: string | null;
   linkedSymbols?: string | null;
+  replyToMessageId?: number | null;
+  documentVersionIds?: number[];
 }
 
 export type TicketDetailLoadStatus = 'idle' | 'loading' | 'loaded' | 'error';

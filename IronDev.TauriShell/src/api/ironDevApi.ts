@@ -19,6 +19,7 @@ import type {
   SkeletonRunReport,
   ChatCompletionRequest,
   ChatCompletionResponse,
+  ChatDocumentSource,
   ChatMessage,
   ChatTurnAuditResponse,
   ConfirmBaWorkingDraftRequest,
@@ -611,6 +612,13 @@ class IronDevApiClient {
 
   async getProjectChatSessions(projectId: number, signal?: AbortSignal): Promise<ProjectChatSession[]> {
     return this.request<ProjectChatSession[]>(`/api/projects/${projectId}/chat/sessions`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getProjectChatDocumentSources(projectId: number, signal?: AbortSignal): Promise<ChatDocumentSource[]> {
+    return this.request<ChatDocumentSource[]>(`/api/projects/${projectId}/chat/document-sources`, {
       method: 'GET',
       signal
     });

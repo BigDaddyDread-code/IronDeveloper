@@ -13,6 +13,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
     private readonly IChatBaDraftService _baDraftService;
     private readonly ProjectChatResponseComposer _composer;
     private readonly ProjectChatResponseMetadataBuilder _metadataBuilder;
+    private readonly IProjectChatDocumentSourceService _documentSources;
 
     public ProjectChatResponseService(
         ProjectChatContextPipeline contextPipeline,
@@ -21,7 +22,8 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         IChatClarificationClassifier clarificationClassifier,
         IChatBaDraftService baDraftService,
         ProjectChatResponseComposer composer,
-        ProjectChatResponseMetadataBuilder metadataBuilder)
+        ProjectChatResponseMetadataBuilder metadataBuilder,
+        IProjectChatDocumentSourceService documentSources)
     {
         _contextPipeline = contextPipeline;
         _contextStateCompiler = contextStateCompiler;
@@ -30,6 +32,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         _baDraftService = baDraftService;
         _composer = composer;
         _metadataBuilder = metadataBuilder;
+        _documentSources = documentSources;
     }
 
     public async Task<ProjectChatResponseResult?> RespondAsync(
@@ -39,11 +42,19 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
         string? dogfoodTraceId = null,
         string? recentConversationSummary = null,
         long? sessionId = null,
+        long? sourceMessageId = null,
         CancellationToken cancellationToken = default)
     {
         var normalizedPrompt = prompt.ReplaceLineEndings(" ").Trim();
         var recentSummary = recentConversationSummary ?? string.Empty;
         var correlationId = string.IsNullOrWhiteSpace(dogfoodTraceId) ? Guid.NewGuid().ToString("N") : dogfoodTraceId;
+        var attachedDocumentContexts = sourceMessageId.HasValue && sessionId.HasValue
+            ? await _documentSources.GetAttachedContextsAsync(
+                projectId,
+                sessionId.Value,
+                sourceMessageId.Value,
+                cancellationToken).ConfigureAwait(false)
+            : [];
 
         var context = await _contextPipeline.RunAsync(
             projectId,
@@ -52,7 +63,8 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             recentSummary,
             correlationId,
             cancellationToken,
-            explicitMode).ConfigureAwait(false);
+            explicitMode,
+            attachedDocumentContexts).ConfigureAwait(false);
 
         if (context is null)
             return null;
@@ -130,6 +142,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             DogfoodTraceId: correlationId,
             RouteSource: effectiveRoute.Source,
             RouteChallenge: contextAgentResult.RouteChallenge,
-            BaDraft: baDraft);
+            BaDraft: baDraft,
+            DocumentSources: context.AttachedDocumentSources ?? []);
     }
 }
