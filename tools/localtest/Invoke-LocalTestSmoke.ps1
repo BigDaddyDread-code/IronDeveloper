@@ -78,6 +78,129 @@ function Get-NodeCommand {
     return $node.Source
 }
 
+function New-LocalTestJwtKey {
+    $bytes = New-Object byte[] 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($bytes)
+        return [Convert]::ToBase64String($bytes)
+    }
+    finally {
+        $rng.Dispose()
+    }
+}
+
+function Resolve-LocalDbDataSource {
+    param([Parameter(Mandatory = $true)][string]$DataSource)
+
+    if ($DataSource -notmatch '^\(localdb\)\\(?<instance>.+)$') {
+        return $DataSource
+    }
+
+    $instance = $Matches.instance
+    $localDb = Get-Command sqllocaldb -ErrorAction SilentlyContinue
+    if ($null -ne $localDb) {
+        & $localDb.Source start $instance | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Could not start LocalDB instance '$instance' through sqllocaldb; attempting to resolve an existing named pipe."
+        }
+
+        $info = & $localDb.Source info $instance 2>$null
+        foreach ($line in $info) {
+            $match = [regex]::Match($line, '^\s*Instance pipe name:\s*(?<pipe>.+?)\s*$')
+            if ($match.Success -and -not [string]::IsNullOrWhiteSpace($match.Groups['pipe'].Value)) {
+                return "np:$($match.Groups['pipe'].Value.Trim())"
+            }
+        }
+    }
+
+    $errorLog = Join-Path $env:LOCALAPPDATA "Microsoft\Microsoft SQL Server Local DB\Instances\$instance\error.log"
+    if (Test-Path -LiteralPath $errorLog -PathType Leaf) {
+        foreach ($line in (Get-Content -LiteralPath $errorLog | Select-Object -Last 200)) {
+            $match = [regex]::Match($line, 'Server local connection provider is ready to accept connection on \[(?<pipe>[^\]]+)\]')
+            if ($match.Success) {
+                $pipe = $match.Groups['pipe'].Value.Trim()
+                if ($pipe -like '\\.\pipe\*\tsql\query') {
+                    return "np:$pipe"
+                }
+            }
+        }
+    }
+
+    throw "Could not resolve LocalDB instance '$instance' to a SQL Server named pipe."
+}
+
+function Invoke-JsonRequest {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("GET", "POST")][string]$Method,
+        [Parameter(Mandatory = $true)][string]$Uri,
+        [object]$Body,
+        [string]$BearerToken,
+        [int]$TimeoutSeconds = 10
+    )
+
+    Add-Type -AssemblyName System.Net.Http
+
+    $client = [System.Net.Http.HttpClient]::new()
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
+    $request = $null
+    try {
+        $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::new($Method), $Uri)
+
+        if (-not [string]::IsNullOrWhiteSpace($BearerToken)) {
+            $request.Headers.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $BearerToken)
+        }
+
+        if ($null -ne $Body) {
+            $json = $Body | ConvertTo-Json -Compress
+            $request.Content = [System.Net.Http.StringContent]::new($json, [System.Text.Encoding]::UTF8, "application/json")
+        }
+
+        $response = $client.SendAsync($request).GetAwaiter().GetResult()
+        $text = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+        if (-not $response.IsSuccessStatusCode) {
+            throw "HTTP $([int]$response.StatusCode): $text"
+        }
+
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            return $null
+        }
+
+        return $text | ConvertFrom-Json
+    }
+    finally {
+        if ($null -ne $request) {
+            $request.Dispose()
+        }
+        $client.Dispose()
+    }
+}
+
+function Test-LocalTestAuthenticationContract {
+    param(
+        [string]$BaseUrl,
+        [int]$TimeoutSeconds = 60
+    )
+
+    try {
+        $login = Invoke-JsonRequest `
+            -Method "POST" `
+            -Uri "$BaseUrl/api/auth/login" `
+            -Body @{ email = "localtest@irondev.local"; password = "change-me-local-only" } `
+            -TimeoutSeconds $TimeoutSeconds
+
+        if ($null -eq $login -or [string]::IsNullOrWhiteSpace($login.token)) {
+            throw "Login returned no token."
+        }
+
+        return $login
+    }
+    catch {
+        throw "FAIL LocalTest authentication contract`nExpected seeded account was rejected.`nRun reset-localtest-data.ps1 or inspect the API error log.`n$($_.Exception.Message)"
+    }
+}
+
 function Get-LocalTestConnectionInfo {
     $settingsPath = Join-Path $repoRoot "IronDev.Api\appsettings.LocalTest.json"
     if (-not (Test-Path $settingsPath)) {
@@ -92,6 +215,7 @@ function Get-LocalTestConnectionInfo {
 
     Add-Type -AssemblyName System.Data
     $builder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder($connectionString)
+    $builder["Data Source"] = Resolve-LocalDbDataSource -DataSource $builder.DataSource
     $normalDatabase = if ($builder.InitialCatalog -match "(?i)_Test$") {
         $builder.InitialCatalog -replace "(?i)_Test$", ""
     }
@@ -106,6 +230,7 @@ function Get-LocalTestConnectionInfo {
         integratedSecurity = $builder.IntegratedSecurity
         userId = $builder.UserID
         password = $builder.Password
+        connectionString = $builder.ConnectionString
     }
 }
 
@@ -244,8 +369,13 @@ try {
 
         $apiOut = Join-Path $env:TEMP "irondev-localtest-api.out.log"
         $apiErr = Join-Path $env:TEMP "irondev-localtest-api.err.log"
+        $connectionInfoForApi = Get-LocalTestConnectionInfo
         $previousEnvironment = $env:ASPNETCORE_ENVIRONMENT
+        $previousJwtKey = $env:IRONDEV_JWT_KEY
+        $previousConnectionString = $env:ConnectionStrings__IronDeveloperDb
         $env:ASPNETCORE_ENVIRONMENT = "LocalTest"
+        $env:IRONDEV_JWT_KEY = New-LocalTestJwtKey
+        $env:ConnectionStrings__IronDeveloperDb = $connectionInfoForApi.connectionString
         try {
             Start-Process -FilePath dotnet `
                 -ArgumentList @("run", "-c", "Release", "--no-launch-profile", "--project", "IronDev.Api\IronDev.Api.csproj", "--urls", $ApiBaseUrl) `
@@ -257,10 +387,12 @@ try {
         }
         finally {
             $env:ASPNETCORE_ENVIRONMENT = $previousEnvironment
+            $env:IRONDEV_JWT_KEY = $previousJwtKey
+            $env:ConnectionStrings__IronDeveloperDb = $previousConnectionString
         }
         $startedPorts.Add($apiPort)
 
-        Wait-HttpOk -Uri "$ApiBaseUrl/health"
+        Wait-HttpOk -Uri "$ApiBaseUrl/health" -TimeoutSeconds 90
 
         $node = Get-NodeCommand
         $uiOut = Join-Path $env:TEMP "irondev-localtest-ui.out.log"
@@ -287,7 +419,10 @@ try {
         $checks.Add([ordered]@{ name = "Use existing LocalTest API and UI"; status = "PASS"; detail = "Both endpoints are reachable" })
     }
 
-    $environment = Invoke-RestMethod -Uri "$ApiBaseUrl/api/environment" -TimeoutSec 5
+    $login = Test-LocalTestAuthenticationContract -BaseUrl $ApiBaseUrl
+    $checks.Add([ordered]@{ name = "LocalTest authentication contract"; status = "PASS"; detail = "Seeded account returned a JWT" })
+
+    $environment = Invoke-JsonRequest -Method "GET" -Uri "$ApiBaseUrl/api/environment" -BearerToken $login.token
     if ($environment.environment -ne "LocalTest" -or $environment.database -notmatch "Test" -or -not $environment.isTestEnvironment) {
         throw "Environment guard failed: $($environment.environment) / $($environment.database)."
     }

@@ -104,7 +104,7 @@ VALUES (1, 1, 'Owner');
 GO
 
 SET IDENTITY_INSERT dbo.Projects ON;
-INSERT INTO dbo.Projects (Id, TenantId, Name, Description, LocalPath, IndexingStatus, IndexedFileCount)
+INSERT INTO dbo.Projects (Id, TenantId, Name, Description, LocalPath, LastIndexedUtc, IndexingStatus, IndexedFileCount)
 VALUES
 (
     1,
@@ -112,10 +112,37 @@ VALUES
     'IronDev Local Test Project',
     'Seeded project for manual Tauri cockpit testing against isolated LocalTest data.',
     'C:\IronDevTestWorkspaces\IronDevLocalTestProject',
+    NULL,
     'LocalTest Seeded',
     0
+),
+(
+    2,
+    1,
+    'BookSeller Test Fixture',
+    'Realistic LocalTest fixture for provisioning, build, review, and apply journeys.',
+    'C:\IronDevTestWorkspaces\BookSellerTestFixture',
+    SYSUTCDATETIME(),
+    'Indexed',
+    4
 );
 SET IDENTITY_INSERT dbo.Projects OFF;
+GO
+
+INSERT INTO dbo.ProjectProfiles
+    (TenantId, ProjectId, IsExternalProject, ApplicationType, PrimaryLanguage, Framework, DatabaseEngine, DataAccessStyle, TestFramework, SolutionFile, SafeWriteRoot, AllowBuilderApply, AllowWritesOutsideProjectRoot, ProfileNotes)
+VALUES
+    (1, 1, 1, 'ClassLibrary', 'CSharp', 'DotNet10', 'None', 'None', 'None', 'IronDevLocalTestProject.csproj', 'C:\IronDevTestWorkspaces\IronDevLocalTestProject', 0, 0, 'Tiny deterministic baseline fixture for every PR.'),
+    (1, 2, 1, 'ConsoleApp', 'CSharp', 'DotNet10', 'None', 'InMemory', 'SelfTest', 'BookSeller.TestFixture.csproj', 'C:\IronDevTestWorkspaces\BookSellerTestFixture', 1, 0, 'Realistic BookSeller fixture for provisioning/build/review/apply manual testing.');
+GO
+
+INSERT INTO dbo.ProjectCommands
+    (TenantId, ProjectId, CommandType, CommandText, WorkingDirectory, TimeoutSeconds, IsDefault, IsEnabled)
+VALUES
+    (1, 1, 'Build', 'dotnet build "IronDevLocalTestProject.csproj" -v quiet', 'C:\IronDevTestWorkspaces\IronDevLocalTestProject', 300, 1, 1),
+    (1, 1, 'Test', 'dotnet build "IronDevLocalTestProject.csproj" -v quiet', 'C:\IronDevTestWorkspaces\IronDevLocalTestProject', 300, 1, 1),
+    (1, 2, 'Build', 'dotnet build "BookSeller.TestFixture.csproj" -v quiet', 'C:\IronDevTestWorkspaces\BookSellerTestFixture', 300, 1, 1),
+    (1, 2, 'Test', 'dotnet run --project "BookSeller.TestFixture.csproj" -- --self-test', 'C:\IronDevTestWorkspaces\BookSellerTestFixture', 300, 1, 1);
 GO
 
 SET IDENTITY_INSERT dbo.ProjectChatSessions ON;
@@ -127,6 +154,13 @@ VALUES
     1,
     'LocalTest cockpit planning',
     'Seeded trace source for manual testing linked ticket context.'
+),
+(
+    4002,
+    1,
+    2,
+    'BookSeller fixture planning',
+    'Seeded trace source for the realistic LocalTest fixture.'
 );
 SET IDENTITY_INSERT dbo.ProjectChatSessions OFF;
 GO
@@ -143,6 +177,16 @@ VALUES
     'Make the ticket workspace feel like a governed AI engineering cockpit.',
     'Seeded LocalTest trace message.',
     'localtest'
+),
+(
+    5002,
+    1,
+    2,
+    4002,
+    'user',
+    'Add search-by-author behavior to the BookSeller fixture.',
+    'Seeded BookSeller LocalTest trace message.',
+    'localtest,bookseller'
 );
 SET IDENTITY_INSERT dbo.ChatMessages OFF;
 GO
@@ -316,6 +360,34 @@ VALUES
     NULL,
     NULL,
     2003
+),
+(
+    3101,
+    1,
+    2,
+    NEWID(),
+    'Add Search By Author',
+    'Feature',
+    'High',
+    'Exercise a realistic BookSeller change through the governed loop.',
+    'The BookSeller fixture is intentionally small but shaped like a real repository.',
+    'Users need a repeatable engineering journey against a non-trivial fixture.',
+    'Searching by author returns matching books in title order; refusal paths stay visible; apply remains bounded to the fixture root.',
+    'Seeded BookSeller ticket for provisioning/build/review/apply manual testing.',
+    'Ready',
+    'Implement and verify search-by-author behavior in the BookSeller fixture.',
+    '["Program.cs","BookSeller.TestFixture.csproj"]',
+    '["CatalogService","BookSellerSelfTest"]',
+    'Self-test mode covers the seeded behavior.',
+    'LocalTest build/test commands run against the fixture root.',
+    'Select BookSeller Test Fixture, open the ticket, run the governed journey, and reload backend-owned state.',
+    'dotnet build BookSeller.TestFixture.csproj; dotnet run --project BookSeller.TestFixture.csproj -- --self-test',
+    'BookSeller realistic fixture ticket.',
+    0,
+    NULL,
+    4002,
+    5002,
+    NULL
 );
 SET IDENTITY_INSERT dbo.ProjectTickets OFF;
 GO

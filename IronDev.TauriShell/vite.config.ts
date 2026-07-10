@@ -15,6 +15,11 @@ export default defineConfig(({ mode }) => {
       host: '127.0.0.1',
       port: 5173,
       strictPort: true,
+      watch: {
+        ignored: [
+          '**/src-tauri/**'
+        ]
+      },
       proxy: {
         '/irondev-api': {
           target: apiProxyTarget,
