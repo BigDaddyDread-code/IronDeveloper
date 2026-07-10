@@ -31,7 +31,7 @@ interface SessionContextState {
 
 const SessionContext = createContext<SessionContextState | null>(null);
 const initialApiStatusStatus: ApiConnectionStatus = 'loading';
-const localTestEmail = 'localtest@irondev.local';
+const localTestEmail = 'bob@irondev.local';
 const localTestPassword = 'change-me-local-only';
 
 function createInitialStatus(config: IronDevApiConfig): ApiStatus {

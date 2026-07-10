@@ -145,7 +145,7 @@ export function BoardScreen({ onOpenWorkItem, onOpenBatch, onOpenProvisioning }:
               className={readiness.isReady ? 'fl-tag fl-green' : 'fl-tag fl-amber'}
               data-testid="flow.cockpit.badge"
             >
-              {readiness.isReady ? 'Ready to run' : `Setup incomplete · ${readiness.blockedStates.length} blocker(s)`}
+              {readiness.isReady ? 'Ready to run' : `Setup incomplete · ${readiness.blockedCount} blocker(s)`}
             </span>
           ) : readinessState === 'error' ? (
             <span className="fl-tag" data-testid="flow.cockpit.badge">readiness unavailable</span>
@@ -173,7 +173,7 @@ export function BoardScreen({ onOpenWorkItem, onOpenBatch, onOpenProvisioning }:
           <p className="fl-sub">
             You can shape work and draft tickets now; governed runs unlock when backend readiness is satisfied.{' '}
             <button className="fl-btn" onClick={onOpenProvisioning} data-testid="flow.cockpit.setup.open">
-              Open provisioning
+              Open project setup
             </button>
           </p>
         </div>

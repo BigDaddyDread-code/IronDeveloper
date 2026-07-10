@@ -32,7 +32,7 @@ This plan verifies the Tauri cockpit against isolated LocalTest data. It must no
 
 ## Seeded Login
 
-- Email: `localtest@irondev.local`
+- Email: `bob@irondev.local`
 - Password: `change-me-local-only`
 - Tenant: `Local Test Tenant`
 - Project: `IronDev Local Test Project`

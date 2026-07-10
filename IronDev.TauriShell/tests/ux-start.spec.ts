@@ -26,8 +26,8 @@ test('signed in without a project lands on the chooser; badges are backend readi
   await page.goto('/');
 
   await expect(page.getByTestId('flow.chooser')).toBeVisible();
-  await expect(page.getByTestId('flow.chooser.readiness.7')).toContainText('Ready to run');
-  await expect(page.getByTestId('flow.chooser.readiness.8')).toContainText('Setup incomplete · 2 blocker(s)');
+  await expect(page.getByTestId('flow.chooser.readiness.7')).toContainText('Ready');
+  await expect(page.getByTestId('flow.chooser.readiness.8')).toContainText('Setup required, 2 items');
 
   // Selecting a project changes context — the cockpit renders with the same truth.
   await page.getByTestId('flow.chooser.project.7').click();
@@ -50,12 +50,12 @@ test('creating a project lands on the readiness screen, never straight into work
   });
   await page.goto('/');
 
-  await page.getByTestId('flow.chooser.create.open').click();
+  await page.getByTestId('flow.projectEntry.connect').click();
   await page.getByTestId('flow.chooser.create.name').fill('FreshRepo');
   await page.getByTestId('flow.chooser.create.path').fill('C:\\repos\\FreshRepo');
   await page.getByTestId('flow.chooser.create.submit').click();
 
-  await expect(page.getByTestId('flow.provisioning')).toBeVisible();
+  await expect(page.getByTestId('flow.projectSetup')).toBeVisible();
 });
 
 test('cockpit: a gate-waiting item outranks new work, with the reason named', async ({ page }) => {
@@ -79,25 +79,42 @@ test('cockpit: blocked readiness switches the primary action to setup and names 
     readiness: {
       projectId: 7,
       isReady: false,
+      blockedCount: 2,
       blockedStates: ['BlockedMissingTestCommand', 'BlockedProjectNotIndexed'],
       checks: [
         {
+          code: 'TestCommand',
           name: 'Test command',
+          label: 'Test command',
           state: 'Missing',
+          summary: 'No test command was detected.',
           evidence: 'No stored default and detection found no candidate.',
           remedy: 'Supply it: POST /api/projects/{projectId}/profile/commands with CommandType=Test.',
           blocking: true,
-          detectedValue: ''
+          detectedValue: '',
+          actionKind: 'ConfirmTestCommand'
         },
         {
+          code: 'CodeIndex',
           name: 'Code index',
+          label: 'Code index',
           state: 'Missing',
+          summary: 'The project has never been indexed.',
           evidence: 'The project has never been indexed.',
           remedy: 'Index it: POST /api/projects/{projectId}/code-index.',
           blocking: true,
-          detectedValue: ''
+          detectedValue: '',
+          actionKind: 'ResolveAdditionalSetup'
         }
       ],
+      nextAction: {
+        kind: 'ConfirmTestCommand',
+        checkCode: 'TestCommand',
+        allowed: true,
+        reasonCode: 'BlockedMissingTestCommand',
+        label: 'Confirm test command',
+        nextSafeAction: 'Supply the test command.'
+      },
       proposedProfile: null,
       boundary: 'Readiness is computed from stored truth and scan evidence.'
     }
@@ -111,7 +128,7 @@ test('cockpit: blocked readiness switches the primary action to setup and names 
   await expect(page.getByTestId('flow.cockpit.setup')).toContainText('governed runs unlock when backend readiness is satisfied');
 
   await page.getByTestId('flow.cockpit.primary.setup').click();
-  await expect(page.getByTestId('flow.provisioning')).toBeVisible();
+  await expect(page.getByTestId('flow.projectSetup')).toBeVisible();
 });
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -123,8 +140,10 @@ function reviewTicket(id: number, title: string, status: string) {
 const READY_READINESS = {
   projectId: 7,
   isReady: true,
+  blockedCount: 0,
   blockedStates: [] as string[],
   checks: [] as unknown[],
+  nextAction: { kind: 'OpenBoard', checkCode: null, allowed: true, reasonCode: null, label: 'Open Board', nextSafeAction: 'Open the project Board.' },
   proposedProfile: null,
   boundary: 'Readiness is computed from stored truth and scan evidence.'
 };
@@ -217,7 +236,17 @@ async function mockStart(
         ...READY_READINESS,
         projectId: 8,
         isReady: false,
-        blockedStates: ['BlockedMissingBuildCommand', 'BlockedMissingTestCommand']
+        blockedCount: 2,
+        blockedStates: ['BlockedMissingBuildCommand', 'BlockedMissingTestCommand'],
+        checks: [setupCheck('BuildCommand', 'Build command', 'dotnet build ParcelTracker.slnx')],
+        nextAction: {
+          kind: 'ConfirmBuildCommand',
+          checkCode: 'BuildCommand',
+          allowed: true,
+          reasonCode: 'BlockedMissingBuildCommand',
+          label: 'Confirm build command',
+          nextSafeAction: 'Confirm the build command.'
+        }
       })
     })
   );
@@ -225,7 +254,37 @@ async function mockStart(
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ...READY_READINESS, projectId: 9, isReady: false, blockedStates: ['BlockedUnknownArchitecture'] })
+      body: JSON.stringify({
+        ...READY_READINESS,
+        projectId: 9,
+        isReady: false,
+        blockedCount: 1,
+        blockedStates: ['BlockedUnknownArchitecture'],
+        checks: [setupCheck('ProjectProfile', 'Architecture profile', 'ASP.NET Core')],
+        nextAction: {
+          kind: 'ConfirmProjectProfile',
+          checkCode: 'ProjectProfile',
+          allowed: true,
+          reasonCode: 'BlockedUnknownArchitecture',
+          label: 'Confirm project structure',
+          nextSafeAction: 'Confirm the detected project structure.'
+        }
+      })
     })
   );
+}
+
+function setupCheck(code: string, label: string, detectedValue: string) {
+  return {
+    code,
+    name: label,
+    label,
+    state: 'NeedsConfirmation',
+    summary: `A likely ${label.toLowerCase()} was detected.`,
+    evidence: `Detected candidate: ${detectedValue}`,
+    remedy: `Confirm or edit the ${label.toLowerCase()}.`,
+    blocking: true,
+    detectedValue,
+    actionKind: code === 'BuildCommand' ? 'ConfirmBuildCommand' : 'ConfirmProjectProfile'
+  };
 }

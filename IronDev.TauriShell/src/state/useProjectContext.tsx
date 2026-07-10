@@ -16,7 +16,7 @@ interface ProjectContextState {
   refreshProjectContext: () => Promise<void>;
   refreshTicketsContext: () => void;
   selectTenantContext: (tenantId: number) => Promise<void>;
-  selectProjectContext: (projectId: number) => void;
+  selectProjectContext: (projectId: number) => Promise<void>;
   setProjectAccessStatus: (status: ProductAccessStatus) => void;
 }
 
@@ -103,11 +103,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         const response = await client.selectTenant(tenantId);
         window.localStorage.setItem('irondev.token', response.token);
         window.localStorage.setItem('irondev.tenantId', `${tenantId}`);
-        if (config.fallbackProjectId !== null) {
-          window.localStorage.setItem('irondev.selectedProjectId', `${config.fallbackProjectId}`);
-        } else {
-          window.localStorage.removeItem('irondev.selectedProjectId');
-        }
+        window.localStorage.removeItem('irondev.selectedProjectId');
         refreshConfig();
         return;
       }
@@ -115,7 +111,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const projectList = await client.getProjects();
       setProjects(projectList);
 
-      const configuredProject = getSelectedProject(projectList, config.selectedProjectId, config.fallbackProjectId);
+      const configuredProject = getSelectedProject(projectList, config.selectedProjectId);
       const resolvedProjectId = configuredProject?.id ?? null;
       setSelectedProjectId(resolvedProjectId);
       setProjectSelectionMode(configuredProject?.mode ?? 'missing');
@@ -147,7 +143,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setIsRefreshing(false);
       setTokenEditorOpen(false);
     }
-  }, [checkApiConnection, clearRejectedSession, clearWorkspace, client, config.fallbackProjectId, config.selectedProjectId, config.selectedTenantId, refreshConfig, setTokenEditorOpen, tokenConfigured]);
+  }, [checkApiConnection, clearRejectedSession, clearWorkspace, client, config.selectedProjectId, config.selectedTenantId, refreshConfig, setTokenEditorOpen, tokenConfigured]);
 
   const refreshTicketsContext = useCallback(() => {
     if (accessStatus === 'ready' || accessStatus === 'emptyTickets') {
@@ -193,11 +189,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   );
 
   const selectProjectContext = useCallback(
-    (projectId: number) => {
+    async (projectId: number) => {
       if (!Number.isFinite(projectId)) {
         return;
       }
 
+      await client.selectProject(projectId);
       window.localStorage.setItem('irondev.selectedProjectId', `${projectId}`);
       setSelectedProjectId(projectId);
       setProjectSelectionMode('api');
@@ -205,7 +202,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setAccessStatus('loadingTickets');
       refreshConfig();
     },
-    [projects, refreshConfig]
+    [client, projects, refreshConfig]
   );
 
   useEffect(() => {
@@ -263,18 +260,12 @@ export function useProjectContext() {
 
 function getSelectedProject(
   projects: ProjectSummary[],
-  selectedProjectId?: number,
-  fallbackProjectId?: number | null
-): (ProjectSummary & { mode: 'api' | 'fallback-config' }) | null {
+  selectedProjectId?: number
+): (ProjectSummary & { mode: 'api' }) | null {
   const configuredProject = projects.find((project) => project.id === selectedProjectId);
 
   if (configuredProject) {
     return { ...configuredProject, mode: 'api' };
-  }
-
-  if (!selectedProjectId && fallbackProjectId !== null && fallbackProjectId !== undefined) {
-    const fallbackProject = projects.find((project) => project.id === fallbackProjectId);
-    return fallbackProject ? { ...fallbackProject, mode: 'fallback-config' } : null;
   }
 
   return null;

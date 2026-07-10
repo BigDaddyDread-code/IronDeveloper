@@ -297,6 +297,14 @@ class IronDevApiClient {
     });
   }
 
+  async updateProjectLocalPath(projectId: number, localPath: string, signal?: AbortSignal): Promise<void> {
+    await this.request<unknown>(`/api/projects/${projectId}/local-path`, {
+      method: 'PUT',
+      body: { localPath },
+      signal
+    });
+  }
+
   async getProjectTickets(projectId: number, signal?: AbortSignal): Promise<TicketLoadResult> {
     try {
       const tickets = await this.request<ProjectTicket[]>(`/api/projects/${projectId}/tickets`, {
@@ -1059,7 +1067,12 @@ class IronDevApiClient {
       return undefined as T;
     }
 
-    return (await response.json()) as T;
+    const text = await response.text();
+    if (text.trim().length === 0) {
+      return undefined as T;
+    }
+
+    return JSON.parse(text) as T;
   }
 }
 

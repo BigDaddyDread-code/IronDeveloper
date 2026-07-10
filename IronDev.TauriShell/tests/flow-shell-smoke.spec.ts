@@ -11,7 +11,7 @@ test('normal sign-in appears before any product surface', async ({ page }) => {
   await expect(page.getByTestId('auth.route')).toBeVisible();
   await expect(page.getByTestId('flow.shell')).toHaveCount(0);
   await expect(page.getByTestId('auth.form')).toBeVisible();
-  await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
+  await expect(page.getByTestId('auth.email')).toHaveValue('bob@irondev.local');
   await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
   await expect(page.getByTestId('auth.flowHint')).toHaveText('Sign in, then select a project to continue.');
   await expect(page.getByTestId('auth.submit')).toBeVisible();
@@ -260,7 +260,7 @@ async function mockLoginToSingleTenantChooser(page: import('@playwright/test').P
       contentType: 'application/json',
       body: JSON.stringify({
         userId: 7,
-        email: 'localtest@irondev.local',
+        email: 'bob@irondev.local',
         displayName: 'Local Test User',
         selectedTenantId: authorization.includes('tenant-token') ? 3 : null
       })
@@ -294,8 +294,10 @@ async function mockLoginToSingleTenantChooser(page: import('@playwright/test').P
       body: JSON.stringify({
         projectId: 7,
         isReady: true,
+        blockedCount: 0,
         blockedStates: [],
         checks: [],
+        nextAction: { kind: 'OpenBoard', checkCode: null, allowed: true, reasonCode: null, label: 'Open Board', nextSafeAction: 'Open the project Board.' },
         proposedProfile: null,
         boundary: 'Readiness is computed from stored truth and scan evidence.'
       })
