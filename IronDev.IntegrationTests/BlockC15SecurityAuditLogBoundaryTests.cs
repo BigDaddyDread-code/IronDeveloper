@@ -158,7 +158,8 @@ public sealed class BlockC15SecurityAuditLogBoundaryTests
         var allowedAdminChangeEmitters = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["TenantUsersController.cs"] = "[Route(\"api/tenants/{tenantId:int}/users\")]",
-            ["ProjectChannelMembersController.cs"] = "[Route(\"api/projects/{projectId:int}/channels/{channelId:long}/members\")]"
+            ["ProjectChannelMembersController.cs"] = "[Route(\"api/projects/{projectId:int}/channels/{channelId:long}/members\")]",
+            ["ProjectChannelsController.cs"] = "[Route(\"api/projects/{projectId:int}/channels\")]"
         };
 
         var controllerDirectory = Path.Combine(RepositoryRoot(), "IronDev.Api", "Controllers");

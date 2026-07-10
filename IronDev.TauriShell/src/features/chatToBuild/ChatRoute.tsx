@@ -4,11 +4,13 @@ import type { ProjectTicket } from '../../api/types';
 import { RouteOutcomeScreen } from '../../flow/components/RouteOutcomeScreen';
 import { ChatWorkspace } from './ChatWorkspace';
 import { useProjectChat } from './useProjectChat';
+import { useProjectChannels } from './useProjectChannels';
 
 interface ChatRouteProps {
   route: WorkspaceRoute;
   requestedSessionId: number | null;
   onOpenSession: (sessionId: number) => void;
+  onOpenChannel: (slug: string) => void;
   onOpenLanding: () => void;
   onOpenWorkItem: (ticket: ProjectTicket) => void;
   onRouteReady?: (state: WorkspaceRouteMeta) => void;
@@ -18,11 +20,13 @@ export function ChatRoute({
   route,
   requestedSessionId,
   onOpenSession,
+  onOpenChannel,
   onOpenLanding,
   onOpenWorkItem,
   onRouteReady
 }: ChatRouteProps) {
   const chat = useProjectChat({ requestedSessionId, onSessionCreated: onOpenSession });
+  const channels = useProjectChannels();
 
   const routeSummary = useMemo(
     () => [
@@ -83,6 +87,10 @@ export function ChatRoute({
     <main className="chat-route-workspace" data-testid="chat.route" aria-label={route.label}>
       <ChatWorkspace
         sessions={chat.sessions}
+        channels={channels.channels}
+        canCreateChannels={channels.canCreateChannels}
+        channelLoadState={channels.loadState}
+        channelError={channels.error}
         activeSessionId={chat.sessionId}
         messages={chat.messages}
         composerValue={chat.draft}
@@ -98,6 +106,9 @@ export function ChatRoute({
         latestResponseText={chat.latestResponseText}
         projectLabel={chat.projectLabel}
         onOpenSession={onOpenSession}
+        onOpenChannel={onOpenChannel}
+        onCreateChannel={channels.createChannel}
+        onRetryChannels={channels.retry}
         onStartNewConversation={() => {
           chat.startNewConversation();
           onOpenLanding();

@@ -879,6 +879,54 @@ export interface SetProjectChannelMembershipRequest {
   notificationLevel: string;
 }
 
+export interface ProjectChannelChatSummary {
+  channelId: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  channelKind: string;
+  visibility: 'Project' | 'MembersOnly';
+  memberCount: number;
+  currentUserRole: string | null;
+  currentUserNotificationLevel: string | null;
+  canPostMessages: boolean;
+  boundary: string;
+}
+
+export interface ProjectChannelChatListResponse {
+  canCreateChannels: boolean;
+  channels: ProjectChannelChatSummary[];
+  boundary: string;
+}
+
+export interface ProjectChannelChatMessage {
+  messageId: number;
+  authorUserId: number | null;
+  authorDisplayName: string;
+  role: 'User' | 'Assistant' | 'SystemNotice' | 'EventLink';
+  message: string;
+  messageFormat: 'PlainText' | 'Markdown';
+  status: 'Active' | 'Edited' | 'Deleted';
+  replyToMessageId: number | null;
+  threadRootMessageId: number | null;
+  createdUtc: string;
+  editedUtc: string | null;
+  boundary: string;
+}
+
+export interface ProjectChannelChatDetail {
+  channel: ProjectChannelChatSummary;
+  messages: ProjectChannelChatMessage[];
+  assistantParticipationStatus: string;
+  boundary: string;
+}
+
+export interface CreateProjectChannelRequest {
+  name: string;
+  description: string | null;
+  visibility: 'Project' | 'MembersOnly';
+}
+
 export interface CreateTenantUserRequest {
   email: string;
   displayName: string;

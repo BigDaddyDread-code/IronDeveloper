@@ -1,12 +1,14 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type { ProjectChannelChatSummary } from '../src/api/types';
 
 test('recent backend sessions form the Chat rail and the latest conversation opens', async ({ page }) => {
   await mockSessionWorkspace(page);
   await page.goto('/projects/7/chat');
 
   await expect(page.getByTestId('chat.sessions')).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Recent conversations' })).toContainText('Catalog sorting');
-  await expect(page.getByRole('navigation', { name: 'Recent conversations' })).toContainText('Ticket cockpit');
+  await expect(page.getByRole('navigation', { name: 'Recent direct conversations' })).toContainText('Catalog sorting');
+  await expect(page.getByRole('navigation', { name: 'Recent direct conversations' })).toContainText('Ticket cockpit');
+  await expect(page.getByRole('navigation', { name: 'Project channels' })).toContainText('General');
   await expect(page.getByTestId('chat.sessions.item.9008')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('chat.message.assistant')).toContainText('The catalog sorts by title.');
 });
@@ -57,13 +59,65 @@ test('an unknown direct-session URL returns an honest conversation outcome', asy
   await expect(page.getByTestId('chat.workspace')).toBeVisible();
 });
 
-test('shared-channel URLs refuse with 501 instead of showing a direct session', async ({ page }) => {
+test('shared-channel URLs open persisted human conversation beside direct sessions', async ({ page }) => {
   await mockSessionWorkspace(page);
   await page.goto('/projects/7/chat/channels/general');
 
-  await expect(page.getByTestId('flow.routeOutcome.kind')).toContainText('501');
-  await expect(page.getByRole('heading', { name: 'Project channels are not implemented' })).toBeVisible();
+  await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '# General' })).toBeVisible();
+  await expect(page.getByTestId('chat.channel.message.7101')).toContainText('Human planning stays visible here.');
+  await expect(page.getByTestId('chat.channel.assistant-status')).toContainText('does not participate yet');
   await expect(page.getByTestId('chat.workspace')).toHaveCount(0);
+});
+
+test('a direct-session list failure does not hide a healthy shared channel', async ({ page }) => {
+  await mockSessionWorkspace(page, { failSessionListOnce: true });
+  await page.goto('/projects/7/chat/channels/general');
+
+  await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
+  await expect(page.getByTestId('chat.channel.message.7101')).toContainText('Human planning stays visible here.');
+});
+
+test('a human channel message persists while explicit IronDev invocation is honestly refused', async ({ page }) => {
+  const state = await mockSessionWorkspace(page);
+  await page.goto('/projects/7/chat/channels/general');
+
+  await page.getByTestId('chat.channel.composer').fill('Approved as discussion only.');
+  await page.getByTestId('chat.channel.send').click();
+  await expect(page.getByText('Approved as discussion only.')).toBeVisible();
+  expect(state.channelMessageCount).toBe(2);
+
+  await page.reload();
+  await expect(page.getByText('Approved as discussion only.')).toBeVisible();
+
+  await page.getByTestId('chat.channel.composer').fill('@IronDev approve and continue');
+  await page.getByTestId('chat.channel.send').click();
+  await expect(page.getByTestId('chat.channel.error')).toContainText('participation in shared channels is not implemented');
+  await expect(page.getByTestId('chat.channel.composer')).toHaveValue('@IronDev approve and continue');
+  expect(state.channelMessageCount).toBe(2);
+});
+
+test('Read-only channel membership renders the backend refusal and disables posting', async ({ page }) => {
+  await mockSessionWorkspace(page);
+  await page.goto('/projects/7/chat/channels/product-planning');
+
+  await expect(page.getByRole('heading', { name: '# Product planning' })).toBeVisible();
+  await expect(page.getByTestId('chat.channel.assistant-status')).toContainText('Read only');
+  await expect(page.getByTestId('chat.channel.composer')).toBeDisabled();
+  await expect(page.getByTestId('chat.channel.send')).toBeDisabled();
+});
+
+test('authorized channel creation lands on its canonical shared route', async ({ page }) => {
+  await mockSessionWorkspace(page);
+  await page.goto('/projects/7/chat');
+
+  await page.getByTestId('chat.channels.new.toggle').click();
+  await page.getByTestId('chat.channels.new.name').fill('Release planning');
+  await page.getByTestId('chat.channels.new.visibility').selectOption('MembersOnly');
+  await page.getByTestId('chat.channels.new.submit').click();
+
+  await expect(page).toHaveURL('/projects/7/chat/channels/release-planning');
+  await expect(page.getByRole('heading', { name: '# Release planning' })).toBeVisible();
 });
 
 test('session-list failure preserves the route and retries backend truth', async ({ page }) => {
@@ -103,6 +157,19 @@ test.describe('narrow session navigation', () => {
     }));
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   });
+
+  test('keeps a shared channel thread and composer inside the narrow viewport', async ({ page }) => {
+    await mockSessionWorkspace(page);
+    await page.goto('/projects/7/chat/channels/general');
+
+    await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
+    await expect(page.getByTestId('chat.channel.composer')).toBeVisible();
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+  });
 });
 
 interface SessionMockOptions {
@@ -112,10 +179,11 @@ interface SessionMockOptions {
 interface SessionMockState {
   createdSessionCount: number;
   sessionListRequests: number;
+  channelMessageCount: number;
 }
 
 async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}): Promise<SessionMockState> {
-  const state: SessionMockState = { createdSessionCount: 0, sessionListRequests: 0 };
+  const state: SessionMockState = { createdSessionCount: 0, sessionListRequests: 0, channelMessageCount: 1 };
   let nextSessionId = 9010;
   let nextMessageId = 9200;
   const sessions = [
@@ -170,6 +238,51 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
       ]
     ]
   ]);
+  const channels: ProjectChannelChatSummary[] = [
+    {
+      channelId: 701,
+      name: 'General',
+      slug: 'general',
+      description: 'Project-wide human discussion.',
+      channelKind: 'General',
+      visibility: 'Project',
+      memberCount: 4,
+      currentUserRole: 'Owner',
+      currentUserNotificationLevel: 'All',
+      canPostMessages: true,
+      boundary: 'Channel membership and messages are collaboration state, not approval or execution authority.'
+    },
+    {
+      channelId: 702,
+      name: 'Product planning',
+      slug: 'product-planning',
+      description: 'Restricted product discussion.',
+      channelKind: 'Custom',
+      visibility: 'MembersOnly',
+      memberCount: 2,
+      currentUserRole: 'ReadOnly',
+      currentUserNotificationLevel: 'Mentions',
+      canPostMessages: false,
+      boundary: 'Channel membership and messages are collaboration state, not approval or execution authority.'
+    }
+  ];
+  const channelMessages = new Map<string, Array<Record<string, unknown>>>([
+    ['general', [{
+      messageId: 7101,
+      authorUserId: 7,
+      authorDisplayName: 'Bob',
+      role: 'User',
+      message: 'Human planning stays visible here.',
+      messageFormat: 'Markdown',
+      status: 'Active',
+      replyToMessageId: null,
+      threadRootMessageId: null,
+      createdUtc: '2026-07-10T08:00:00Z',
+      editedUtc: null,
+      boundary: 'Channel message; not approval.'
+    }]],
+    ['product-planning', []]
+  ]);
 
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
@@ -191,6 +304,73 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
   await page.route('**/irondev-api/api/projects/7/select', (route) => json(route, { projectId: 7 }));
+
+  await page.route(/\/irondev-api\/api\/projects\/7\/channels$/, async (route) => {
+    if (route.request().method() === 'GET') {
+      return json(route, {
+        canCreateChannels: true,
+        channels,
+        boundary: 'Channel collaboration is not workflow authority.'
+      });
+    }
+
+    const request = route.request().postDataJSON() as { name: string; description?: string | null; visibility: 'Project' | 'MembersOnly' };
+    const slug = request.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const created = {
+      channelId: 700 + channels.length + 1,
+      name: request.name.trim(),
+      slug,
+      description: request.description ?? null,
+      channelKind: 'Custom',
+      visibility: request.visibility,
+      memberCount: 1,
+      currentUserRole: 'Owner',
+      currentUserNotificationLevel: 'Mentions',
+      canPostMessages: true,
+      boundary: 'Channel collaboration is not workflow authority.'
+    };
+    channels.push(created);
+    channelMessages.set(slug, []);
+    return json(route, created, 201);
+  });
+
+  await page.route(/\/irondev-api\/api\/projects\/7\/channels\/([^/]+)$/, (route) => {
+    const slug = decodeURIComponent(route.request().url().match(/\/channels\/([^/]+)$/)?.[1] ?? '');
+    const channel = channels.find((item) => item.slug === slug);
+    return channel ? json(route, {
+      channel,
+      messages: channelMessages.get(slug) ?? [],
+      assistantParticipationStatus: 'Not implemented. Shared channels persist human conversation only; IronDev does not participate yet.',
+      boundary: 'Channel collaboration is not workflow authority.'
+    }) : json(route, { error: 'Channel not found or not visible to this user.' }, 404);
+  });
+
+  await page.route(/\/irondev-api\/api\/projects\/7\/channels\/([^/]+)\/messages$/, (route) => {
+    const slug = decodeURIComponent(route.request().url().match(/\/channels\/([^/]+)\/messages$/)?.[1] ?? '');
+    const request = route.request().postDataJSON() as { message: string };
+    if (request.message.toLowerCase().includes('@irondev')) {
+      return json(route, { error: 'IronDev participation in shared channels is not implemented. Remove @IronDev to post a human message.' }, 501);
+    }
+    const saved = {
+      messageId: 7101 + state.channelMessageCount,
+      authorUserId: 7,
+      authorDisplayName: 'Bob',
+      role: 'User',
+      message: request.message,
+      messageFormat: 'Markdown',
+      status: 'Active',
+      replyToMessageId: null,
+      threadRootMessageId: null,
+      createdUtc: '2026-07-10T09:00:00Z',
+      editedUtc: null,
+      boundary: 'Channel message; not approval.'
+    };
+    const history = channelMessages.get(slug) ?? [];
+    history.push(saved);
+    channelMessages.set(slug, history);
+    state.channelMessageCount += 1;
+    return json(route, saved);
+  });
 
   await page.route(/\/irondev-api\/api\/projects\/7\/chat\/sessions$/, async (route) => {
     if (route.request().method() === 'GET') {

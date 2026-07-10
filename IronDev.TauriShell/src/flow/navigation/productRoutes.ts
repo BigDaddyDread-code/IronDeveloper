@@ -186,6 +186,10 @@ export function chatSessionPath(projectId: number, sessionId: number): string {
   return `${projectPath(projectId, 'chat')}/sessions/${sessionId}`;
 }
 
+export function chatChannelPath(projectId: number, channelReference: string): string {
+  return `${projectPath(projectId, 'chat')}/channels/${encodeURIComponent(channelReference)}`;
+}
+
 export function workItemPath(projectId: number, workItemId: number | 'new'): string {
   return `/projects/${projectId}/work-items/${workItemId}`;
 }

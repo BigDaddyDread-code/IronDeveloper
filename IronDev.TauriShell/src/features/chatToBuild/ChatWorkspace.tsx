@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { BaWorkingDraft, ChatCompletionResponse, ChatDocumentSource, ProjectChatSession, ProjectTicket } from '../../api/types';
+import type { BaWorkingDraft, ChatCompletionResponse, ChatDocumentSource, CreateProjectChannelRequest, ProjectChannelChatSummary, ProjectChatSession, ProjectTicket } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
 import { ChatComposer } from './ChatComposer';
 import { ChatContextPanel } from './ChatContextPanel';
@@ -10,6 +10,10 @@ import type { ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 interface ChatWorkspaceProps {
   sessions: ProjectChatSession[];
+  channels: ProjectChannelChatSummary[];
+  canCreateChannels: boolean;
+  channelLoadState: 'loading' | 'ready' | 'error';
+  channelError: string | null;
   activeSessionId: number | null;
   messages: ChatWorkspaceMessage[];
   composerValue: string;
@@ -25,6 +29,9 @@ interface ChatWorkspaceProps {
   latestResponseText: string | null;
   projectLabel: string;
   onOpenSession: (sessionId: number) => void;
+  onOpenChannel: (slug: string) => void;
+  onCreateChannel: (request: CreateProjectChannelRequest) => Promise<ProjectChannelChatSummary>;
+  onRetryChannels: () => void;
   onStartNewConversation: () => void;
   onComposerChange: (value: string) => void;
   onSend: (request?: ChatSendRequest) => void;
@@ -41,6 +48,10 @@ interface ChatWorkspaceProps {
 
 export function ChatWorkspace({
   sessions,
+  channels,
+  canCreateChannels,
+  channelLoadState,
+  channelError,
   activeSessionId,
   messages,
   composerValue,
@@ -56,6 +67,9 @@ export function ChatWorkspace({
   latestResponseText,
   projectLabel,
   onOpenSession,
+  onOpenChannel,
+  onCreateChannel,
+  onRetryChannels,
   onStartNewConversation,
   onComposerChange,
   onSend,
@@ -94,10 +108,18 @@ export function ChatWorkspace({
     <section className="chat-workspace-panel" data-testid="chat.workspace">
       <ChatSessionRail
         sessions={sessions}
+        channels={channels}
         activeSessionId={activeSessionId}
+        activeChannelSlug={null}
+        canCreateChannels={canCreateChannels}
+        channelLoadState={channelLoadState}
+        channelError={channelError}
         isOpen={isSessionRailOpen}
         onClose={() => setIsSessionRailOpen(false)}
         onOpenSession={onOpenSession}
+        onOpenChannel={onOpenChannel}
+        onCreateChannel={onCreateChannel}
+        onRetryChannels={onRetryChannels}
         onStartNewConversation={() => {
           setIsSessionRailOpen(false);
           onStartNewConversation();

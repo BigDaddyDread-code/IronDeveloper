@@ -58,6 +58,11 @@ import type {
   ProjectToolDetailResponse,
   ProjectMemberDirectoryResponse,
   SetProjectChannelMembershipRequest,
+  ProjectChannelChatDetail,
+  ProjectChannelChatListResponse,
+  ProjectChannelChatMessage,
+  ProjectChannelChatSummary,
+  CreateProjectChannelRequest,
   ProjectChatSession,
   ProjectImplementationPlan,
   ProjectFileSummary,
@@ -499,6 +504,45 @@ class IronDevApiClient {
     await this.request(`/api/projects/${projectId}/channels/${channelId}/members/${userId}`, {
       method: 'DELETE'
     });
+  }
+
+  async getProjectChannels(projectId: number, signal?: AbortSignal): Promise<ProjectChannelChatListResponse> {
+    return this.request<ProjectChannelChatListResponse>(`/api/projects/${projectId}/channels`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getProjectChannel(
+    projectId: number,
+    channelReference: string,
+    signal?: AbortSignal
+  ): Promise<ProjectChannelChatDetail> {
+    return this.request<ProjectChannelChatDetail>(
+      `/api/projects/${projectId}/channels/${encodeURIComponent(channelReference)}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async createProjectChannel(
+    projectId: number,
+    request: CreateProjectChannelRequest
+  ): Promise<ProjectChannelChatSummary> {
+    return this.request<ProjectChannelChatSummary>(`/api/projects/${projectId}/channels`, {
+      method: 'POST',
+      body: request
+    });
+  }
+
+  async postProjectChannelMessage(
+    projectId: number,
+    channelReference: string,
+    message: string
+  ): Promise<ProjectChannelChatMessage> {
+    return this.request<ProjectChannelChatMessage>(
+      `/api/projects/${projectId}/channels/${encodeURIComponent(channelReference)}/messages`,
+      { method: 'POST', body: { message } }
+    );
   }
 
   async getDocument(documentId: number, signal?: AbortSignal): Promise<ProjectDocument | null> {
