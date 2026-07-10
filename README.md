@@ -71,14 +71,13 @@ The supported development posture is local:
 - optional configured model provider;
 - optional Weaviate as a rebuildable retrieval index.
 
-Start the LocalTest API and browser client in separate terminals with:
+Start the complete LocalTest stack used for product and PR checks with:
 
 ```powershell
-.\tools\localtest\start-localtest.ps1
-.\tools\localtest\start-ui-localtest.ps1 -BrowserOnly
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly
 ```
 
-The unified PR-test launcher and reset controls are documented in [Docs/testing/LOCAL_MANUAL_TEST_PLAN.md](Docs/testing/LOCAL_MANUAL_TEST_PLAN.md). The UI reports the actual `LocalTest` environment and deterministic model mode.
+Use `-Reset` only when disposable LocalTest data should be rebuilt. The launcher starts the API, verifies the seeded login and environment contract, then starts the browser or Tauri shell. The UI reports the actual `LocalTest` environment and deterministic model mode.
 
 LocalTest credentials are seeded for local use only:
 

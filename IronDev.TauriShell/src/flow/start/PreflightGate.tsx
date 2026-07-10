@@ -22,8 +22,8 @@ export function PreflightGate({ onOpenSettings }: PreflightGateProps) {
         <div style={{ margin: '16px 0', padding: 12, background: 'var(--fl-panel, #f6f6f4)', borderRadius: 8 }}>
           <p style={{ margin: 0, fontWeight: 600 }}>Next safe action</p>
           <p style={{ margin: '6px 0 0' }}>
-            Start the LocalTest API, then retry:
-            <code style={{ display: 'block', marginTop: 6 }}>.\tools\localtest\start-localtest.ps1</code>
+            Start the LocalTest stack, then retry:
+            <code style={{ display: 'block', marginTop: 6 }}>.\tools\localtest\start-pr-manual-test.ps1 -FreshSession</code>
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>

@@ -57,7 +57,7 @@ public sealed class BlockC05GitHubActionsFrontendContractCiTests
     }
 
     [TestMethod]
-    public void BlockC05_Workflow_DoesNotMutatePublishReleaseDeployOrUploadArtifacts()
+    public void BlockC05_Workflow_DoesNotMutatePublishReleaseDeployOrUploadGeneratedContracts()
     {
         var workflow = WorkflowText();
 
@@ -71,7 +71,6 @@ public sealed class BlockC05GitHubActionsFrontendContractCiTests
             "gh release",
             "gh api",
             "gh workflow",
-            "actions/upload-artifact",
             "create-pull-request",
             "auto-merge",
             "softprops/action-gh-release",
@@ -101,6 +100,8 @@ public sealed class BlockC05GitHubActionsFrontendContractCiTests
         StringAssert.Contains(script, "$script:OpenApiSnapshot = Join-Path $script:FrontendRoot \"openapi\\irondev-api.openapi.json\"");
         StringAssert.Contains(script, "$script:GeneratedClient = Join-Path $script:FrontendRoot \"src\\api\\generated\\ironDevApiTypes.ts\"");
         StringAssert.Contains(script, "npm ci");
+        StringAssert.Contains(script, "npm install --no-audit --no-fund");
+        StringAssert.Contains(script, "$env:CI -eq \"true\"");
         StringAssert.Contains(script, "npx tsc --noEmit");
         StringAssert.Contains(script, "npx openapi-typescript openapi/irondev-api.openapi.json -o $tempGeneratedClient");
         StringAssert.Contains(script, "[System.IO.Path]::GetTempPath()");

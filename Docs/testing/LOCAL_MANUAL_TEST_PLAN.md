@@ -13,13 +13,13 @@ This plan verifies the Tauri cockpit against isolated LocalTest data. It must no
 2. Start the backend API and Tauri shell in LocalTest mode:
 
    ```powershell
-   .\tools\localtest\start-alpha-localtest.ps1 -Reset -FreshSession
+   .\tools\localtest\start-pr-manual-test.ps1 -Reset -FreshSession
    ```
 
    For browser-only UI testing instead of the desktop shell:
 
    ```powershell
-   .\tools\localtest\start-alpha-localtest.ps1 -Reset -FreshSession -BrowserOnly
+   .\tools\localtest\start-pr-manual-test.ps1 -Reset -FreshSession -BrowserOnly
    ```
 
 3. Run the Playwright/manual-smoke hybrid and generate a report:

@@ -392,6 +392,12 @@ try {
         -Attempts 30 `
         -DelaySeconds 2
 
+    Invoke-TimedCommand "Isolated platform baseline" {
+        & (Join-Path $script:RepoRoot "Scripts\ci\run-platform-baseline-ci.ps1") `
+            -ConnectionString $connectionString `
+            -SkipFrontend
+    }
+
     $sqlStoreFilter = @(
         "FullyQualifiedName~AcceptedApprovalSqlStoreTests",
         "FullyQualifiedName~PolicySatisfactionSqlStoreTests",

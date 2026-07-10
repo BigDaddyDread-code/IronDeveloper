@@ -33,6 +33,10 @@ function Test-LocalDeveloperSqlTarget {
 }
 
 function New-ConnectionString {
+    if ([string]::IsNullOrWhiteSpace($ConnectionString)) {
+        $ConnectionString = $env:IRONDEV_MIGRATION_CONNECTION_STRING
+    }
+
     if (-not [string]::IsNullOrWhiteSpace($ConnectionString)) {
         return $ConnectionString
     }

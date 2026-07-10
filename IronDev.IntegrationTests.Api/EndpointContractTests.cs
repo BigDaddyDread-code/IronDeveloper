@@ -196,11 +196,17 @@ public sealed class EndpointContractTests : ApiTestBase
             freeformMode.Equals("Exploration", StringComparison.OrdinalIgnoreCase) ||
             freeformMode.Equals("Formalization", StringComparison.OrdinalIgnoreCase) ||
             freeformMode.Equals("Confirmation", StringComparison.OrdinalIgnoreCase));
-        Assert.IsTrue(
-            (freeformMode.Equals("Exploration", StringComparison.OrdinalIgnoreCase) && freeformResponse?.Contains("open reasoning", StringComparison.OrdinalIgnoreCase) == true) ||
-            (freeformMode.Equals("Formalization", StringComparison.OrdinalIgnoreCase) && freeformResponse?.Contains("handoff", StringComparison.OrdinalIgnoreCase) == true) ||
-            (freeformMode.Equals("Confirmation", StringComparison.OrdinalIgnoreCase) && freeformResponse?.Contains("lane you want", StringComparison.OrdinalIgnoreCase) == true)
-        );
+        var freeformGate = freeformBody.RootElement.GetProperty("gate");
+        Assert.AreEqual(freeformMode, freeformGate.GetProperty("mode").GetString(), ignoreCase: true);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(freeformGate.GetProperty("reason").GetString()));
+        var gateConfidence = freeformGate.GetProperty("confidence").GetDouble();
+        Assert.IsTrue(gateConfidence is >= 0 and <= 1);
+
+        var formalization = freeformMode.Equals("Formalization", StringComparison.OrdinalIgnoreCase);
+        Assert.AreEqual(formalization, freeformGate.GetProperty("canSaveDiscussion").GetBoolean());
+        Assert.AreEqual(formalization, freeformGate.GetProperty("canCreateTicket").GetBoolean());
+        Assert.AreEqual(formalization, freeformGate.GetProperty("canViewSources").GetBoolean());
+        Assert.AreEqual(formalization, freeformGate.GetProperty("canCopyMarkdown").GetBoolean());
 
         var wrongProjectChat = await client.PostAsJsonAsync($"/api/projects/{project.Id}/chat/complete", new
         {
@@ -1382,6 +1388,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    [TestCategory("ProcessExecution")]
     public async Task DiscussionCodeLoop_ShouldUseGenericProposalRunAndReviewPackagePipeline()
     {
         var baseToken = await LoginAsync();
@@ -1508,6 +1515,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    [TestCategory("ProcessExecution")]
     public async Task DiscussionCodeLoop_CalculatorScenario_ShouldUseSameProposalRunPipeline()
     {
         var baseToken = await LoginAsync();
@@ -1576,6 +1584,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    [TestCategory("ProcessExecution")]
     public async Task DiscussionCodeLoop_HealthApiScenario_ShouldUseSameProposalRunPipeline()
     {
         var baseToken = await LoginAsync();
@@ -1687,6 +1696,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    [TestCategory("ProcessExecution")]
     public async Task DiscussionCodeLoop_FailedCommand_ShouldPersistFailedRunAndEvidence()
     {
         var baseToken = await LoginAsync();
