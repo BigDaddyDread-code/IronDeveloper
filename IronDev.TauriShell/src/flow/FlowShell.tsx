@@ -11,6 +11,7 @@ import { BoardScreen } from './board/BoardScreen';
 import { RouteOutcomeScreen, type RouteOutcomeKind } from './components/RouteOutcomeScreen';
 import { LibraryScreen } from './library/LibraryScreen';
 import {
+  chatSessionPath,
   libraryPath,
   navigateProductPath,
   projectPath,
@@ -482,7 +483,24 @@ export function FlowShell() {
         {displayedKind === 'board' ? (
           <BoardScreen onOpenWorkItem={openWorkItem} onOpenProvisioning={() => openProjectSetup()} />
         ) : null}
-        {displayedKind === 'chat' ? <ChatRoute route={routeForId('chat')} /> : null}
+        {displayedKind === 'chat' && currentRoute.chatChannelId ? (
+          <RouteOutcomeScreen
+            kind="notImplemented"
+            title="Project channels are not implemented"
+            message="This route names a shared project channel, but the current Chat API only supports direct IronDev sessions."
+            nextSafeAction="Return to direct Chat. No channel messages or membership state have been inferred."
+            actionLabel="Open direct Chat"
+            onAction={() => navigateProductPath(projectPath(activeProjectId, 'chat'))}
+          />
+        ) : null}
+        {displayedKind === 'chat' && !currentRoute.chatChannelId ? (
+          <ChatRoute
+            route={routeForId('chat')}
+            requestedSessionId={currentRoute.chatSessionId}
+            onOpenSession={(sessionId) => navigateProductPath(chatSessionPath(activeProjectId, sessionId))}
+            onOpenLanding={() => navigateProductPath(projectPath(activeProjectId, 'chat'))}
+          />
+        ) : null}
         {displayedKind === 'workItem' && workItemLoadState === 'loading' ? (
           <p className="fl-empty" data-testid="flow.workItem.loading">Loading work item from the API...</p>
         ) : null}

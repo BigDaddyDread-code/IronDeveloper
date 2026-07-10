@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { BaWorkingDraft, ChatClarificationKind, ChatCompletionResponse, ChatMessage, ChatTurnAuditResponse } from '../../api/types';
+import type {
+  BaWorkingDraft,
+  ChatClarificationKind,
+  ChatCompletionResponse,
+  ChatMessage,
+  ChatTurnAuditResponse,
+  ProjectChatSession
+} from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { coerceChatGovernanceMode, getChatModeGate } from './chatGovernanceGate';
@@ -15,15 +22,28 @@ const projectReviewPrompt = [
 
 const chatAuditHydrationLimit = 50;
 
-export function useProjectChat() {
+type SessionLoadState = 'loading' | 'ready' | 'notFound' | 'unavailable';
+
+interface UseProjectChatOptions {
+  requestedSessionId: number | null;
+  onSessionCreated: (sessionId: number) => void;
+}
+
+export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProjectChatOptions) {
   const session = useSessionContext();
   const project = useProjectContext();
+  const [sessions, setSessions] = useState<ProjectChatSession[]>([]);
   const [messages, setMessages] = useState<ChatWorkspaceMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [isSending, setSending] = useState(false);
   const [isHistoryLoading, setHistoryLoading] = useState(false);
   const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessionLoadState, setSessionLoadState] = useState<SessionLoadState>('loading');
+  const [sessionLoadRequest, setSessionLoadRequest] = useState(0);
+  const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const freshConversationRef = useRef(false);
+  const errorSessionIdRef = useRef<number | null>(null);
 
   const projectId = project.selectedProjectId;
   const disabledReason =
@@ -37,45 +57,101 @@ export function useProjectChat() {
 
     async function loadProjectChat() {
       if (!projectId || !session.tokenConfigured || session.apiStatus.status !== 'connected') {
+        setSessions([]);
         setMessages([]);
         setSessionId(null);
+        setSessionLoadState('ready');
         setHistoryLoading(false);
         return;
       }
 
       setHistoryLoading(true);
-      setErrorMessage(null);
+      setSessionLoadState('loading');
+      setSessionLoadError(null);
+      if (requestedSessionId !== null) {
+        freshConversationRef.current = false;
+      }
 
       try {
-        const sessions = await session.client.getProjectChatSessions(projectId);
-        const latestSession = sessions.find((item) => Number.isFinite(item.id));
+        const recentSessions = await session.client.getProjectChatSessions(projectId);
+        let availableSessions = recentSessions.filter((item) => Number.isFinite(item.id));
+        let targetSession = requestedSessionId
+          ? availableSessions.find((item) => item.id === requestedSessionId)
+          : availableSessions[0];
 
-        if (!latestSession?.id) {
+        if (requestedSessionId && !targetSession) {
+          const requestedSession = await session.client.getProjectChatSession(
+            projectId,
+            requestedSessionId
+          );
+          if (!requestedSession?.id || requestedSession.projectId !== projectId) {
+            if (!isCancelled) {
+              setSessions(availableSessions);
+              setMessages([]);
+              setSessionId(null);
+              setSessionLoadState('notFound');
+            }
+            return;
+          }
+          targetSession = requestedSession;
+          availableSessions = [requestedSession, ...availableSessions];
+        }
+
+        if (!isCancelled) {
+          setSessions(availableSessions);
+        }
+
+        if (freshConversationRef.current && requestedSessionId === null) {
           if (!isCancelled) {
             setMessages([]);
             setSessionId(null);
+            setSessionLoadState('ready');
           }
           return;
         }
 
-        const history = await session.client.getProjectChatMessages(projectId, latestSession.id);
+        if (!targetSession?.id) {
+          if (!isCancelled) {
+            setMessages([]);
+            setSessionId(null);
+            setSessionLoadState('ready');
+            if (errorSessionIdRef.current !== null) {
+              errorSessionIdRef.current = null;
+              setErrorMessage(null);
+            }
+          }
+          return;
+        }
+
+        if (errorSessionIdRef.current !== null && errorSessionIdRef.current !== targetSession.id) {
+          errorSessionIdRef.current = null;
+          setErrorMessage(null);
+        }
+
+        const history = await session.client.getProjectChatMessages(projectId, targetSession.id);
         const replayedMessages = history.map(mapApiMessage).filter(Boolean);
         const hydratedMessages = await hydrateMessagesWithDurableAudit(
           projectId,
-          latestSession.id,
+          targetSession.id,
           history,
           replayedMessages,
           session.client
         );
         if (!isCancelled) {
-          setSessionId(latestSession.id);
+          setSessionId(targetSession.id);
           setMessages(hydratedMessages);
+          setSessionLoadState('ready');
         }
       } catch (error) {
         if (!isCancelled) {
           setMessages([]);
           setSessionId(null);
-          setErrorMessage(describeApiError(error, 'Chat history failed to load.'));
+          setSessionLoadState(
+            requestedSessionId && error instanceof IronDevApiError && error.status === 404
+              ? 'notFound'
+              : 'unavailable'
+          );
+          setSessionLoadError(describeApiError(error, 'Chat history failed to load.'));
         }
       } finally {
         if (!isCancelled) {
@@ -89,7 +165,28 @@ export function useProjectChat() {
     return () => {
       isCancelled = true;
     };
-  }, [projectId, session.apiStatus.status, session.client, session.tokenConfigured]);
+  }, [
+    projectId,
+    requestedSessionId,
+    session.apiStatus.status,
+    session.client,
+    session.tokenConfigured,
+    sessionLoadRequest
+  ]);
+
+  const retrySessionLoad = useCallback(() => {
+    setSessionLoadRequest((current) => current + 1);
+  }, []);
+
+  const startNewConversation = useCallback(() => {
+    freshConversationRef.current = true;
+    setSessionId(null);
+    setMessages([]);
+    setDraft('');
+    errorSessionIdRef.current = null;
+    setErrorMessage(null);
+    setSessionLoadState('ready');
+  }, []);
 
   const ensureChatSession = useCallback(
     async (prompt: string) => {
@@ -98,7 +195,7 @@ export function useProjectChat() {
       }
 
       if (sessionId) {
-        return sessionId;
+        return { id: sessionId, created: false };
       }
 
       const title = createSessionTitle(prompt);
@@ -107,8 +204,9 @@ export function useProjectChat() {
         title,
         summary: 'Project conversation'
       });
+      freshConversationRef.current = false;
       setSessionId(createdSessionId);
-      return createdSessionId;
+      return { id: createdSessionId, created: true };
     },
     [projectId, session.client, sessionId]
   );
@@ -133,10 +231,14 @@ export function useProjectChat() {
 
       setMessages((current) => [...current, userMessage]);
       setSending(true);
+      errorSessionIdRef.current = null;
       setErrorMessage(null);
+      let createdSessionId: number | null = null;
 
       try {
-        const activeSessionId = await ensureChatSession(prompt);
+        const activeSession = await ensureChatSession(prompt);
+        const activeSessionId = activeSession.id;
+        createdSessionId = activeSession.created ? activeSessionId : null;
         const savedUserMessageId = await session.client.saveProjectChatMessage(projectId, activeSessionId, {
           projectId,
           chatSessionId: activeSessionId,
@@ -213,12 +315,16 @@ export function useProjectChat() {
           setDraft('');
         }
       } catch (error) {
+        errorSessionIdRef.current = createdSessionId ?? sessionId;
         setErrorMessage(describeApiError(error, 'Send failed.'));
       } finally {
         setSending(false);
+        if (createdSessionId) {
+          onSessionCreated(createdSessionId);
+        }
       }
     },
-    [disabledReason, draft, ensureChatSession, isSending, projectId, session.client]
+    [disabledReason, draft, ensureChatSession, isSending, onSessionCreated, projectId, session.client, sessionId]
   );
 
   const reviewProjectState = useCallback(() => {
@@ -352,6 +458,10 @@ export function useProjectChat() {
   );
 
   return {
+    sessions,
+    sessionId,
+    sessionLoadState,
+    sessionLoadError,
     messages,
     draft,
     isSending,
@@ -361,6 +471,8 @@ export function useProjectChat() {
     latestResponse: latestResponse as ChatCompletionResponse | null,
     latestResponseText,
     projectLabel,
+    retrySessionLoad,
+    startNewConversation,
     setDraft,
     sendMessage,
     reviewProjectState,

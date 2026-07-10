@@ -29,6 +29,8 @@ export interface ProductRoute {
   kind: ProductRouteKind;
   pathname: string;
   projectId: number | null;
+  chatSessionId: number | null;
+  chatChannelId: string | null;
   workItemId: number | 'new' | null;
   librarySection: LibrarySection | null;
   compatibility: boolean;
@@ -45,6 +47,8 @@ function route(
     kind,
     pathname,
     projectId: options.projectId ?? null,
+    chatSessionId: options.chatSessionId ?? null,
+    chatChannelId: options.chatChannelId ?? null,
     workItemId: options.workItemId ?? null,
     librarySection: options.librarySection ?? null,
     compatibility: options.compatibility ?? false
@@ -70,7 +74,23 @@ export function parseProductRoute(pathname: string): ProductRoute {
   const boardMatch = normalized.match(/^\/projects\/(\d+)\/board$/);
   if (boardMatch) return route(normalized, 'board', { projectId: Number(boardMatch[1]) });
 
-  const chatMatch = normalized.match(/^\/projects\/(\d+)\/chat(?:\/(?:channels|sessions)\/[^/]+)?$/);
+  const chatSessionMatch = normalized.match(/^\/projects\/(\d+)\/chat\/sessions\/([1-9]\d*)$/);
+  if (chatSessionMatch) {
+    return route(normalized, 'chat', {
+      projectId: Number(chatSessionMatch[1]),
+      chatSessionId: Number(chatSessionMatch[2])
+    });
+  }
+
+  const chatChannelMatch = normalized.match(/^\/projects\/(\d+)\/chat\/channels\/([^/]+)$/);
+  if (chatChannelMatch) {
+    return route(normalized, 'chat', {
+      projectId: Number(chatChannelMatch[1]),
+      chatChannelId: chatChannelMatch[2]
+    });
+  }
+
+  const chatMatch = normalized.match(/^\/projects\/(\d+)\/chat$/);
   if (chatMatch) return route(normalized, 'chat', { projectId: Number(chatMatch[1]) });
 
   const workItemMatch = normalized.match(/^\/projects\/(\d+)\/work-items\/(new|\d+)$/);
@@ -105,6 +125,10 @@ export function parseProductRoute(pathname: string): ProductRoute {
 
 export function projectPath(projectId: number, destination: 'setup' | 'board' | 'chat' | 'library'): string {
   return `/projects/${projectId}/${destination}`;
+}
+
+export function chatSessionPath(projectId: number, sessionId: number): string {
+  return `${projectPath(projectId, 'chat')}/sessions/${sessionId}`;
 }
 
 export function workItemPath(projectId: number, workItemId: number | 'new'): string {

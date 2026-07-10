@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import type { BaWorkingDraft, ChatCompletionResponse } from '../../api/types';
+import type { BaWorkingDraft, ChatCompletionResponse, ProjectChatSession } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
 import { ChatComposer } from './ChatComposer';
 import { ChatContextPanel } from './ChatContextPanel';
+import { ChatSessionRail } from './ChatSessionRail';
 import { ChatThread } from './ChatThread';
 import type { ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 interface ChatWorkspaceProps {
+  sessions: ProjectChatSession[];
+  activeSessionId: number | null;
   messages: ChatWorkspaceMessage[];
   composerValue: string;
   isSending: boolean;
@@ -16,6 +19,8 @@ interface ChatWorkspaceProps {
   latestResponse: ChatCompletionResponse | null;
   latestResponseText: string | null;
   projectLabel: string;
+  onOpenSession: (sessionId: number) => void;
+  onStartNewConversation: () => void;
   onComposerChange: (value: string) => void;
   onSend: (request?: ChatSendRequest) => void;
   onReviewProjectState: () => void;
@@ -27,6 +32,8 @@ interface ChatWorkspaceProps {
 }
 
 export function ChatWorkspace({
+  sessions,
+  activeSessionId,
   messages,
   composerValue,
   isSending,
@@ -36,6 +43,8 @@ export function ChatWorkspace({
   latestResponse,
   latestResponseText,
   projectLabel,
+  onOpenSession,
+  onStartNewConversation,
   onComposerChange,
   onSend,
   onReviewProjectState,
@@ -46,6 +55,12 @@ export function ChatWorkspace({
   onConfirmBaDraft
 }: ChatWorkspaceProps) {
   const [isContextOpen, setIsContextOpen] = useState(false);
+  const [isSessionRailOpen, setIsSessionRailOpen] = useState(false);
+
+  useEffect(() => {
+    setIsContextOpen(false);
+    setIsSessionRailOpen(false);
+  }, [activeSessionId]);
 
   useEffect(() => {
     if (latestResponse?.baDraft) {
@@ -60,53 +75,77 @@ export function ChatWorkspace({
 
   return (
     <section className="chat-workspace-panel" data-testid="chat.workspace">
-      <header className="chat-page-header">
-        <div>
-          <h1>Chat</h1>
-          <p>
-            {projectLabel} <span aria-hidden="true">/</span> Direct with IronDev
-          </p>
-        </div>
-        <CommandButton
-          type="button"
-          variant="subtle"
-          testId="chat.contextPanel.show"
-          onClick={() => setIsContextOpen((current) => !current)}
-        >
-          {isContextOpen ? 'Close details' : 'Conversation details'}
-        </CommandButton>
-      </header>
-      <div className={`chat-workspace-layout ${isContextOpen ? '' : 'chat-workspace-layout--context-collapsed'}`.trim()}>
-        <div className="chat-workspace-layout__thread">
-          <ChatThread
-            messages={messages}
-            isSending={isSending}
-            onSaveDiscussion={onSaveDiscussion}
-            onViewSources={() => setIsContextOpen(true)}
-            onReviewProjectState={onReviewProjectState}
-            onStartDraft={startDraft}
+      <ChatSessionRail
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        isOpen={isSessionRailOpen}
+        onClose={() => setIsSessionRailOpen(false)}
+        onOpenSession={onOpenSession}
+        onStartNewConversation={() => {
+          setIsSessionRailOpen(false);
+          onStartNewConversation();
+        }}
+      />
+      <div className="chat-conversation">
+        <header className="chat-page-header">
+          <div>
+            <h1>Chat</h1>
+            <p>
+              {projectLabel} <span aria-hidden="true">/</span> Direct with IronDev
+            </p>
+          </div>
+          <div className="chat-page-header__actions">
+            <CommandButton
+              type="button"
+              variant="subtle"
+              className="chat-session-rail__toggle"
+              testId="chat.sessions.toggle"
+              onClick={() => setIsSessionRailOpen(true)}
+            >
+              Conversations
+            </CommandButton>
+            <CommandButton
+              type="button"
+              variant="subtle"
+              testId="chat.contextPanel.show"
+              onClick={() => setIsContextOpen((current) => !current)}
+            >
+              {isContextOpen ? 'Close details' : 'Conversation details'}
+            </CommandButton>
+          </div>
+        </header>
+        <div className={`chat-workspace-layout ${isContextOpen ? '' : 'chat-workspace-layout--context-collapsed'}`.trim()}>
+          <div className="chat-workspace-layout__thread">
+            <ChatThread
+              messages={messages}
+              isSending={isSending}
+              onSaveDiscussion={onSaveDiscussion}
+              onViewSources={() => setIsContextOpen(true)}
+              onReviewProjectState={onReviewProjectState}
+              onStartDraft={startDraft}
+            />
+            {errorMessage ? <p className="state-error" data-testid="chat.error">{errorMessage}</p> : null}
+            <ChatComposer
+              value={composerValue}
+              isSending={isSending}
+              disabledReason={disabledReason}
+              sendDisabledReason={sendDisabledReason}
+              onChange={onComposerChange}
+              onSend={() => onSend()}
+            />
+          </div>
+          <ChatContextPanel
+            latestResponse={latestResponse}
+            latestResponseText={latestResponseText}
+            projectLabel={projectLabel}
+            isCollapsed={!isContextOpen}
+            onToggleCollapsed={() => setIsContextOpen((current) => !current)}
+            onKeepDiscussingBaDraft={onKeepDiscussingBaDraft}
+            onAskNextBaQuestion={onAskNextBaQuestion}
+            onEditBaDraft={onEditBaDraft}
+            onConfirmBaDraft={onConfirmBaDraft}
           />
-          {errorMessage ? <p className="state-error" data-testid="chat.error">{errorMessage}</p> : null}
-          <ChatComposer
-            value={composerValue}
-            isSending={isSending}
-            disabledReason={disabledReason}
-            sendDisabledReason={sendDisabledReason}
-            onChange={onComposerChange}
-            onSend={() => onSend()}
-          />
         </div>
-        <ChatContextPanel
-          latestResponse={latestResponse}
-          latestResponseText={latestResponseText}
-          projectLabel={projectLabel}
-          isCollapsed={!isContextOpen}
-          onToggleCollapsed={() => setIsContextOpen((current) => !current)}
-          onKeepDiscussingBaDraft={onKeepDiscussingBaDraft}
-          onAskNextBaQuestion={onAskNextBaQuestion}
-          onEditBaDraft={onEditBaDraft}
-          onConfirmBaDraft={onConfirmBaDraft}
-        />
       </div>
     </section>
   );
