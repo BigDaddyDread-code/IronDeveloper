@@ -529,6 +529,9 @@ export function FlowShell() {
           <LibraryScreen
             projectId={activeProjectId}
             section={currentRoute.librarySection ?? 'settings'}
+            documentId={currentRoute.libraryDocumentId}
+            documentVersionId={currentRoute.libraryDocumentVersionId}
+            documentAction={currentRoute.libraryDocumentAction}
             preserveGovernancePath={currentRoute.compatibility && currentRoute.librarySection === 'governance'}
             onBackToProjects={openProjectEntry}
             onOpenBoard={() => openProjectBoard()}

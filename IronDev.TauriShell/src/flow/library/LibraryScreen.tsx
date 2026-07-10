@@ -4,10 +4,14 @@ import { GovernanceHost } from './GovernanceHost';
 import { AuditSection, ProvisioningSection } from './PlannedSections';
 import { SolutionExplorer } from './SolutionExplorer';
 import { SettingsScreen } from '../settings/SettingsScreen';
+import { DocumentsScreen } from './DocumentsScreen';
 
 interface LibraryScreenProps {
   projectId: number;
   section: LibrarySection;
+  documentId?: number | null;
+  documentVersionId?: number | null;
+  documentAction?: 'upload' | null;
   preserveGovernancePath?: boolean;
   onBackToProjects: () => void;
   onOpenBoard: () => void;
@@ -24,12 +28,7 @@ const sections: Array<{ id: LibrarySection; label: string }> = [
   { id: 'settings', label: 'Settings' }
 ];
 
-const plannedCopy: Record<'documents' | 'tools' | 'members', { title: string; message: string; next: string }> = {
-  documents: {
-    title: 'Documents are not implemented',
-    message: 'This route is reserved for versioned project documents. The current explorer does not pretend to be that capability.',
-    next: 'Return to Library or use Chat without attaching a project document.'
-  },
+const plannedCopy: Record<'tools' | 'members', { title: string; message: string; next: string }> = {
   tools: {
     title: 'Project tools are not implemented',
     message: 'Tenant connections and project enablement need their governed backend contract before this catalogue can operate.',
@@ -45,6 +44,9 @@ const plannedCopy: Record<'documents' | 'tools' | 'members', { title: string; me
 export function LibraryScreen({
   projectId,
   section,
+  documentId = null,
+  documentVersionId = null,
+  documentAction = null,
   preserveGovernancePath = false,
   onBackToProjects,
   onOpenBoard
@@ -80,13 +82,21 @@ export function LibraryScreen({
       </div>
 
       {section === 'explorer' ? <SolutionExplorer /> : null}
+      {section === 'documents' ? (
+        <DocumentsScreen
+          projectId={projectId}
+          documentId={documentId}
+          versionId={documentVersionId}
+          action={documentAction}
+        />
+      ) : null}
       {section === 'governance' ? <GovernanceHost /> : null}
       {section === 'provisioning' ? (
         <ProvisioningSection onBackToProjects={onBackToProjects} onOpenBoard={onOpenBoard} />
       ) : null}
       {section === 'audit' ? <AuditSection /> : null}
       {section === 'settings' ? <SettingsScreen /> : null}
-      {section === 'documents' || section === 'tools' || section === 'members' ? (
+      {section === 'tools' || section === 'members' ? (
         <RouteOutcomeScreen
           kind="notImplemented"
           title={plannedCopy[section].title}
