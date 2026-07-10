@@ -42,6 +42,7 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
 
         string text = _contentExtractor.Extract(document);
         var embeddingResult = await _embeddingProvider.EmbedAsync(text, ct);
+        var hasProjectDocumentVersion = ProjectDocumentContextSource.TryGetVersionId(document.Source, out var projectDocumentVersionId);
 
         var artefactId = GuidFromLong(document.Id);
 
@@ -51,7 +52,9 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
             ArtefactId = artefactId,
             ArtefactType = document.DocumentType,
             ProjectId = document.ProjectId,
-            SourceDocumentVersionId = null,
+            SourceDocumentVersionId = hasProjectDocumentVersion && projectDocumentVersionId <= int.MaxValue
+                ? (int)projectDocumentVersionId
+                : null,
             ContentHash = GetContentHash(text),
             Vector = embeddingResult.Vector,
             EmbeddedAtUtc = DateTime.UtcNow,
@@ -75,6 +78,7 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
 
         var candidates = _store.Values
             .Where(x => x.Embedding.ProjectId == projectId)
+            .Where(x => string.Equals(x.Document.Status, "Active", StringComparison.OrdinalIgnoreCase))
             .Select(x =>
             {
                 double similarity = CosineSimilarity.Compute(queryEmbedding.Vector, x.Embedding.Vector);
@@ -91,6 +95,7 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
             double freshnessScore = GetFreshnessScore(doc.UpdatedDate ?? doc.CreatedDate);
             double directLinkScore = GetDirectLinkScore(doc, query);
             bool isStale = IsStale(doc, embedding);
+            var hasProjectDocumentVersion = ProjectDocumentContextSource.TryGetVersionId(doc.Source, out var versionId);
 
             double finalScore = (similarity * _rankingOptions.SimilarityWeight) +
                                  (authorityScore * _rankingOptions.AuthorityWeight) +
@@ -120,7 +125,12 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
                 IndexedUtc = embedding.EmbeddedAtUtc,
                 MatchReason = $"Semantic similarity: {similarity:F2}, Authority: {doc.AuthorityLevel}",
                 AuthorityLevel = doc.AuthorityLevel,
-                SourceDocumentVersionId = null
+                SourceEntityType = hasProjectDocumentVersion ? ProjectDocumentContextSource.EntityType : "ProjectContextDocument",
+                SourceEntityId = hasProjectDocumentVersion ? versionId.ToString() : doc.Id.ToString(),
+                SourceVersionId = hasProjectDocumentVersion ? versionId.ToString() : null,
+                SourceDocumentVersionId = hasProjectDocumentVersion && versionId <= int.MaxValue
+                    ? (int)versionId
+                    : null
             });
         }
 
@@ -245,7 +255,25 @@ public sealed class InMemorySemanticMemoryService : ISemanticMemoryService
         => RebuildIndexAsync(projectId, ct: ct);
 
     public Task MarkStaleAsync(SemanticStaleRequest request, CancellationToken ct = default)
-        => Task.CompletedTask;
+    {
+        if (string.Equals(request.SourceEntityType, "ProjectContextDocument", StringComparison.OrdinalIgnoreCase)
+            && long.TryParse(request.SourceEntityId, out var contextDocumentId))
+        {
+            _store.TryRemove(GuidFromLong(contextDocumentId), out _);
+        }
+        else if (string.Equals(request.SourceEntityType, ProjectDocumentContextSource.EntityType, StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var entry in _store.Where(entry =>
+                         entry.Value.Embedding.ProjectId == request.ProjectId
+                         && ProjectDocumentContextSource.TryGetVersionId(entry.Value.Document.Source, out var versionId)
+                         && string.Equals(versionId.ToString(), request.SourceEntityId, StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                _store.TryRemove(entry.Key, out _);
+            }
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task DeleteEmbeddingAsync(Guid artefactId, CancellationToken ct = default)
     {

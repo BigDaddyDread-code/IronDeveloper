@@ -231,6 +231,15 @@ public abstract class ApiTestBase
             IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'ByteSize') IS NULL
                 ALTER TABLE dbo.ProjectDocuments ADD ByteSize BIGINT NULL;
 
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'ProcessingFailureReason') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ProcessingFailureReason NVARCHAR(1000) NULL;
+
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'ProcessingStartedAtUtc') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ProcessingStartedAtUtc DATETIME2(7) NULL;
+
+            IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL AND COL_LENGTH('dbo.ProjectDocuments', 'ProcessingCompletedAtUtc') IS NULL
+                ALTER TABLE dbo.ProjectDocuments ADD ProcessingCompletedAtUtc DATETIME2(7) NULL;
+
             -- Ensure ProjectChatSessions exists
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NULL
             BEGIN

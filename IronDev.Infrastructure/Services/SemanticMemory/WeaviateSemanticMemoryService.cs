@@ -124,13 +124,15 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
         var artefactId = GuidFromLong(document.Id);
         string collectionName = _options.CollectionPrefix;
         string contentHash = GetContentHash(text);
+        var hasProjectDocumentVersion = ProjectDocumentContextSource.TryGetVersionId(document.Source, out var projectDocumentVersionId);
         var draft = new SemanticArtefactDraft
         {
             Id = artefactId,
             TenantId = document.TenantId == 0 ? null : document.TenantId,
             ProjectId = document.ProjectId,
-            SourceEntityType = "ProjectContextDocument",
-            SourceEntityId = document.Id.ToString(),
+            SourceEntityType = hasProjectDocumentVersion ? ProjectDocumentContextSource.EntityType : "ProjectContextDocument",
+            SourceEntityId = hasProjectDocumentVersion ? projectDocumentVersionId.ToString() : document.Id.ToString(),
+            SourceVersionId = hasProjectDocumentVersion ? projectDocumentVersionId.ToString() : null,
             ArtefactType = MapArtefactType(document.DocumentType),
             AuthorityLevel = MapAuthorityLevel(document.AuthorityLevel),
             Title = document.Title,
@@ -234,6 +236,7 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
             var doc = await _projectMemoryService.GetContextDocumentByIdAsync(documentId, ct);
             if (doc == null) continue;
             if (doc.ProjectId != query.ProjectId) continue;
+            if (!string.Equals(doc.Status, "Active", StringComparison.OrdinalIgnoreCase)) continue;
 
             double similarity = 0.85;
             if (obj.Vectors != null && obj.Vectors.Count > 0)

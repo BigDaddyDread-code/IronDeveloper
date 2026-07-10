@@ -13,7 +13,7 @@ using IronDev.Data.Models;
 
 namespace IronDev.Services;
 
-public sealed class ProjectDocumentService : IProjectDocumentService
+public sealed class ProjectDocumentService : IProjectDocumentService, IProjectDocumentProcessingStateStore
 {
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly ICurrentTenantContext _tenant;
@@ -56,6 +56,7 @@ public sealed class ProjectDocumentService : IProjectDocumentService
                    inserted.Slug, inserted.DocumentType, inserted.CurrentVersionId,
                    inserted.Status, inserted.Origin, inserted.ProcessingStatus, inserted.Description,
                    inserted.Visibility, inserted.OriginalFileName, inserted.MediaType, inserted.ByteSize,
+                   inserted.ProcessingFailureReason, inserted.ProcessingStartedAtUtc, inserted.ProcessingCompletedAtUtc,
                    inserted.CreatedAtUtc, inserted.UpdatedAtUtc,
                    inserted.CreatedBy, inserted.UpdatedBy
             VALUES
@@ -218,6 +219,10 @@ public sealed class ProjectDocumentService : IProjectDocumentService
         const string updateDocSql = """
             UPDATE dbo.ProjectDocuments
             SET CurrentVersionId = @VersionId,
+                ProcessingStatus = 'Draft',
+                ProcessingFailureReason = NULL,
+                ProcessingStartedAtUtc = NULL,
+                ProcessingCompletedAtUtc = NULL,
                 UpdatedAtUtc     = SYSUTCDATETIME(),
                 UpdatedBy        = @UpdatedBy
             WHERE Id = @DocumentId AND TenantId = @TenantId;
@@ -270,6 +275,7 @@ public sealed class ProjectDocumentService : IProjectDocumentService
             SELECT Id, TenantId, ProjectId, Title, Slug, DocumentType, CurrentVersionId,
                    Status, Origin, ProcessingStatus, Description, Visibility,
                    OriginalFileName, MediaType, ByteSize,
+                   ProcessingFailureReason, ProcessingStartedAtUtc, ProcessingCompletedAtUtc,
                    CreatedAtUtc, UpdatedAtUtc, CreatedBy, UpdatedBy
             FROM dbo.ProjectDocuments
             WHERE {string.Join(" AND ", whereParts)}
@@ -416,6 +422,89 @@ public sealed class ProjectDocumentService : IProjectDocumentService
         return rows.ToList();
     }
 
+    public async Task<ProjectDocument?> TryBeginProcessingAsync(
+        long documentId,
+        string? updatedBy,
+        CancellationToken ct = default)
+    {
+        const string sql = """
+            UPDATE dbo.ProjectDocuments
+            SET ProcessingStatus = 'Processing',
+                ProcessingFailureReason = NULL,
+                ProcessingStartedAtUtc = SYSUTCDATETIME(),
+                ProcessingCompletedAtUtc = NULL,
+                UpdatedAtUtc = SYSUTCDATETIME(),
+                UpdatedBy = @UpdatedBy
+            OUTPUT inserted.Id, inserted.TenantId, inserted.ProjectId, inserted.Title,
+                   inserted.Slug, inserted.DocumentType, inserted.CurrentVersionId,
+                   inserted.Status, inserted.Origin, inserted.ProcessingStatus, inserted.Description,
+                   inserted.Visibility, inserted.OriginalFileName, inserted.MediaType, inserted.ByteSize,
+                   inserted.ProcessingFailureReason, inserted.ProcessingStartedAtUtc, inserted.ProcessingCompletedAtUtc,
+                   inserted.CreatedAtUtc, inserted.UpdatedAtUtc, inserted.CreatedBy, inserted.UpdatedBy
+            WHERE Id = @DocumentId
+              AND TenantId = @TenantId
+              AND (
+                  ProcessingStatus <> 'Processing'
+                  OR ProcessingStartedAtUtc IS NULL
+                  OR ProcessingStartedAtUtc <= DATEADD(MINUTE, -10, SYSUTCDATETIME())
+              );
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.QuerySingleOrDefaultAsync<ProjectDocument>(new CommandDefinition(
+            sql,
+            new { DocumentId = documentId, UpdatedBy = updatedBy, TenantId = _tenant.TenantId },
+            cancellationToken: ct));
+    }
+
+    public async Task<ProjectDocument> UpdateProcessingStateAsync(
+        ProjectDocumentProcessingStateUpdate update,
+        CancellationToken ct = default)
+    {
+        if (update.Status is not ("Draft" or "Processing" or "Ready" or "ProcessingFailed"))
+            throw new ArgumentException("Unsupported document processing state.", nameof(update));
+
+        const string sql = """
+            UPDATE dbo.ProjectDocuments
+            SET ProcessingStatus = @Status,
+                ProcessingFailureReason = CASE WHEN @Status = 'ProcessingFailed' THEN @FailureReason ELSE NULL END,
+                ProcessingStartedAtUtc = CASE
+                    WHEN @Status = 'Processing' THEN SYSUTCDATETIME()
+                    WHEN @Status = 'Draft' THEN NULL
+                    ELSE ProcessingStartedAtUtc
+                END,
+                ProcessingCompletedAtUtc = CASE
+                    WHEN @Status IN ('Ready', 'ProcessingFailed') THEN SYSUTCDATETIME()
+                    ELSE NULL
+                END,
+                UpdatedAtUtc = SYSUTCDATETIME(),
+                UpdatedBy = @UpdatedBy
+            OUTPUT inserted.Id, inserted.TenantId, inserted.ProjectId, inserted.Title,
+                   inserted.Slug, inserted.DocumentType, inserted.CurrentVersionId,
+                   inserted.Status, inserted.Origin, inserted.ProcessingStatus, inserted.Description,
+                   inserted.Visibility, inserted.OriginalFileName, inserted.MediaType, inserted.ByteSize,
+                   inserted.ProcessingFailureReason, inserted.ProcessingStartedAtUtc, inserted.ProcessingCompletedAtUtc,
+                   inserted.CreatedAtUtc, inserted.UpdatedAtUtc, inserted.CreatedBy, inserted.UpdatedBy
+            WHERE Id = @DocumentId AND TenantId = @TenantId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var document = await connection.QuerySingleOrDefaultAsync<ProjectDocument>(new CommandDefinition(
+            sql,
+            new
+            {
+                update.DocumentId,
+                update.Status,
+                update.FailureReason,
+                update.UpdatedBy,
+                TenantId = _tenant.TenantId
+            },
+            cancellationToken: ct));
+
+        return document ?? throw new UnauthorizedAccessException(
+            $"Document {update.DocumentId} does not belong to tenant {_tenant.TenantId}.");
+    }
+
     // ------------------------------------------------------------------
     // Lifecycle
     // ------------------------------------------------------------------
@@ -451,6 +540,7 @@ public sealed class ProjectDocumentService : IProjectDocumentService
             SELECT Id, TenantId, ProjectId, Title, Slug, DocumentType, CurrentVersionId,
                    Status, Origin, ProcessingStatus, Description, Visibility,
                    OriginalFileName, MediaType, ByteSize,
+                   ProcessingFailureReason, ProcessingStartedAtUtc, ProcessingCompletedAtUtc,
                    CreatedAtUtc, UpdatedAtUtc, CreatedBy, UpdatedBy
             FROM dbo.ProjectDocuments
             WHERE Id = @DocumentId AND TenantId = @TenantId;

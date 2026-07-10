@@ -137,6 +137,57 @@ test('backend upload refusal preserves the selected file and entered metadata', 
   await expect(page.getByTestId('flow.documents.upload.success')).toHaveCount(0);
 });
 
+test('a Draft becomes Ready only after exact-version processing completes', async ({ page }) => {
+  const state = await mockDocumentsWorkspace(page, { processDelayMs: 250 });
+  await page.goto('/projects/7/library/documents/203');
+
+  await expect(page.getByTestId('flow.documents.processing')).toContainText('Process this Draft version');
+  await page.getByTestId('flow.documents.process').click();
+  await expect(page.getByTestId('flow.documents.process')).toHaveText('Processing...');
+  await expect(page.getByTestId('flow.documents.processing')).not.toContainText('Ready for project retrieval');
+
+  await expect(page.getByTestId('flow.documents.processing')).toContainText('Ready for project retrieval');
+  await expect(page.getByTestId('flow.documents.processing')).toContainText('exact immutable version');
+  await expect(page.getByTestId('flow.documents.process')).toHaveCount(0);
+  expect(state.processRequests).toBe(1);
+});
+
+test('a processing failure keeps the backend reason and offers a working retry', async ({ page }) => {
+  const state = await mockDocumentsWorkspace(page, { processFailures: 1 });
+  await page.goto('/projects/7/library/documents/203');
+
+  await page.getByTestId('flow.documents.process').click();
+  await expect(page.getByTestId('flow.documents.processing')).toContainText('Document processing failed');
+  await expect(page.getByTestId('flow.documents.processing')).toContainText('Document retrieval processing did not complete.');
+  await expect(page.getByTestId('flow.documents.process')).toHaveText('Retry processing');
+
+  await page.getByTestId('flow.documents.process').click();
+  await expect(page.getByTestId('flow.documents.processing')).toContainText('Ready for project retrieval');
+  expect(state.processRequests).toBe(2);
+});
+
+test('a Ready document reports retrieval truth without another processing command', async ({ page }) => {
+  await mockDocumentsWorkspace(page);
+  await page.goto('/projects/7/library/documents/201');
+
+  await expect(page.getByTestId('flow.documents.processing')).toContainText('Ready for project retrieval');
+  await expect(page.getByTestId('flow.documents.process')).toHaveCount(0);
+});
+
+test('an interrupted processing lease is recoverable instead of becoming a dead end', async ({ page }) => {
+  const state = await mockDocumentsWorkspace(page, {
+    uploadedProcessingStatus: 'Processing',
+    uploadedProcessingStartedAtUtc: new Date(Date.now() - 11 * 60 * 1000).toISOString()
+  });
+  await page.goto('/projects/7/library/documents/203');
+
+  await expect(page.getByTestId('flow.documents.processing')).toContainText('The previous processing attempt did not complete.');
+  await expect(page.getByTestId('flow.documents.process')).toHaveText('Retry processing');
+  await page.getByTestId('flow.documents.process').click();
+  await expect(page.getByTestId('flow.documents.processing')).toContainText('Ready for project retrieval');
+  expect(state.processRequests).toBe(1);
+});
+
 test.describe('narrow Documents', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -174,17 +225,23 @@ interface DocumentsMockOptions {
   listFailures?: number;
   listErrorStatus?: number;
   uploadErrorStatus?: number;
+  processFailures?: number;
+  processDelayMs?: number;
+  uploadedProcessingStatus?: string;
+  uploadedProcessingStartedAtUtc?: string;
 }
 
 interface DocumentsMockState {
   listRequests: number;
   uploadRequests: number;
+  processRequests: number;
   lastUploadBody: string;
 }
 
 async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions = {}): Promise<DocumentsMockState> {
-  const state: DocumentsMockState = { listRequests: 0, uploadRequests: 0, lastUploadBody: '' };
+  const state: DocumentsMockState = { listRequests: 0, uploadRequests: 0, processRequests: 0, lastUploadBody: '' };
   let failuresRemaining = options.listFailures ?? 0;
+  let processFailuresRemaining = options.processFailures ?? 0;
   const documents = options.documents ?? [
     {
       id: 201,
@@ -277,7 +334,10 @@ async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions 
     currentVersionId: 501,
     status: 'Active',
     origin: 'Uploaded',
-    processingStatus: 'Draft',
+    processingStatus: options.uploadedProcessingStatus ?? 'Draft',
+    processingFailureReason: null,
+    processingStartedAtUtc: options.uploadedProcessingStartedAtUtc ?? null,
+    processingCompletedAtUtc: null,
     description: 'Uploaded architecture context.',
     visibility: 'Project',
     originalFileName: 'api-boundaries.md',
@@ -335,6 +395,34 @@ async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions 
       processingStatus: 'Draft',
       boundary: 'The uploaded file is an immutable Draft document. It is not attached to Chat, indexed for retrieval, approved, or source-mutation authority.'
     }, 201);
+  });
+
+  await page.route('**/irondev-api/api/projects/7/documents/203/process', async (route) => {
+    state.processRequests += 1;
+    if (options.processDelayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.processDelayMs));
+    }
+
+    const failed = processFailuresRemaining > 0;
+    if (failed) processFailuresRemaining -= 1;
+    Object.assign(uploadedDocument, {
+      processingStatus: failed ? 'ProcessingFailed' : 'Ready',
+      processingFailureReason: failed ? 'Document retrieval processing did not complete.' : null,
+      processingStartedAtUtc: '2026-07-10T09:01:00Z',
+      processingCompletedAtUtc: '2026-07-10T09:01:01Z'
+    });
+    return json(route, {
+      document: uploadedDocument,
+      version: uploadedVersion,
+      contextDocumentId: failed ? null : 801,
+      succeeded: !failed,
+      status: failed ? 'ProcessingFailed' : 'Ready',
+      failureReason: failed ? 'Document retrieval processing did not complete.' : null,
+      nextSafeAction: failed
+        ? 'Retry processing this exact immutable version.'
+        : 'This exact version can now support project retrieval.',
+      boundary: 'Ready means exact-version retrieval processing completed. It is not approval or source-mutation authority.'
+    });
   });
 
   await page.route(/\/irondev-api\/api\/projects\/7\/documents(?:\?[^#]*)?$/, (route) => {

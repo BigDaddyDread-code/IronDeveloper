@@ -144,6 +144,15 @@ public sealed class MemoryAuthorityModelTests
                     Content = "This document is observed fact.",
                     Status = "Active",
                     AuthorityLevel = "ObservedFact"
+                },
+                new ProjectContextDocument
+                {
+                    Id = 41,
+                    Title = "Processed immutable version",
+                    Content = "This exact project document version is retrieval context.",
+                    Source = ProjectDocumentContextSource.ForVersion(900),
+                    Status = "Active",
+                    AuthorityLevel = "ContextOnly"
                 }
             ],
             [
@@ -186,6 +195,9 @@ public sealed class MemoryAuthorityModelTests
         Assert.IsTrue(evidence.Single(item => item.SourceId == "ticket-10").IsCurrent);
         Assert.AreEqual(MemoryAuthorityLevels.ObservedFact, evidence.Single(item => item.SourceId == "document-40").AuthorityLevel);
         Assert.IsTrue(evidence.Single(item => item.SourceId == "document-40").IsCurrent);
+        Assert.AreEqual("ProjectDocumentVersion", evidence.Single(item => item.SourceId == "project-document-version-900").SourceType);
+        Assert.AreEqual(MemoryAuthorityLevels.ObservedFact, evidence.Single(item => item.SourceId == "project-document-version-900").AuthorityLevel);
+        Assert.IsTrue(evidence.Single(item => item.SourceId == "project-document-version-900").IsCurrent);
         Assert.AreEqual(MemoryAuthorityLevels.Accepted, evidence.Single(item => item.SourceId == "rule-30").AuthorityLevel);
         Assert.IsTrue(evidence.Single(item => item.SourceId == "rule-30").IsCurrent);
         Assert.AreEqual(MemoryAuthorityLevels.Accepted, evidence.Single(item => item.SourceId == "semantic-doc-1").AuthorityLevel);
