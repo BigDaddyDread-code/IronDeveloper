@@ -33,7 +33,11 @@ internal static class GovernedToolPolicyEvaluatorTestFixtures
         new()
         {
             Name = name,
+            DisplayName = name,
+            Category = "Test fixture",
+            DefinitionVersion = "test-1",
             Description = "Read-only governed policy fixture.",
+            ConnectionRequirement = GovernedToolConnectionRequirement.None,
             InputType = typeof(TestInput),
             OutputType = typeof(TestOutput),
             AllowedCallers = allowedCallers ?? [AllowedCaller],
