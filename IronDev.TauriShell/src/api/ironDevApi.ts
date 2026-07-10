@@ -385,8 +385,38 @@ class IronDevApiClient {
     });
   }
 
-  async getProjectDocuments(projectId: number, signal?: AbortSignal): Promise<ProjectDocument[]> {
-    return this.request<ProjectDocument[]>(`/api/projects/${projectId}/documents`, { method: 'GET', signal });
+  async getProjectDocuments(projectId: number, status = '*', signal?: AbortSignal): Promise<ProjectDocument[]> {
+    const query = new URLSearchParams({ status });
+    return this.request<ProjectDocument[]>(`/api/projects/${projectId}/documents?${query}`, { method: 'GET', signal });
+  }
+
+  async getProjectDocument(projectId: number, documentId: number, signal?: AbortSignal): Promise<ProjectDocument> {
+    return this.request<ProjectDocument>(`/api/projects/${projectId}/documents/${documentId}`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getProjectDocumentCurrentVersion(
+    projectId: number,
+    documentId: number,
+    signal?: AbortSignal
+  ): Promise<ProjectDocumentVersion> {
+    return this.request<ProjectDocumentVersion>(
+      `/api/projects/${projectId}/documents/${documentId}/versions/current`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getProjectDocumentVersions(
+    projectId: number,
+    documentId: number,
+    signal?: AbortSignal
+  ): Promise<ProjectDocumentVersion[]> {
+    return this.request<ProjectDocumentVersion[]>(`/api/projects/${projectId}/documents/${documentId}/versions`, {
+      method: 'GET',
+      signal
+    });
   }
 
   async getDocument(documentId: number, signal?: AbortSignal): Promise<ProjectDocument | null> {

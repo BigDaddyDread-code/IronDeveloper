@@ -33,6 +33,9 @@ export interface ProductRoute {
   chatChannelId: string | null;
   workItemId: number | 'new' | null;
   librarySection: LibrarySection | null;
+  libraryDocumentId: number | null;
+  libraryDocumentVersionId: number | null;
+  libraryDocumentAction: 'upload' | null;
   compatibility: boolean;
 }
 
@@ -51,6 +54,9 @@ function route(
     chatChannelId: options.chatChannelId ?? null,
     workItemId: options.workItemId ?? null,
     librarySection: options.librarySection ?? null,
+    libraryDocumentId: options.libraryDocumentId ?? null,
+    libraryDocumentVersionId: options.libraryDocumentVersionId ?? null,
+    libraryDocumentAction: options.libraryDocumentAction ?? null,
     compatibility: options.compatibility ?? false
   };
 }
@@ -101,7 +107,45 @@ export function parseProductRoute(pathname: string): ProductRoute {
     });
   }
 
-  const libraryMatch = normalized.match(/^\/projects\/(\d+)\/library(?:\/(explorer|documents|tools|members|governance|provisioning|audit|settings)(?:\/.*)?)?$/);
+  const documentUploadMatch = normalized.match(/^\/projects\/(\d+)\/library\/documents\/upload$/);
+  if (documentUploadMatch) {
+    return route(normalized, 'library', {
+      projectId: Number(documentUploadMatch[1]),
+      librarySection: 'documents',
+      libraryDocumentAction: 'upload'
+    });
+  }
+
+  const documentVersionMatch = normalized.match(
+    /^\/projects\/(\d+)\/library\/documents\/([1-9]\d*)\/versions\/([1-9]\d*)$/
+  );
+  if (documentVersionMatch) {
+    return route(normalized, 'library', {
+      projectId: Number(documentVersionMatch[1]),
+      librarySection: 'documents',
+      libraryDocumentId: Number(documentVersionMatch[2]),
+      libraryDocumentVersionId: Number(documentVersionMatch[3])
+    });
+  }
+
+  const documentDetailMatch = normalized.match(/^\/projects\/(\d+)\/library\/documents\/([1-9]\d*)$/);
+  if (documentDetailMatch) {
+    return route(normalized, 'library', {
+      projectId: Number(documentDetailMatch[1]),
+      librarySection: 'documents',
+      libraryDocumentId: Number(documentDetailMatch[2])
+    });
+  }
+
+  const libraryGovernanceMatch = normalized.match(/^\/projects\/(\d+)\/library\/governance(?:\/.*)?$/);
+  if (libraryGovernanceMatch) {
+    return route(normalized, 'library', {
+      projectId: Number(libraryGovernanceMatch[1]),
+      librarySection: 'governance'
+    });
+  }
+
+  const libraryMatch = normalized.match(/^\/projects\/(\d+)\/library(?:\/(explorer|documents|tools|members|provisioning|audit|settings))?$/);
   if (libraryMatch) {
     return route(normalized, 'library', {
       projectId: Number(libraryMatch[1]),
@@ -139,6 +183,14 @@ export function libraryPath(projectId: number, section: LibrarySection): string 
   return section === 'explorer'
     ? projectPath(projectId, 'library')
     : `${projectPath(projectId, 'library')}/${section}`;
+}
+
+export function documentPath(projectId: number, documentId: number): string {
+  return `${libraryPath(projectId, 'documents')}/${documentId}`;
+}
+
+export function documentVersionPath(projectId: number, documentId: number, versionId: number): string {
+  return `${documentPath(projectId, documentId)}/versions/${versionId}`;
 }
 
 export function navigateProductPath(pathname: string, replace = false): void {

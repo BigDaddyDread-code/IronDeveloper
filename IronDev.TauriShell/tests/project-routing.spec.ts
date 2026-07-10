@@ -70,12 +70,15 @@ test('missing projects and unknown paths do not fall through to Board', async ({
   await expect(page.getByRole('heading', { name: 'This route does not exist' })).toBeVisible();
 });
 
-test('defined Library capabilities refuse honestly while they remain unbuilt', async ({ page }) => {
+test('Documents is functional while its unbuilt upload child refuses honestly', async ({ page }) => {
   await page.goto('/projects/7/library/documents');
 
   await expect(page).toHaveURL('/projects/7/library/documents');
+  await expect(page.getByTestId('flow.documents.empty')).toBeVisible();
+
+  await page.goto('/projects/7/library/documents/upload');
   await expect(page.getByTestId('flow.routeOutcome.kind')).toContainText('501');
-  await expect(page.getByRole('heading', { name: 'Documents are not implemented' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Document upload is not implemented' })).toBeVisible();
 });
 
 test('legacy Chat links are replaced with the selected project route', async ({ page }) => {
@@ -165,6 +168,9 @@ async function mockRoutedProject(page: Page) {
   );
   await page.route('**/irondev-api/api/projects/7/tickets', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([ticket]) })
+  );
+  await page.route(/\/irondev-api\/api\/projects\/7\/documents(?:\?[^#]*)?$/, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   );
   await page.route('**/irondev-api/api/projects/7/chat/sessions', (route) => {
     if (route.request().method() === 'GET') {
