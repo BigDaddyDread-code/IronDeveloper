@@ -70,15 +70,16 @@ test('missing projects and unknown paths do not fall through to Board', async ({
   await expect(page.getByRole('heading', { name: 'This route does not exist' })).toBeVisible();
 });
 
-test('Documents is functional while its unbuilt upload child refuses honestly', async ({ page }) => {
+test('Documents and its upload child are functional project routes', async ({ page }) => {
   await page.goto('/projects/7/library/documents');
 
   await expect(page).toHaveURL('/projects/7/library/documents');
   await expect(page.getByTestId('flow.documents.empty')).toBeVisible();
 
   await page.goto('/projects/7/library/documents/upload');
-  await expect(page.getByTestId('flow.routeOutcome.kind')).toContainText('501');
-  await expect(page.getByRole('heading', { name: 'Document upload is not implemented' })).toBeVisible();
+  await expect(page).toHaveURL('/projects/7/library/documents/upload');
+  await expect(page.getByTestId('flow.documents.upload')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Upload a document' })).toBeVisible();
 });
 
 test('legacy Chat links are replaced with the selected project route', async ({ page }) => {

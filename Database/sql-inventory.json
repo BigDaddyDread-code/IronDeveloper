@@ -189,9 +189,9 @@
                         "referencedBy":  [
                                              "SQL inventory discovery"
                                          ],
-                        "appliedByManifest":  false,
-                        "verifiedByScript":  false,
-                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Manifest-managed append-only safe agent-run audit envelope schema."
                     },
                     {
                         "id":  "database.migrate-chat-message-tags-envelope",
@@ -246,9 +246,9 @@
                         "referencedBy":  [
                                              "SQL inventory discovery"
                                          ],
-                        "appliedByManifest":  false,
-                        "verifiedByScript":  false,
-                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Manifest-managed project file indexing schema."
                     },
                     {
                         "id":  "database.migrate-collective-memory",
@@ -398,6 +398,27 @@
                         "bucket":  "required-runtime-schema",
                         "ownerArea":  "api",
                         "objectsCreated":  [
+                                               "dbo.ProjectDocuments",
+                                               "dbo.ProjectDocumentVersions",
+                                               "dbo.ProjectDocumentLinks"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Manifest-managed versioned document schema with backend-owned upload metadata and immutable content versions."
+                    },
+                    {
+                        "id":  "database.migrate-project-channels",
+                        "path":  "Database/migrate_project_channels.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "api",
+                        "objectsCreated":  [
 
                                            ],
                         "objectsCalled":  [
@@ -408,7 +429,7 @@
                                          ],
                         "appliedByManifest":  false,
                         "verifiedByScript":  false,
-                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                        "notes":  "Project collaboration schema is inventoried but remains outside the active migration manifest until its service and API slice is implemented."
                     },
                     {
                         "id":  "database.migrate-project-profiles",
@@ -425,9 +446,9 @@
                         "referencedBy":  [
                                              "SQL inventory discovery"
                                          ],
-                        "appliedByManifest":  false,
-                        "verifiedByScript":  false,
-                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Manifest-managed project profile, command, and profile-option schema."
                     },
                     {
                         "id":  "database.migrate-projects-indexing-fields",
@@ -444,9 +465,9 @@
                         "referencedBy":  [
                                              "SQL inventory discovery"
                                          ],
-                        "appliedByManifest":  false,
-                        "verifiedByScript":  false,
-                        "notes":  "Runtime schema or compatibility migration not yet covered by the current Block G manifest."
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Manifest-managed project indexing status columns."
                     },
                     {
                         "id":  "database.migrate-structured-tickets",

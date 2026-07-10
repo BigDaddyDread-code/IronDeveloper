@@ -50,6 +50,7 @@ import type {
   PlannedSurfaceEnvelope,
   ProjectProvisioningReadinessUi,
   ProjectDocument,
+  ProjectDocumentUploadResult,
   ProjectDocumentVersion,
   ProjectChatSession,
   ProjectImplementationPlan,
@@ -388,6 +389,31 @@ class IronDevApiClient {
   async getProjectDocuments(projectId: number, status = '*', signal?: AbortSignal): Promise<ProjectDocument[]> {
     const query = new URLSearchParams({ status });
     return this.request<ProjectDocument[]>(`/api/projects/${projectId}/documents?${query}`, { method: 'GET', signal });
+  }
+
+  async uploadProjectDocument(
+    projectId: number,
+    input: {
+      file: File;
+      displayName: string;
+      documentType: string;
+      description?: string;
+    },
+    signal?: AbortSignal
+  ): Promise<ProjectDocumentUploadResult> {
+    const form = new FormData();
+    form.set('file', input.file, input.file.name);
+    form.set('displayName', input.displayName);
+    form.set('documentType', input.documentType);
+    if (input.description?.trim()) {
+      form.set('description', input.description.trim());
+    }
+
+    return this.request<ProjectDocumentUploadResult>(`/api/projects/${projectId}/documents/upload`, {
+      method: 'POST',
+      rawBody: form,
+      signal
+    });
   }
 
   async getProjectDocument(projectId: number, documentId: number, signal?: AbortSignal): Promise<ProjectDocument> {
@@ -1089,6 +1115,10 @@ class IronDevApiClient {
   private async request<T>(path: string, options: RequestOptions): Promise<T> {
     const headers = new Headers({ Accept: 'application/json' });
 
+    if (options.body !== undefined && options.rawBody !== undefined) {
+      throw new Error('IronDev API requests cannot contain both JSON and raw bodies.');
+    }
+
     if (options.body !== undefined) {
       headers.set('Content-Type', 'application/json');
     }
@@ -1100,7 +1130,7 @@ class IronDevApiClient {
     const response = await fetch(`${this.config.requestBaseUrl}${path}`, {
       method: options.method,
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.rawBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
       signal: options.signal
     });
 
@@ -1158,6 +1188,7 @@ function normalizeSkeletonAgentRole(role: string | number): string {
 interface RequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
+  rawBody?: BodyInit;
   signal?: AbortSignal;
   skipAuth?: boolean;
 }

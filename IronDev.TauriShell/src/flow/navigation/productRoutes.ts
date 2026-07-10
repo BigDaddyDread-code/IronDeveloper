@@ -189,6 +189,10 @@ export function documentPath(projectId: number, documentId: number): string {
   return `${libraryPath(projectId, 'documents')}/${documentId}`;
 }
 
+export function documentUploadPath(projectId: number): string {
+  return `${libraryPath(projectId, 'documents')}/upload`;
+}
+
 export function documentVersionPath(projectId: number, documentId: number, versionId: number): string {
   return `${documentPath(projectId, documentId)}/versions/${versionId}`;
 }

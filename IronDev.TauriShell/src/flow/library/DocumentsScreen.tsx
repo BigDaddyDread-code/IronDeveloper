@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { ProjectDocument, ProjectDocumentVersion } from '../../api/types';
+import type { ProjectDocument, ProjectDocumentUploadResult, ProjectDocumentVersion } from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useSessionContext } from '../../state/useSessionContext';
 import { RouteOutcomeScreen, type RouteOutcomeKind } from '../components/RouteOutcomeScreen';
 import {
   documentPath,
+  documentUploadPath,
   documentVersionPath,
   libraryPath,
   navigateProductPath,
@@ -21,25 +22,170 @@ interface DocumentsScreenProps {
 
 type DocumentLoadState = 'loading' | 'ready' | 'notFound' | 'permission' | 'unavailable';
 type StatusFilter = 'all' | 'active' | 'archived';
+type UploadState = 'idle' | 'uploading' | 'uploaded';
+
+const maximumUploadBytes = 1024 * 1024;
+const supportedDocumentExtensions = ['.md', '.markdown', '.txt'];
+const documentTypes = ['Architecture', 'DiscussionSummary', 'BuildPlan', 'DecisionLog'] as const;
 
 export function DocumentsScreen({ projectId, documentId, versionId, action }: DocumentsScreenProps) {
   if (action === 'upload') {
-    return (
-      <RouteOutcomeScreen
-        kind="notImplemented"
-        title="Document upload is not implemented"
-        message="The current backend stores versioned Markdown documents but exposes no file upload or processing contract."
-        nextSafeAction="Return to Documents. No file has been accepted or processed."
-        actionLabel="Back to Documents"
-        onAction={() => navigateProductPath(libraryPath(projectId, 'documents'))}
-      />
-    );
+    return <DocumentUpload projectId={projectId} />;
   }
 
   return documentId === null ? (
     <DocumentList projectId={projectId} />
   ) : (
     <DocumentDetail projectId={projectId} documentId={documentId} requestedVersionId={versionId} />
+  );
+}
+
+function DocumentUpload({ projectId }: { projectId: number }) {
+  const session = useSessionContext();
+  const [file, setFile] = useState<File | null>(null);
+  const [displayName, setDisplayName] = useState('');
+  const [displayNameEdited, setDisplayNameEdited] = useState(false);
+  const [documentType, setDocumentType] = useState<(typeof documentTypes)[number]>('DiscussionSummary');
+  const [description, setDescription] = useState('');
+  const [uploadState, setUploadState] = useState<UploadState>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [result, setResult] = useState<ProjectDocumentUploadResult | null>(null);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorMessage('');
+    setResult(null);
+
+    const validationError = validateUpload(file, displayName, description);
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
+    setUploadState('uploading');
+    try {
+      const uploaded = await session.client.uploadProjectDocument(projectId, {
+        file: file!,
+        displayName: displayName.trim(),
+        documentType,
+        description
+      });
+      setResult(uploaded);
+      setUploadState('uploaded');
+    } catch (error) {
+      setUploadState('idle');
+      setErrorMessage(error instanceof IronDevApiError
+        ? readApiErrorMessage(error)
+        : error instanceof Error ? error.message : 'The document upload did not complete.');
+    }
+  };
+
+  return (
+    <section className="fl-document-upload" data-testid="flow.documents.upload" aria-labelledby="document-upload-heading">
+      <div className="fl-document-breadcrumbs" aria-label="Document path">
+        <button type="button" onClick={() => navigateProductPath(libraryPath(projectId, 'documents'))}>Documents</button>
+        <span>/</span>
+        <strong>Upload</strong>
+      </div>
+
+      <header className="fl-document-upload__heading">
+        <div>
+          <p className="fl-plabel">Project document</p>
+          <h2 id="document-upload-heading">Upload a document</h2>
+          <p>Markdown and plain-text files become an immutable Draft version.</p>
+        </div>
+        <button className="fl-btn" type="button" onClick={() => navigateProductPath(libraryPath(projectId, 'documents'))}>
+          Back to Documents
+        </button>
+      </header>
+
+      {result ? (
+        <div className="fl-document-upload__success" data-testid="flow.documents.upload.success" role="status">
+          <div>
+            <p className="fl-plabel">Upload complete</p>
+            <h3>Document uploaded as Draft</h3>
+            <p><strong>{result.document.title}</strong> was stored as {result.version.versionLabel
+              ? `immutable ${result.version.versionLabel}`
+              : 'an immutable initial version'}.</p>
+          </div>
+          <div className="fl-document-upload__result-state">
+            <DocumentStatus status={result.processingStatus || result.document.processingStatus} />
+            <span>{formatOrigin(result.document.origin)}</span>
+          </div>
+          <p className="fl-document-boundary">{result.boundary}</p>
+          <button
+            className="fl-btn fl-pri"
+            type="button"
+            onClick={() => navigateProductPath(documentPath(projectId, result.document.id!))}
+          >
+            Open document
+          </button>
+        </div>
+      ) : (
+        <form className="fl-document-upload__form" onSubmit={handleSubmit} noValidate>
+          <label className="fl-document-upload__file">
+            <span>Document file</span>
+            <input
+              type="file"
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              onChange={(event) => {
+                const selected = event.target.files?.[0] ?? null;
+                setFile(selected);
+                setErrorMessage('');
+                if (selected && !displayNameEdited) setDisplayName(titleFromFileName(selected.name));
+              }}
+              data-testid="flow.documents.upload.file"
+            />
+            <small>UTF-8 .md, .markdown, or .txt, up to 1 MiB.</small>
+          </label>
+
+          <div className="fl-document-upload__fields">
+            <label>
+              <span>Display name</span>
+              <input
+                value={displayName}
+                maxLength={300}
+                onChange={(event) => {
+                  setDisplayName(event.target.value);
+                  setDisplayNameEdited(true);
+                }}
+                data-testid="flow.documents.upload.displayName"
+              />
+            </label>
+            <label>
+              <span>Document type</span>
+              <select
+                value={documentType}
+                onChange={(event) => setDocumentType(event.target.value as (typeof documentTypes)[number])}
+                data-testid="flow.documents.upload.documentType"
+              >
+                {documentTypes.map((type) => <option key={type} value={type}>{formatDocumentType(type)}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <label>
+            <span>Description <small>Optional</small></span>
+            <textarea
+              value={description}
+              maxLength={1000}
+              rows={4}
+              onChange={(event) => setDescription(event.target.value)}
+              data-testid="flow.documents.upload.description"
+            />
+          </label>
+
+          {errorMessage ? <p className="fl-document-upload__error" role="alert">{errorMessage}</p> : null}
+
+          <div className="fl-document-upload__actions">
+            <button className="fl-btn fl-pri" type="submit" disabled={uploadState === 'uploading'} data-testid="flow.documents.upload.submit">
+              {uploadState === 'uploading' ? 'Uploading...' : 'Upload document'}
+            </button>
+            <p>The backend validates and stores the file. Upload does not attach it to Chat or index it.</p>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
 
@@ -132,9 +278,14 @@ function DocumentList({ projectId }: { projectId: number }) {
           <h2 id="documents-heading">Project documents</h2>
           <p>Versioned project context. A document does not grant approval or source-mutation authority.</p>
         </div>
-        <button className="fl-btn" type="button" onClick={() => navigateProductPath(projectPath(projectId, 'chat'))}>
-          Open Chat
-        </button>
+        <div className="fl-documents-actions">
+          <button className="fl-btn fl-pri" type="button" onClick={() => navigateProductPath(documentUploadPath(projectId))}>
+            Upload document
+          </button>
+          <button className="fl-btn" type="button" onClick={() => navigateProductPath(projectPath(projectId, 'chat'))}>
+            Open Chat
+          </button>
+        </div>
       </header>
 
       {loadState === 'loading' ? (
@@ -142,10 +293,15 @@ function DocumentList({ projectId }: { projectId: number }) {
       ) : documents.length === 0 ? (
         <div className="fl-documents-empty" data-testid="flow.documents.empty">
           <h3>No project documents</h3>
-          <p>Save an eligible Chat response as a discussion document to create durable project context.</p>
-          <button className="fl-btn fl-pri" type="button" onClick={() => navigateProductPath(projectPath(projectId, 'chat'))}>
-            Open Chat
-          </button>
+          <p>Upload a Markdown or text file, or save an eligible Chat response as durable project context.</p>
+          <div className="fl-documents-actions">
+            <button className="fl-btn fl-pri" type="button" onClick={() => navigateProductPath(documentUploadPath(projectId))}>
+              Upload document
+            </button>
+            <button className="fl-btn" type="button" onClick={() => navigateProductPath(projectPath(projectId, 'chat'))}>
+              Open Chat
+            </button>
+          </div>
         </div>
       ) : (
         <>
@@ -200,6 +356,7 @@ function DocumentList({ projectId }: { projectId: number }) {
             <div className="fl-documents-table" aria-label="Project documents">
               <div className="fl-documents-row fl-documents-row--head" aria-hidden="true">
                 <span>Document</span>
+                <span>Origin</span>
                 <span>Type</span>
                 <span>Version</span>
                 <span>State</span>
@@ -221,9 +378,13 @@ function DocumentList({ projectId }: { projectId: number }) {
                           <strong>{document.title?.trim() || 'Untitled document'}</strong>
                           <small>{document.updatedBy || document.createdBy || 'Author unavailable'}</small>
                         </span>
+                        <span data-label="Origin">{formatOrigin(document.origin)}</span>
                         <span data-label="Type">{formatDocumentType(document.documentType)}</span>
                         <span data-label="Version">{currentVersion?.versionLabel || 'Unavailable'}</span>
-                        <span data-label="State"><DocumentStatus status={document.status} /></span>
+                        <span className="fl-documents-state" data-label="State">
+                          <DocumentStatus status={document.processingStatus} />
+                          <small>{document.status || 'Active'}</small>
+                        </span>
                         <span data-label="Updated">{formatDate(document.updatedAtUtc ?? document.createdAtUtc)}</span>
                       </button>
                     </li>
@@ -346,10 +507,24 @@ function DocumentDetail({
           <p>{selectedVersion.changeSummary?.trim() || 'No change summary was recorded for this version.'}</p>
         </div>
         <div className="fl-document-statuses">
+          <DocumentStatus status={document.processingStatus} />
           <DocumentStatus status={document.status} />
           <DocumentStatus status={selectedVersion.status} />
         </div>
       </header>
+
+      <details className="fl-document-metadata">
+        <summary>Document details</summary>
+        <dl>
+          <div><dt>Origin</dt><dd>{formatOrigin(document.origin)}</dd></div>
+          <div><dt>Processing</dt><dd>{document.processingStatus || 'Unavailable'}</dd></div>
+          <div><dt>Visibility</dt><dd>{document.visibility ? formatDocumentType(document.visibility) : 'Unavailable'}</dd></div>
+          <div><dt>Original file</dt><dd>{document.originalFileName || 'Not uploaded from a file'}</dd></div>
+          <div><dt>Media type</dt><dd>{document.mediaType || 'Unavailable'}</dd></div>
+          <div><dt>File size</dt><dd>{formatByteSize(document.byteSize)}</dd></div>
+          <div className="fl-document-metadata__description"><dt>Description</dt><dd>{document.description || 'No description recorded.'}</dd></div>
+        </dl>
+      </details>
 
       <div className="fl-document-layout">
         <aside className="fl-document-versions" aria-labelledby="document-versions-heading">
@@ -398,7 +573,7 @@ function DocumentDetail({
 function DocumentStatus({ status }: { status: string | null | undefined }) {
   const label = status?.trim() || 'Unknown';
   const normalized = label.toLowerCase();
-  const tone = normalized === 'active' || normalized === 'approved'
+  const tone = normalized === 'active' || normalized === 'approved' || normalized === 'ready'
     ? 'ready'
     : normalized === 'archived' || normalized === 'superseded'
       ? 'warning'
@@ -467,6 +642,34 @@ function sortVersions(versions: ProjectDocumentVersion[]) {
 function formatDocumentType(value: string | null | undefined) {
   const type = value?.trim();
   return type ? type.replace(/([a-z])([A-Z])/g, '$1 $2') : 'Type unavailable';
+}
+
+function formatOrigin(value: string | null | undefined) {
+  if (!value) return 'Origin unavailable';
+  return value === 'CreatedInIronDev' ? 'Created in IronDev' : formatDocumentType(value);
+}
+
+function formatByteSize(value: number | null | undefined) {
+  if (value === null || value === undefined) return 'Unavailable';
+  if (value < 1024) return `${value} bytes`;
+  return `${(value / 1024).toFixed(value < 10 * 1024 ? 1 : 0)} KiB`;
+}
+
+function titleFromFileName(fileName: string) {
+  return fileName.replace(/\.(md|markdown|txt)$/i, '').replace(/[-_]+/g, ' ').trim();
+}
+
+function validateUpload(file: File | null, displayName: string, description: string) {
+  if (!file) return 'Choose a document file.';
+  const lowerName = file.name.toLowerCase();
+  if (!supportedDocumentExtensions.some((extension) => lowerName.endsWith(extension))) {
+    return 'Choose a .md, .markdown, or .txt file.';
+  }
+  if (file.size > maximumUploadBytes) return 'The document exceeds the 1 MiB upload limit.';
+  if (!displayName.trim()) return 'Enter a display name.';
+  if (displayName.trim().length > 300) return 'Display name must be 300 characters or fewer.';
+  if (description.trim().length > 1000) return 'Description must be 1000 characters or fewer.';
+  return '';
 }
 
 function formatDate(value: string | null | undefined) {

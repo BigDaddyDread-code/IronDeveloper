@@ -134,6 +134,11 @@
                            "id":  "2026-07-rehearsal-agent-run-audit-envelope",
                            "path":  "Database/migrate_agent_run_audit_envelope.sql",
                            "description":  "DEMO-REHEARSAL-001: append-only agent run audit envelope store - the real critic persists durable reviews here."
+                       },
+                       {
+                           "id":  "2026-07-product-document-upload-draft",
+                           "path":  "Database/migrate_project_documents.sql",
+                           "description":  "Creates versioned project documents and adds backend-owned upload origin, processing, visibility, and file metadata required by DOCS-UPLOAD-1."
                        }
                    ]
 }

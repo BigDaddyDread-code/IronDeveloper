@@ -20,6 +20,8 @@ Current Block G order:
 
 The order matters because each durable ledger depends on the earlier governance evidence chain: tool requests depend on governance events, gate decisions depend on tool requests, approval decisions depend on governance events, and policy decision events may reference tool request, gate, and approval evidence, dogfood receipts may reference the full governance evidence chain without creating approval or execution authority, and ThoughtLedger governance references may cite existing governance events as evidence without creating approval, execution, policy, workflow, source apply, memory promotion, release, dogfood, or A2A authority.
 
+The manifest also owns the idempotent project-document migration. It creates immutable document/version storage and upgrades existing document identities with backend-owned upload metadata.
+
 ## Apply migrations
 
 ```powershell
