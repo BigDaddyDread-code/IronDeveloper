@@ -14,7 +14,8 @@ test('captures login hierarchy for LocalTest review', async ({ page }) => {
   await expect(page.getByTestId('auth.email')).toHaveValue('localtest@irondev.local');
   await expect(page.getByTestId('auth.password')).toHaveValue('change-me-local-only');
   await expect(page.getByTestId('auth.submit')).toBeVisible();
-  await expect(page.getByTestId('app.versionStrip')).toBeVisible();
+  await expect(page.getByTestId('auth.apiStatusChip')).toContainText('LocalTest');
+  await expect(page.getByTestId('app.authState.configureToken')).toHaveCount(0);
 
   await capture(page, 'login-localtest.png');
 });

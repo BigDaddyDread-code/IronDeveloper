@@ -85,7 +85,7 @@ const DEFAULT_PROJECT_ID = 1;
 export interface IronDevApiConfig {
   apiBaseUrl: string;
   requestBaseUrl: string;
-  fallbackProjectId: number;
+  fallbackProjectId: number | null;
   token?: string;
   selectedTenantId?: number;
   selectedProjectId?: number;
@@ -116,6 +116,7 @@ export function getIronDevApiConfig(): IronDevApiConfig {
     import.meta.env.VITE_IRONDEV_PROJECT_ID ??
     window.localStorage.getItem('irondev.projectId') ??
     `${DEFAULT_PROJECT_ID}`;
+  const fallbackProjectId = parseFallbackProjectId(rawFallbackProjectId);
 
   const token =
     import.meta.env.VITE_IRONDEV_DEV_TOKEN ?? window.localStorage.getItem('irondev.token') ?? undefined;
@@ -126,7 +127,7 @@ export function getIronDevApiConfig(): IronDevApiConfig {
   return {
     apiBaseUrl,
     requestBaseUrl: shouldUseViteProxy ? '/irondev-api' : apiBaseUrl,
-    fallbackProjectId: Number.parseInt(rawFallbackProjectId, 10) || DEFAULT_PROJECT_ID,
+    fallbackProjectId,
     token: token?.trim() || undefined,
     selectedTenantId,
     selectedProjectId
@@ -224,7 +225,11 @@ class IronDevApiClient {
   }
 
   async getTenantUsers(tenantId: number, signal?: AbortSignal): Promise<TenantUser[]> {
-    return this.request<TenantUser[]>(`/api/tenants/${tenantId}/users`, { method: 'GET', signal });
+    const response = await this.request<TenantUser[] | TenantUser | null>(`/api/tenants/${tenantId}/users`, {
+      method: 'GET',
+      signal
+    });
+    return Array.isArray(response) ? response : response === null ? [] : [response];
   }
 
   async createTenantUser(tenantId: number, request: CreateTenantUserRequest, signal?: AbortSignal): Promise<TenantUser> {
@@ -839,7 +844,8 @@ class IronDevApiClient {
   // Voice and model only; the backend refuses secrets and grants no authority.
 
   async listAgentProfiles(signal?: AbortSignal): Promise<SkeletonAgentProfile[]> {
-    return this.request<SkeletonAgentProfile[]>('/api/v1/agent-profiles', { method: 'GET', signal });
+    const response = await this.request<RawSkeletonAgentProfile[]>('/api/v1/agent-profiles', { method: 'GET', signal });
+    return response.map(normalizeSkeletonAgentProfile);
   }
 
   async updateAgentProfile(
@@ -1044,6 +1050,40 @@ class IronDevApiClient {
   }
 }
 
+type RawSkeletonAgentProfile = Omit<SkeletonAgentProfile, 'role' | 'provider'> & {
+  role: string | number;
+  provider: string | null;
+};
+
+const skeletonAgentRoleNames = new Map<number, string>([
+  [0, 'Orchestrator'],
+  [1, 'Builder'],
+  [2, 'Tester'],
+  [3, 'Critic']
+]);
+
+function normalizeSkeletonAgentProfile(profile: RawSkeletonAgentProfile): SkeletonAgentProfile {
+  return {
+    ...profile,
+    role: normalizeSkeletonAgentRole(profile.role),
+    provider: (profile.provider ?? '').toLowerCase()
+  };
+}
+
+function normalizeSkeletonAgentRole(role: string | number): string {
+  if (typeof role === 'number') {
+    return skeletonAgentRoleNames.get(role) ?? `Role${role}`;
+  }
+
+  const trimmed = role.trim();
+  const numeric = Number.parseInt(trimmed, 10);
+  if (/^\d+$/.test(trimmed) && Number.isFinite(numeric)) {
+    return skeletonAgentRoleNames.get(numeric) ?? `Role${trimmed}`;
+  }
+
+  return trimmed;
+}
+
 interface RequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -1082,6 +1122,16 @@ function parseOptionalInt(value: string | null) {
 
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseFallbackProjectId(value: string | null | undefined): number | null {
+  const trimmed = value?.trim();
+  if (trimmed && /^(none|disabled|manual)$/i.test(trimmed)) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(trimmed || `${DEFAULT_PROJECT_ID}`, 10);
+  return Number.isFinite(parsed) ? parsed : DEFAULT_PROJECT_ID;
 }
 
 function isDefaultLocalApi(value: string) {

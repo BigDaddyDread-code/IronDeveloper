@@ -43,6 +43,18 @@ test('the orchestrator card is honest — deterministic, no model to configure',
   await expect(page.getByTestId('flow.settings.agent.builder.provider')).toBeVisible();
 });
 
+test('agents panel accepts numeric backend role values from LocalTest', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockAgentProfiles(page, { numericRoles: true });
+
+  await page.goto('/');
+  await page.getByTestId('flow.nav.settings').click();
+
+  await expect(page.getByTestId('flow.settings.agent.orchestrator')).toBeVisible();
+  await expect(page.getByTestId('flow.settings.agent.orchestrator.deterministic')).toContainText('runs no model');
+  await expect(page.getByTestId('flow.settings.agent.tester.provider')).toBeVisible();
+});
+
 test('a secret in a profile is refused and shown honestly', async ({ page }) => {
   await mockWorkspace(page);
   await mockAgentProfiles(page, { refuseSecret: true });
@@ -60,11 +72,11 @@ interface AgentState {
   lastUpdate: { role: string; body: Record<string, unknown> };
 }
 
-async function mockAgentProfiles(page: Page, options: { refuseSecret?: boolean } = {}): Promise<AgentState> {
+async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; refuseSecret?: boolean } = {}): Promise<AgentState> {
   const state: AgentState = { lastUpdate: { role: '', body: {} } };
-  const profile = (role: string) => ({
+  const profile = (role: string | number) => ({
     role,
-    provider: 'openai',
+    provider: options.numericRoles ? 'OpenAI' : 'openai',
     model: 'gpt-4o',
     baseUrl: '',
     timeoutSeconds: 60,
@@ -74,10 +86,11 @@ async function mockAgentProfiles(page: Page, options: { refuseSecret?: boolean }
   });
 
   await page.route('**/irondev-api/api/v1/agent-profiles', async (route) => {
+    const roles = options.numericRoles ? [0, 1, 2, 3] : ['Orchestrator', 'Builder', 'Tester', 'Critic'];
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(['Orchestrator', 'Builder', 'Tester', 'Critic'].map(profile))
+      body: JSON.stringify(roles.map(profile))
     });
   });
 

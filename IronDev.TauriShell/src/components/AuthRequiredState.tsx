@@ -1,9 +1,5 @@
 import type { ApiStatus, ProductAccessStatus, ProjectSummary, TenantSummary } from '../api/types';
-import { ApiStatusBadge } from './ApiStatusBadge';
 import { CommandButton } from './CommandButton';
-import { MetadataRow } from './MetadataRow';
-import { ProjectSelector } from './ProjectSelector';
-import { StatusBadge } from './StatusBadge';
 
 interface AuthRequiredStateProps {
   apiStatus: ApiStatus;
@@ -31,57 +27,28 @@ interface AuthRequiredStateProps {
   onSelectProject: (projectId: number) => void;
 }
 
+// Legacy/debug fallback for the old tickets workspace. The primary entry route
+// is owned by FlowShell, SignInRoute, TenantChooser, and ProjectChooser.
 export function AuthRequiredState({
-  apiStatus,
   accessStatus,
-  authLabel,
-  tokenDraft,
   email,
   password,
-  isConfigOpen,
   isLocalTestEnvironment = false,
-  tenants,
-  projects,
-  selectedTenantId,
-  selectedProjectId,
   isBusy,
   errorMessage,
-  onConfigureToken,
   onRetry,
-  onTokenDraftChange,
   onEmailChange,
   onPasswordChange,
-  onSaveToken,
-  onSignIn,
-  onSelectTenant,
-  onSelectProject
+  onSignIn
 }: AuthRequiredStateProps) {
-  const isApiOffline = accessStatus === 'apiOffline';
-  const isApiError = accessStatus === 'apiError';
-  const isTenantRequired = accessStatus === 'tenantRequired';
-  const isProjectRequired = accessStatus === 'projectRequired';
   const isAuthRequired = accessStatus === 'authRequired' || accessStatus === 'authInvalid';
-  const title = getTitle(accessStatus);
 
   return (
     <div className="auth-required-state" data-testid="app.authState">
       <div className="auth-required-state__header">
         <p className="eyebrow">{isAuthRequired ? 'Sign in' : 'Product access'}</p>
-        <h2>{title}</h2>
-        {isApiOffline ? (
-          <>
-            <p>Start the backend with:</p>
-            <code>dotnet run --project IronDev.Api</code>
-          </>
-        ) : isApiError ? (
-          <p>IronDev.Api responded, but the health check is not passing. Check the local backend and retry.</p>
-        ) : isTenantRequired ? (
-          <p>Select the tenant context before IronDev loads projects and tickets.</p>
-        ) : isProjectRequired ? (
-          <p>Select the project context before IronDev loads the ticket queue.</p>
-        ) : (
-          <p>IronDev.Api is reachable, but ticket data requires a signed-in API session.</p>
-        )}
+        <h2>{getTitle(accessStatus)}</h2>
+        <p>{getMessage(accessStatus)}</p>
       </div>
 
       {isAuthRequired ? (
@@ -94,7 +61,7 @@ export function AuthRequiredState({
           }}
         >
           <p className="auth-form__flow" data-testid="auth.flowHint">
-            Sign in, then select a project to continue.
+            Sign in, then continue through the flow entry screens.
           </p>
           {isLocalTestEnvironment ? (
             <p className="auth-form__localtest" data-testid="auth.localtestCredentials">
@@ -130,101 +97,40 @@ export function AuthRequiredState({
             <CommandButton variant="secondary" testId="app.authState.retry" type="button" onClick={onRetry}>
               Retry connection
             </CommandButton>
-            <CommandButton variant="subtle" testId="app.authState.configureToken" type="button" onClick={onConfigureToken}>
-              Configure token
-            </CommandButton>
           </div>
         </form>
-      ) : null}
-
-      <div className={`auth-required-state__metadata ${isAuthRequired ? 'auth-required-state__metadata--secondary' : ''}`.trim()}>
-        <MetadataRow label="API" value={<code>{apiStatus.baseUrl}</code>} />
-        <MetadataRow label="Status" value={<ApiStatusBadge status={apiStatus.status} withTestId={false} />} />
-        {isAuthRequired ? (
-          <MetadataRow
-            label="Auth"
-            value={
-              <StatusBadge status="authRequired" data-testid="api.status.authRequired">
-                {authLabel}
-              </StatusBadge>
-            }
-          />
-        ) : null}
-        {isTenantRequired ? (
-          <MetadataRow label="Tenant" value={<StatusBadge status="warning">Required</StatusBadge>} />
-        ) : null}
-        {isProjectRequired ? (
-          <MetadataRow
-            label="Project"
-            value={
-              <StatusBadge status="warning" data-testid="project.status.missing">
-                Required
-              </StatusBadge>
-            }
-          />
-        ) : null}
-      </div>
-
-      {isTenantRequired ? (
-        <label className="context-select">
-          <span>Tenant</span>
-          <select
-            data-testid="tenant.selector"
-            value={selectedTenantId ?? ''}
-            onChange={(event) => onSelectTenant(Number.parseInt(event.target.value, 10))}
-            disabled={isBusy}
-          >
-            <option value="">Select tenant</option>
-            {tenants.map((tenant) => (
-              <option key={tenant.id} value={tenant.id} data-testid="tenant.option">
-                {tenant.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-
-      {isProjectRequired ? (
-        <ProjectSelector
-          projects={projects}
-          selectedProjectId={selectedProjectId}
-          isBusy={isBusy}
-          onSelectProject={onSelectProject}
-        />
-      ) : null}
-
-      {!isAuthRequired ? (
+      ) : (
         <div className="auth-required-state__actions">
           <CommandButton variant="secondary" testId="app.authState.retry" onClick={onRetry} disabled={isBusy}>
             Retry connection
           </CommandButton>
         </div>
-      ) : null}
+      )}
 
-      {isAuthRequired && isConfigOpen ? (
-        <div className="token-config">
-          <input
-            aria-label="IronDev API token"
-            data-testid="auth.tokenInput"
-            type="password"
-            value={tokenDraft}
-            placeholder="Paste local API token"
-            onChange={(event) => onTokenDraftChange(event.target.value)}
-          />
-          <CommandButton
-            variant="primary"
-            testId="auth.saveToken"
-            onClick={onSaveToken}
-            disabled={tokenDraft.trim().length === 0}
-          >
-            Save token
-          </CommandButton>
-        </div>
+      {errorMessage ? (
+        <p className="state-error" role="alert">
+          {errorMessage}
+        </p>
       ) : null}
-
-      {errorMessage ? <p className="state-error">{errorMessage}</p> : null}
     </div>
   );
+}
+
+function getMessage(status: ProductAccessStatus) {
+  switch (status) {
+    case 'apiOffline':
+      return 'Start the backend, then retry the connection.';
+    case 'apiError':
+      return 'IronDev.Api responded, but the health check is not passing.';
+    case 'authInvalid':
+      return 'Your session has expired. Sign in again.';
+    case 'tenantRequired':
+      return 'Return to the flow entry screen to choose a tenant.';
+    case 'projectRequired':
+      return 'Return to the flow entry screen to choose a project.';
+    default:
+      return 'Sign in to continue.';
+  }
 }
 
 function getTitle(status: ProductAccessStatus) {
@@ -234,7 +140,7 @@ function getTitle(status: ProductAccessStatus) {
     case 'apiError':
       return 'IronDev.Api needs attention';
     case 'authInvalid':
-      return 'Authentication failed';
+      return 'Session expired';
     case 'tenantRequired':
       return 'Tenant required';
     case 'projectRequired':

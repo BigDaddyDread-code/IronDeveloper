@@ -20,20 +20,20 @@ test.describe('LocalTest manual flow-shell smoke', () => {
     await page.getByTestId('auth.password').fill('change-me-local-only');
     await page.getByTestId('auth.submit').click();
 
-    if (await page.getByTestId('tenant.selector').isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await page.getByTestId('tenant.selector').selectOption('1');
-      notes.push('Tenant selector shown and Local Test Tenant selected.');
+    if (await page.getByTestId('flow.tenantChooser').isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await page.getByTestId('flow.tenantChooser.tenant.1').click();
+      notes.push('Tenant chooser shown and Local Test Tenant selected.');
     } else {
       notes.push('Tenant auto-selected through the tenant API.');
     }
 
-    if (await page.getByTestId('project.selector').isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await page.getByTestId('project.option.select.1').click();
-      notes.push('Project selector shown and IronDev Local Test Project selected.');
-    }
+    await expect(page.getByTestId('flow.chooser')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('flow.chooser.project.1').click();
+    notes.push('Project chooser shown and IronDev Local Test Project selected.');
 
     await expect(page.getByTestId('flow.shell')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('flow.board.columns')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Add Governed Tool Architecture')).toBeVisible({ timeout: 15_000 });
 
     const board = await page.getByTestId('flow.board.columns').innerText();
     for (const title of ['Add Governed Tool Architecture', 'Wire Start Sandbox Run', 'Improve Ticket Workspace UI']) {
