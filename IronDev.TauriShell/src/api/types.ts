@@ -172,7 +172,7 @@ export interface ChatTurnAuditResponse {
   routeChallenge?: ChatRouteChallenge | null;
   baDraft?: BaWorkingDraft | null;
 }
-export type ChatCompletionResponse = components['schemas']['ChatCompletionResponse'] & {
+interface ChatCompletionResponseOverrides {
   mode?: string | null;
   modeConfidence?: number | null;
   modeReason?: string | null;
@@ -191,7 +191,11 @@ export type ChatCompletionResponse = components['schemas']['ChatCompletionRespon
   auditFallbackReason?: string | null;
   auditHasFallbackEvidence?: boolean;
   documentSources?: ChatDocumentSource[] | null;
-};
+}
+export type ChatCompletionResponse = Omit<
+  components['schemas']['ChatCompletionResponse'],
+  keyof ChatCompletionResponseOverrides
+> & ChatCompletionResponseOverrides;
 export type ProjectChatSession = components['schemas']['ProjectChatSession'];
 export interface ChatDocumentSource {
   documentId: number;
@@ -202,10 +206,11 @@ export interface ChatDocumentSource {
   status: string;
   boundary: string;
 }
-export type ChatMessage = components['schemas']['ChatMessage'] & {
+interface ChatMessageOverrides {
   replyToMessageId?: number | null;
   documentSources?: ChatDocumentSource[] | null;
-};
+}
+export type ChatMessage = Omit<components['schemas']['ChatMessage'], keyof ChatMessageOverrides> & ChatMessageOverrides;
 
 export interface SaveProjectChatSessionRequest {
   id?: number;
