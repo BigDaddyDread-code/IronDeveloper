@@ -104,8 +104,9 @@ test('a failed response stays in the conversation and leaves the composer usable
   await page.getByTestId('chat.composer.input').fill('Investigate the failing build.');
   await page.getByTestId('chat.command.send').click();
 
-  await expect(page.getByTestId('chat.error')).toContainText('Chat service unavailable.');
+  await expect(page).toHaveURL('/projects/7/chat/sessions/9007');
   await expect(page.getByTestId('chat.message.user')).toContainText('Investigate the failing build.');
+  await expect(page.getByTestId('chat.error')).toContainText('Chat service unavailable.');
   await expect(page.getByTestId('chat.composer')).toBeVisible();
   await expect(page.getByTestId('chat.contextPanel')).toHaveCount(0);
 });
@@ -192,6 +193,8 @@ async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Pro
   const state: ChatMockState = { lastCompletionMode: null };
   const history = options.history ?? [];
   let messageId = 9100;
+  let sessionExists = history.length > 0;
+  let sessionTitle = 'Current conversation';
 
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
@@ -235,13 +238,25 @@ async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Pro
   );
   await page.route('**/irondev-api/api/projects/7/chat/sessions', (route) => {
     if (route.request().method() === 'GET') {
-      const sessions = history.length > 0
-        ? [{ id: 9007, tenantId: 3, projectId: 7, summary: 'Current conversation' }]
+      const sessions = sessionExists
+        ? [{ id: 9007, tenantId: 3, projectId: 7, title: sessionTitle, summary: 'Current conversation' }]
         : [];
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) });
     }
+    const request = route.request().postDataJSON() as { title?: string };
+    sessionExists = true;
+    sessionTitle = request.title ?? sessionTitle;
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(9007) });
   });
+  await page.route('**/irondev-api/api/projects/7/chat/sessions/9007', (route) =>
+    sessionExists
+      ? route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ id: 9007, tenantId: 3, projectId: 7, title: sessionTitle, summary: 'Current conversation' })
+        })
+      : route.fulfill({ status: 204 })
+  );
   await page.route('**/irondev-api/api/projects/7/chat/sessions/9007/messages/*/audit', (route) =>
     route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'No audit row.' }) })
   );
@@ -250,6 +265,27 @@ async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Pro
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(history) });
     }
     messageId += 1;
+    const request = route.request().postDataJSON() as {
+      role: string;
+      message: string;
+      tags?: string | null;
+      contextSummary?: string | null;
+      linkedFilePaths?: string | null;
+      linkedSymbols?: string | null;
+    };
+    history.push({
+      id: messageId,
+      tenantId: 3,
+      projectId: 7,
+      chatSessionId: 9007,
+      role: request.role,
+      message: request.message,
+      tags: request.tags,
+      contextSummary: request.contextSummary,
+      linkedFilePaths: request.linkedFilePaths,
+      linkedSymbols: request.linkedSymbols,
+      createdDate: '2026-07-10T08:00:00Z'
+    });
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(messageId) });
   });
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {

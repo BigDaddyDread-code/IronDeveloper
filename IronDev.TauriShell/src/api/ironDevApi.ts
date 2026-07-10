@@ -548,6 +548,17 @@ class IronDevApiClient {
     });
   }
 
+  async getProjectChatSession(
+    projectId: number,
+    sessionId: number,
+    signal?: AbortSignal
+  ): Promise<ProjectChatSession | undefined> {
+    return this.request<ProjectChatSession | undefined>(
+      `/api/projects/${projectId}/chat/sessions/${sessionId}`,
+      { method: 'GET', signal }
+    );
+  }
+
   async saveProjectChatSession(
     projectId: number,
     request: SaveProjectChatSessionRequest,
