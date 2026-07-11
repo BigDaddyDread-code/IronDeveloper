@@ -200,7 +200,7 @@ public sealed class ReadOnlyApprovalPackageReviewUiStaticBoundaryTests
     {
         var text = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.TauriShell", "src", "api", "types.ts"));
         var start = text.IndexOf("export interface ApprovalPackageFilter", StringComparison.Ordinal);
-        var end = text.IndexOf("export interface LoginRequest", StringComparison.Ordinal);
+        var end = text.IndexOf("export type LoginRequest", StringComparison.Ordinal);
         Assert.IsTrue(start >= 0, "Missing approval package type block.");
         Assert.IsTrue(end > start, "Missing end of approval package type block.");
         return text[start..end];

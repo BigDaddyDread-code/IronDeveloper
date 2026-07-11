@@ -51,10 +51,19 @@ public sealed class ChatController : ControllerBase
         _chat.GetSessionByIdAsync(sessionId, ct);
 
     [HttpPost("api/projects/{projectId:int}/chat/sessions")]
-    public async Task<ActionResult<long>> SaveSession(int projectId, ProjectChatSession session, CancellationToken ct)
+    public async Task<ActionResult<long>> SaveSession(int projectId, SaveProjectChatSessionRequest request, CancellationToken ct)
     {
-        if (session.ProjectId != 0 && session.ProjectId != projectId)
+        if (request.ProjectId != 0 && request.ProjectId != projectId)
             return BadRequest(new { message = "Session projectId must match route project id." });
+
+        var session = new ProjectChatSession
+        {
+            Id = request.Id ?? 0,
+            ProjectId = request.ProjectId,
+            Summary = request.Summary
+        };
+        if (request.Title is not null)
+            session.Title = request.Title;
 
         return await _chat.SaveSessionAsync(session, ct);
     }
@@ -127,17 +136,30 @@ public sealed class ChatController : ControllerBase
     }
 
     [HttpPost("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
-    public async Task<ActionResult<long>> SaveMessage(int projectId, long sessionId, ChatMessage message, CancellationToken ct)
+    public async Task<ActionResult<long>> SaveMessage(int projectId, long sessionId, SaveProjectChatMessageRequest request, CancellationToken ct)
     {
-        if (message.ProjectId != 0 && message.ProjectId != projectId)
+        if (request.ProjectId != 0 && request.ProjectId != projectId)
             return BadRequest(new { message = "Message projectId must match route project id." });
 
-        if (message.ChatSessionId != 0 && message.ChatSessionId != sessionId)
+        if (request.ChatSessionId != 0 && request.ChatSessionId != sessionId)
             return BadRequest(new { message = "Message chat session id must match route session id." });
 
-        message.SourceAttachedBy = User.FindFirst(ClaimTypes.Email)?.Value
-            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value;
+        var message = new ChatMessage
+        {
+            ProjectId = request.ProjectId,
+            ChatSessionId = request.ChatSessionId,
+            Role = request.Role ?? string.Empty,
+            Message = request.Message ?? string.Empty,
+            Tags = request.Tags,
+            ContextSummary = request.ContextSummary,
+            LinkedFilePaths = request.LinkedFilePaths,
+            LinkedSymbols = request.LinkedSymbols,
+            ReplyToMessageId = request.ReplyToMessageId,
+            DocumentVersionIds = request.DocumentVersionIds ?? [],
+            SourceAttachedBy = User.FindFirst(ClaimTypes.Email)?.Value
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value
+        };
 
         try
         {
@@ -281,6 +303,24 @@ public sealed class ChatController : ControllerBase
         ChatRouteChallenge? RouteChallenge = null,
         BaWorkingDraft? BaDraft = null,
         IReadOnlyList<ChatDocumentSource>? DocumentSources = null);
+
+    public sealed record SaveProjectChatSessionRequest(
+        long? Id,
+        int ProjectId,
+        string? Title,
+        string? Summary);
+
+    public sealed record SaveProjectChatMessageRequest(
+        int ProjectId,
+        long ChatSessionId,
+        string? Role,
+        string? Message,
+        string? Tags,
+        string? ContextSummary,
+        string? LinkedFilePaths,
+        string? LinkedSymbols,
+        long? ReplyToMessageId,
+        IReadOnlyList<long>? DocumentVersionIds);
 
     [HttpPost("api/projects/{projectId:int}/chat/feedback")]
     public Task<long> SaveFeedback(ChatMessageFeedback feedback, CancellationToken ct) =>

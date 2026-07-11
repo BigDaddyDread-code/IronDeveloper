@@ -177,13 +177,19 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": { }
+              "schema": {
+                "$ref": "#/components/schemas/CreateAcceptedApprovalRequest"
+              }
             },
             "text/json": {
-              "schema": { }
+              "schema": {
+                "$ref": "#/components/schemas/CreateAcceptedApprovalRequest"
+              }
             },
             "application/*+json": {
-              "schema": { }
+              "schema": {
+                "$ref": "#/components/schemas/CreateAcceptedApprovalRequest"
+              }
             }
           }
         },
@@ -1708,17 +1714,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProjectChatSession"
+                "$ref": "#/components/schemas/SaveProjectChatSessionRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProjectChatSession"
+                "$ref": "#/components/schemas/SaveProjectChatSessionRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/ProjectChatSession"
+                "$ref": "#/components/schemas/SaveProjectChatSessionRequest"
               }
             }
           }
@@ -1972,17 +1978,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChatMessage"
+                "$ref": "#/components/schemas/SaveProjectChatMessageRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChatMessage"
+                "$ref": "#/components/schemas/SaveProjectChatMessageRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/ChatMessage"
+                "$ref": "#/components/schemas/SaveProjectChatMessageRequest"
               }
             }
           }
@@ -7125,13 +7131,19 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": { }
+              "schema": {
+                "$ref": "#/components/schemas/PolicySatisfactionCreateRequest"
+              }
             },
             "text/json": {
-              "schema": { }
+              "schema": {
+                "$ref": "#/components/schemas/PolicySatisfactionCreateRequest"
+              }
             },
             "application/*+json": {
-              "schema": { }
+              "schema": {
+                "$ref": "#/components/schemas/PolicySatisfactionCreateRequest"
+              }
             }
           }
         },
@@ -15169,6 +15181,67 @@
         "type": "integer",
         "format": "int32"
       },
+      "ApprovalSatisfactionEvaluation": {
+        "required": [
+          "isSatisfied",
+          "issues"
+        ],
+        "type": "object",
+        "properties": {
+          "isSatisfied": {
+            "type": "boolean"
+          },
+          "acceptedApprovalId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "evidenceReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "boundaryMaxims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApprovalSatisfactionIssue"
+            },
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ApprovalSatisfactionIssue": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "field": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "BaWorkingDraft": {
         "type": "object",
         "properties": {
@@ -17122,6 +17195,63 @@
           },
           "workflowContinued": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateAcceptedApprovalRequest": {
+        "type": "object",
+        "properties": {
+          "approvalTargetKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalTargetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalTargetHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "capabilityCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalPurpose": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "boundaryMaxims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "clientRequestId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -21708,6 +21838,98 @@
         },
         "additionalProperties": false
       },
+      "PolicyRequirement": {
+        "required": [
+          "approvalPurpose",
+          "approvalRequirementHash",
+          "approvalTargetHash",
+          "approvalTargetId",
+          "approvalTargetKind",
+          "capabilityCode",
+          "evaluatedAtUtc",
+          "policyCode",
+          "policyVersion",
+          "projectId",
+          "subjectHash",
+          "subjectId",
+          "subjectKind"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "policyCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "subjectKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "subjectId": {
+            "type": "string",
+            "nullable": true
+          },
+          "subjectHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "capabilityCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalTargetKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalTargetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalTargetHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalPurpose": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalRequirementHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "evaluatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "requiredEvidenceReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "requiredBoundaryMaxims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PolicySatisfactionApiErrorDto": {
         "required": [
           "category",
@@ -21730,6 +21952,53 @@
             "nullable": true
           },
           "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PolicySatisfactionCreateRequest": {
+        "type": "object",
+        "properties": {
+          "policyRequirement": {
+            "$ref": "#/components/schemas/PolicyRequirement"
+          },
+          "approvalSatisfactionEvaluation": {
+            "$ref": "#/components/schemas/ApprovalSatisfactionEvaluation"
+          },
+          "policyRequirementHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "boundaryMaxims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "clientRequestId": {
             "type": "string",
             "nullable": true
           }
@@ -26178,6 +26447,80 @@
           "documentVersionId": {
             "type": "integer",
             "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveProjectChatMessageRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chatSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "string",
+            "nullable": true
+          },
+          "contextSummary": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkedFilePaths": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkedSymbols": {
+            "type": "string",
+            "nullable": true
+          },
+          "replyToMessageId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "documentVersionIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveProjectChatSessionRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

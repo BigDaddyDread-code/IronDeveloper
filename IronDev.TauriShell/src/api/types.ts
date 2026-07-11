@@ -149,10 +149,12 @@ export interface BaWorkingDraft {
   suggestedArtifact?: string | null;
   boundary?: string | null;
 }
-export interface ConfirmBaWorkingDraftRequest {
-  sourceChatSessionId?: number | null;
+export type ConfirmBaWorkingDraftRequest = Omit<
+  components['schemas']['ConfirmBaWorkingDraftRequest'],
+  'draft'
+> & {
   draft: BaWorkingDraft;
-}
+};
 export type ChatAuditSource = 'durable' | 'tags' | 'live' | 'none';
 export interface ChatTurnAuditResponse {
   chatMessageId: number;
@@ -212,25 +214,23 @@ interface ChatMessageOverrides {
 }
 export type ChatMessage = Omit<components['schemas']['ChatMessage'], keyof ChatMessageOverrides> & ChatMessageOverrides;
 
-export interface SaveProjectChatSessionRequest {
+export type SaveProjectChatSessionRequest = Omit<
+  components['schemas']['SaveProjectChatSessionRequest'],
+  'projectId'
+> & {
   id?: number;
   projectId: number;
-  title?: string;
-  summary?: string | null;
-}
+};
 
-export interface SaveProjectChatMessageRequest {
+export type SaveProjectChatMessageRequest = Omit<
+  components['schemas']['SaveProjectChatMessageRequest'],
+  'projectId' | 'chatSessionId' | 'role' | 'message'
+> & {
   projectId: number;
   chatSessionId: number;
   role: 'user' | 'assistant';
   message: string;
-  tags?: string | null;
-  contextSummary?: string | null;
-  linkedFilePaths?: string | null;
-  linkedSymbols?: string | null;
-  replyToMessageId?: number | null;
-  documentVersionIds?: number[];
-}
+};
 
 export type TicketDetailLoadStatus = 'idle' | 'loading' | 'loaded' | 'error';
 export type TicketReadinessLoadStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';
@@ -285,10 +285,7 @@ export interface TicketEvidenceSummary {
   nextSafeAction?: string | null;
 }
 
-export interface StartTicketBuildRunRequest {
-  workflowRunId?: string | null;
-  maxRetries?: number | null;
-}
+export type StartTicketBuildRunRequest = components['schemas']['StartTicketBuildRunRequest'];
 
 export interface TicketBuildRunDto {
   runId: string;
@@ -300,28 +297,24 @@ export interface TicketBuildRunDto {
   message?: string | null;
 }
 
-export interface SaveDiscussionRequest {
+export type SaveDiscussionRequest = Omit<components['schemas']['SaveDiscussionRequest'], 'title' | 'content'> & {
   title: string;
   content: string;
-}
+};
 
 export interface SaveDiscussionResponse {
   documentId: number;
   documentVersionId: number;
 }
 
-export interface CreateTicketFromDocumentRequest {
-  requestedTitle?: string | null;
-}
+export type CreateTicketFromDocumentRequest = components['schemas']['CreateTicketFromDocumentRequest'];
 
 export interface CreateTicketFromDocumentResponse {
   ticketId: number;
   sourceDocumentVersionId: number;
 }
 
-export interface RunTicketReviewRequest {
-  useLiveModel: boolean;
-}
+export type RunTicketReviewRequest = components['schemas']['RunTicketReviewRequest'];
 
 export interface TicketReviewContribution {
   role: string;
@@ -351,11 +344,9 @@ export interface RunTicketReviewResponse {
   result: TicketReviewResult;
 }
 
-export interface StartDisposableCodeRunRequest {
+export type StartDisposableCodeRunRequest = Omit<components['schemas']['StartDisposableCodeRunRequest'], 'reviewId'> & {
   reviewId: string;
-  scenarioId?: string;
-  expectedOutput?: string;
-}
+};
 
 export interface StartDisposableCodeRunResponse {
   runId: string;
@@ -802,10 +793,10 @@ export interface ApprovalPackageReviewViewModel {
   errors: string[];
 }
 
-export interface LoginRequest {
+export type LoginRequest = Omit<components['schemas']['LoginRequest'], 'email' | 'password'> & {
   email: string;
   password: string;
-}
+};
 
 export interface LoginResponse {
   token: string;
@@ -879,10 +870,13 @@ export interface ProjectChannelDirectoryEntry {
   boundary: string;
 }
 
-export interface SetProjectChannelMembershipRequest {
+export type SetProjectChannelMembershipRequest = Omit<
+  components['schemas']['SetProjectChannelMembershipRequest'],
+  'channelRole' | 'notificationLevel'
+> & {
   channelRole: string;
   notificationLevel: string;
-}
+};
 
 export interface ProjectChannelChatSummary {
   channelId: number;
@@ -926,18 +920,24 @@ export interface ProjectChannelChatDetail {
   boundary: string;
 }
 
-export interface CreateProjectChannelRequest {
+export type CreateProjectChannelRequest = Omit<
+  components['schemas']['CreateProjectChannelRequest'],
+  'name' | 'description' | 'visibility'
+> & {
   name: string;
   description: string | null;
   visibility: 'Project' | 'MembersOnly';
-}
+};
 
-export interface CreateTenantUserRequest {
+export type CreateTenantUserRequest = Omit<
+  components['schemas']['CreateTenantUserRequest'],
+  'email' | 'displayName' | 'password' | 'role'
+> & {
   email: string;
   displayName: string;
   password: string | null;
   role: string;
-}
+};
 
 export interface ProjectFileSummary {
   id: number;
@@ -1208,34 +1208,7 @@ export interface FrontendActionRequestBoundary {
   canContinueWorkflow?: boolean | null;
 }
 
-export interface ControlledActionRequestCreateRequest {
-  requestId: string;
-  operationId: string;
-  requestKind: string;
-  repository: string;
-  branch: string;
-  runId: string;
-  patchPackageId?: string | null;
-  patchHash?: string | null;
-  proposedFilePaths?: string[] | null;
-  sourceApplyReceiptRef?: string | null;
-  commitPackageId?: string | null;
-  commitMessageEvidenceRef?: string | null;
-  commitSha?: string | null;
-  remoteTarget?: string | null;
-  pushIntent?: string | null;
-  headBranch?: string | null;
-  baseBranch?: string | null;
-  pushedCommitSha?: string | null;
-  draftPullRequestPackageId?: string | null;
-  pullRequestTextPackageRef?: string | null;
-  rollbackTargetReceiptRef?: string | null;
-  rollbackScopePaths?: string[] | null;
-  humanIntent: string;
-  evidenceRefs: string[];
-  receiptRefs: string[];
-  requestedAtUtc: string;
-}
+export type ControlledActionRequestCreateRequest = components['schemas']['ControlledActionRequestCreateRequest'];
 
 export interface ControlledActionRequestCreateResponse {
   requestId: string;
@@ -1411,7 +1384,7 @@ export interface SkeletonRunReport {
 // The human gate's own governed surface: recording an accepted approval. The
 // backend owns identity, timestamps, and every derived authority field — the
 // client may only describe WHAT is being approved.
-export interface CreateAcceptedApprovalUiRequest {
+export type CreateAcceptedApprovalUiRequest = components['schemas']['CreateAcceptedApprovalRequest'] & {
   approvalTargetKind: string;
   approvalTargetId: string;
   approvalTargetHash: string;
@@ -1422,7 +1395,7 @@ export interface CreateAcceptedApprovalUiRequest {
   evidenceReferences: string[];
   boundaryMaxims: string[];
   clientRequestId?: string | null;
-}
+};
 
 export interface AcceptedApprovalApiError {
   category: string;

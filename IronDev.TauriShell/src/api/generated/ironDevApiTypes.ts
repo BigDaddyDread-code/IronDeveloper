@@ -145,9 +145,9 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": unknown;
-                    "text/json": unknown;
-                    "application/*+json": unknown;
+                    "application/json": components["schemas"]["CreateAcceptedApprovalRequest"];
+                    "text/json": components["schemas"]["CreateAcceptedApprovalRequest"];
+                    "application/*+json": components["schemas"]["CreateAcceptedApprovalRequest"];
                 };
             };
             responses: {
@@ -1160,9 +1160,9 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["ProjectChatSession"];
-                    "text/json": components["schemas"]["ProjectChatSession"];
-                    "application/*+json": components["schemas"]["ProjectChatSession"];
+                    "application/json": components["schemas"]["SaveProjectChatSessionRequest"];
+                    "text/json": components["schemas"]["SaveProjectChatSessionRequest"];
+                    "application/*+json": components["schemas"]["SaveProjectChatSessionRequest"];
                 };
             };
             responses: {
@@ -1331,9 +1331,9 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["ChatMessage"];
-                    "text/json": components["schemas"]["ChatMessage"];
-                    "application/*+json": components["schemas"]["ChatMessage"];
+                    "application/json": components["schemas"]["SaveProjectChatMessageRequest"];
+                    "text/json": components["schemas"]["SaveProjectChatMessageRequest"];
+                    "application/*+json": components["schemas"]["SaveProjectChatMessageRequest"];
                 };
             };
             responses: {
@@ -5226,9 +5226,9 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": unknown;
-                    "text/json": unknown;
-                    "application/*+json": unknown;
+                    "application/json": components["schemas"]["PolicySatisfactionCreateRequest"];
+                    "text/json": components["schemas"]["PolicySatisfactionCreateRequest"];
+                    "application/*+json": components["schemas"]["PolicySatisfactionCreateRequest"];
                 };
             };
             responses: {
@@ -10614,6 +10614,20 @@ export interface components {
          * @enum {integer}
          */
         AgentRunTriggerType: 1 | 2 | 3 | 4;
+        ApprovalSatisfactionEvaluation: {
+            isSatisfied: boolean;
+            /** Format: uuid */
+            acceptedApprovalId?: string | null;
+            evidenceReferences?: string[] | null;
+            boundaryMaxims?: string[] | null;
+            issues: components["schemas"]["ApprovalSatisfactionIssue"][] | null;
+            boundary?: string | null;
+        };
+        ApprovalSatisfactionIssue: {
+            code?: string | null;
+            field?: string | null;
+            message?: string | null;
+        };
         BaWorkingDraft: {
             candidateTitle?: string | null;
             problem?: string | null;
@@ -11133,6 +11147,20 @@ export interface components {
             executionStarted: boolean;
             sourceMutated: boolean;
             workflowContinued: boolean;
+        };
+        CreateAcceptedApprovalRequest: {
+            approvalTargetKind?: string | null;
+            approvalTargetId?: string | null;
+            approvalTargetHash?: string | null;
+            capabilityCode?: string | null;
+            approvalPurpose?: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            correlationId?: string | null;
+            causationId?: string | null;
+            evidenceReferences?: string[] | null;
+            boundaryMaxims?: string[] | null;
+            clientRequestId?: string | null;
         };
         CreateProjectChannelRequest: {
             name?: string | null;
@@ -12296,11 +12324,44 @@ export interface components {
             summary?: string | null;
             fileResults?: components["schemas"]["FilePatchValidation"][] | null;
         };
+        PolicyRequirement: {
+            /** Format: uuid */
+            projectId: string;
+            policyCode: string | null;
+            policyVersion: string | null;
+            subjectKind: string | null;
+            subjectId: string | null;
+            subjectHash: string | null;
+            capabilityCode: string | null;
+            approvalTargetKind: string | null;
+            approvalTargetId: string | null;
+            approvalTargetHash: string | null;
+            approvalPurpose: string | null;
+            approvalRequirementHash: string | null;
+            /** Format: date-time */
+            evaluatedAtUtc: string;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            requiredEvidenceReferences?: string[] | null;
+            requiredBoundaryMaxims?: string[] | null;
+        };
         PolicySatisfactionApiErrorDto: {
             category: string | null;
             code: string | null;
             field: string | null;
             message: string | null;
+        };
+        PolicySatisfactionCreateRequest: {
+            policyRequirement?: components["schemas"]["PolicyRequirement"];
+            approvalSatisfactionEvaluation?: components["schemas"]["ApprovalSatisfactionEvaluation"];
+            policyRequirementHash?: string | null;
+            /** Format: date-time */
+            expiresAtUtc?: string | null;
+            correlationId?: string | null;
+            causationId?: string | null;
+            evidenceReferences?: string[] | null;
+            boundaryMaxims?: string[] | null;
+            clientRequestId?: string | null;
         };
         PolicySatisfactionReadBoundary: {
             policySatisfactionReadIsCreation?: boolean;
@@ -13536,6 +13597,29 @@ export interface components {
             documentId: number;
             /** Format: int64 */
             documentVersionId: number;
+        };
+        SaveProjectChatMessageRequest: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            chatSessionId?: number;
+            role?: string | null;
+            message?: string | null;
+            tags?: string | null;
+            contextSummary?: string | null;
+            linkedFilePaths?: string | null;
+            linkedSymbols?: string | null;
+            /** Format: int64 */
+            replyToMessageId?: number | null;
+            documentVersionIds?: number[] | null;
+        };
+        SaveProjectChatSessionRequest: {
+            /** Format: int64 */
+            id?: number | null;
+            /** Format: int32 */
+            projectId?: number;
+            title?: string | null;
+            summary?: string | null;
         };
         ScenarioVerification: {
             kind: string | null;

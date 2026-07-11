@@ -36,6 +36,7 @@ using IronDev.Infrastructure.Agents;
 using IronDev.Infrastructure.Governance;
 using IronDev.Infrastructure.Operations;
 using IronDev.Infrastructure.Workflow;
+using IronDev.Api.OpenApi;
 using IronDev.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -93,7 +94,10 @@ Log.Information(
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.OperationFilter<GovernedJsonRequestBodyOperationFilter>();
+});
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddCors(options =>

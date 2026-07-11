@@ -202,7 +202,7 @@ public sealed class ReadOnlyToolGateDecisionUiStaticBoundaryTests
     {
         var text = File.ReadAllText(Path.Combine(RepositoryRoot(), "IronDev.TauriShell", "src", "api", "types.ts"));
         var start = text.IndexOf("export interface ToolGateFilter", StringComparison.Ordinal);
-        var end = text.IndexOf("export interface LoginRequest", StringComparison.Ordinal);
+        var end = text.IndexOf("export type LoginRequest", StringComparison.Ordinal);
         Assert.IsTrue(start >= 0, "Missing tool gate type block.");
         Assert.IsTrue(end > start, "Missing end of tool gate type block.");
         return text[start..end];
