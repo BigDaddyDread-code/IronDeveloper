@@ -1762,6 +1762,30 @@ export interface SkeletonAgentProfileOutcome {
   profile?: SkeletonAgentProfile | null;
 }
 
+export interface AiConnectionMetadata {
+  id: string;
+  tenantId: number;
+  displayName: string;
+  providerKind: string;
+  controlledEndpointId: string;
+  controlledEndpoint: string;
+  credentialConfigured: boolean;
+  credentialStatus: string;
+  lastSuccessfulTestUtc?: string | null;
+  lastFailedTestUtc?: string | null;
+  availableModels: string[];
+  enabled: boolean;
+  tenantAvailable: boolean;
+  projectAvailable: boolean;
+  credentialRotatedUtc?: string | null;
+  createdByUserId: number;
+  createdUtc?: string | null;
+  updatedByUserId: number;
+  updatedUtc?: string | null;
+  version: string;
+  boundary: string;
+}
+
 // ── PROJECT-0..3: provisioning readiness (computed server-side, never asserted) ──
 
 export interface ProvisioningCheckUi {

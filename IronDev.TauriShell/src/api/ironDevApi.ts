@@ -1,6 +1,7 @@
 import type {
   AcceptedApprovalEnvelope,
   AcceptedApprovalReadModelUi,
+  AiConnectionMetadata,
   ApiConnectionStatus,
   ApiStatus,
   AuditLedgerQuery,
@@ -1152,6 +1153,10 @@ class IronDevApiClient {
   async listAgentProfiles(signal?: AbortSignal): Promise<SkeletonAgentProfile[]> {
     const response = await this.request<RawSkeletonAgentProfile[]>('/api/v1/agent-profiles', { method: 'GET', signal });
     return response.map(normalizeSkeletonAgentProfile);
+  }
+
+  async listAiConnections(signal?: AbortSignal): Promise<AiConnectionMetadata[]> {
+    return this.request<AiConnectionMetadata[]>('/api/v1/ai-connections', { method: 'GET', signal });
   }
 
   async updateAgentProfile(

@@ -180,6 +180,9 @@ async function mockWorkspace(page: Page) {
   await page.route('**/irondev-api/api/tenants/3/users', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
   });
+  await page.route('**/irondev-api/api/v1/ai-connections', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+  });
   await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
     if (route.request().method() !== 'GET') {
       await route.fallback();
