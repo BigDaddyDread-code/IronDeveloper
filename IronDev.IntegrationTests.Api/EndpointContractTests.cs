@@ -189,6 +189,9 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(ProjectWorkItemStages.Shape, workItem.Stage);
         Assert.IsFalse(string.IsNullOrWhiteSpace(workItem.Gate.Reason));
         Assert.IsFalse(string.IsNullOrWhiteSpace(workItem.Gate.NextSafeAction));
+        Assert.AreEqual(ProjectWorkItemApplyRecoveryStatuses.NotRequired, workItem.ApplyRecovery.Status);
+        Assert.IsFalse(workItem.ApplyRecovery.Required);
+        Assert.IsFalse(workItem.ApplyRecovery.RetryAllowed);
 
         var otherProjectResponse = await client.PostAsJsonAsync("/api/projects", new Project
         {

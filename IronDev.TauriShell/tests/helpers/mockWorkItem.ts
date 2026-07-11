@@ -18,6 +18,7 @@ export interface MockWorkItemProjectionOptions {
   affectedFiles?: string[];
   linkedChatSessionId?: number | null;
   ticket?: Record<string, unknown>;
+  applyRecovery?: Record<string, unknown>;
 }
 
 export function workItemProjection(options: MockWorkItemProjectionOptions = {}) {
@@ -68,6 +69,23 @@ export function workItemProjection(options: MockWorkItemProjectionOptions = {}) 
       label: options.primaryActionLabel ?? 'Start governed run',
       allowed: options.primaryActionAllowed ?? true,
       reason: options.gateReason ?? 'Build readiness is satisfied.'
+    },
+    applyRecovery: options.applyRecovery ?? {
+      status: 'NotRequired',
+      required: false,
+      applyAttemptObserved: false,
+      partialMutationPossible: false,
+      succeededStageCount: 0,
+      failedStageCount: 0,
+      failedStages: [],
+      technicalDetails: [],
+      existingReceiptCount: 0,
+      missingReceiptCount: 0,
+      reason: 'No apply attempt or refusal was recorded for the latest run.',
+      nextSafeAction: 'No apply recovery action is required.',
+      retryAllowed: false,
+      humanReviewRequired: false,
+      boundary: 'Inspection only.'
     },
     evidenceLinks: {
       runReportApiPath: null,

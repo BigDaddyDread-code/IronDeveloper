@@ -13108,6 +13108,27 @@ export interface components {
             userId?: number | null;
             displayName?: string | null;
         };
+        ProjectWorkItemApplyRecoveryReadModel: {
+            status?: string | null;
+            required?: boolean;
+            applyAttemptObserved?: boolean;
+            partialMutationPossible?: boolean;
+            /** Format: int32 */
+            succeededStageCount?: number;
+            /** Format: int32 */
+            failedStageCount?: number;
+            failedStages?: string[] | null;
+            technicalDetails?: string[] | null;
+            /** Format: int32 */
+            existingReceiptCount?: number;
+            /** Format: int32 */
+            missingReceiptCount?: number;
+            reason?: string | null;
+            nextSafeAction?: string | null;
+            retryAllowed?: boolean;
+            humanReviewRequired?: boolean;
+            boundary?: string | null;
+        };
         ProjectWorkItemCollaborationReadModel: {
             assignee?: components["schemas"]["ProjectWorkItemActorReadModel"];
             followers?: components["schemas"]["ProjectWorkItemActorReadModel"][] | null;
@@ -13158,6 +13179,7 @@ export interface components {
             latestRun?: components["schemas"]["ProjectWorkItemRunReadModel"];
             gate: components["schemas"]["ProjectWorkItemGateReadModel"];
             primaryAction: components["schemas"]["ProjectWorkItemActionReadModel"];
+            applyRecovery: components["schemas"]["ProjectWorkItemApplyRecoveryReadModel"];
             evidenceLinks: components["schemas"]["ProjectWorkItemEvidenceLinksReadModel"];
             boundary?: string | null;
         };

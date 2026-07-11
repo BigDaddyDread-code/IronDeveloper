@@ -25,6 +25,14 @@ public static class ProjectWorkItemActionKinds
     public const string ViewOutcome = "ViewOutcome";
 }
 
+public static class ProjectWorkItemApplyRecoveryStatuses
+{
+    public const string NotRequired = "NotRequired";
+    public const string ApplyRefused = "ApplyRefused";
+    public const string RecoveryEvidenceMissing = "RecoveryEvidenceMissing";
+    public const string Applied = "Applied";
+}
+
 public sealed record ProjectWorkItemReadModel
 {
     public int ProjectId { get; init; }
@@ -40,12 +48,36 @@ public sealed record ProjectWorkItemReadModel
     public ProjectWorkItemRunReadModel? LatestRun { get; init; }
     public required ProjectWorkItemGateReadModel Gate { get; init; }
     public required ProjectWorkItemActionReadModel PrimaryAction { get; init; }
+    public required ProjectWorkItemApplyRecoveryReadModel ApplyRecovery { get; init; }
     public required ProjectWorkItemEvidenceLinksReadModel EvidenceLinks { get; init; }
     public string Boundary { get; init; } = BoundaryText;
 
     public const string BoundaryText =
         "The Work Item projection reports ticket, run, gate, and evidence truth. It starts no run, grants no approval, " +
         "continues no workflow, and applies no source. Missing collaboration data remains empty rather than inferred.";
+}
+
+public sealed record ProjectWorkItemApplyRecoveryReadModel
+{
+    public string Status { get; init; } = ProjectWorkItemApplyRecoveryStatuses.NotRequired;
+    public bool Required { get; init; }
+    public bool ApplyAttemptObserved { get; init; }
+    public bool PartialMutationPossible { get; init; }
+    public int SucceededStageCount { get; init; }
+    public int FailedStageCount { get; init; }
+    public IReadOnlyList<string> FailedStages { get; init; } = [];
+    public IReadOnlyList<string> TechnicalDetails { get; init; } = [];
+    public int ExistingReceiptCount { get; init; }
+    public int MissingReceiptCount { get; init; }
+    public string Reason { get; init; } = string.Empty;
+    public string NextSafeAction { get; init; } = string.Empty;
+    public bool RetryAllowed { get; init; }
+    public bool HumanReviewRequired { get; init; }
+    public string Boundary { get; init; } = BoundaryText;
+
+    public const string BoundaryText =
+        "Apply recovery reports durable apply-stage and receipt observations only. It does not retry apply, execute " +
+        "rollback, run rollback audit, continue workflow, or declare recovery complete.";
 }
 
 public sealed record ProjectWorkItemContractReadModel
@@ -191,6 +223,7 @@ public static class ProjectWorkItemProjector
             LatestRun = RunModel(latestRun, report),
             Gate = gate,
             PrimaryAction = action,
+            ApplyRecovery = ApplyRecoveryFor(report),
             EvidenceLinks = new ProjectWorkItemEvidenceLinksReadModel
             {
                 RunReportApiPath = latestRun is null
@@ -203,6 +236,75 @@ public static class ProjectWorkItemProjector
             }
         };
     }
+
+    private static ProjectWorkItemApplyRecoveryReadModel ApplyRecoveryFor(SkeletonRunReport? report)
+    {
+        var apply = report?.Apply;
+        if (apply is null)
+        {
+            return Recovery(
+                ProjectWorkItemApplyRecoveryStatuses.NotRequired,
+                "No apply attempt or refusal was recorded for the latest run.",
+                "No apply recovery action is required.");
+        }
+
+        if (apply.Applied)
+        {
+            return Recovery(
+                ProjectWorkItemApplyRecoveryStatuses.Applied,
+                "Controlled apply completed; failed-apply recovery is not active.",
+                "Inspect the final report and receipts.");
+        }
+
+        var failedStages = apply.Stages.Where(stage => !stage.Succeeded).ToArray();
+        var succeededStages = apply.Stages.Count(stage => stage.Succeeded);
+        var existingReceipts = apply.Receipts.Count(receipt => receipt.ExistsOnDisk);
+        var missingReceipts = apply.Receipts.Count - existingReceipts;
+        if (failedStages.Length == 0)
+        {
+            return Recovery(
+                ProjectWorkItemApplyRecoveryStatuses.ApplyRefused,
+                TextOr(apply.RefusedReason, "Apply was refused before a failed apply stage was recorded."),
+                "Resolve the refusal and request a fresh preflight before any apply attempt.",
+                humanReviewRequired: true);
+        }
+
+        return new ProjectWorkItemApplyRecoveryReadModel
+        {
+            Status = ProjectWorkItemApplyRecoveryStatuses.RecoveryEvidenceMissing,
+            Required = true,
+            ApplyAttemptObserved = true,
+            PartialMutationPossible = succeededStages > 0,
+            SucceededStageCount = succeededStages,
+            FailedStageCount = failedStages.Length,
+            FailedStages = failedStages.Select(stage => stage.Stage).Where(stage => !string.IsNullOrWhiteSpace(stage)).ToArray(),
+            TechnicalDetails = failedStages
+                .Select(stage => TextOr(stage.Errors, $"{TextOr(stage.Stage, "Apply stage")} failed."))
+                .ToArray(),
+            ExistingReceiptCount = existingReceipts,
+            MissingReceiptCount = missingReceipts,
+            Reason = succeededStages > 0
+                ? "A partial apply is possible because at least one apply stage succeeded before a later stage failed."
+                : "The apply attempt recorded one or more failed stages.",
+            NextSafeAction =
+                "Inspect failed stages and source state. Supply rollback and rollback-audit evidence before retrying apply.",
+            RetryAllowed = false,
+            HumanReviewRequired = true
+        };
+    }
+
+    private static ProjectWorkItemApplyRecoveryReadModel Recovery(
+        string status,
+        string reason,
+        string nextSafeAction,
+        bool humanReviewRequired = false) => new()
+    {
+        Status = status,
+        Reason = reason,
+        NextSafeAction = nextSafeAction,
+        RetryAllowed = false,
+        HumanReviewRequired = humanReviewRequired
+    };
 
     private static ProjectWorkItemRunReadModel? RunModel(RunRecord? run, SkeletonRunReport? report)
     {
