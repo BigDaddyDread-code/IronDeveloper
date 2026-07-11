@@ -8323,6 +8323,75 @@
         }
       }
     },
+    "/api/projects/{projectId}/work-items/{workItemId}": {
+      "get": {
+        "tags": [
+          "ProjectWorkItems"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "workItemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkItemReadModel"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkItemReadModel"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkItemReadModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/provisioning/readiness": {
       "get": {
         "tags": [
@@ -24076,6 +24145,315 @@
         },
         "additionalProperties": false
       },
+      "ProjectWorkItemActionReadModel": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemActivityReadModel": {
+        "type": "object",
+        "properties": {
+          "timestampUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ProjectWorkItemActorReadModel"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemActorReadModel": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemCollaborationReadModel": {
+        "type": "object",
+        "properties": {
+          "assignee": {
+            "$ref": "#/components/schemas/ProjectWorkItemActorReadModel"
+          },
+          "followers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorkItemActorReadModel"
+            },
+            "nullable": true
+          },
+          "waitingOn": {
+            "$ref": "#/components/schemas/ProjectWorkItemActorReadModel"
+          },
+          "linkedChatSessionId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "recentActivity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorkItemActivityReadModel"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemContractReadModel": {
+        "type": "object",
+        "properties": {
+          "acceptanceCriterionCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "affectedFileCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasAcceptanceCriteria": {
+            "type": "boolean"
+          },
+          "affectedFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "sourceChatSessionId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "sourceChatMessageId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "sourceDocumentVersionId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemEvidenceLinksReadModel": {
+        "type": "object",
+        "properties": {
+          "runReportApiPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "criticPackageApiPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "governanceLibraryPath": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemGateReadModel": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          },
+          "technicalDetails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemReadModel": {
+        "required": [
+          "collaboration",
+          "contract",
+          "evidenceLinks",
+          "gate",
+          "primaryAction",
+          "ticket"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "stage": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "statusSummary": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastMeaningfulEventUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/ProjectTicket"
+          },
+          "contract": {
+            "$ref": "#/components/schemas/ProjectWorkItemContractReadModel"
+          },
+          "collaboration": {
+            "$ref": "#/components/schemas/ProjectWorkItemCollaborationReadModel"
+          },
+          "latestRun": {
+            "$ref": "#/components/schemas/ProjectWorkItemRunReadModel"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/ProjectWorkItemGateReadModel"
+          },
+          "primaryAction": {
+            "$ref": "#/components/schemas/ProjectWorkItemActionReadModel"
+          },
+          "evidenceLinks": {
+            "$ref": "#/components/schemas/ProjectWorkItemEvidenceLinksReadModel"
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemRunReadModel": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "repairAttemptCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "findingCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unresolvedFindingCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "approvalHaltObserved": {
+            "type": "boolean"
+          },
+          "continuationUnblocked": {
+            "type": "boolean"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "loopComplete": {
+            "type": "boolean"
+          },
+          "evidenceGapCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "ProposalRequest": {
         "type": "object",
         "properties": {
@@ -33287,6 +33665,9 @@
     },
     {
       "name": "ProjectTools"
+    },
+    {
+      "name": "ProjectWorkItems"
     },
     {
       "name": "Provisioning"

@@ -6236,6 +6236,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/work-items/{workItemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    workItemId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectWorkItemReadModel"];
+                        "application/json": components["schemas"]["ProjectWorkItemReadModel"];
+                        "text/json": components["schemas"]["ProjectWorkItemReadModel"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/provisioning/readiness": {
         parameters: {
             query?: never;
@@ -13037,6 +13088,104 @@ export interface components {
             healthStatus?: string | null;
             effectiveScopeSummary?: string | null;
             boundary?: string | null;
+        };
+        ProjectWorkItemActionReadModel: {
+            kind?: string | null;
+            label?: string | null;
+            allowed?: boolean;
+            reason?: string | null;
+        };
+        ProjectWorkItemActivityReadModel: {
+            /** Format: date-time */
+            timestampUtc?: string;
+            kind?: string | null;
+            summary?: string | null;
+            actor?: components["schemas"]["ProjectWorkItemActorReadModel"];
+        };
+        ProjectWorkItemActorReadModel: {
+            kind?: string | null;
+            /** Format: int32 */
+            userId?: number | null;
+            displayName?: string | null;
+        };
+        ProjectWorkItemCollaborationReadModel: {
+            assignee?: components["schemas"]["ProjectWorkItemActorReadModel"];
+            followers?: components["schemas"]["ProjectWorkItemActorReadModel"][] | null;
+            waitingOn?: components["schemas"]["ProjectWorkItemActorReadModel"];
+            /** Format: int64 */
+            linkedChatSessionId?: number | null;
+            recentActivity?: components["schemas"]["ProjectWorkItemActivityReadModel"][] | null;
+        };
+        ProjectWorkItemContractReadModel: {
+            /** Format: int32 */
+            acceptanceCriterionCount?: number;
+            /** Format: int32 */
+            affectedFileCount?: number;
+            hasAcceptanceCriteria?: boolean;
+            affectedFiles?: string[] | null;
+            /** Format: int64 */
+            sourceChatSessionId?: number | null;
+            /** Format: int64 */
+            sourceChatMessageId?: number | null;
+            /** Format: int64 */
+            sourceDocumentVersionId?: number | null;
+        };
+        ProjectWorkItemEvidenceLinksReadModel: {
+            runReportApiPath?: string | null;
+            criticPackageApiPath?: string | null;
+            governanceLibraryPath?: string | null;
+        };
+        ProjectWorkItemGateReadModel: {
+            state?: string | null;
+            reason?: string | null;
+            nextSafeAction?: string | null;
+            technicalDetails?: string[] | null;
+        };
+        ProjectWorkItemReadModel: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            workItemId?: number;
+            title?: string | null;
+            stage?: string | null;
+            state?: string | null;
+            statusSummary?: string | null;
+            /** Format: date-time */
+            lastMeaningfulEventUtc?: string;
+            ticket: components["schemas"]["ProjectTicket"];
+            contract: components["schemas"]["ProjectWorkItemContractReadModel"];
+            collaboration: components["schemas"]["ProjectWorkItemCollaborationReadModel"];
+            latestRun?: components["schemas"]["ProjectWorkItemRunReadModel"];
+            gate: components["schemas"]["ProjectWorkItemGateReadModel"];
+            primaryAction: components["schemas"]["ProjectWorkItemActionReadModel"];
+            evidenceLinks: components["schemas"]["ProjectWorkItemEvidenceLinksReadModel"];
+            boundary?: string | null;
+        };
+        ProjectWorkItemRunReadModel: {
+            runId?: string | null;
+            status?: string | null;
+            summary?: string | null;
+            failureReason?: string | null;
+            /** Format: date-time */
+            createdUtc?: string;
+            /** Format: date-time */
+            updatedUtc?: string;
+            /** Format: date-time */
+            startedUtc?: string | null;
+            /** Format: date-time */
+            completedUtc?: string | null;
+            /** Format: int32 */
+            repairAttemptCount?: number;
+            /** Format: int32 */
+            findingCount?: number;
+            /** Format: int32 */
+            unresolvedFindingCount?: number;
+            approvalHaltObserved?: boolean;
+            continuationUnblocked?: boolean;
+            applied?: boolean;
+            loopComplete?: boolean;
+            /** Format: int32 */
+            evidenceGapCount?: number;
         };
         ProposalRequest: {
             request?: string | null;

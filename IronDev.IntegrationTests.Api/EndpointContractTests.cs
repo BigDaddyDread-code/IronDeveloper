@@ -7,6 +7,7 @@ using IronDev.Core.Board;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
+using IronDev.Core.WorkItems;
 using IronDev.Data.Models;
 using Microsoft.Data.SqlClient;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -32,6 +33,7 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects",
             "/api/projects/{projectId}",
             "/api/projects/{projectId}/board",
+            "/api/projects/{projectId}/work-items/{workItemId}",
             "/api/projects/{projectId}/tickets",
             "/api/projects/{projectId}/tickets/{ticketId}",
             "/api/projects/{projectId}/tickets/{ticketId}/archive",
@@ -87,6 +89,7 @@ public sealed class EndpointContractTests : ApiTestBase
         {
             "/api/projects",
             "/api/projects/1/board",
+            "/api/projects/1/work-items/1",
             "/api/projects/1/tickets",
             "/api/projects/1/documents",
             "/api/projects/1/memory/search?q=architecture",
@@ -141,6 +144,63 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual("Shape the requirement and confirm acceptance criteria.", item.NextSafeAction);
         Assert.AreEqual(ProjectBoardWaitingOnKinds.Human, item.WaitingOn?.Kind);
         Assert.IsNull(item.Assignee);
+    }
+
+    [TestMethod]
+    public async Task ProjectWorkItem_ShouldReturnContractGateAndHonestCollaborationTruth()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var createProject = await client.PostAsJsonAsync("/api/projects", new Project
+        {
+            Name = "Work Item Read Contract Test",
+            Description = "Exercises the Work Item read projection.",
+            LocalPath = @"C:\Temp\WorkItemReadContractTest"
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createProject.StatusCode);
+        var project = await createProject.Content.ReadFromJsonAsync<Project>();
+        Assert.IsNotNull(project);
+
+        var createTicket = await client.PostAsJsonAsync($"/api/projects/{project!.Id}/tickets", new CreateProjectTicketRequest
+        {
+            Title = "Read the governed Work Item",
+            Summary = "The backend owns current gate and action truth.",
+            AcceptanceCriteria = ["The contract is visible.", "Missing collaboration stays empty."],
+            LinkedFilePaths = ["src/One.cs", "src/Two.cs"],
+            Priority = "High",
+            Type = "Task"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createTicket.StatusCode);
+        var ticket = await createTicket.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.IsNotNull(ticket);
+
+        var response = await client.GetAsync($"/api/projects/{project.Id}/work-items/{ticket!.Id}");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var workItem = await response.Content.ReadFromJsonAsync<ProjectWorkItemReadModel>();
+        Assert.IsNotNull(workItem);
+        Assert.AreEqual(project.Id, workItem.ProjectId);
+        Assert.AreEqual(ticket.Id, workItem.WorkItemId);
+        Assert.AreEqual(2, workItem.Contract.AcceptanceCriterionCount);
+        Assert.AreEqual(2, workItem.Contract.AffectedFileCount);
+        Assert.IsNull(workItem.Collaboration.Assignee);
+        Assert.AreEqual(0, workItem.Collaboration.Followers.Count);
+        Assert.AreEqual(ProjectWorkItemStages.Shape, workItem.Stage);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(workItem.Gate.Reason));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(workItem.Gate.NextSafeAction));
+
+        var otherProjectResponse = await client.PostAsJsonAsync("/api/projects", new Project
+        {
+            Name = "Other Work Item Project",
+            LocalPath = @"C:\Temp\OtherWorkItemProject"
+        });
+        Assert.AreEqual(HttpStatusCode.Created, otherProjectResponse.StatusCode);
+        var otherProject = await otherProjectResponse.Content.ReadFromJsonAsync<Project>();
+        Assert.IsNotNull(otherProject);
+
+        var wrongProjectRead = await client.GetAsync($"/api/projects/{otherProject!.Id}/work-items/{ticket.Id}");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectRead.StatusCode);
     }
 
     [TestMethod]
