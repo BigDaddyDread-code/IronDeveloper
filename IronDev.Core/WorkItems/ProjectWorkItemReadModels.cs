@@ -252,13 +252,18 @@ public static class ProjectWorkItemProjector
         ProjectWorkItemCollaborationSnapshot? collaboration = null,
         ProjectMemberDirectoryResponse? members = null,
         int currentUserId = 0,
-        bool soloApprovalExceptionAllowed = false)
+        bool soloApprovalExceptionAllowed = false,
+        WorkItemIdentitySnapshot? identity = null)
     {
-        var stage = StageFor(ticket, latestRun);
+        var currentContract = identity?.CurrentContract;
+        var stage = StageFor(ticket, latestRun, identity?.CurrentStage);
         var waitingOn = WaitingOn(ticket, latestRun, readiness);
         var gate = GateFor(ticket, latestRun, report, readiness);
         var action = ActionFor(latestRun, readiness, report);
-        var affectedFiles = SplitValues(ticket.LinkedFilePaths);
+        var acceptanceCriteria = currentContract?.AcceptanceCriteria ?? ticket.AcceptanceCriteria;
+        var affectedFiles = SplitValues(currentContract?.LinkedFilePaths ?? ticket.LinkedFilePaths);
+        var workItemId = identity?.WorkItemId ?? ticket.Id;
+        var workItemTitle = TextOr(currentContract?.Title, TextOr(identity?.Title, TextOr(ticket.Title, $"Work item {workItemId}")));
         var runActivity = (report?.Timeline ?? [])
             .OrderByDescending(entry => entry.TimestampUtc)
             .Take(8)
@@ -286,22 +291,22 @@ public static class ProjectWorkItemProjector
         return new ProjectWorkItemReadModel
         {
             ProjectId = ticket.ProjectId,
-            WorkItemId = ticket.Id,
-            Title = string.IsNullOrWhiteSpace(ticket.Title) ? $"Work item {ticket.Id}" : ticket.Title,
+            WorkItemId = workItemId,
+            Title = workItemTitle,
             Stage = stage,
-            State = latestRun?.State.ToString() ?? Normalize(ticket.Status, "Unknown"),
+            State = latestRun?.State.ToString() ?? Normalize(identity?.CurrentState ?? ticket.Status, "Unknown"),
             StatusSummary = StatusSummary(ticket, latestRun),
             LastMeaningfulEventUtc = latestRun?.UpdatedUtc ?? ToUtc(ticket.CreatedDate, generatedUtc),
             Ticket = ticket,
             Contract = new ProjectWorkItemContractReadModel
             {
-                AcceptanceCriterionCount = CountCriteria(ticket.AcceptanceCriteria),
+                AcceptanceCriterionCount = CountCriteria(acceptanceCriteria),
                 AffectedFileCount = affectedFiles.Count,
-                HasAcceptanceCriteria = !string.IsNullOrWhiteSpace(ticket.AcceptanceCriteria),
+                HasAcceptanceCriteria = !string.IsNullOrWhiteSpace(acceptanceCriteria),
                 AffectedFiles = affectedFiles,
-                SourceChatSessionId = ticket.SourceChatSessionId,
-                SourceChatMessageId = ticket.SourceChatMessageId,
-                SourceDocumentVersionId = ticket.SourceDocumentVersionId
+                SourceChatSessionId = currentContract?.SourceWorkshopSessionId ?? ticket.SourceChatSessionId,
+                SourceChatMessageId = currentContract?.SourceWorkshopMessageId ?? ticket.SourceChatMessageId,
+                SourceDocumentVersionId = currentContract?.SourceDocumentVersionId ?? ticket.SourceDocumentVersionId
             },
             Collaboration = new ProjectWorkItemCollaborationReadModel
             {
@@ -309,7 +314,7 @@ public static class ProjectWorkItemProjector
                 Assignee = MapActor(collaboration?.Assignee),
                 Followers = (collaboration?.Followers ?? []).Select(MapActor).Where(actor => actor is not null).Cast<ProjectWorkItemActorReadModel>().ToArray(),
                 WaitingOn = MapActor(collaboration?.WaitingOn) ?? waitingOn,
-                LinkedChatSessionId = ticket.SourceChatSessionId,
+                LinkedChatSessionId = currentContract?.SourceWorkshopSessionId ?? ticket.SourceChatSessionId,
                 RecentActivity = activity
             },
             Authority = AuthorityModel(report, members, currentUserId, soloApprovalExceptionAllowed),
@@ -653,7 +658,7 @@ public static class ProjectWorkItemProjector
         };
     }
 
-    private static string StageFor(ProjectTicket ticket, RunRecord? run)
+    private static string StageFor(ProjectTicket ticket, RunRecord? run, string? identityStage = null)
     {
         if (run is not null)
         {
@@ -665,12 +670,23 @@ public static class ProjectWorkItemProjector
             };
         }
 
+        if (IsKnownStage(identityStage) &&
+            !(string.Equals(identityStage, ProjectWorkItemStages.Ticket, StringComparison.Ordinal) &&
+              ContainsAny(ticket.Status, "draft", "shape")))
+            return identityStage!;
         if (ContainsAny(ticket.Status, "applied", "done", "closed")) return ProjectWorkItemStages.Done;
         if (ContainsAny(ticket.Status, "approval", "review")) return ProjectWorkItemStages.Review;
         if (ContainsAny(ticket.Status, "build", "progress", "failed", "blocked")) return ProjectWorkItemStages.Build;
         if (ContainsAny(ticket.Status, "draft", "shape")) return ProjectWorkItemStages.Shape;
         return ProjectWorkItemStages.Ticket;
     }
+
+    private static bool IsKnownStage(string? stage) =>
+        stage is ProjectWorkItemStages.Shape or
+            ProjectWorkItemStages.Ticket or
+            ProjectWorkItemStages.Build or
+            ProjectWorkItemStages.Review or
+            ProjectWorkItemStages.Done;
 
     private static ProjectWorkItemActorReadModel? WaitingOn(
         ProjectTicket ticket,

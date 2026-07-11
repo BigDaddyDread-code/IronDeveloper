@@ -144,25 +144,121 @@ public sealed class WorkItemIdentityService : IWorkItemIdentityService
         }
     }
 
+    public async Task<WorkItemIdentitySnapshot?> GetByWorkItemIdAsync(
+        int projectId,
+        long workItemId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT TOP (1)
+                wi.Id AS WorkItemId,
+                wi.TenantId,
+                wi.ProjectId,
+                wi.Title,
+                wi.LegacyTicketId,
+                wi.CurrentContractId,
+                wi.CurrentStage,
+                wi.CurrentState,
+                wi.Version,
+                c.Id AS ContractId,
+                c.ContractVersion,
+                c.WorkItemId AS ContractWorkItemId,
+                c.SourceTicketId,
+                c.Title AS ContractTitle,
+                c.AcceptanceCriteria,
+                c.LinkedFilePaths,
+                c.SourceWorkshopSessionId,
+                c.SourceWorkshopMessageIds,
+                c.SourceDocumentVersionIds
+            FROM dbo.WorkItems wi
+            LEFT JOIN dbo.WorkItemContracts c ON c.Id = wi.CurrentContractId
+            WHERE wi.TenantId = @TenantId
+              AND wi.ProjectId = @ProjectId
+              AND wi.Id = @WorkItemId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var row = await connection.QuerySingleOrDefaultAsync<WorkItemIdentityRow>(new CommandDefinition(
+            sql,
+            new { TenantId = _tenant.TenantId, ProjectId = projectId, WorkItemId = workItemId },
+            cancellationToken: cancellationToken));
+        return row is null ? null : ToSnapshot(row);
+    }
+
     public async Task<WorkItemIdentitySnapshot?> GetByLegacyTicketIdAsync(long ticketId, CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT TOP (1)
-                Id AS WorkItemId,
-                LegacyTicketId,
-                CurrentContractId,
-                CurrentStage,
-                CurrentState
-            FROM dbo.WorkItems
-            WHERE TenantId = @TenantId
-              AND LegacyTicketId = @TicketId;
+                wi.Id AS WorkItemId,
+                wi.TenantId,
+                wi.ProjectId,
+                wi.Title,
+                wi.LegacyTicketId,
+                wi.CurrentContractId,
+                wi.CurrentStage,
+                wi.CurrentState,
+                wi.Version,
+                c.Id AS ContractId,
+                c.ContractVersion,
+                c.WorkItemId AS ContractWorkItemId,
+                c.SourceTicketId,
+                c.Title AS ContractTitle,
+                c.AcceptanceCriteria,
+                c.LinkedFilePaths,
+                c.SourceWorkshopSessionId,
+                c.SourceWorkshopMessageIds,
+                c.SourceDocumentVersionIds
+            FROM dbo.WorkItems wi
+            LEFT JOIN dbo.WorkItemContracts c ON c.Id = wi.CurrentContractId
+            WHERE wi.TenantId = @TenantId
+              AND wi.LegacyTicketId = @TicketId;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
-        return await connection.QuerySingleOrDefaultAsync<WorkItemIdentitySnapshot>(new CommandDefinition(
+        var row = await connection.QuerySingleOrDefaultAsync<WorkItemIdentityRow>(new CommandDefinition(
             sql,
             new { TenantId = _tenant.TenantId, TicketId = ticketId },
             cancellationToken: cancellationToken));
+        return row is null ? null : ToSnapshot(row);
+    }
+
+    private static WorkItemIdentitySnapshot ToSnapshot(WorkItemIdentityRow row) => new()
+    {
+        WorkItemId = row.WorkItemId,
+        TenantId = row.TenantId,
+        ProjectId = row.ProjectId,
+        Title = row.Title,
+        LegacyTicketId = row.LegacyTicketId,
+        CurrentContractId = row.CurrentContractId,
+        CurrentStage = row.CurrentStage,
+        CurrentState = row.CurrentState,
+        Version = row.Version,
+        CurrentContract = row.ContractId is long contractId
+            ? new WorkItemContractSnapshot
+            {
+                ContractId = contractId,
+                ContractVersion = row.ContractVersion,
+                WorkItemId = row.ContractWorkItemId,
+                SourceTicketId = row.SourceTicketId,
+                Title = row.ContractTitle ?? row.Title,
+                AcceptanceCriteria = row.AcceptanceCriteria,
+                LinkedFilePaths = row.LinkedFilePaths,
+                SourceWorkshopSessionId = row.SourceWorkshopSessionId,
+                SourceWorkshopMessageId = FirstLong(row.SourceWorkshopMessageIds),
+                SourceDocumentVersionId = FirstLong(row.SourceDocumentVersionIds)
+            }
+            : null
+    };
+
+    private static long? FirstLong(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        foreach (var part in value.Split(new[] { ',', ';', ' ', '\r', '\n', '\t', '[', ']' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            if (long.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+                return parsed;
+
+        return null;
     }
 
     private static string StageFor(string? status)
@@ -207,4 +303,27 @@ public sealed class WorkItemIdentityService : IWorkItemIdentityService
         !string.IsNullOrWhiteSpace(value) && needles.Any(needle => value.Contains(needle, StringComparison.OrdinalIgnoreCase));
 
     private static string TextOr(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private sealed class WorkItemIdentityRow
+    {
+        public long WorkItemId { get; init; }
+        public int TenantId { get; init; }
+        public int ProjectId { get; init; }
+        public string Title { get; init; } = string.Empty;
+        public long? LegacyTicketId { get; init; }
+        public long? CurrentContractId { get; init; }
+        public string CurrentStage { get; init; } = ProjectWorkItemStages.Ticket;
+        public string CurrentState { get; init; } = "Draft";
+        public long Version { get; init; }
+        public long? ContractId { get; init; }
+        public int ContractVersion { get; init; }
+        public long ContractWorkItemId { get; init; }
+        public long? SourceTicketId { get; init; }
+        public string? ContractTitle { get; init; }
+        public string? AcceptanceCriteria { get; init; }
+        public string? LinkedFilePaths { get; init; }
+        public long? SourceWorkshopSessionId { get; init; }
+        public string? SourceWorkshopMessageIds { get; init; }
+        public string? SourceDocumentVersionIds { get; init; }
+    }
 }
