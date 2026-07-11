@@ -309,6 +309,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_project_channels.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_project_collaboration.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_versioned_collaboration_writes.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_work_item_identity.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -587,6 +588,9 @@ public abstract class ApiTestBase
             IF OBJECT_ID('dbo.ProjectWorkItemActivity', 'U') IS NOT NULL DELETE FROM dbo.ProjectWorkItemActivity;
             IF OBJECT_ID('dbo.ProjectWorkItemFollowers', 'U') IS NOT NULL DELETE FROM dbo.ProjectWorkItemFollowers;
             IF OBJECT_ID('dbo.ProjectWorkItemCollaboration', 'U') IS NOT NULL DELETE FROM dbo.ProjectWorkItemCollaboration;
+            IF OBJECT_ID('dbo.WorkItems', 'U') IS NOT NULL UPDATE dbo.WorkItems SET CurrentContractId = NULL;
+            IF OBJECT_ID('dbo.WorkItemContracts', 'U') IS NOT NULL DELETE FROM dbo.WorkItemContracts;
+            IF OBJECT_ID('dbo.WorkItems', 'U') IS NOT NULL DELETE FROM dbo.WorkItems;
             IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectContextDocuments;
             IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;
             IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentVersions;

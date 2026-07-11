@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Data.SqlClient;
 using IronDev.Core.Interfaces;
+using IronDev.Core.WorkItems;
 using IronDev.Data.Models;
 using IronDev.Services;
 
@@ -49,6 +50,60 @@ public class TicketServiceIntegrationTests : IntegrationTestBase
         Assert.AreEqual("Task", loaded.TicketType);
         Assert.AreEqual("Draft", loaded.Status);
     }
+
+    [TestMethod]
+    public async Task SaveTicketAsync_ShouldCreateDurableWorkItemIdentityAndVersionedContract()
+    {
+        using var scope = ServiceProvider.CreateScope();
+        var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+
+        var projectId = await SeedProjectAsync();
+        var ticketId = await ticketService.SaveTicketAsync(new ProjectTicket
+        {
+            ProjectId = projectId,
+            SessionId = Guid.NewGuid(),
+            Title = "Make Work Item identity durable",
+            TicketType = "Task",
+            Priority = "High",
+            Status = "Draft",
+            Summary = "Persist a Work Item identity row for each ticket-backed item.",
+            Problem = "Ticket ids are doing double duty as Work Item ids.",
+            AcceptanceCriteria = "- Work Item row exists\n- Current contract is linked",
+            TechnicalNotes = "Keep current ticket-backed routes compatible.",
+            Content = "Work Item identity contract test",
+            LinkedFilePaths = "IronDev.Core/WorkItems/WorkItemIdentityModels.cs",
+            SourceChatSessionId = 4001,
+            SourceChatMessageId = 5001
+        });
+
+        var first = await LoadIdentityRowAsync(ticketId);
+
+        Assert.IsNotNull(first);
+        Assert.AreEqual(ticketId, first.Id);
+        Assert.AreEqual(ticketId, first.LegacyTicketId);
+        Assert.AreEqual(ProjectWorkItemStages.Ticket, first.CurrentStage);
+        Assert.AreEqual("Draft", first.CurrentState);
+        Assert.AreEqual(1, first.ContractVersion);
+        Assert.AreEqual("Make Work Item identity durable", first.Title);
+        Assert.AreEqual("4001", first.SourceWorkshopSessionId);
+        Assert.AreEqual("5001", first.SourceWorkshopMessageIds);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(first.ContractHash));
+
+        var loaded = await ticketService.GetTicketByIdAsync(ticketId);
+        Assert.IsNotNull(loaded);
+        loaded.AcceptanceCriteria = "- Work Item row exists\n- Current contract is linked\n- Contract changes version";
+
+        await ticketService.SaveTicketAsync(loaded);
+
+        var second = await LoadIdentityRowAsync(ticketId);
+        var contractCount = await CountContractsAsync(ticketId);
+
+        Assert.IsNotNull(second);
+        Assert.AreEqual(2, contractCount);
+        Assert.AreEqual(2, second.ContractVersion);
+        Assert.AreNotEqual(first.ContractHash, second.ContractHash);
+    }
+
     [TestMethod]
     public async Task SaveTicketAsync_WithExtendedFields_ShouldPersistAllFields()
     {
@@ -193,5 +248,52 @@ public class TicketServiceIntegrationTests : IntegrationTestBase
         Assert.AreEqual(9009, loaded.SourceChatSessionId);
         Assert.AreEqual(9010, loaded.SourceChatMessageId);
         Assert.HasCount(2, references);
+    }
+
+    private async Task<WorkItemIdentityContractRow> LoadIdentityRowAsync(long ticketId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        const string sql = """
+            SELECT
+                wi.Id,
+                wi.LegacyTicketId,
+                wi.CurrentStage,
+                wi.CurrentState,
+                c.ContractVersion,
+                c.ContractHash,
+                c.Title,
+                CONVERT(NVARCHAR(40), c.SourceWorkshopSessionId) AS SourceWorkshopSessionId,
+                c.SourceWorkshopMessageIds
+            FROM dbo.WorkItems wi
+            INNER JOIN dbo.WorkItemContracts c ON c.Id = wi.CurrentContractId
+            WHERE wi.LegacyTicketId = @TicketId;
+            """;
+
+        return await connection.QuerySingleAsync<WorkItemIdentityContractRow>(sql, new { TicketId = ticketId });
+    }
+
+    private async Task<int> CountContractsAsync(long ticketId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        return await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(1) FROM dbo.WorkItemContracts WHERE SourceTicketId = @TicketId;",
+            new { TicketId = ticketId });
+    }
+
+    private sealed class WorkItemIdentityContractRow
+    {
+        public long Id { get; set; }
+        public long LegacyTicketId { get; set; }
+        public string CurrentStage { get; set; } = string.Empty;
+        public string CurrentState { get; set; } = string.Empty;
+        public int ContractVersion { get; set; }
+        public string ContractHash { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string? SourceWorkshopSessionId { get; set; }
+        public string? SourceWorkshopMessageIds { get; set; }
     }
 }

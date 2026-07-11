@@ -159,6 +159,11 @@
                            "id":  "2026-07-v2-versioned-collaboration-writes",
                            "path":  "Database/migrate_versioned_collaboration_writes.sql",
                            "description":  "Adds optimistic revisions to ticket drafts and channel memberships; Work Item collaboration already carries its revision."
+                       },
+                       {
+                           "id":  "2026-07-v25-work-item-identity",
+                           "path":  "Database/migrate_work_item_identity.sql",
+                           "description":  "Creates durable Work Item identity and versioned contract tables while preserving ticket-backed route compatibility."
                        }
                    ]
 }

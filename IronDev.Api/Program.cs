@@ -22,6 +22,7 @@ using IronDev.Core.Workspaces;
 using IronDev.Core.Governance;
 using IronDev.Core.Operations;
 using IronDev.Core.Workflow;
+using IronDev.Core.WorkItems;
 using IronDev.Infrastructure.AgentRunAudit;
 using IronDev.Data;
 using IronDev.Infrastructure.Builder;
@@ -191,6 +192,7 @@ builder.Services.AddScoped<IProjectDocumentProcessingStateStore>(services => ser
 builder.Services.AddScoped<IProjectDocumentUploadService, ProjectDocumentUploadService>();
 builder.Services.AddScoped<IProjectDocumentProcessingService, ProjectDocumentProcessingService>();
 builder.Services.AddScoped<IProjectContextExportService, ProjectContextExportService>();
+builder.Services.AddScoped<IWorkItemIdentityService, WorkItemIdentityService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<IronDev.Core.Board.IProjectBoardReadService, ProjectBoardReadService>();
 builder.Services.AddScoped<IronDev.Core.WorkItems.IProjectWorkItemReadService, ProjectWorkItemReadService>();

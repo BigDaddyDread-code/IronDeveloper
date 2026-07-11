@@ -432,6 +432,78 @@
                         "notes":  "Manifest-managed project channel schema with tenant/project-scoped membership and collaboration-only authority boundaries."
                     },
                     {
+                        "id":  "database.migrate-project-collaboration",
+                        "path":  "Database/migrate_project_collaboration.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "work-items",
+                        "objectsCreated":  [
+                                               "dbo.ProjectMembers",
+                                               "dbo.ProjectWorkItemCollaboration",
+                                               "dbo.ProjectWorkItemFollowers",
+                                               "dbo.ProjectWorkItemActivity"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.ProjectTickets",
+                                              "dbo.TenantUsers",
+                                              "dbo.Users"
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Manifest-managed project membership and Work Item collaboration state. It grants no workflow continuation, approval, apply, git, release, deployment, or execution authority."
+                    },
+                    {
+                        "id":  "database.migrate-versioned-collaboration-writes",
+                        "path":  "Database/migrate_versioned_collaboration_writes.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "work-items",
+                        "objectsCreated":  [
+                                               "dbo.ProjectTickets.Revision",
+                                               "dbo.ProjectChannelMembers.Revision"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.ProjectTickets",
+                                              "dbo.ProjectChannelMembers"
+                                          ],
+                        "referencedBy":  [
+                                             "SQL inventory discovery"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Manifest-managed optimistic revision columns for mutable ticket and channel-member collaboration writes."
+                    },
+                    {
+                        "id":  "database.migrate-work-item-identity",
+                        "path":  "Database/migrate_work_item_identity.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "work-items",
+                        "objectsCreated":  [
+                                               "dbo.WorkItems",
+                                               "dbo.WorkItemContracts",
+                                               "dbo.IX_WorkItems_Project_Updated",
+                                               "dbo.UX_WorkItems_LegacyTicket",
+                                               "dbo.IX_WorkItemContracts_WorkItem",
+                                               "dbo.IX_WorkItemContracts_SourceTicket"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.ProjectTickets",
+                                              "dbo.Users"
+                                          ],
+                        "referencedBy":  [
+                                             "V25-01 Work Item identity"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Creates durable Work Item identity and versioned contracts while preserving current ticket-backed route compatibility. It does not start runs, approve, continue workflow, apply source, or grant authority."
+                    },
+                    {
                         "id":  "database.migrate-project-profiles",
                         "path":  "Database/migrate_project_profiles.sql",
                         "kind":  "migration-script",
