@@ -24206,6 +24206,73 @@
         },
         "additionalProperties": false
       },
+      "ProjectWorkItemApplyRecoveryReadModel": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "applyAttemptObserved": {
+            "type": "boolean"
+          },
+          "partialMutationPossible": {
+            "type": "boolean"
+          },
+          "succeededStageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failedStageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failedStages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "technicalDetails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "existingReceiptCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "missingReceiptCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          },
+          "retryAllowed": {
+            "type": "boolean"
+          },
+          "humanReviewRequired": {
+            "type": "boolean"
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ProjectWorkItemCollaborationReadModel": {
         "type": "object",
         "properties": {
@@ -24321,6 +24388,7 @@
       },
       "ProjectWorkItemReadModel": {
         "required": [
+          "applyRecovery",
           "collaboration",
           "contract",
           "evidenceLinks",
@@ -24375,6 +24443,9 @@
           },
           "primaryAction": {
             "$ref": "#/components/schemas/ProjectWorkItemActionReadModel"
+          },
+          "applyRecovery": {
+            "$ref": "#/components/schemas/ProjectWorkItemApplyRecoveryReadModel"
           },
           "evidenceLinks": {
             "$ref": "#/components/schemas/ProjectWorkItemEvidenceLinksReadModel"

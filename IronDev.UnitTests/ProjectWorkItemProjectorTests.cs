@@ -115,6 +115,67 @@ public sealed class ProjectWorkItemProjectorTests
         StringAssert.Contains(model.Gate.Reason, "evidence gaps");
         Assert.IsNotNull(model.EvidenceLinks.RunReportApiPath);
         Assert.IsFalse(model.EvidenceLinks.RunReportApiPath!.Contains("artifacts", StringComparison.OrdinalIgnoreCase));
+        Assert.AreEqual(ProjectWorkItemApplyRecoveryStatuses.Applied, model.ApplyRecovery.Status);
+        Assert.IsFalse(model.ApplyRecovery.Required);
+        Assert.IsFalse(model.ApplyRecovery.RetryAllowed);
+    }
+
+    [TestMethod]
+    public void Build_ApplyRefusalDoesNotPretendARecoveryCampaignIsRequired()
+    {
+        var report = Report() with
+        {
+            Apply = new SkeletonRunApplyTrace
+            {
+                Applied = false,
+                RefusedReason = "Apply preflight refused a dirty source workspace."
+            }
+        };
+
+        var model = Build(Ticket(), Run(RunLifecycleState.Completed), report, Ready());
+
+        Assert.AreEqual(ProjectWorkItemApplyRecoveryStatuses.ApplyRefused, model.ApplyRecovery.Status);
+        Assert.IsFalse(model.ApplyRecovery.Required);
+        Assert.IsFalse(model.ApplyRecovery.ApplyAttemptObserved);
+        Assert.IsFalse(model.ApplyRecovery.RetryAllowed);
+        StringAssert.Contains(model.ApplyRecovery.Reason, "dirty source workspace");
+    }
+
+    [TestMethod]
+    public void Build_FailedPartialApplyRequiresRecoveryEvidenceAndHumanReview()
+    {
+        var report = Report() with
+        {
+            Apply = new SkeletonRunApplyTrace
+            {
+                Applied = false,
+                Stages =
+                [
+                    new SkeletonRunApplyStageTrace { Stage = "Copy", Succeeded = true },
+                    new SkeletonRunApplyStageTrace { Stage = "PostApplyValidation", Succeeded = false, Errors = "Tests failed." }
+                ],
+                Receipts =
+                [
+                    new SkeletonRunReceiptRef { Name = "copy-receipt", ExistsOnDisk = true },
+                    new SkeletonRunReceiptRef { Name = "validation-receipt", ExistsOnDisk = false }
+                ]
+            }
+        };
+
+        var model = Build(Ticket(), Run(RunLifecycleState.Failed), report, Ready());
+
+        Assert.AreEqual(ProjectWorkItemApplyRecoveryStatuses.RecoveryEvidenceMissing, model.ApplyRecovery.Status);
+        Assert.IsTrue(model.ApplyRecovery.Required);
+        Assert.IsTrue(model.ApplyRecovery.ApplyAttemptObserved);
+        Assert.IsTrue(model.ApplyRecovery.PartialMutationPossible);
+        Assert.AreEqual(1, model.ApplyRecovery.SucceededStageCount);
+        Assert.AreEqual(1, model.ApplyRecovery.FailedStageCount);
+        Assert.AreEqual(1, model.ApplyRecovery.ExistingReceiptCount);
+        Assert.AreEqual(1, model.ApplyRecovery.MissingReceiptCount);
+        Assert.IsFalse(model.ApplyRecovery.RetryAllowed);
+        Assert.IsTrue(model.ApplyRecovery.HumanReviewRequired);
+        CollectionAssert.Contains(model.ApplyRecovery.FailedStages.ToList(), "PostApplyValidation");
+        CollectionAssert.Contains(model.ApplyRecovery.TechnicalDetails.ToList(), "Tests failed.");
     }
 
     private static ProjectWorkItemReadModel Build(

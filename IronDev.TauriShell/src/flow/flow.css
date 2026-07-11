@@ -1114,6 +1114,65 @@
   font-size: 12px;
 }
 
+.fl-apply-recovery {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--fl-gate);
+  border-radius: 6px;
+  background: var(--fl-gate-soft);
+  color: var(--fl-gate-ink);
+}
+
+.fl-apply-recovery-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.fl-apply-recovery-head .fl-plabel {
+  margin-bottom: 4px;
+  color: currentColor;
+}
+
+.fl-apply-recovery-head > span {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fl-apply-recovery p,
+.fl-apply-recovery details,
+.fl-apply-recovery small {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fl-apply-recovery-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.fl-apply-recovery-facts div {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 4px;
+}
+
+.fl-apply-recovery-facts dt {
+  font-size: 10.5px;
+}
+
+.fl-apply-recovery-facts dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .fl-workitem-side {
   display: grid;
   align-content: start;
@@ -1200,6 +1259,10 @@
 
   .fl-workitem-gate details {
     max-width: none;
+  }
+
+  .fl-apply-recovery-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .fl-appbar {

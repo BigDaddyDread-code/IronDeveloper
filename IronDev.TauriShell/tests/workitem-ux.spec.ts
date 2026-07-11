@@ -53,6 +53,50 @@ test('Work Item projection failure offers retry and never reconstructs lifecycle
   expect(attempts).toBeGreaterThanOrEqual(2);
 });
 
+test('failed partial apply names missing recovery evidence without offering retry', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockProjectWorkItem(page, {
+    stage: 'Build',
+    state: 'Failed',
+    gateState: 'Blocked',
+    gateReason: 'Post-apply validation failed after source mutation began.',
+    nextSafeAction: 'Inspect recovery evidence before any retry decision.',
+    primaryActionKind: 'RepairOrRetry',
+    primaryActionLabel: 'Review failure',
+    applyRecovery: {
+      status: 'RecoveryEvidenceMissing',
+      required: true,
+      applyAttemptObserved: true,
+      partialMutationPossible: true,
+      succeededStageCount: 1,
+      failedStageCount: 1,
+      failedStages: ['PostApplyValidation'],
+      technicalDetails: ['dotnet test returned exit code 1'],
+      existingReceiptCount: 1,
+      missingReceiptCount: 1,
+      reason: 'A partial apply is possible because a stage succeeded before validation failed.',
+      nextSafeAction: 'Inspect source state and supply rollback evidence before retrying apply.',
+      retryAllowed: false,
+      humanReviewRequired: true,
+      boundary: 'Inspection does not retry apply or execute rollback.'
+    }
+  });
+
+  await page.goto('/projects/7/work-items/42');
+
+  const recovery = page.getByTestId('flow.workItem.applyRecovery');
+  await expect(recovery).toContainText('Recovery evidence required');
+  await expect(recovery).toContainText('Succeeded stages');
+  await expect(recovery).toContainText('Missing receipts');
+  await expect(recovery).toContainText('supply rollback evidence before retrying apply');
+  await recovery.getByText('Failure details', { exact: true }).click();
+  await expect(recovery).toContainText('dotnet test returned exit code 1');
+  await expect(page.getByRole('button', { name: 'Retry apply' })).toHaveCount(0);
+  if (process.env.IRONDEV_VISUAL_CAPTURE === '1') {
+    await page.screenshot({ path: 'reports/visual-smoke/apply-recovery-1.png', fullPage: true });
+  }
+});
+
 test('Discuss in Chat routes to the exact backend-linked session', async ({ page }) => {
   await mockWorkspace(page);
   await mockProjectWorkItem(page, { linkedChatSessionId: 9007 });

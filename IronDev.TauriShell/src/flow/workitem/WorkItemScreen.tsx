@@ -90,6 +90,19 @@ function stageFromProjection(stage: string | null | undefined): WorkItemStage {
   }
 }
 
+function applyRecoveryStatusLabel(status: string | null | undefined): string {
+  switch (status) {
+    case 'ApplyRefused':
+      return 'Apply refused';
+    case 'RecoveryEvidenceMissing':
+      return 'Recovery evidence missing';
+    case 'Applied':
+      return 'Applied';
+    default:
+      return 'Not required';
+  }
+}
+
 export function WorkItemScreen({
   ticket,
   onTicketCreated,
@@ -725,6 +738,35 @@ export function WorkItemScreen({
               <ul>{workItem.gate.technicalDetails?.map((detail) => <li key={detail}>{detail}</li>)}</ul>
             </details>
           ) : null}
+        </section>
+      ) : null}
+
+      {workItem && !['NotRequired', 'Applied'].includes(workItem.applyRecovery.status ?? '') ? (
+        <section className="fl-apply-recovery" data-testid="flow.workItem.applyRecovery">
+          <div className="fl-apply-recovery-head">
+            <div>
+              <p className="fl-plabel">Apply recovery</p>
+              <strong>{workItem.applyRecovery.required ? 'Recovery evidence required' : 'Apply refused before recovery'}</strong>
+            </div>
+            <span>{applyRecoveryStatusLabel(workItem.applyRecovery.status)}</span>
+          </div>
+          <p>{workItem.applyRecovery.reason}</p>
+          {workItem.applyRecovery.required ? (
+            <dl className="fl-apply-recovery-facts">
+              <div><dt>Succeeded stages</dt><dd>{workItem.applyRecovery.succeededStageCount ?? 0}</dd></div>
+              <div><dt>Failed stages</dt><dd>{workItem.applyRecovery.failedStageCount ?? 0}</dd></div>
+              <div><dt>Existing receipts</dt><dd>{workItem.applyRecovery.existingReceiptCount ?? 0}</dd></div>
+              <div><dt>Missing receipts</dt><dd>{workItem.applyRecovery.missingReceiptCount ?? 0}</dd></div>
+            </dl>
+          ) : null}
+          <p><strong>Next safe action:</strong> {workItem.applyRecovery.nextSafeAction}</p>
+          {(workItem.applyRecovery.technicalDetails?.length ?? 0) > 0 ? (
+            <details>
+              <summary>Failure details</summary>
+              <ul>{workItem.applyRecovery.technicalDetails?.map((detail) => <li key={detail}>{detail}</li>)}</ul>
+            </details>
+          ) : null}
+          <small>{workItem.applyRecovery.boundary}</small>
         </section>
       ) : null}
 
