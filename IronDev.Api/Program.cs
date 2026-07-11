@@ -190,6 +190,7 @@ builder.Services.AddScoped<IProjectDocumentProcessingService, ProjectDocumentPro
 builder.Services.AddScoped<IProjectContextExportService, ProjectContextExportService>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<IronDev.Core.Board.IProjectBoardReadService, ProjectBoardReadService>();
+builder.Services.AddScoped<IronDev.Core.WorkItems.IProjectWorkItemReadService, ProjectWorkItemReadService>();
 builder.Services.AddScoped<SqlCodeIndexService>();
 builder.Services.AddScoped<ICodeIndexService, TracingCodeIndexServiceDecorator>();
 builder.Services.AddScoped<global::IronDev.Infrastructure.Services.IDeepCodeLookupService, global::IronDev.Infrastructure.Services.DeepCodeLookupService>();
