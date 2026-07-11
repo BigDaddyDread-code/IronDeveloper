@@ -206,6 +206,71 @@ public sealed class ProjectWorkItemProjectorTests
     }
 
     [TestMethod]
+    public void Build_InterruptedPreMutationAttemptOffersBackendConstrainedRecovery()
+    {
+        var report = Report() with
+        {
+            Apply = new SkeletonRunApplyTrace
+            {
+                Attempts =
+                [
+                    new SkeletonRunApplyAttemptTrace
+                    {
+                        AttemptId = "run-42-apply-001",
+                        AttemptNumber = 1,
+                        Status = SkeletonApplyAttemptStatuses.Interrupted,
+                        MutationState = SkeletonApplyMutationStates.NotObserved,
+                        AvailableActions =
+                        [
+                            SkeletonApplyRecoveryActions.Resume,
+                            SkeletonApplyRecoveryActions.Retry,
+                            SkeletonApplyRecoveryActions.ManualReview,
+                            SkeletonApplyRecoveryActions.Abandon
+                        ]
+                    }
+                ]
+            }
+        };
+
+        var model = Build(Ticket(), Run(RunLifecycleState.Completed), report, Ready());
+
+        Assert.AreEqual(ProjectWorkItemApplyRecoveryStatuses.Interrupted, model.ApplyRecovery.Status);
+        Assert.AreEqual(ProjectWorkItemActionKinds.RecoverApply, model.PrimaryAction.Kind);
+        Assert.IsTrue(model.ApplyRecovery.RetryAllowed);
+        Assert.AreEqual("run-42-apply-001", model.ApplyRecovery.ApplyAttemptId);
+        CollectionAssert.Contains(model.ApplyRecovery.AvailableActions.ToList(), SkeletonApplyRecoveryActions.Resume);
+    }
+
+    [TestMethod]
+    public void Build_UncertainMutationNeverOffersRetry()
+    {
+        var report = Report() with
+        {
+            Apply = new SkeletonRunApplyTrace
+            {
+                Attempts =
+                [
+                    new SkeletonRunApplyAttemptTrace
+                    {
+                        AttemptId = "run-42-apply-001",
+                        AttemptNumber = 1,
+                        Status = SkeletonApplyAttemptStatuses.Interrupted,
+                        MutationState = SkeletonApplyMutationStates.Uncertain,
+                        AvailableActions = [SkeletonApplyRecoveryActions.ManualReview, SkeletonApplyRecoveryActions.Abandon]
+                    }
+                ]
+            }
+        };
+
+        var model = Build(Ticket(), Run(RunLifecycleState.Completed), report, Ready());
+
+        Assert.AreEqual(ProjectWorkItemApplyRecoveryStatuses.ManualReviewRequired, model.ApplyRecovery.Status);
+        Assert.IsFalse(model.ApplyRecovery.RetryAllowed);
+        Assert.IsTrue(model.ApplyRecovery.PartialMutationPossible);
+        CollectionAssert.DoesNotContain(model.ApplyRecovery.AvailableActions.ToList(), SkeletonApplyRecoveryActions.Retry);
+    }
+
+    [TestMethod]
     public void Build_ArtifactsWithoutDurableExecutionEventRemainProofMissing()
     {
         var report = Report() with

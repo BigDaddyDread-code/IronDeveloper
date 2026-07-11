@@ -35,58 +35,75 @@ public sealed class SkeletonApplySpine
         SkeletonCriticPackage approvedPackage,
         string approvedByActorId,
         string approvalReason,
+        Func<string, Task>? onStageStarted = null,
+        Func<StageOutcome, Task>? onStageCompleted = null,
         CancellationToken cancellationToken = default)
     {
         var stages = new List<StageOutcome>();
         var workspacePath = Path.Combine(workspaceRoot, applyRunId);
 
+        async Task StartStageAsync(string stage)
+        {
+            if (onStageStarted is not null)
+                await onStageStarted(stage).ConfigureAwait(false);
+        }
+
+        async Task<bool> CompleteStageAsync(StageOutcome stage)
+        {
+            stages.Add(stage);
+            if (onStageCompleted is not null)
+                await onStageCompleted(stage).ConfigureAwait(false);
+            return stage.Succeeded;
+        }
+
+        await StartStageAsync("prepare").ConfigureAwait(false);
         var prepare = await new DisposableWorkspacePrepareService(new DisposableWorkspaceReadinessService()).PrepareAsync(new DisposableWorkspacePrepareRequest
         {
             RunId = applyRunId,
             SourceRepo = sourceRepo,
             WorkspaceRoot = workspaceRoot
         }, cancellationToken).ConfigureAwait(false);
-        stages.Add(new StageOutcome("prepare", prepare.ExitCode == 0, prepare.Summary, prepare.Errors));
-        if (prepare.ExitCode != 0)
+        if (!await CompleteStageAsync(new StageOutcome("prepare", prepare.ExitCode == 0, prepare.Summary, prepare.Errors)).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
+        await StartStageAsync("materialize-approved-changes").ConfigureAwait(false);
         var materialize = MaterializeApprovedChanges(workspacePath, approvedPackage);
-        stages.Add(materialize);
-        if (!materialize.Succeeded)
+        if (!await CompleteStageAsync(materialize).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
         // Validation runs against the materialized workspace: what gets validated is
         // exactly what will be applied.
+        await StartStageAsync("validate").ConfigureAwait(false);
         var validation = await new DisposableWorkspaceValidationService(new DisposableWorkspaceCommandService()).ValidateAsync(new DisposableWorkspaceValidationRequest
         {
             RunId = applyRunId,
             WorkspacePath = workspacePath,
             ProfileId = "dotnet-build-test"
         }, cancellationToken).ConfigureAwait(false);
-        stages.Add(new StageOutcome("validate", validation.ExitCode == 0, validation.Summary, validation.Errors));
-        if (validation.ExitCode != 0)
+        if (!await CompleteStageAsync(new StageOutcome("validate", validation.ExitCode == 0, validation.Summary, validation.Errors)).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
+        await StartStageAsync("diff").ConfigureAwait(false);
         var diff = await new DisposableWorkspaceDiffService().DiffAsync(new DisposableWorkspaceDiffRequest
         {
             RunId = applyRunId,
             WorkspacePath = workspacePath
         }, cancellationToken).ConfigureAwait(false);
-        stages.Add(new StageOutcome("diff", diff.ExitCode == 0, diff.Summary, diff.Errors));
-        if (diff.ExitCode != 0)
+        if (!await CompleteStageAsync(new StageOutcome("diff", diff.ExitCode == 0, diff.Summary, diff.Errors)).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
+        await StartStageAsync("promotion-package").ConfigureAwait(false);
         var package = await new DisposableWorkspacePromotionPackageService().CreateAsync(new DisposableWorkspacePromotionPackageRequest
         {
             RunId = applyRunId,
             WorkspacePath = workspacePath
         }, cancellationToken).ConfigureAwait(false);
-        stages.Add(new StageOutcome("promotion-package", package.ExitCode == 0, package.Summary, package.Errors));
-        if (package.ExitCode != 0)
+        if (!await CompleteStageAsync(new StageOutcome("promotion-package", package.ExitCode == 0, package.Summary, package.Errors)).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
         // Records the human decision already made through the accepted-approvals
         // surface into workspace evidence. This stage records; it does not decide.
+        await StartStageAsync("promotion-approval").ConfigureAwait(false);
         var approval = await new DisposableWorkspacePromotionApprovalService().CreateAsync(new DisposableWorkspacePromotionApprovalRequest
         {
             RunId = applyRunId,
@@ -95,43 +112,43 @@ public sealed class SkeletonApplySpine
             ApprovedBy = approvedByActorId,
             Reason = approvalReason
         }, cancellationToken).ConfigureAwait(false);
-        stages.Add(new StageOutcome("promotion-approval", approval.ExitCode == 0, approval.Summary, approval.Errors));
-        if (approval.ExitCode != 0)
+        if (!await CompleteStageAsync(new StageOutcome("promotion-approval", approval.ExitCode == 0, approval.Summary, approval.Errors)).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
+        await StartStageAsync("apply-preflight").ConfigureAwait(false);
         var preflight = await new DisposableWorkspaceApplyPreflightService().CheckAsync(new DisposableWorkspaceApplyPreflightRequest
         {
             RunId = applyRunId,
             WorkspacePath = workspacePath
         }, cancellationToken).ConfigureAwait(false);
-        stages.Add(new StageOutcome("apply-preflight", preflight.ExitCode == 0, preflight.Summary, preflight.Errors));
-        if (preflight.ExitCode != 0)
+        if (!await CompleteStageAsync(new StageOutcome("apply-preflight", preflight.ExitCode == 0, preflight.Summary, preflight.Errors)).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
+        await StartStageAsync("apply-dry-run").ConfigureAwait(false);
         var dryRun = await new DisposableWorkspaceApplyDryRunService().CheckAsync(new DisposableWorkspaceApplyDryRunRequest
         {
             RunId = applyRunId,
             WorkspacePath = workspacePath
         }, cancellationToken).ConfigureAwait(false);
-        stages.Add(new StageOutcome("apply-dry-run", dryRun.ExitCode == 0, dryRun.Summary, dryRun.Errors));
-        if (dryRun.ExitCode != 0)
+        if (!await CompleteStageAsync(new StageOutcome("apply-dry-run", dryRun.ExitCode == 0, dryRun.Summary, dryRun.Errors)).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
+        await StartStageAsync("apply-copy").ConfigureAwait(false);
         var copy = await new DisposableWorkspaceApplyCopyService().ApplyAsync(new DisposableWorkspaceApplyCopyRequest
         {
             RunId = applyRunId,
             WorkspacePath = workspacePath
         }, cancellationToken).ConfigureAwait(false);
-        stages.Add(new StageOutcome("apply-copy", copy.ExitCode == 0, copy.Summary, copy.Errors));
-        if (copy.ExitCode != 0)
+        if (!await CompleteStageAsync(new StageOutcome("apply-copy", copy.ExitCode == 0, copy.Summary, copy.Errors)).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
+        await StartStageAsync("apply-verify").ConfigureAwait(false);
         var verify = await new DisposableWorkspaceApplyVerifyService().VerifyAsync(new DisposableWorkspaceApplyVerifyRequest
         {
             RunId = applyRunId,
             WorkspacePath = workspacePath
         }, cancellationToken).ConfigureAwait(false);
-        stages.Add(new StageOutcome("apply-verify", verify.ExitCode == 0, verify.Summary, verify.Errors));
+        await CompleteStageAsync(new StageOutcome("apply-verify", verify.ExitCode == 0, verify.Summary, verify.Errors)).ConfigureAwait(false);
 
         return Result(verify.ExitCode == 0, workspacePath, stages);
     }

@@ -772,7 +772,9 @@ public sealed class SkeletonRunTests
         Assert.IsFalse(Directory.Exists(Path.Combine(repo.Path, ".irondev")), "Workspace evidence must stay out of the source repository.");
 
         var workspacePath = applied.Payload["workspacePath"];
-        var evidenceDir = Path.Combine(workspacePath, ".irondev", "runs", $"{run.RunId}-apply");
+        var applyAttemptId = applied.Payload["applyAttemptId"];
+        Assert.AreEqual($"{run.RunId}-apply-001", applyAttemptId);
+        var evidenceDir = Path.Combine(workspacePath, ".irondev", "runs", applyAttemptId);
         foreach (var evidence in new[] { "promotion-package.json", "promotion-approval.json", "apply-preflight.json", "apply-dry-run.json", "apply-copy.json" })
         {
             Assert.IsTrue(File.Exists(Path.Combine(evidenceDir, evidence)), $"The evidence chain is the receipt: missing {evidence}.");
@@ -1244,8 +1246,15 @@ public sealed class SkeletonRunTests
         // REVISE-1 adds ReviseAsync: a HUMAN-directed, bounded revision at the gate —
         // proposal-shaped work only. It mints no approval and the revised package
         // needs its own critic review, dispositions, and hash-bound approval.
-        CollectionAssert.AreEquivalent(new[] { "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ReviseAsync", "ApplyAsync", "GetRunReportAsync" }, methods,
-            "The skeleton contract is start + read-package + approval-gated continue + human-directed revise + governed apply + read-report: no approve, promote, commit, push, release, or review-create surface.");
+        // V2-FINAL-3 adds actor-aware apply and explicit recovery. Recovery can only
+        // create a fresh attempt when durable stage evidence proves mutation was not
+        // observed; it cannot approve, commit, push, release, or invent authority.
+        CollectionAssert.AreEquivalent(new[]
+        {
+            "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ReviseAsync", "ApplyAsync", "ApplyAsAsync",
+            "RecoverApplyAsync", "GetRunReportAsync"
+        }, methods,
+            "The skeleton contract exposes governed apply recovery without adding approve, promote, commit, push, release, or review-create authority.");
     }
 
     // ── Workspace containment: file writes cannot escape ──────────────────────

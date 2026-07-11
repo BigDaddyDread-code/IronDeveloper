@@ -912,7 +912,111 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         return ToDto(revised, projectId, ticketId, requiresHumanApproval: revised.State == RunLifecycleState.PausedForApproval);
     }
 
-    public async Task<TicketBuildRunDto?> ApplyAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default)
+    public Task<TicketBuildRunDto?> ApplyAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken cancellationToken = default) =>
+        ApplyAsAsync(projectId, ticketId, runId, "unknown-user", cancellationToken);
+
+    public Task<TicketBuildRunDto?> ApplyAsAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        string requestedByUserId,
+        CancellationToken cancellationToken = default) =>
+        ApplyAttemptAsync(projectId, ticketId, runId, "Start", "Initial governed apply request.", requestedByUserId, false, cancellationToken);
+
+    public async Task<TicketBuildRunDto?> RecoverApplyAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        SkeletonApplyRecoveryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
+        if (ticket is null || ticket.ProjectId != projectId)
+            return null;
+
+        var run = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (run is null || run.ProjectId != projectId || run.TicketId != ticketId)
+            return null;
+
+        var action = request.Action?.Trim() ?? string.Empty;
+        var reason = request.Reason?.Trim() ?? string.Empty;
+        var actor = string.IsNullOrWhiteSpace(request.RequestedByUserId) ? "unknown-user" : request.RequestedByUserId.Trim();
+        if (!SkeletonApplyRecoveryActions.IsSupported(action) || reason.Length == 0)
+        {
+            return await RefuseRecoveryAsync(run, projectId, ticketId, action, actor,
+                "Recovery requires a supported action and the acting human's reason.", cancellationToken).ConfigureAwait(false);
+        }
+
+        var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        var latest = SkeletonApplyAttemptProjector.Build(events).LastOrDefault();
+        if (latest is null)
+        {
+            return await RefuseRecoveryAsync(run, projectId, ticketId, action, actor,
+                "No attempt-scoped apply evidence exists to recover.", cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!latest.AvailableActions.Contains(action, StringComparer.Ordinal))
+        {
+            return await RefuseRecoveryAsync(run, projectId, ticketId, action, actor,
+                $"{action} is not safe for attempt {latest.AttemptId}. Mutation state is {latest.MutationState}; available actions are {string.Join(", ", latest.AvailableActions)}.",
+                cancellationToken,
+                latest).ConfigureAwait(false);
+        }
+
+        await PublishAsync(runId, "SkeletonApplyRecoveryDecision",
+            $"{action} selected for apply attempt {latest.AttemptId}: {reason}",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["applyAttemptId"] = latest.AttemptId,
+                ["attemptNumber"] = latest.AttemptNumber.ToString(),
+                ["recoveryAction"] = action,
+                ["reason"] = reason,
+                ["requestedByUserId"] = actor,
+                ["mutationState"] = latest.MutationState,
+                ["currentNode"] = "SkeletonApplyRecovery"
+            }, cancellationToken).ConfigureAwait(false);
+
+        if (action == SkeletonApplyRecoveryActions.ManualReview)
+            return ToDto(run, projectId, ticketId, requiresHumanApproval: false);
+
+        if (action == SkeletonApplyRecoveryActions.Abandon)
+        {
+            await PublishAsync(runId, "SkeletonApplyAttemptAbandoned",
+                $"Apply attempt {latest.AttemptId} was abandoned by {actor}. No retry was executed.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["applyAttemptId"] = latest.AttemptId,
+                    ["attemptNumber"] = latest.AttemptNumber.ToString(),
+                    ["reason"] = reason,
+                    ["requestedByUserId"] = actor,
+                    ["currentNode"] = "SkeletonApplyRecovery"
+                }, cancellationToken).ConfigureAwait(false);
+            await _runs.TransitionAsync(new RunStateTransition
+            {
+                RunId = runId,
+                State = RunLifecycleState.Cancelled,
+                Summary = $"Apply recovery abandoned by {actor}. Preserved attempt: {latest.AttemptId}."
+            }, cancellationToken).ConfigureAwait(false);
+            var abandoned = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
+            return ToDto(abandoned, projectId, ticketId, requiresHumanApproval: false);
+        }
+
+        return await ApplyAttemptAsync(projectId, ticketId, runId, action, reason, actor, true, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<TicketBuildRunDto?> ApplyAttemptAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        string requestedAction,
+        string recoveryReason,
+        string requestedByUserId,
+        bool isRecovery,
+        CancellationToken cancellationToken)
     {
         var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
         if (ticket is null || ticket.ProjectId != projectId)
@@ -938,6 +1042,13 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // Continuation must have been unblocked, proven from durable events —
         // never from the request or a cached flag.
         var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        if (!isRecovery && SkeletonApplyAttemptProjector.Build(events).Count > 0)
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                "RecoveryDecisionRequired",
+                "A prior apply attempt exists. Choose a backend-offered recovery action instead of starting apply again.",
+                cancellationToken).ConfigureAwait(false);
+        }
         if (run.State != RunLifecycleState.Completed ||
             !events.Any(runEvent => string.Equals(runEvent.EventType, "SkeletonContinuationUnblocked", StringComparison.Ordinal)))
         {
@@ -1041,41 +1152,89 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 cancellationToken).ConfigureAwait(false);
         }
 
+        var attemptNumber = SkeletonApplyAttemptProjector.Build(events).Count + 1;
+        var applyAttemptId = $"{runId}-apply-{attemptNumber:D3}";
+        var spineWorkspaceRoot = ResolveWorkspaceRoot();
+        var attemptWorkspacePath = Path.Combine(spineWorkspaceRoot, applyAttemptId);
+        var currentStage = string.Empty;
+
         try
         {
+            await PublishAsync(runId, "SkeletonApplyAttemptStarted",
+                $"Apply attempt {attemptNumber} started as a fresh preserved workspace ({requestedAction}).",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["applyAttemptId"] = applyAttemptId,
+                    ["attemptNumber"] = attemptNumber.ToString(),
+                    ["requestedAction"] = requestedAction,
+                    ["requestedByUserId"] = requestedByUserId,
+                    ["reason"] = recoveryReason,
+                    ["workspacePath"] = attemptWorkspacePath,
+                    ["currentNode"] = "SkeletonApply"
+                }, cancellationToken).ConfigureAwait(false);
+
             await PublishAsync(runId, "SkeletonApplyStarted",
                 "Governed apply spine started: copy-only, evidence-chained, into and out of a prepared workspace. No commit, no push, no release.",
                 projectId, ticketId, new Dictionary<string, string>
                 {
+                    ["applyAttemptId"] = applyAttemptId,
+                    ["attemptNumber"] = attemptNumber.ToString(),
                     ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
                     ["approvalTargetHash"] = packageHash,
                     ["mutationLeaseId"] = lease.LeaseId,
                     ["currentNode"] = "SkeletonApply"
                 }, cancellationToken).ConfigureAwait(false);
 
-            var spineWorkspaceRoot = ResolveWorkspaceRoot();
             Directory.CreateDirectory(spineWorkspaceRoot);
 
-            var spineResult = await new SkeletonApplySpine().RunAsync(
-                applyRunId: $"{runId}-apply",
-                sourceRepo: project.LocalPath!,
-                workspaceRoot: spineWorkspaceRoot,
-                approvedPackage: package,
-                approvedByActorId: approvedByActorId,
-                approvalReason: $"Mirrors AcceptedApprovalRecord {satisfied.AcceptedApprovalId:D} bound to package hash {packageHash}. This stage records the decision; it did not make it.",
-                cancellationToken).ConfigureAwait(false);
-
-            foreach (var stage in spineResult.Stages)
+            SkeletonApplySpine.SpineResult spineResult;
+            try
             {
-                await PublishAsync(runId, "SkeletonApplyStage",
-                    $"{stage.Stage}: {(stage.Succeeded ? "completed" : "blocked")} — {stage.Summary}",
-                    projectId, ticketId, new Dictionary<string, string>
+                spineResult = await new SkeletonApplySpine().RunAsync(
+                    applyRunId: applyAttemptId,
+                    sourceRepo: project.LocalPath!,
+                    workspaceRoot: spineWorkspaceRoot,
+                    approvedPackage: package,
+                    approvedByActorId: approvedByActorId,
+                    approvalReason: $"Mirrors AcceptedApprovalRecord {satisfied.AcceptedApprovalId:D} bound to package hash {packageHash}. This stage records the decision; it did not make it.",
+                    onStageStarted: async stage =>
                     {
-                        ["stage"] = stage.Stage,
-                        ["succeeded"] = stage.Succeeded.ToString().ToLowerInvariant(),
-                        ["errors"] = string.Join(" | ", stage.Errors),
-                        ["currentNode"] = "SkeletonApply"
-                    }, cancellationToken).ConfigureAwait(false);
+                        currentStage = stage;
+                        await PublishAsync(runId, "SkeletonApplyStageStarted",
+                            $"Apply attempt {attemptNumber} entered stage {stage}.",
+                            projectId, ticketId, new Dictionary<string, string>
+                            {
+                                ["applyAttemptId"] = applyAttemptId,
+                                ["attemptNumber"] = attemptNumber.ToString(),
+                                ["stage"] = stage,
+                                ["currentNode"] = "SkeletonApply"
+                            }, cancellationToken).ConfigureAwait(false);
+                    },
+                    onStageCompleted: stage => PublishAsync(runId, "SkeletonApplyStage",
+                        $"{stage.Stage}: {(stage.Succeeded ? "completed" : "blocked")} - {stage.Summary}",
+                        projectId, ticketId, new Dictionary<string, string>
+                        {
+                            ["applyAttemptId"] = applyAttemptId,
+                            ["attemptNumber"] = attemptNumber.ToString(),
+                            ["stage"] = stage.Stage,
+                            ["succeeded"] = stage.Succeeded.ToString().ToLowerInvariant(),
+                            ["errors"] = string.Join(" | ", stage.Errors),
+                            ["currentNode"] = "SkeletonApply"
+                        }, cancellationToken),
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                await PublishInterruptedAsync(run, projectId, ticketId, applyAttemptId, attemptNumber, currentStage,
+                    "The apply request was interrupted or cancelled. Reload backend truth before choosing recovery.").ConfigureAwait(false);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await PublishInterruptedAsync(run, projectId, ticketId, applyAttemptId, attemptNumber, currentStage,
+                    $"The apply process stopped unexpectedly: {ex.Message}").ConfigureAwait(false);
+                var interrupted = await _runs.GetAsync(runId, CancellationToken.None).ConfigureAwait(false) ?? run;
+                return ToDto(interrupted, projectId, ticketId, requiresHumanApproval: false);
             }
 
             if (!spineResult.Succeeded)
@@ -1083,7 +1242,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 return await RefuseApplyAsync(run, projectId, ticketId,
                     $"SpineBlocked:{spineResult.FailedStage}",
                     $"The governed apply spine blocked at '{spineResult.FailedStage}'. The workspace evidence chain records why; nothing was silently applied.",
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    applyAttemptId,
+                    attemptNumber).ConfigureAwait(false);
             }
 
             await _runs.TransitionAsync(new RunStateTransition
@@ -1098,6 +1259,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 "Apply spine succeeded and the run was promoted to the canonical apply boundary. Promotion is not commit, push, release, or deployment authority.",
                 projectId, ticketId, new Dictionary<string, string>
                 {
+                    ["applyAttemptId"] = applyAttemptId,
+                    ["attemptNumber"] = attemptNumber.ToString(),
                     ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
                     ["workspacePath"] = spineResult.WorkspacePath,
                     ["currentNode"] = "SkeletonApply"
@@ -1115,6 +1278,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 "Applied through the governed workspace spine. The workspace evidence chain is the receipt. Copy-only: commit, push, and release remain separate governed steps.",
                 projectId, ticketId, new Dictionary<string, string>
                 {
+                    ["applyAttemptId"] = applyAttemptId,
+                    ["attemptNumber"] = attemptNumber.ToString(),
                     ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
                     ["workspacePath"] = spineResult.WorkspacePath,
                     ["evidenceChain"] = string.Join(",", spineResult.Stages.Select(stage => stage.Stage)),
@@ -1138,19 +1303,71 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         long ticketId,
         string refusedReason,
         string message,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? applyAttemptId = null,
+        int? attemptNumber = null)
     {
+        var payload = new Dictionary<string, string>
+        {
+            ["refusedReason"] = refusedReason,
+            ["currentNode"] = "SkeletonApply"
+        };
+        if (!string.IsNullOrWhiteSpace(applyAttemptId))
+        {
+            payload["applyAttemptId"] = applyAttemptId;
+            payload["attemptNumber"] = attemptNumber?.ToString() ?? string.Empty;
+        }
+
         await PublishAsync(run.RunId, "SkeletonApplyRefused",
             $"Apply refused: {message}",
-            projectId, ticketId, new Dictionary<string, string>
-            {
-                ["refusedReason"] = refusedReason,
-                ["currentNode"] = "SkeletonApply"
-            }, cancellationToken).ConfigureAwait(false);
+            projectId, ticketId, payload, cancellationToken).ConfigureAwait(false);
 
         var current = await _runs.GetAsync(run.RunId, cancellationToken).ConfigureAwait(false) ?? run;
         return ToDto(current, projectId, ticketId, requiresHumanApproval: current.State == RunLifecycleState.PausedForApproval);
     }
+
+    private async Task<TicketBuildRunDto> RefuseRecoveryAsync(
+        RunRecord run,
+        int projectId,
+        long ticketId,
+        string action,
+        string actor,
+        string message,
+        CancellationToken cancellationToken,
+        SkeletonRunApplyAttemptTrace? attempt = null)
+    {
+        await PublishAsync(run.RunId, "SkeletonApplyRecoveryRefused",
+            $"Apply recovery refused: {message}",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["recoveryAction"] = action,
+                ["requestedByUserId"] = actor,
+                ["refusedReason"] = message,
+                ["currentNode"] = "SkeletonApplyRecovery"
+            }, cancellationToken).ConfigureAwait(false);
+        throw new SkeletonApplyRecoveryRefusedException(
+            message,
+            attempt?.AttemptId ?? string.Empty,
+            attempt?.MutationState ?? string.Empty,
+            attempt?.AvailableActions);
+    }
+
+    private Task PublishInterruptedAsync(
+        RunRecord run,
+        int projectId,
+        long ticketId,
+        string applyAttemptId,
+        int attemptNumber,
+        string stage,
+        string message) =>
+        PublishAsync(run.RunId, "SkeletonApplyInterrupted", message,
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["applyAttemptId"] = applyAttemptId,
+                ["attemptNumber"] = attemptNumber.ToString(),
+                ["stage"] = stage,
+                ["currentNode"] = "SkeletonApplyRecovery"
+            }, CancellationToken.None);
 
     /// <summary>
     /// Deterministic governance-scope Guid for an int project id, so approvals recorded
@@ -1462,29 +1679,53 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
 
         // Apply link (P0-4): stages from durable events, receipts checked on disk.
         SkeletonRunApplyTrace? applyTrace = null;
-        var appliedEvent = events.FirstOrDefault(runEvent => runEvent.EventType == "SkeletonApplied");
+        var applyAttempts = SkeletonApplyAttemptProjector.Build(events)
+            .Select(attempt => attempt with
+            {
+                Receipts = string.IsNullOrWhiteSpace(attempt.WorkspacePath)
+                    ? []
+                    : ApplyReceiptChain.Select(receiptName =>
+                    {
+                        var receiptPath = Path.Combine(attempt.WorkspacePath, ".irondev", "runs", attempt.AttemptId, receiptName);
+                        return new SkeletonRunReceiptRef
+                        {
+                            Name = receiptName,
+                            Path = receiptPath,
+                            ExistsOnDisk = File.Exists(receiptPath)
+                        };
+                    }).ToArray()
+            })
+            .ToArray();
+        var latestApplyAttempt = applyAttempts.LastOrDefault();
+        var appliedEvent = events.LastOrDefault(runEvent => runEvent.EventType == "SkeletonApplied");
         var refusedEvent = events.LastOrDefault(runEvent => runEvent.EventType == "SkeletonApplyRefused");
-        var stageEvents = events.Where(runEvent => runEvent.EventType == "SkeletonApplyStage").ToList();
-        if (appliedEvent is not null || refusedEvent is not null || stageEvents.Count > 0)
+        var stageEvents = events
+            .Where(runEvent => runEvent.EventType == "SkeletonApplyStage" &&
+                (latestApplyAttempt is null || string.Equals(Payload(runEvent, "applyAttemptId"), latestApplyAttempt.AttemptId, StringComparison.Ordinal)))
+            .ToList();
+        if (appliedEvent is not null || refusedEvent is not null || stageEvents.Count > 0 || latestApplyAttempt is not null)
         {
-            var workspacePath = appliedEvent is null
+            var workspacePath = latestApplyAttempt?.WorkspacePath ?? (appliedEvent is null
                 ? run.WorkspacePath ?? string.Empty
-                : Payload(appliedEvent, "workspacePath");
+                : Payload(appliedEvent, "workspacePath"));
 
-            var receipts = new List<SkeletonRunReceiptRef>();
-            if (appliedEvent is not null && !string.IsNullOrEmpty(workspacePath))
+            var receipts = latestApplyAttempt?.Receipts.ToList() ?? [];
+            if (appliedEvent is not null && receipts.Count > 0)
+            {
+                foreach (var receipt in receipts)
+                {
+                    if (!receipt.ExistsOnDisk)
+                        gaps.Add($"Apply receipt '{receipt.Name}' is missing from the workspace evidence chain.");
+                }
+            }
+            else if (appliedEvent is not null && latestApplyAttempt is null && !string.IsNullOrEmpty(workspacePath))
             {
                 var receiptDir = Path.Combine(workspacePath, ".irondev", "runs", $"{runId}-apply");
                 foreach (var receiptName in ApplyReceiptChain)
                 {
                     var receiptPath = Path.Combine(receiptDir, receiptName);
                     var receiptExists = File.Exists(receiptPath);
-                    receipts.Add(new SkeletonRunReceiptRef
-                    {
-                        Name = receiptName,
-                        Path = receiptPath,
-                        ExistsOnDisk = receiptExists
-                    });
+                    receipts.Add(new SkeletonRunReceiptRef { Name = receiptName, Path = receiptPath, ExistsOnDisk = receiptExists });
                     if (!receiptExists)
                         gaps.Add($"Apply receipt '{receiptName}' is missing from the workspace evidence chain.");
                 }
@@ -1492,9 +1733,11 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
 
             applyTrace = new SkeletonRunApplyTrace
             {
-                Applied = appliedEvent is not null,
+                Applied = latestApplyAttempt?.Status == SkeletonApplyAttemptStatuses.Applied ||
+                    (latestApplyAttempt is null && appliedEvent is not null),
                 WorkspacePath = workspacePath,
-                RefusedReason = appliedEvent is null && refusedEvent is not null ? Payload(refusedEvent, "refusedReason") : string.Empty,
+                RefusedReason = latestApplyAttempt?.RefusedReason ??
+                    (appliedEvent is null && refusedEvent is not null ? Payload(refusedEvent, "refusedReason") : string.Empty),
                 Stages = stageEvents
                     .Select(stageEvent => new SkeletonRunApplyStageTrace
                     {
@@ -1503,7 +1746,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                         Errors = Payload(stageEvent, "errors")
                     })
                     .ToList(),
-                Receipts = receipts
+                Receipts = receipts,
+                Attempts = applyAttempts
             };
         }
 

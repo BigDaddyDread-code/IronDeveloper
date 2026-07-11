@@ -21,6 +21,7 @@ public static class ProjectWorkItemActionKinds
     public const string RefreshRun = "RefreshRun";
     public const string Review = "Review";
     public const string Apply = "Apply";
+    public const string RecoverApply = "RecoverApply";
     public const string RepairOrRetry = "RepairOrRetry";
     public const string ViewOutcome = "ViewOutcome";
 }
@@ -29,7 +30,12 @@ public static class ProjectWorkItemApplyRecoveryStatuses
 {
     public const string NotRequired = "NotRequired";
     public const string ApplyRefused = "ApplyRefused";
+    public const string ApplyInProgress = "ApplyInProgress";
     public const string RecoveryEvidenceMissing = "RecoveryEvidenceMissing";
+    public const string RetryReady = "RetryReady";
+    public const string Interrupted = "Interrupted";
+    public const string ManualReviewRequired = "ManualReviewRequired";
+    public const string Abandoned = "Abandoned";
     public const string Applied = "Applied";
 }
 
@@ -108,11 +114,16 @@ public sealed record ProjectWorkItemApplyRecoveryReadModel
     public string NextSafeAction { get; init; } = string.Empty;
     public bool RetryAllowed { get; init; }
     public bool HumanReviewRequired { get; init; }
+    public string ApplyAttemptId { get; init; } = string.Empty;
+    public int ApplyAttemptNumber { get; init; }
+    public string AttemptStatus { get; init; } = string.Empty;
+    public string MutationState { get; init; } = SkeletonApplyMutationStates.NotObserved;
+    public IReadOnlyList<string> AvailableActions { get; init; } = [];
     public string Boundary { get; init; } = BoundaryText;
 
     public const string BoundaryText =
-        "Apply recovery reports durable apply-stage and receipt observations only. It does not retry apply, execute " +
-        "rollback, run rollback audit, continue workflow, or declare recovery complete.";
+        "Apply recovery actions are constrained by durable attempt and stage evidence. A retry or resume always creates " +
+        "a fresh attempt; uncertain source mutation requires manual review or abandon and is never retried automatically.";
 }
 
 public sealed record ProjectWorkItemContractReadModel
@@ -215,7 +226,7 @@ public static class ProjectWorkItemProjector
         var stage = StageFor(ticket, latestRun);
         var waitingOn = WaitingOn(ticket, latestRun, readiness);
         var gate = GateFor(ticket, latestRun, report, readiness);
-        var action = ActionFor(latestRun, readiness);
+        var action = ActionFor(latestRun, readiness, report);
         var affectedFiles = SplitValues(ticket.LinkedFilePaths);
         var runActivity = (report?.Timeline ?? [])
             .OrderByDescending(entry => entry.TimestampUtc)
@@ -392,6 +403,58 @@ public static class ProjectWorkItemProjector
                 "No apply recovery action is required.");
         }
 
+        var latestAttempt = apply.Attempts.LastOrDefault();
+        if (latestAttempt is not null)
+        {
+            if (latestAttempt.Status == SkeletonApplyAttemptStatuses.Applied)
+            {
+                return AttemptRecovery(
+                    latestAttempt,
+                    ProjectWorkItemApplyRecoveryStatuses.Applied,
+                    "Controlled apply completed; failed-apply recovery is not active.",
+                    "Inspect the final report and receipts.");
+            }
+
+            if (latestAttempt.Status == SkeletonApplyAttemptStatuses.Abandoned)
+            {
+                return AttemptRecovery(
+                    latestAttempt,
+                    ProjectWorkItemApplyRecoveryStatuses.Abandoned,
+                    "The acting human abandoned this apply path. The preserved attempt remains evidence.",
+                    "Start a new governed run if the work should be reconsidered.");
+            }
+
+            if (latestAttempt.Status == SkeletonApplyAttemptStatuses.InProgress)
+            {
+                return AttemptRecovery(
+                    latestAttempt,
+                    ProjectWorkItemApplyRecoveryStatuses.ApplyInProgress,
+                    "The latest apply attempt has started and has no durable terminal event yet.",
+                    "Wait for the attempt to finish or refresh backend truth.");
+            }
+
+            var mutationUncertain = latestAttempt.MutationState != SkeletonApplyMutationStates.NotObserved;
+            var interrupted = latestAttempt.Status == SkeletonApplyAttemptStatuses.Interrupted;
+            var retryAllowed = latestAttempt.AvailableActions.Contains(SkeletonApplyRecoveryActions.Retry, StringComparer.Ordinal);
+            var reason = mutationUncertain
+                ? "Source mutation may have begun. The backend cannot prove a clean retry boundary from durable stage evidence."
+                : interrupted
+                    ? "The apply attempt did not reach a durable terminal state before source mutation was observed."
+                    : TextOr(latestAttempt.RefusedReason, "The apply attempt failed before source mutation was observed.");
+            var nextSafeAction = mutationUncertain
+                ? "Inspect the source repository and attempt evidence, then record manual review or abandon."
+                : interrupted
+                    ? "Choose resume or retry to create a fresh attempt, or record manual review or abandon."
+                    : "Choose retry to create a fresh attempt, or record manual review or abandon.";
+            var status = mutationUncertain
+                ? ProjectWorkItemApplyRecoveryStatuses.ManualReviewRequired
+                : interrupted
+                    ? ProjectWorkItemApplyRecoveryStatuses.Interrupted
+                    : ProjectWorkItemApplyRecoveryStatuses.RetryReady;
+
+            return AttemptRecovery(latestAttempt, status, reason, nextSafeAction, retryAllowed, true);
+        }
+
         if (apply.Applied)
         {
             return Recovery(
@@ -434,6 +497,39 @@ public static class ProjectWorkItemProjector
                 "Inspect failed stages and source state. Supply rollback and rollback-audit evidence before retrying apply.",
             RetryAllowed = false,
             HumanReviewRequired = true
+        };
+    }
+
+    private static ProjectWorkItemApplyRecoveryReadModel AttemptRecovery(
+        SkeletonRunApplyAttemptTrace attempt,
+        string status,
+        string reason,
+        string nextSafeAction,
+        bool retryAllowed = false,
+        bool required = false)
+    {
+        var failedStages = attempt.Stages.Where(stage => !stage.Succeeded).ToArray();
+        return new ProjectWorkItemApplyRecoveryReadModel
+        {
+            Status = status,
+            Required = required,
+            ApplyAttemptObserved = true,
+            PartialMutationPossible = attempt.MutationState != SkeletonApplyMutationStates.NotObserved,
+            SucceededStageCount = attempt.Stages.Count(stage => stage.Succeeded),
+            FailedStageCount = failedStages.Length,
+            FailedStages = failedStages.Select(stage => stage.Stage).ToArray(),
+            TechnicalDetails = failedStages.Select(stage => TextOr(stage.Errors, $"{stage.Stage} failed.")).ToArray(),
+            ExistingReceiptCount = attempt.Receipts.Count(receipt => receipt.ExistsOnDisk),
+            MissingReceiptCount = attempt.Receipts.Count(receipt => !receipt.ExistsOnDisk),
+            Reason = reason,
+            NextSafeAction = nextSafeAction,
+            RetryAllowed = retryAllowed,
+            HumanReviewRequired = required,
+            ApplyAttemptId = attempt.AttemptId,
+            ApplyAttemptNumber = attempt.AttemptNumber,
+            AttemptStatus = attempt.Status,
+            MutationState = attempt.MutationState,
+            AvailableActions = attempt.AvailableActions
         };
     }
 
@@ -577,7 +673,10 @@ public static class ProjectWorkItemProjector
         };
     }
 
-    private static ProjectWorkItemActionReadModel ActionFor(RunRecord? run, BuildReadinessResult readiness)
+    private static ProjectWorkItemActionReadModel ActionFor(
+        RunRecord? run,
+        BuildReadinessResult readiness,
+        SkeletonRunReport? report)
     {
         if (run is null)
         {
@@ -592,8 +691,21 @@ public static class ProjectWorkItemProjector
                 ProjectWorkItemActionKinds.RefreshRun, "Refresh run", true, "The run remains backend-owned."),
             RunLifecycleState.PausedForApproval => Action(
                 ProjectWorkItemActionKinds.Review, "Review waiting work", true, "Human review is required."),
+            RunLifecycleState.Completed or RunLifecycleState.Promoted when report?.Apply?.Attempts.LastOrDefault()?.Status == SkeletonApplyAttemptStatuses.InProgress => Action(
+                    ProjectWorkItemActionKinds.RefreshRun,
+                    "Refresh apply attempt",
+                    true,
+                    "The apply attempt has not published a durable terminal event."),
+            RunLifecycleState.Completed or RunLifecycleState.Promoted when report?.Apply?.Attempts.LastOrDefault() is { } attempt &&
+                attempt.Status != SkeletonApplyAttemptStatuses.Applied => Action(
+                    ProjectWorkItemActionKinds.RecoverApply,
+                    attempt.MutationState == SkeletonApplyMutationStates.NotObserved ? "Recover apply" : "Review uncertain apply",
+                    attempt.AvailableActions.Count > 0,
+                    "The backend has constrained recovery to actions justified by durable attempt evidence."),
             RunLifecycleState.Completed or RunLifecycleState.Promoted => Action(
                 ProjectWorkItemActionKinds.Apply, "Review controlled apply", true, "Apply remains a separate governed action."),
+            RunLifecycleState.Cancelled when report?.Apply?.Attempts.LastOrDefault()?.Status == SkeletonApplyAttemptStatuses.Abandoned => Action(
+                ProjectWorkItemActionKinds.ViewOutcome, "View abandoned apply", true, "The apply path was explicitly abandoned and no retry was executed."),
             RunLifecycleState.Failed or RunLifecycleState.Cancelled => Action(
                 ProjectWorkItemActionKinds.RepairOrRetry, "Review failure", true, "A human must inspect evidence before retry."),
             RunLifecycleState.Applied => Action(

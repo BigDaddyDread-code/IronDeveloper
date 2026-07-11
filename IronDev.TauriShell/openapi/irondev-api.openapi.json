@@ -11626,6 +11626,122 @@
         }
       }
     },
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/apply-recovery": {
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonApplyRecoveryBody"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonApplyRecoveryBody"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonApplyRecoveryBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketBuildRunDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketBuildRunDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketBuildRunDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/critic-package": {
       "get": {
         "tags": [
@@ -25255,6 +25371,29 @@
           "humanReviewRequired": {
             "type": "boolean"
           },
+          "applyAttemptId": {
+            "type": "string",
+            "nullable": true
+          },
+          "applyAttemptNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attemptStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "mutationState": {
+            "type": "string",
+            "nullable": true
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
           "boundary": {
             "type": "string",
             "nullable": true
@@ -28800,6 +28939,20 @@
         "type": "integer",
         "format": "int32"
       },
+      "SkeletonApplyRecoveryBody": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SkeletonAuthoredTest": {
         "required": [
           "content",
@@ -29833,6 +29986,82 @@
         },
         "additionalProperties": false
       },
+      "SkeletonRunApplyAttemptTrace": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "nullable": true
+          },
+          "attemptNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestedAction": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedByUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "workspacePath": {
+            "type": "string",
+            "nullable": true
+          },
+          "interruptedStage": {
+            "type": "string",
+            "nullable": true
+          },
+          "refusedReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "mutationState": {
+            "type": "string",
+            "nullable": true
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkeletonRunApplyStageTrace"
+            },
+            "nullable": true
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkeletonRunReceiptRef"
+            },
+            "nullable": true
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SkeletonRunApplyStageTrace": {
         "type": "object",
         "properties": {
@@ -29875,6 +30104,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SkeletonRunReceiptRef"
+            },
+            "nullable": true
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkeletonRunApplyAttemptTrace"
             },
             "nullable": true
           }

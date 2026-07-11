@@ -67,6 +67,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         var workspaceParent = TempDir("irondev-rel3-ws");
         var evidenceRoot = TempDir("irondev-rel3-ev");
         var sampleCopy = TempDir("irondev-rel3-src");
+        var unavailableSample = sampleCopy + "-temporarily-unavailable";
 
         try
         {
@@ -150,10 +151,33 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
             Assert.AreEqual("Completed", continued.Status);
             Assert.IsFalse(continued.RequiresHumanApproval);
 
+            Directory.Move(sampleCopy, unavailableSample);
+            TicketBuildRunDto failedApply;
+            try
+            {
+                failedApply = await PostJsonAsync<TicketBuildRunDto>(
+                    client,
+                    $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/apply",
+                    content: null);
+            }
+            finally
+            {
+                Directory.Move(unavailableSample, sampleCopy);
+            }
+            Assert.AreEqual("Completed", failedApply.Status);
+
+            var failedApplyReport = await GetJsonAsync<SkeletonRunReport>(
+                client,
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/report");
+            Assert.AreEqual(1, failedApplyReport.Apply!.Attempts.Count);
+            Assert.AreEqual(SkeletonApplyAttemptStatuses.Failed, failedApplyReport.Apply.Attempts[0].Status);
+            Assert.AreEqual(SkeletonApplyMutationStates.NotObserved, failedApplyReport.Apply.Attempts[0].MutationState);
+            CollectionAssert.Contains(failedApplyReport.Apply.Attempts[0].AvailableActions.ToList(), SkeletonApplyRecoveryActions.Retry);
+
             var applied = await PostJsonAsync<TicketBuildRunDto>(
                 client,
-                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/apply",
-                content: null);
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/apply-recovery",
+                new { action = SkeletonApplyRecoveryActions.Retry, reason = "Source fixture is available again; retry in a fresh preserved attempt." });
             Assert.AreEqual("Applied", applied.Status);
 
             var finalStatus = await GetJsonAsync<RunStatusDto>(client, $"/api/runs/{started.RunId}");
@@ -167,6 +191,22 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
             Assert.AreEqual(approval.AcceptedApprovalId.ToString("D"), finalReport.Approval!.AcceptedApprovalId);
             Assert.IsTrue(finalReport.Apply!.Applied);
             Assert.IsTrue(finalReport.Apply.Receipts.All(receipt => receipt.ExistsOnDisk));
+            Assert.AreEqual(2, finalReport.Apply.Attempts.Count);
+            Assert.AreEqual($"{started.RunId}-apply-001", finalReport.Apply.Attempts[0].AttemptId);
+            Assert.AreEqual(SkeletonApplyAttemptStatuses.Failed, finalReport.Apply.Attempts[0].Status);
+            Assert.AreNotEqual("unknown-user", finalReport.Apply.Attempts[0].RequestedByUserId);
+            Assert.AreEqual($"{started.RunId}-apply-002", finalReport.Apply.Attempts[1].AttemptId);
+            Assert.AreEqual(SkeletonApplyAttemptStatuses.Applied, finalReport.Apply.Attempts[1].Status);
+            Assert.AreEqual(SkeletonApplyRecoveryActions.Retry, finalReport.Apply.Attempts[1].RequestedAction);
+            Assert.AreNotEqual("unknown-user", finalReport.Apply.Attempts[1].RequestedByUserId);
+            StringAssert.Contains(finalReport.Apply.WorkspacePath, finalReport.Apply.Attempts[1].AttemptId);
+
+            var unsafeRetry = await client.PostAsJsonAsync(
+                $"/api/projects/{project.Id}/tickets/{ticket.Id}/skeleton-runs/{started.RunId}/apply-recovery",
+                new { action = SkeletonApplyRecoveryActions.Retry, reason = "Attempting to retry an already applied run must fail." });
+            Assert.AreEqual(HttpStatusCode.Conflict, unsafeRetry.StatusCode);
+            var unsafeRetryBody = await unsafeRetry.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.AreEqual("ApplyRecoveryRefused", unsafeRetryBody.GetProperty("code").GetString());
 
             await AssertSqlPersistenceAsync(started.RunId, project.Id, ticket.Id, approval.AcceptedApprovalId, packageHash);
 
@@ -229,6 +269,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         finally
         {
             TryDelete(sampleCopy);
+            TryDelete(unavailableSample);
             TryDelete(workspaceParent);
             TryDelete(evidenceRoot);
         }
@@ -773,6 +814,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
                      "ApprovalRequiredHalt",
                      "SkeletonCriticReviewRecorded",
                      "SkeletonContinuationUnblocked",
+                     "SkeletonApplyAttemptStarted",
                      "SkeletonApplyStarted",
                      "SkeletonApplyPromoted",
                      "SkeletonApplied"

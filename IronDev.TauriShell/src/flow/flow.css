@@ -1220,6 +1220,39 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.fl-apply-recovery-actions {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.fl-apply-recovery-actions .fl-field {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fl-apply-recovery-actions textarea {
+  min-height: 72px;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 4px;
+  padding: 9px 10px;
+  background: var(--fl-surface);
+  color: var(--fl-ink);
+  font: inherit;
+  font-weight: 400;
+}
+
+.fl-apply-recovery-actions .fl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .fl-execution-proof {

@@ -97,6 +97,80 @@ test('failed partial apply names missing recovery evidence without offering retr
   }
 });
 
+test('interrupted pre-mutation apply submits a reasoned fresh retry attempt', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockRunEvidence(page);
+  let recoveryBody: Record<string, unknown> | null = null;
+  await page.route('**/irondev-api/api/projects/7/tickets/42/skeleton-runs/run-42/apply-recovery', async (route) => {
+    recoveryBody = await route.request().postDataJSON();
+    return json(route, {
+      runId: 'run-42', projectId: 7, ticketId: 42, status: 'Completed',
+      currentNode: 'SkeletonApplyRecovery', requiresHumanApproval: false,
+      message: 'Fresh retry attempt started.'
+    });
+  });
+  await mockProjectWorkItem(page, {
+    stage: 'Review',
+    state: 'Completed',
+    primaryActionKind: 'RecoverApply',
+    primaryActionLabel: 'Recover apply',
+    applyRecovery: {
+      status: 'Interrupted', required: true, applyAttemptObserved: true,
+      partialMutationPossible: false, succeededStageCount: 2, failedStageCount: 0,
+      failedStages: [], technicalDetails: [], existingReceiptCount: 2, missingReceiptCount: 0,
+      reason: 'The apply attempt was interrupted before source mutation was observed.',
+      nextSafeAction: 'Choose resume or retry to create a fresh attempt.',
+      retryAllowed: true, humanReviewRequired: true,
+      applyAttemptId: 'run-42-apply-001', applyAttemptNumber: 1,
+      attemptStatus: 'Interrupted', mutationState: 'NotObserved',
+      availableActions: ['Resume', 'Retry', 'ManualReview', 'Abandon'],
+      boundary: 'Recovery actions are constrained by durable evidence.'
+    }
+  });
+
+  await page.goto('/projects/7/work-items/42');
+
+  const recovery = page.getByTestId('flow.workItem.applyRecovery');
+  await expect(recovery).toContainText('run-42-apply-001');
+  await expect(recovery.getByRole('button', { name: 'Retry in new attempt' })).toBeDisabled();
+  await page.getByTestId('flow.workItem.applyRecovery.reason').fill('Validation stopped before copy; create a clean preserved retry.');
+  await recovery.getByRole('button', { name: 'Retry in new attempt' }).click();
+  await expect.poll(() => recoveryBody).not.toBeNull();
+  expect(recoveryBody).toEqual({ action: 'Retry', reason: 'Validation stopped before copy; create a clean preserved retry.' });
+});
+
+test('uncertain source mutation exposes manual review and abandon only', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockRunEvidence(page);
+  await mockProjectWorkItem(page, {
+    stage: 'Review',
+    state: 'Completed',
+    primaryActionKind: 'RecoverApply',
+    primaryActionLabel: 'Review uncertain apply',
+    applyRecovery: {
+      status: 'ManualReviewRequired', required: true, applyAttemptObserved: true,
+      partialMutationPossible: true, succeededStageCount: 7, failedStageCount: 0,
+      failedStages: [], technicalDetails: [], existingReceiptCount: 7, missingReceiptCount: 1,
+      reason: 'Source mutation may have begun.',
+      nextSafeAction: 'Inspect source state, then record manual review or abandon.',
+      retryAllowed: false, humanReviewRequired: true,
+      applyAttemptId: 'run-42-apply-001', applyAttemptNumber: 1,
+      attemptStatus: 'Interrupted', mutationState: 'Uncertain',
+      availableActions: ['ManualReview', 'Abandon'],
+      boundary: 'Uncertain source mutation is never retried automatically.'
+    }
+  });
+
+  await page.goto('/projects/7/work-items/42');
+
+  const recovery = page.getByTestId('flow.workItem.applyRecovery');
+  await expect(recovery).toContainText('Manual review required');
+  await expect(recovery.getByRole('button', { name: 'Resume in new attempt' })).toHaveCount(0);
+  await expect(recovery.getByRole('button', { name: 'Retry in new attempt' })).toHaveCount(0);
+  await expect(recovery.getByRole('button', { name: 'Record manual review' })).toBeVisible();
+  await expect(recovery.getByRole('button', { name: 'Abandon apply' })).toBeVisible();
+});
+
 test('execution proof renders durable events separately from artifact evidence', async ({ page }) => {
   await mockWorkspace(page);
   await mockProjectWorkItem(page, {
@@ -281,6 +355,26 @@ async function mockWorkspace(page: Page) {
     channels: [],
     boundary: 'Project membership controls visibility only.'
   }));
+}
+
+async function mockRunEvidence(page: Page) {
+  await page.route('**/irondev-api/api/projects/7/tickets/42/evidence-summary', (route) =>
+    json(route, {
+      ticketId: 42,
+      status: 'loaded',
+      message: 'Latest governed run loaded.',
+      latestRun: { runId: 'run-42', status: 'Completed', recommendation: 'Recover apply from backend truth.' },
+      blockedActions: [],
+      nextSafeAction: 'Review apply recovery'
+    })
+  );
+  await page.route('**/irondev-api/api/projects/7/tickets/42/skeleton-runs/run-42/report', (route) =>
+    json(route, {
+      runId: 'run-42', projectId: 7, ticketId: 42, status: 'Completed', summary: 'Apply recovery required.',
+      timeline: [], criticReviews: [], findingDispositions: [], repairAttempts: [], revisionAttempts: [],
+      gaps: [], loopComplete: false, boundary: 'Read-only report.'
+    })
+  );
 }
 
 function json(route: Route, body: unknown, status = 200) {

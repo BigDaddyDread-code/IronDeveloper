@@ -154,6 +154,26 @@ public sealed record SkeletonRunApplyTrace
 
     /// <summary>The spine's evidence-chain files, each checked on disk. The chain is the receipt.</summary>
     public IReadOnlyList<SkeletonRunReceiptRef> Receipts { get; init; } = [];
+    public IReadOnlyList<SkeletonRunApplyAttemptTrace> Attempts { get; init; } = [];
+}
+
+public sealed record SkeletonRunApplyAttemptTrace
+{
+    public string AttemptId { get; init; } = string.Empty;
+    public int AttemptNumber { get; init; }
+    public string RequestedAction { get; init; } = string.Empty;
+    public string RequestedByUserId { get; init; } = string.Empty;
+    public string Reason { get; init; } = string.Empty;
+    public string Status { get; init; } = SkeletonApplyAttemptStatuses.InProgress;
+    public DateTimeOffset StartedUtc { get; init; }
+    public DateTimeOffset? CompletedUtc { get; init; }
+    public string WorkspacePath { get; init; } = string.Empty;
+    public string InterruptedStage { get; init; } = string.Empty;
+    public string RefusedReason { get; init; } = string.Empty;
+    public string MutationState { get; init; } = SkeletonApplyMutationStates.NotObserved;
+    public IReadOnlyList<SkeletonRunApplyStageTrace> Stages { get; init; } = [];
+    public IReadOnlyList<SkeletonRunReceiptRef> Receipts { get; init; } = [];
+    public IReadOnlyList<string> AvailableActions { get; init; } = [];
 }
 
 /// <summary>An independent critic review linked to the run, by reference. Advisory only.</summary>
