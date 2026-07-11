@@ -207,6 +207,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-profiles/effective": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["EffectiveSkeletonAgentProfile"][];
+                        "application/json": components["schemas"]["EffectiveSkeletonAgentProfile"][];
+                        "text/json": components["schemas"]["EffectiveSkeletonAgentProfile"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent-profiles/{role}": {
         parameters: {
             query?: never;
@@ -12121,6 +12160,23 @@ export interface components {
             /** Format: int64 */
             messageId?: number | null;
         };
+        EffectiveSkeletonAgentProfile: {
+            role: components["schemas"]["SkeletonAgentRole"];
+            displayName: string | null;
+            aiConnectionId?: string | null;
+            provider: string | null;
+            model: string | null;
+            /** Format: int32 */
+            timeoutSeconds: number;
+            effectiveSkill: string | null;
+            effectivePersonality: string | null;
+            fieldSources?: components["schemas"]["SkeletonAgentProfileFieldSource"][] | null;
+            builtInDefaultVersion?: string | null;
+            tenantProfileVersion?: string | null;
+            projectProfileVersion?: string | null;
+            effectiveHash: string | null;
+            boundary?: string | null;
+        };
         ExternalReferenceDto: {
             provider?: string | null;
             kind?: string | null;
@@ -14880,6 +14936,14 @@ export interface components {
             skill?: string | null;
             personality?: string | null;
             boundary?: string | null;
+        };
+        SkeletonAgentProfileFieldSource: {
+            field: string | null;
+            sourceLayer: string | null;
+            sourceLabel: string | null;
+            version?: string | null;
+            inherited: boolean;
+            detail?: string | null;
         };
         SkeletonAgentProfileOutcome: {
             succeeded: boolean;

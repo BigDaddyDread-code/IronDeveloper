@@ -1748,6 +1748,32 @@ export interface SkeletonAgentProfile {
   boundary: string;
 }
 
+export interface SkeletonAgentProfileFieldSource {
+  field: string;
+  sourceLayer: string;
+  sourceLabel: string;
+  version?: string | null;
+  inherited: boolean;
+  detail: string;
+}
+
+export interface EffectiveSkeletonAgentProfile {
+  role: string;
+  displayName: string;
+  aiConnectionId: string;
+  provider: string;
+  model: string;
+  timeoutSeconds: number;
+  effectiveSkill: string;
+  effectivePersonality: string;
+  fieldSources: SkeletonAgentProfileFieldSource[];
+  builtInDefaultVersion: string;
+  tenantProfileVersion?: string | null;
+  projectProfileVersion?: string | null;
+  effectiveHash: string;
+  boundary: string;
+}
+
 export interface SkeletonAgentProfileUpdate {
   provider: string;
   model: string;

@@ -218,6 +218,34 @@ public sealed record SkeletonAgentProfileOutcome
     public SkeletonAgentProfile? Profile { get; init; }
 }
 
+public sealed record SkeletonAgentProfileFieldSource
+{
+    public required string Field { get; init; }
+    public required string SourceLayer { get; init; }
+    public required string SourceLabel { get; init; }
+    public string? Version { get; init; }
+    public required bool Inherited { get; init; }
+    public string Detail { get; init; } = string.Empty;
+}
+
+public sealed record EffectiveSkeletonAgentProfile
+{
+    public required SkeletonAgentRole Role { get; init; }
+    public required string DisplayName { get; init; }
+    public string AiConnectionId { get; init; } = "deployment-default";
+    public required string Provider { get; init; }
+    public required string Model { get; init; }
+    public required int TimeoutSeconds { get; init; }
+    public required string EffectiveSkill { get; init; }
+    public required string EffectivePersonality { get; init; }
+    public IReadOnlyList<SkeletonAgentProfileFieldSource> FieldSources { get; init; } = [];
+    public string BuiltInDefaultVersion { get; init; } = string.Empty;
+    public string? TenantProfileVersion { get; init; }
+    public string? ProjectProfileVersion { get; init; }
+    public required string EffectiveHash { get; init; }
+    public string Boundary { get; init; } = SkeletonAgentProfile.BoundaryText;
+}
+
 /// <summary>
 /// Reads and updates per-role agent profiles from a file-backed store
 /// (AgentProfiles/{role}/). Read returns defaults when a profile is absent, so
@@ -228,5 +256,9 @@ public interface ISkeletonAgentProfileService
 {
     Task<SkeletonAgentProfile> GetAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SkeletonAgentProfile>> ListAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<EffectiveSkeletonAgentProfile>> ListEffectiveAsync(
+        int tenantId,
+        int? projectId = null,
+        CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileOutcome> UpdateAsync(SkeletonAgentRole role, SkeletonAgentProfileUpdate update, CancellationToken cancellationToken = default);
 }

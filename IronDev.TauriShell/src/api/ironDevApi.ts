@@ -35,6 +35,7 @@ import type {
   CreateTicketFromDocumentRequest,
   CreateTicketFromDocumentResponse,
   CreateProjectTicketRequest,
+  EffectiveSkeletonAgentProfile,
   DogfoodLoopApiEnvelope,
   DogfoodReceiptDetailData,
   GovernanceTraceApiEnvelope,
@@ -1158,6 +1159,12 @@ class IronDevApiClient {
     return response.map(normalizeSkeletonAgentProfile);
   }
 
+  async listEffectiveAgentProfiles(projectId?: number | null, signal?: AbortSignal): Promise<EffectiveSkeletonAgentProfile[]> {
+    const query = typeof projectId === 'number' ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    const response = await this.request<RawEffectiveSkeletonAgentProfile[]>(`/api/v1/agent-profiles/effective${query}`, { method: 'GET', signal });
+    return response.map(normalizeEffectiveSkeletonAgentProfile);
+  }
+
   async listAiConnections(signal?: AbortSignal): Promise<AiConnectionMetadata[]> {
     return this.request<AiConnectionMetadata[]>('/api/v1/ai-connections', { method: 'GET', signal });
   }
@@ -1408,6 +1415,11 @@ type RawSkeletonAgentProfile = Omit<SkeletonAgentProfile, 'role' | 'provider'> &
   provider: string | null;
 };
 
+type RawEffectiveSkeletonAgentProfile = Omit<EffectiveSkeletonAgentProfile, 'role' | 'provider'> & {
+  role: string | number;
+  provider: string | null;
+};
+
 const skeletonAgentRoleNames = new Map<number, string>([
   [0, 'Orchestrator'],
   [1, 'Builder'],
@@ -1417,6 +1429,14 @@ const skeletonAgentRoleNames = new Map<number, string>([
 ]);
 
 function normalizeSkeletonAgentProfile(profile: RawSkeletonAgentProfile): SkeletonAgentProfile {
+  return {
+    ...profile,
+    role: normalizeSkeletonAgentRole(profile.role),
+    provider: (profile.provider ?? '').toLowerCase()
+  };
+}
+
+function normalizeEffectiveSkeletonAgentProfile(profile: RawEffectiveSkeletonAgentProfile): EffectiveSkeletonAgentProfile {
   return {
     ...profile,
     role: normalizeSkeletonAgentRole(profile.role),
