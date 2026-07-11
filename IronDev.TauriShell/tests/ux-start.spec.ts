@@ -70,7 +70,8 @@ test('cockpit: a gate-waiting item outranks new work, with the reason named', as
 
   await expect(page.getByTestId('flow.cockpit.primary.review')).toContainText('Review waiting item');
   await expect(page.getByTestId('flow.cockpit.attention')).toContainText('search-by-author');
-  await expect(page.getByTestId('flow.cockpit.attention')).toContainText('waiting at the human gate');
+  await expect(page.getByTestId('flow.cockpit.attention')).toContainText('Waiting for approval');
+  await expect(page.getByTestId('flow.cockpit.attention')).toContainText('Review the waiting run');
 });
 
 test('cockpit: blocked readiness switches the primary action to setup and names every blocker with its remedy', async ({ page }) => {
@@ -123,9 +124,8 @@ test('cockpit: blocked readiness switches the primary action to setup and names 
 
   await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Setup incomplete · 2 blocker(s)');
   await expect(page.getByTestId('flow.cockpit.primary.setup')).toContainText('Complete project setup');
-  await expect(page.getByTestId('flow.cockpit.setup.test-command')).toContainText('Supply it');
-  await expect(page.getByTestId('flow.cockpit.setup.code-index')).toContainText('Index it');
-  await expect(page.getByTestId('flow.cockpit.setup')).toContainText('governed runs unlock when backend readiness is satisfied');
+  await expect(page.getByTestId('flow.cockpit.setup')).toContainText('Supply the test command');
+  await expect(page.getByTestId('flow.cockpit.setup')).toContainText('View setup details');
 
   await page.getByTestId('flow.cockpit.primary.setup').click();
   await expect(page.getByTestId('flow.projectSetup')).toBeVisible();
@@ -221,6 +221,13 @@ async function mockStart(
       });
     });
   }
+  await page.route('**/irondev-api/api/projects/7/board', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(boardProjection(options.tickets ?? [], options.readiness ?? READY_READINESS))
+    })
+  );
   await page.route('**/irondev-api/api/projects/7/provisioning/readiness', (route) =>
     route.fulfill({
       status: 200,
@@ -272,6 +279,34 @@ async function mockStart(
       })
     })
   );
+}
+
+function boardProjection(tickets: Array<Record<string, unknown>>, readiness: Record<string, unknown>) {
+  return {
+    projectId: 7,
+    projectName: 'BookSeller',
+    generatedUtc: '2026-07-11T01:00:00Z',
+    readiness,
+    items: tickets.map((ticket) => {
+      const status = String(ticket.status ?? 'Ready');
+      const review = status.toLowerCase().includes('approval') || status.toLowerCase().includes('review');
+      const done = status.toLowerCase().includes('applied');
+      return {
+        workItemId: ticket.id,
+        title: ticket.title,
+        stage: done ? 'Done' : review ? 'Review' : 'Ticket',
+        state: status,
+        priority: 'Medium',
+        needsAttention: review,
+        attentionReason: review ? 'Waiting for approval' : null,
+        nextSafeAction: review ? 'Review the waiting run and disposition its findings.' : 'Open the Work Item.',
+        waitingOn: review ? { kind: 'Human', label: 'Human review' } : null,
+        assignee: null,
+        lastMeaningfulEventUtc: '2026-07-11T01:00:00Z',
+        latestRun: null
+      };
+    })
+  };
 }
 
 function setupCheck(code: string, label: string, detectedValue: string) {

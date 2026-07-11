@@ -1,155 +1,149 @@
-import { useEffect, useState } from 'react';
-import type { ProjectProvisioningReadinessUi, ProjectTicket } from '../../api/types';
+import { useEffect, useMemo, useState } from 'react';
+import type { ProjectBoardItemReadModel, ProjectBoardReadModel } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { BatchScreen } from '../batch/BatchScreen';
-import { WorkItemStage, stageLabels, stageOrder } from '../flowTypes';
 
 interface BoardScreenProps {
-  onOpenWorkItem: (ticket: ProjectTicket | null) => void;
+  onOpenWorkItem: (workItemId: number | null) => void;
   onOpenProvisioning: () => void;
 }
 
-function stageForTicket(ticket: ProjectTicket): WorkItemStage {
-  const status = (ticket.status ?? '').toLowerCase();
-  if (status.includes('applied') || status.includes('done') || status.includes('closed')) {
-    return 'done';
-  }
-  if (status.includes('approval') || status.includes('review')) {
-    return 'review';
-  }
-  if (status.includes('build') || status.includes('progress')) {
-    return 'build';
-  }
-  if (status.includes('draft') || status.includes('shap')) {
-    return 'shape';
-  }
-  return 'ticket';
+type BoardFilter = 'all' | 'attention' | 'active';
+
+const columns = [
+  { stage: 'Shape', label: 'Shape' },
+  { stage: 'Ticket', label: 'Ticket' },
+  { stage: 'Build', label: 'Build' },
+  { stage: 'Review', label: 'Review' },
+  { stage: 'Done', label: 'Done' }
+] as const;
+
+function emptyColumnMessage(stage: string): string {
+  if (stage === 'Shape') return 'No draft work items. Next safe action: start new work from Chat or the Board.';
+  if (stage === 'Ticket') return 'No confirmed tickets. Next safe action: confirm acceptance criteria on shaped work.';
+  if (stage === 'Build') return 'No governed runs are building. Next safe action: open an eligible ticket.';
+  if (stage === 'Review') return 'No work is waiting at review. Next safe action: inspect active builds.';
+  return 'No applied tickets yet. Next safe action: complete controlled apply through the Work Item.';
 }
 
-function emptyColumnMessage(stage: WorkItemStage): string {
-  if (stage === 'shape') {
-    return 'No draft work items. Next safe action: create a new work item from chat or the New work item button.';
-  }
-  if (stage === 'ticket') {
-    return 'No ready tickets. Next safe action: confirm acceptance criteria on a draft ticket.';
-  }
-  if (stage === 'build') {
-    return 'No active builds. Next safe action: open a ready ticket and start a governed run.';
-  }
-  if (stage === 'review') {
-    return 'No human-gate runs. Next safe action: start a governed run and wait for the backend halt.';
-  }
-  return 'No applied tickets yet. Next safe action: complete continuation and controlled apply through the backend.';
+function formatEventTime(value: string | undefined): string {
+  if (!value) return 'Time unavailable';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Time unavailable';
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  }).format(parsed);
 }
 
-function tagForTicket(ticket: ProjectTicket): { label: string; cls: string } {
-  const stage = stageForTicket(ticket);
-  if (stage === 'done') {
-    return { label: 'complete', cls: 'fl-tag fl-green' };
-  }
-  if (stage === 'build') {
-    return { label: 'in build', cls: 'fl-tag fl-bluet' };
-  }
-  if (stage === 'review') {
-    return { label: 'in review', cls: 'fl-tag fl-redt' };
-  }
-  if (!ticket.acceptanceCriteria) {
-    return { label: 'no criteria yet', cls: 'fl-tag fl-amber' };
-  }
-  return { label: ticket.priority ?? 'ready to assess', cls: 'fl-tag fl-bluet' };
+function stateTone(item: ProjectBoardItemReadModel): string {
+  if (item.stage === 'Done') return 'fl-tag fl-green';
+  if (item.needsAttention) return 'fl-tag fl-redt';
+  if (item.stage === 'Build') return 'fl-tag fl-bluet';
+  return 'fl-tag fl-amber';
+}
+
+function itemId(item: ProjectBoardItemReadModel): number | null {
+  return typeof item.workItemId === 'number' ? item.workItemId : null;
 }
 
 export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
-  const [tickets, setTickets] = useState<ProjectTicket[]>([]);
+  const [board, setBoard] = useState<ProjectBoardReadModel | null>(null);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  // UX-START-1 — the cockpit header reads live provisioning readiness: the same
-  // truth the run start enforces. Backend truth or a spinner, never inference.
-  const [readiness, setReadiness] = useState<ProjectProvisioningReadinessUi | null>(null);
-  const [readinessState, setReadinessState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [filter, setFilter] = useState<BoardFilter>('all');
   const [runQueueOpen, setRunQueueOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (project.selectedProjectId === null) {
-      setReadiness(null);
-      setReadinessState('ready');
-      return;
-    }
-    const controller = new AbortController();
-    setReadinessState('loading');
-    session.client
-      .getProvisioningReadiness(project.selectedProjectId, controller.signal)
-      .then((result) => {
-        setReadiness(result);
-        setReadinessState('ready');
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setReadiness(null);
-          setReadinessState('error');
-        }
-      });
-    return () => controller.abort();
-  }, [session.client, project.selectedProjectId]);
-
-  useEffect(() => {
-    if (project.selectedProjectId === null) {
-      setTickets([]);
+      setBoard(null);
       setLoadState('ready');
       return;
     }
+
     const controller = new AbortController();
     setLoadState('loading');
+    setErrorMessage(null);
     session.client
-      .getProjectTickets(project.selectedProjectId, controller.signal)
+      .getProjectBoard(project.selectedProjectId, controller.signal)
       .then((result) => {
-        setTickets(result.tickets ?? []);
+        setBoard(result);
         setLoadState('ready');
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setErrorMessage(error instanceof Error ? error.message : 'Could not load tickets.');
+        if (controller.signal.aborted) return;
+        setBoard(null);
+        setErrorMessage(error instanceof Error ? error.message : 'The Board projection could not be loaded.');
         setLoadState('error');
       });
+
     return () => controller.abort();
-  }, [session.client, project.selectedProjectId]);
+  }, [session.client, project.selectedProjectId, reloadKey]);
 
-  // The human's queue outranks new work: gate-waiting items first, then setup,
-  // then new work. One primary action — the cockpit never makes the user hunt.
-  const attentionTickets = tickets.filter((ticket) => stageForTicket(ticket) === 'review');
-  const primaryAction: { label: string; testid: string; run: () => void } =
-    attentionTickets.length > 0
-      ? { label: 'Review waiting item', testid: 'flow.cockpit.primary.review', run: () => onOpenWorkItem(attentionTickets[0]) }
-      : readinessState === 'ready' && readiness !== null && !readiness.isReady
-        ? { label: 'Complete project setup', testid: 'flow.cockpit.primary.setup', run: onOpenProvisioning }
-        : { label: 'Start new work item', testid: 'flow.cockpit.primary.new', run: () => onOpenWorkItem(null) };
+  const items = board?.items ?? [];
+  const attentionItems = useMemo(() => items.filter((item) => item.needsAttention === true), [items]);
+  const visibleItems = useMemo(() => {
+    if (filter === 'attention') return attentionItems;
+    if (filter === 'active') return items.filter((item) => item.stage !== 'Done');
+    return items;
+  }, [attentionItems, filter, items]);
+  const unknownStageCount = visibleItems.filter((item) => !columns.some((column) => column.stage === item.stage)).length;
+  const readiness = board?.readiness;
+  const firstAttentionId = attentionItems.map(itemId).find((id): id is number => id !== null);
 
-  const blockedChecks = (readiness?.checks ?? []).filter((check) => check.blocking);
+  const primaryAction = firstAttentionId !== undefined
+    ? {
+        label: 'Review waiting item',
+        testid: 'flow.cockpit.primary.review',
+        run: () => onOpenWorkItem(firstAttentionId)
+      }
+    : readiness?.isReady === false
+      ? {
+          label: 'Complete project setup',
+          testid: 'flow.cockpit.primary.setup',
+          run: onOpenProvisioning
+        }
+      : {
+          label: 'Start new work',
+          testid: 'flow.board.new',
+          run: () => onOpenWorkItem(null)
+        };
+
+  if (loadState === 'error') {
+    return (
+      <section className="fl-board-state" data-testid="flow.board.error">
+        <p className="fl-eyebrow">Board unavailable</p>
+        <h1 className="fl-h1">Current work could not be loaded.</h1>
+        <p className="fl-sub">{errorMessage}</p>
+        <p>The client will not reconstruct pipeline state from ticket strings.</p>
+        <button className="fl-btn fl-pri" type="button" onClick={() => setReloadKey((value) => value + 1)} data-testid="flow.board.retry">
+          Retry
+        </button>
+      </section>
+    );
+  }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+    <div data-testid="flow.board">
+      <header className="fl-board-head">
         <div>
-          <h1 className="fl-h1">{project.selectedProjectName ?? 'Board'}</h1>
-          <p className="fl-sub">Work items flow left to right. A card moves when its gate is satisfied, never before.</p>
+          <p className="fl-eyebrow">Project Board</p>
+          <h1 className="fl-h1">{board?.projectName ?? project.selectedProjectName ?? 'Board'}</h1>
+          <p className="fl-sub">Shared work, current blockers, and the next safe action.</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {readinessState === 'loading' ? (
-            <span className="fl-tag" data-testid="flow.cockpit.badge">checking readiness…</span>
-          ) : readiness !== null ? (
-            <span
-              className={readiness.isReady ? 'fl-tag fl-green' : 'fl-tag fl-amber'}
-              data-testid="flow.cockpit.badge"
-            >
-              {readiness.isReady ? 'Ready to run' : `Setup incomplete · ${readiness.blockedCount} blocker(s)`}
+        <div className="fl-board-actions">
+          {loadState === 'loading' ? (
+            <span className="fl-tag" data-testid="flow.cockpit.badge">Loading Board...</span>
+          ) : readiness ? (
+            <span className={readiness.isReady ? 'fl-tag fl-green' : 'fl-tag fl-amber'} data-testid="flow.cockpit.badge">
+              {readiness.isReady ? 'Ready to run' : `Setup incomplete · ${readiness.blockedCount ?? 0} blocker(s)`}
             </span>
-          ) : readinessState === 'error' ? (
-            <span className="fl-tag" data-testid="flow.cockpit.badge">readiness unavailable</span>
           ) : null}
           <button
             className="fl-btn"
@@ -161,14 +155,17 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenP
           >
             Run queue
           </button>
-          <button className="fl-btn" onClick={() => onOpenWorkItem(null)} data-testid="flow.board.new">
-            New work item
-          </button>
-          <button className="fl-btn fl-pri" onClick={primaryAction.run} data-testid={primaryAction.testid}>
+          <button
+            className="fl-btn fl-pri"
+            type="button"
+            onClick={primaryAction.run}
+            data-testid={primaryAction.testid}
+            disabled={loadState !== 'ready'}
+          >
             {primaryAction.label}
           </button>
         </div>
-      </div>
+      </header>
 
       {runQueueOpen ? (
         <section id="flow-run-queue" className="fl-run-queue" data-testid="flow.board.runQueue">
@@ -176,69 +173,120 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenP
         </section>
       ) : null}
 
-      {blockedChecks.length > 0 ? (
-        <div className="fl-col" style={{ margin: '12px 0', padding: 12 }} data-testid="flow.cockpit.setup">
-          <div className="fl-colh">Setup incomplete — the backend will refuse governed runs</div>
-          {blockedChecks.map((check) => (
-            <p className="fl-empty" key={check.name} data-testid={`flow.cockpit.setup.${check.name.replace(/\s+/g, '-').toLowerCase()}`}>
-              <strong>{check.name}</strong> · {check.state} — {check.evidence} {check.remedy}
-            </p>
-          ))}
-          <p className="fl-sub">
-            You can shape work and draft tickets now; governed runs unlock when backend readiness is satisfied.{' '}
-            <button className="fl-btn" onClick={onOpenProvisioning} data-testid="flow.cockpit.setup.open">
-              Open project setup
-            </button>
-          </p>
-        </div>
+      {readiness?.isReady === false ? (
+        <section className="fl-board-blocked" data-testid="flow.cockpit.setup">
+          <div>
+            <strong>Governed runs are blocked until project setup is complete.</strong>
+            <p>{readiness.nextAction?.nextSafeAction ?? 'Open setup to resolve the backend readiness checks.'}</p>
+          </div>
+          <button className="fl-btn" type="button" onClick={onOpenProvisioning} data-testid="flow.cockpit.setup.open">
+            View setup details
+          </button>
+        </section>
       ) : null}
 
-      {attentionTickets.length > 0 ? (
-        <div className="fl-col" style={{ margin: '12px 0', padding: 12 }} data-testid="flow.cockpit.attention">
-          <div className="fl-colh">Needs your attention</div>
-          {attentionTickets.map((ticket) => (
-            <button className="fl-card" key={ticket.id} onClick={() => onOpenWorkItem(ticket)}>
-              <p className="fl-card-title">{ticket.title ?? `Work item ${ticket.id}`}</p>
-              <span className="fl-sub">
-                Status: {ticket.status ?? 'unknown'} — waiting at the human gate. Open to review, disposition, and
-                decide.
-              </span>
+      {attentionItems.length > 0 ? (
+        <section className="fl-board-attention" data-testid="flow.cockpit.attention">
+          <div className="fl-board-section-title">
+            <div>
+              <p className="fl-eyebrow">Needs attention</p>
+              <h2>{attentionItems.length} waiting {attentionItems.length === 1 ? 'item' : 'items'}</h2>
+            </div>
+          </div>
+          <div className="fl-board-attention-list">
+            {attentionItems.map((item) => {
+              const id = itemId(item);
+              return (
+                <button
+                  className="fl-attention-row"
+                  type="button"
+                  key={id ?? item.title}
+                  onClick={() => id !== null && onOpenWorkItem(id)}
+                  disabled={id === null}
+                  data-testid={id === null ? undefined : `flow.board.attention.${id}`}
+                >
+                  <span className="fl-card-id">{id === null ? 'Work item' : `WI-${id}`}</span>
+                  <span className="fl-attention-copy">
+                    <strong>{item.title ?? 'Untitled work item'}</strong>
+                    <span>{item.attentionReason ?? 'The backend marked this item as needing attention.'}</span>
+                    <span className="fl-next-safe">Next: {item.nextSafeAction ?? 'Open the Work Item for current state.'}</span>
+                  </span>
+                  <span className="fl-waiting">{item.waitingOn?.label ?? 'Waiting state unavailable'}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="fl-board-toolbar">
+        <div className="fl-segmented" role="group" aria-label="Board filter">
+          {([
+            ['all', `All ${items.length}`],
+            ['attention', `Needs attention ${attentionItems.length}`],
+            ['active', `Active ${items.filter((item) => item.stage !== 'Done').length}`]
+          ] as const).map(([value, label]) => (
+            <button
+              type="button"
+              key={value}
+              className={filter === value ? 'active' : ''}
+              aria-pressed={filter === value}
+              onClick={() => setFilter(value)}
+              data-testid={`flow.board.filter.${value}`}
+            >
+              {label}
             </button>
           ))}
         </div>
+        <button className="fl-btn fl-mini" type="button" onClick={() => setReloadKey((value) => value + 1)} disabled={loadState === 'loading'}>
+          Refresh
+        </button>
+      </div>
+
+      {unknownStageCount > 0 ? (
+        <p className="fl-error" data-testid="flow.board.unknownStage">
+          {unknownStageCount} work item(s) returned an unsupported Board stage and were not placed in a column.
+        </p>
       ) : null}
 
-      {loadState === 'error' ? <div className="fl-error">Tickets did not load: {errorMessage}</div> : null}
-
-      <div className="fl-board" data-testid="flow.board.columns">
-        {stageOrder.map((stage) => {
-          const columnTickets = tickets.filter((ticket) => stageForTicket(ticket) === stage);
+      <div className="fl-board" data-testid="flow.board.columns" aria-busy={loadState === 'loading'}>
+        {columns.map((column) => {
+          const columnItems = visibleItems.filter((item) => item.stage === column.stage);
           return (
-            <div className="fl-col" key={stage} data-testid={`flow.board.column.${stage}`}>
+            <section className="fl-col" key={column.stage} data-testid={`flow.board.column.${column.stage.toLowerCase()}`}>
               <div className="fl-colh">
-                {stageLabels[stage]} <span>{columnTickets.length}</span>
+                {column.label} <span>{columnItems.length}</span>
               </div>
               {loadState === 'loading' ? (
-                <p className="fl-empty" data-testid={`flow.board.loading.${stage}`}>
-                  Loading {stageLabels[stage].toLowerCase()} work items from the API...
-                </p>
-              ) : columnTickets.length === 0 ? (
-                <p className="fl-empty" data-testid={`flow.board.empty.${stage}`}>
-                  {emptyColumnMessage(stage)}
-                </p>
+                <p className="fl-empty" data-testid={`flow.board.loading.${column.stage.toLowerCase()}`}>Loading...</p>
+              ) : columnItems.length === 0 ? (
+                <p className="fl-empty" data-testid={`flow.board.empty.${column.stage.toLowerCase()}`}>{emptyColumnMessage(column.stage)}</p>
               ) : (
-                columnTickets.map((ticket) => {
-                  const tag = tagForTicket(ticket);
+                columnItems.map((item) => {
+                  const id = itemId(item);
                   return (
-                    <button className="fl-card" key={ticket.id} onClick={() => onOpenWorkItem(ticket)}>
-                      <span className="fl-card-id">WI-{ticket.id}</span>
-                      <p className="fl-card-title">{ticket.title ?? 'Untitled work item'}</p>
-                      <span className={tag.cls}>{tag.label}</span>
+                    <button
+                      className="fl-card fl-work-card"
+                      type="button"
+                      key={id ?? item.title}
+                      onClick={() => id !== null && onOpenWorkItem(id)}
+                      disabled={id === null}
+                      data-testid={id === null ? undefined : `flow.board.item.${id}`}
+                    >
+                      <span className="fl-card-id">{id === null ? 'Work item' : `WI-${id}`}</span>
+                      <span className="fl-card-title">{item.title ?? 'Untitled work item'}</span>
+                      <span className="fl-card-state">
+                        <span className={stateTone(item)}>{item.state ?? 'Unknown'}</span>
+                        <span>{item.priority ?? 'Priority unavailable'}</span>
+                      </span>
+                      {item.waitingOn?.label ? <span className="fl-card-meta">Waiting on {item.waitingOn.label}</span> : null}
+                      {item.assignee?.displayName ? <span className="fl-card-meta">Assigned to {item.assignee.displayName}</span> : null}
+                      <span className="fl-card-meta">Updated {formatEventTime(item.lastMeaningfulEventUtc)}</span>
                     </button>
                   );
                 })
               )}
-            </div>
+            </section>
           );
         })}
       </div>

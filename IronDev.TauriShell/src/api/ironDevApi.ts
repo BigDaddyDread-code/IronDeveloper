@@ -49,6 +49,7 @@ import type {
   LoginRequest,
   LoginResponse,
   PlannedSurfaceEnvelope,
+  ProjectBoardReadModel,
   ProjectProvisioningReadinessUi,
   ProjectDocument,
   ProjectDocumentProcessingResult,
@@ -356,6 +357,13 @@ class IronDevApiClient {
         message: 'Ticket request could not reach IronDev.Api.'
       };
     }
+  }
+
+  async getProjectBoard(projectId: number, signal?: AbortSignal): Promise<ProjectBoardReadModel> {
+    return this.request<ProjectBoardReadModel>(`/api/projects/${projectId}/board`, {
+      method: 'GET',
+      signal
+    });
   }
 
   async createProjectTicket(

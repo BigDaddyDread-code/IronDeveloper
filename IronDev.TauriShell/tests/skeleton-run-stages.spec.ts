@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockProjectBoard } from './helpers/mockBoard';
 
 // P0-7: Build and Review stages consume the walking-skeleton loop through its
 // governed endpoints. These tests mock the backend and assert the UI's side of
@@ -594,6 +595,16 @@ async function mockTicketWorkspace(
     readiness?: { isReady: boolean; message: string; blockingIssues: string[] };
   } = {}
 ) {
+  const boardTickets = options.tickets ?? [
+    {
+      id: 42,
+      tenantId: 3,
+      projectId: 7,
+      title: 'Add book sorting to catalog',
+      status: options.ticketStatus ?? 'Draft',
+      acceptanceCriteria: 'Catalog sorts by title ascending'
+    }
+  ];
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
     window.localStorage.setItem('irondev.tenantId', '3');
@@ -649,19 +660,17 @@ async function mockTicketWorkspace(
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(
-        options.tickets ?? [
-          {
-            id: 42,
-            tenantId: 3,
-            projectId: 7,
-            title: 'Add book sorting to catalog',
-            status: options.ticketStatus ?? 'Draft',
-            acceptanceCriteria: 'Catalog sorts by title ascending'
-          }
-        ]
-      )
+      body: JSON.stringify(boardTickets)
     });
+  });
+  const detailTicket = boardTickets.find((ticket) => ticket.id === 42) ?? boardTickets[0];
+  await page.route('**/irondev-api/api/projects/7/tickets/42', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detailTicket) })
+  );
+  await mockProjectBoard(page, {
+    projectName: 'IronDeveloper',
+    tickets: boardTickets,
+    latestRuns: options.latestRun ? { 42: options.latestRun } : undefined
   });
   await page.route('**/irondev-api/api/projects/7/tickets/42/build-readiness', async (route) => {
     await route.fulfill({

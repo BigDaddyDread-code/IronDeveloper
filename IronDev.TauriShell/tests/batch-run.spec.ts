@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockProjectBoard } from './helpers/mockBoard';
 
 // P2-7: the batch surface — define three linked BookSeller tickets, hit run,
 // watch the system sequence them. The tests mock the governed endpoints and
@@ -201,6 +202,11 @@ async function mockBatch(page: Page, options: { cyclic?: boolean } = {}): Promis
 }
 
 async function mockBatchWorkspace(page: Page) {
+  const boardTickets = [
+    { id: 42, tenantId: 3, projectId: 7, title: 'Add catalog sort core', status: 'Draft', acceptanceCriteria: 'Sorts by title' },
+    { id: 43, tenantId: 3, projectId: 7, title: 'Wire sort into catalog page', status: 'Draft', acceptanceCriteria: 'Page uses sort' },
+    { id: 44, tenantId: 3, projectId: 7, title: 'Add sort docs', status: 'Draft', acceptanceCriteria: 'Docs updated' }
+  ];
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
     window.localStorage.setItem('irondev.tenantId', '3');
@@ -256,11 +262,8 @@ async function mockBatchWorkspace(page: Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([
-        { id: 42, tenantId: 3, projectId: 7, title: 'Add catalog sort core', status: 'Draft', acceptanceCriteria: 'Sorts by title' },
-        { id: 43, tenantId: 3, projectId: 7, title: 'Wire sort into catalog page', status: 'Draft', acceptanceCriteria: 'Page uses sort' },
-        { id: 44, tenantId: 3, projectId: 7, title: 'Add sort docs', status: 'Draft', acceptanceCriteria: 'Docs updated' }
-      ])
+      body: JSON.stringify(boardTickets)
     });
   });
+  await mockProjectBoard(page, { projectName: 'BookSeller', tickets: boardTickets });
 }

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { mockProjectBoard } from './helpers/mockBoard';
 
 const visualReportDir = path.join(process.cwd(), 'reports', 'visual-smoke');
 
@@ -91,6 +92,9 @@ async function mockHealthyApi(page: import('@playwright/test').Page) {
 }
 
 async function mockSelectedProject(page: import('@playwright/test').Page) {
+  const boardTickets = [
+    { id: 42, tenantId: 3, projectId: 7, title: 'Add book sorting to catalog', status: 'Draft', acceptanceCriteria: null }
+  ];
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
     window.localStorage.setItem('irondev.tenantId', '3');
@@ -129,11 +133,10 @@ async function mockSelectedProject(page: import('@playwright/test').Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([
-        { id: 42, tenantId: 3, projectId: 7, title: 'Add book sorting to catalog', status: 'Draft', acceptanceCriteria: null }
-      ])
+      body: JSON.stringify(boardTickets)
     });
   });
+  await mockProjectBoard(page, { projectName: 'IronDeveloper', tickets: boardTickets });
   await page.route('**/irondev-api/api/projects/7/chat/sessions', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
