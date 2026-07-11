@@ -135,6 +135,40 @@ public sealed class SqlRunStore : IRunStore
         return rows.Select(ToRecord).ToArray();
     }
 
+    public async Task<IReadOnlyList<RunRecord>> GetRecentForProjectAsync(
+        int projectId,
+        int limit = 200,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = """
+            SELECT TOP (@Limit)
+                RunId,
+                ProjectId,
+                TicketId,
+                State,
+                IsDisposable,
+                Summary,
+                FailureReason,
+                WorkspacePath,
+                CreatedUtc,
+                UpdatedUtc,
+                StartedUtc,
+                CompletedUtc
+            FROM dbo.Runs
+            WHERE ProjectId = @ProjectId
+            ORDER BY UpdatedUtc DESC, Id DESC;
+            """;
+
+        var rows = await connection.QueryAsync<RunRow>(new CommandDefinition(
+            sql,
+            new { ProjectId = projectId, Limit = limit <= 0 ? 200 : limit },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        return rows.Select(ToRecord).ToArray();
+    }
+
     public async Task<RunRecord?> TransitionAsync(
         RunStateTransition transition,
         CancellationToken cancellationToken = default)
