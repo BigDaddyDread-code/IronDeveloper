@@ -116,42 +116,29 @@ test('shape stage earns promotion through the readiness gate', async ({ page }) 
   await expect(page.getByTestId('flow.shape.promote')).toBeEnabled();
 });
 
-test('settings lists real tenant users and labels the policy draft honestly', async ({ page }) => {
+test('settings labels membership handoff and the local policy draft honestly', async ({ page }) => {
   await mockSelectedProject(page);
-  await page.route('**/irondev-api/api/tenants/3/users', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([
-        { id: 7, email: 'dev@iron.dev', displayName: 'Dev User', role: 'Owner', isActive: true },
-        { id: 8, email: 'viewer@iron.dev', displayName: 'Viewer User', role: 'Viewer', isActive: true }
-      ])
-    });
-  });
   await page.goto('/');
 
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
-  await expect(page.getByTestId('flow.settings.banner')).toContainText('Role assignment decides visibility, never mutation authority');
-  await expect(page.getByText('Viewer User')).toBeVisible();
+  await expect(page.getByTestId('flow.settings.banner')).toContainText('Tenant membership and roles now live under Library > Members');
+  await expect(page.getByTestId('flow.settings.banner')).toContainText('approval policy below is still a local draft');
   await expect(page.getByTestId('flow.settings.savePolicy')).toBeVisible();
 });
 
-test('settings tolerates the singleton tenant-user response used by LocalTest', async ({ page }) => {
+test('library members lists backend-owned project membership', async ({ page }) => {
   await mockSelectedProject(page);
-  await page.route('**/irondev-api/api/tenants/3/users', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ id: 7, email: 'dev@iron.dev', displayName: 'Dev User', role: 'Owner', isActive: true })
-    });
-  });
+  await mockMembersDirectory(page);
   await page.goto('/');
 
-  await page.getByTestId('flow.userMenu').click();
-  await page.getByTestId('flow.nav.settings').click();
-  await expect(page.getByTestId('flow.library').getByText('Dev User', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('flow.library').getByText('dev@iron.dev')).toBeVisible();
+  await page.getByTestId('flow.nav.library').click();
+  await page.getByTestId('flow.library.nav.members').click();
+  await expect(page).toHaveURL('/projects/7/library/members');
+  await expect(page.getByTestId('flow.members.directory')).toBeVisible();
+  await expect(page.getByTestId('flow.members.row.7')).toContainText('Dev User (you)');
+  await expect(page.getByTestId('flow.members.row.8')).toContainText('Viewer User');
+  await expect(page.getByTestId('flow.members.row.8')).toContainText('Project member');
 });
 
 test('governance deep link renders the timeline viewer inside the Library', async ({ page }) => {
@@ -168,6 +155,39 @@ test('governance deep link renders the timeline viewer inside the Library', asyn
   await expect(page.getByTestId('flow.shell')).toBeVisible();
   await expect(page.getByTestId('flow.governanceHost')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Governance Timeline' })).toBeVisible();
+});
+
+test('audit library route renders read-only ledger rows and filters', async ({ page }) => {
+  await mockSelectedProject(page);
+  const auditRequests: string[] = [];
+  await page.route('**/irondev-api/api/v1/audit/ledger**', async (route) => {
+    const url = route.request().url();
+    auditRequests.push(url);
+    const filtered = new URL(url).searchParams.get('actor');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(auditLedgerResponse(filtered ?? undefined))
+    });
+  });
+  await page.goto('/projects/7/library/audit');
+
+  await expect(page.getByTestId('flow.library.auditLedger')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Project audit', exact: true })).toBeVisible();
+  await expect(page.getByTestId('flow.audit.rows')).toContainText('AcceptedApprovalRecorded');
+  await expect(page.getByTestId('flow.audit.rows')).toContainText('Alice Reviewer');
+  await expect(page.getByTestId('flow.audit.rows')).toContainText('WI-42');
+  await expect(page.getByTestId('flow.audit.rows')).toContainText('WorkflowContinuationInput');
+  await expect(page.getByTestId('flow.audit.evidence').first()).toContainText('Accepted approval');
+  await expect(page.getByTestId('flow.library.auditLedger')).not.toContainText('Not implemented');
+  await expect(page.getByRole('button', { name: /approve|apply|continue/i })).toHaveCount(0);
+
+  await page.getByTestId('flow.audit.filter.actor').fill('Alice');
+  await page.getByTestId('flow.audit.filter.apply').click();
+
+  await expect(page.getByTestId('flow.audit.rows')).toContainText('Filtered for Alice');
+  expect(auditRequests.some((url) => new URL(url).searchParams.get('projectId') === '7')).toBeTruthy();
+  expect(auditRequests.some((url) => new URL(url).searchParams.get('actor') === 'Alice')).toBeTruthy();
 });
 
 async function mockHealthyApi(page: import('@playwright/test').Page) {
@@ -250,6 +270,55 @@ async function mockSelectedProject(page: import('@playwright/test').Page) {
   });
 }
 
+async function mockMembersDirectory(page: import('@playwright/test').Page) {
+  await page.route('**/irondev-api/api/projects/7/members**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        tenantId: 3,
+        projectId: 7,
+        projectName: 'IronDeveloper',
+        currentUserId: 7,
+        canManageTenantUsers: true,
+        canManageProjectMembers: true,
+        canManageChannels: true,
+        tenantMembershipStatus: '2 active tenant users',
+        projectMembershipStatus: '2 active members',
+        channelMembershipStatus: '0 active channels',
+        members: [
+          {
+            userId: 7,
+            displayName: 'Dev User',
+            email: 'dev@iron.dev',
+            tenantRole: 'Owner',
+            projectRole: 'Owner',
+            isProjectMember: true,
+            isActive: true,
+            isCurrentUser: true,
+            projectAccessStatus: 'Project member',
+            channelMembershipSummary: 'No explicit memberships'
+          },
+          {
+            userId: 8,
+            displayName: 'Viewer User',
+            email: 'viewer@iron.dev',
+            tenantRole: 'Viewer',
+            projectRole: 'Viewer',
+            isProjectMember: true,
+            isActive: true,
+            isCurrentUser: false,
+            projectAccessStatus: 'Project member',
+            channelMembershipSummary: 'No explicit memberships'
+          }
+        ],
+        channels: [],
+        boundary: 'Project membership controls visibility only. It does not grant approval, workflow, tool, or source mutation authority.'
+      })
+    });
+  });
+}
+
 async function mockLoginToSingleTenantChooser(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/api/auth/login', async (route) => {
     await route.fulfill({
@@ -309,4 +378,57 @@ async function mockLoginToSingleTenantChooser(page: import('@playwright/test').P
     });
   });
   await mockProjectBoard(page, { projectName: 'BookSeller' });
+}
+
+function auditLedgerResponse(filteredActor?: string) {
+  return {
+    status: 'ok',
+    boundary: {
+      readOnly: true,
+      grantsAuthority: false,
+      canApprove: false,
+      canContinueWorkflow: false,
+      canApplySource: false,
+      exposesRawPayloadJson: false,
+      boundaryStatement: 'The audit ledger is read-only traceability. It does not approve, continue, apply, or grant authority.'
+    },
+    warnings: ['Rows do not approve, continue, apply, release, deploy, or grant authority.'],
+    issues: [],
+    returnedCount: 2,
+    take: 100,
+    items: [
+      {
+        ledgerId: 'accepted-approval:aaa',
+        timeUtc: '2026-07-10T19:00:00Z',
+        projectId: 7,
+        projectName: 'IronDeveloper',
+        workItemId: 42,
+        workItemTitle: filteredActor ? `Filtered for ${filteredActor}` : 'Add book sorting to catalog',
+        source: 'AcceptedApproval',
+        actorId: '8',
+        actorDisplayName: 'Alice Reviewer',
+        action: 'AcceptedApprovalRecorded',
+        outcome: 'WorkflowContinuationInput',
+        summary: 'Accepted approval recorded for workflow continuation.',
+        correlationId: 'run-42',
+        evidenceLinks: [{ label: 'Accepted approval', href: '/governance/accepted-approvals?targetId=run-42' }]
+      },
+      {
+        ledgerId: 'member-added:1',
+        timeUtc: '2026-07-10T18:30:00Z',
+        projectId: 7,
+        projectName: 'IronDeveloper',
+        workItemId: null,
+        workItemTitle: null,
+        source: 'ProjectMembership',
+        actorId: '7',
+        actorDisplayName: 'Dev User',
+        action: 'ProjectMemberAdded',
+        outcome: 'Owner',
+        summary: 'Dev User joined as Owner.',
+        correlationId: 'project:7',
+        evidenceLinks: [{ label: 'Project members', href: '/projects/7/library/members' }]
+      }
+    ]
+  };
 }

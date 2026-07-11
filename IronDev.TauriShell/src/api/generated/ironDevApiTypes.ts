@@ -888,6 +888,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                    workItemId?: number;
+                    actor?: string;
+                    event?: string;
+                    fromUtc?: string;
+                    toUtc?: string;
+                    take?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AuditLedgerResponse"];
+                        "application/json": components["schemas"]["AuditLedgerResponse"];
+                        "text/json": components["schemas"]["AuditLedgerResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AuditLedgerResponse"];
+                        "application/json": components["schemas"]["AuditLedgerResponse"];
+                        "text/json": components["schemas"]["AuditLedgerResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -4931,39 +4987,6 @@ export interface paths {
                         "application/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
                         "text/json": components["schemas"]["PatchArtifactReadModelIReadOnlyListPatchArtifactApiEnvelope"];
                     };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/audit/ledger": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
                 };
             };
         };
@@ -11136,6 +11159,54 @@ export interface components {
             code?: string | null;
             field?: string | null;
             message?: string | null;
+        };
+        AuditLedgerBoundary: {
+            readOnly?: boolean;
+            grantsAuthority?: boolean;
+            canApprove?: boolean;
+            canContinueWorkflow?: boolean;
+            canApplySource?: boolean;
+            exposesRawPayloadJson?: boolean;
+            boundaryStatement?: string | null;
+        };
+        AuditLedgerEvidenceLink: {
+            label?: string | null;
+            href?: string | null;
+        };
+        AuditLedgerIssue: {
+            code?: string | null;
+            field?: string | null;
+            message?: string | null;
+        };
+        AuditLedgerItem: {
+            ledgerId?: string | null;
+            /** Format: date-time */
+            timeUtc?: string;
+            /** Format: int32 */
+            projectId?: number;
+            projectName?: string | null;
+            /** Format: int64 */
+            workItemId?: number | null;
+            workItemTitle?: string | null;
+            source?: string | null;
+            actorId?: string | null;
+            actorDisplayName?: string | null;
+            action?: string | null;
+            outcome?: string | null;
+            summary?: string | null;
+            correlationId?: string | null;
+            evidenceLinks?: components["schemas"]["AuditLedgerEvidenceLink"][] | null;
+        };
+        AuditLedgerResponse: {
+            status?: string | null;
+            boundary?: components["schemas"]["AuditLedgerBoundary"];
+            warnings?: string[] | null;
+            issues?: components["schemas"]["AuditLedgerIssue"][] | null;
+            items?: components["schemas"]["AuditLedgerItem"][] | null;
+            /** Format: int32 */
+            returnedCount?: number;
+            /** Format: int32 */
+            take?: number;
         };
         BaWorkingDraft: {
             candidateTitle?: string | null;

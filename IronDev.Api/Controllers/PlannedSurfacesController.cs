@@ -5,7 +5,7 @@ namespace IronDev.Api.Controllers;
 
 /// <summary>
 /// AFFORDANCE-1: honest 501 surfaces. Every planned-but-unbuilt product surface is a real
-/// route on a real controller returning a real refusal envelope — never a hidden nav item,
+/// route on a real controller returning a real refusal envelope, never a hidden nav item,
 /// never mock data. NotImplemented is a refusal reason like any other; the UI renders it
 /// through the same panel discipline as governed refusals.
 /// Boundary: a 501 grants nothing and hides nothing. It names the roadmap slice that owns
@@ -16,18 +16,10 @@ namespace IronDev.Api.Controllers;
 [Authorize]
 public sealed class PlannedSurfacesController : ControllerBase
 {
-    /// <summary>Unified audit ledger (full-ux-map §8.2). Truth exists scattered; the ledger view does not.</summary>
-    [HttpGet("api/v1/audit/ledger")]
-    public IActionResult GetAuditLedger() => Planned(
-        surface: "Audit ledger",
-        plannedSlice: "AUDIT-1 (unified audit ledger)",
-        detail: "Audit truth exists today across governance traces, agent-run audit, and workflow transition records; the unified actor/action/evidence ledger view is not built.",
-        nextSafeAction: "Use Library > Governance for traces, receipts, and agent-run audit.");
-
     // PROJECT-3 note: the provisioning-readiness stub that lived here graduated to
-    // ProvisioningController — the route is real now. Stubs are meant to die this way.
+    // ProvisioningController. Stubs are meant to die this way.
 
-    /// <summary>Invite flow (full-ux-map §8.3 step 2). Direct user creation exists; invite is gated on TEAM-0.</summary>
+    /// <summary>Invite flow (full-ux-map section 8.3 step 2). Direct user creation exists; invite is gated on TEAM-0.</summary>
     [HttpPost("api/tenants/{tenantId:int}/users/invite")]
     public IActionResult InviteTenantUser(int tenantId) => Planned(
         surface: "Tenant user invite",
@@ -35,7 +27,7 @@ public sealed class PlannedSurfacesController : ControllerBase
         detail: $"Tenant {tenantId} supports direct user creation by an admin today; the invite/pending/accept flow is gated on tenant-scope proof and the role/visibility matrix.",
         nextSafeAction: "Admins can add users directly in Settings > Users and roles.");
 
-    /// <summary>Human-intervention dial (full-ux-map §9.6). The cockpit's dial is a labeled local draft until AUTH-0.</summary>
+    /// <summary>Human-intervention dial (full-ux-map section 9.6). The cockpit's dial is a labeled local draft until AUTH-0.</summary>
     [HttpGet("api/projects/{projectId:int}/authority/intervention-dial")]
     public IActionResult GetInterventionDial(int projectId) => Planned(
         surface: "Human-intervention dial",
@@ -71,7 +63,7 @@ public sealed record PlannedSurfaceEnvelope
     /// <summary>Human name of the surface that refused.</summary>
     public string Surface { get; init; } = string.Empty;
 
-    /// <summary>What exists today and what is missing — honest, specific.</summary>
+    /// <summary>What exists today and what is missing: honest and specific.</summary>
     public string Detail { get; init; } = string.Empty;
 
     /// <summary>The roadmap slice that owns building this surface.</summary>
