@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useProjectContext } from '../../state/useProjectContext';
 import { NotImplementedPanel } from '../components/NotImplementedPanel';
 import { AgentsPanel } from './AgentsPanel';
+import { AiConnectionsPanel } from './AiConnectionsPanel';
 import {
   ApprovalPolicyDraft,
   autonomyProfiles,
@@ -112,6 +113,10 @@ export function SettingsScreen() {
           missingPrerequisite="Select a project to probe the dial's backend contract."
           testId="flow.settings.interventionDial"
         />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <AiConnectionsPanel />
       </div>
 
       <div style={{ marginTop: 16 }}>

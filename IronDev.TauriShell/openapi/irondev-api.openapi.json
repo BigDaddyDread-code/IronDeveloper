@@ -1237,6 +1237,44 @@
         }
       }
     },
+    "/api/v1/ai-connections": {
+      "get": {
+        "tags": [
+          "AiConnections"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiConnectionMetadata"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiConnectionMetadata"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiConnectionMetadata"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workflow/apply-preview/{workflowRunId}/{workflowStepId}": {
       "get": {
         "tags": [
@@ -16030,6 +16068,117 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "AiConnectionMetadata": {
+        "required": [
+          "boundary",
+          "controlledEndpoint",
+          "controlledEndpointId",
+          "createdByUserId",
+          "credentialConfigured",
+          "credentialStatus",
+          "displayName",
+          "enabled",
+          "id",
+          "projectAvailable",
+          "providerKind",
+          "tenantAvailable",
+          "tenantId",
+          "updatedByUserId",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "tenantId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "providerKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "controlledEndpointId": {
+            "type": "string",
+            "nullable": true
+          },
+          "controlledEndpoint": {
+            "type": "string",
+            "nullable": true
+          },
+          "credentialConfigured": {
+            "type": "boolean"
+          },
+          "credentialStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastSuccessfulTestUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastFailedTestUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "availableModels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "tenantAvailable": {
+            "type": "boolean"
+          },
+          "projectAvailable": {
+            "type": "boolean"
+          },
+          "credentialRotatedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdByUserId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedByUserId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updatedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "version": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "ApprovalSatisfactionEvaluation": {
         "required": [
@@ -35436,6 +35585,9 @@
     },
     {
       "name": "AgentRunsV1"
+    },
+    {
+      "name": "AiConnections"
     },
     {
       "name": "ApplyPreview"

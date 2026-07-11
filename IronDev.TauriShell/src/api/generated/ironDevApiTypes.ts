@@ -799,6 +799,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AiConnectionMetadata"][];
+                        "application/json": components["schemas"]["AiConnectionMetadata"][];
+                        "text/json": components["schemas"]["AiConnectionMetadata"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflow/apply-preview/{workflowRunId}/{workflowStepId}": {
         parameters: {
             query?: never;
@@ -11146,6 +11183,37 @@ export interface components {
          * @enum {integer}
          */
         AgentRunTriggerType: 1 | 2 | 3 | 4;
+        AiConnectionMetadata: {
+            id: string | null;
+            /** Format: int32 */
+            tenantId: number;
+            displayName: string | null;
+            providerKind: string | null;
+            controlledEndpointId: string | null;
+            controlledEndpoint: string | null;
+            credentialConfigured: boolean;
+            credentialStatus: string | null;
+            /** Format: date-time */
+            lastSuccessfulTestUtc?: string | null;
+            /** Format: date-time */
+            lastFailedTestUtc?: string | null;
+            availableModels?: string[] | null;
+            enabled: boolean;
+            tenantAvailable: boolean;
+            projectAvailable: boolean;
+            /** Format: date-time */
+            credentialRotatedUtc?: string | null;
+            /** Format: int32 */
+            createdByUserId: number;
+            /** Format: date-time */
+            createdUtc?: string | null;
+            /** Format: int32 */
+            updatedByUserId: number;
+            /** Format: date-time */
+            updatedUtc?: string | null;
+            version: string | null;
+            boundary: string | null;
+        };
         ApprovalSatisfactionEvaluation: {
             isSatisfied: boolean;
             /** Format: uuid */
