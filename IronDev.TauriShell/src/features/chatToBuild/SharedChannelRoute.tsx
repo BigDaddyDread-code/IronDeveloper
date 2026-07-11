@@ -153,8 +153,8 @@ export function SharedChannelRoute({
           kind="notFound"
           title="Channel not found"
           message="This channel does not exist or is not visible to you. Members-only channels do not disclose their contents."
-          nextSafeAction="Open Chat and choose a channel returned by the backend."
-          actionLabel="Open Chat"
+          nextSafeAction="Open Workshop and choose a channel returned by the backend."
+          actionLabel="Open Workshop"
           onAction={onOpenDirect}
         />
       </main>

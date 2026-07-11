@@ -492,7 +492,7 @@ export function WorkItemScreen({
           }
         }
       } catch (error: unknown) {
-        setErrorMessage(error instanceof Error ? error.message : 'Chat failed.');
+        setErrorMessage(error instanceof Error ? error.message : 'Workshop request failed.');
       } finally {
         setIsThinking(false);
       }
@@ -1157,7 +1157,7 @@ export function WorkItemScreen({
                   type="button"
                   onClick={() => onDiscussInChat(workItem.collaboration.linkedChatSessionId)}
                 >
-                  Discuss in Chat
+                  Discuss in Workshop
                 </button>
               </div>
               {memberDirectory ? (

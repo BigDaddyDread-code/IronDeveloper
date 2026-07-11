@@ -74,7 +74,7 @@ export function BuildRoute({ route, onRouteReady }: BuildRouteProps) {
 
     setTitle(draft.title || defaultTitle);
     setContent(draft.content);
-    setStatusMessage('Discussion imported from Chat.');
+    setStatusMessage('Discussion imported from Workshop.');
     navigation.consumeBuildDiscussionDraft();
   }, [document, navigation, review, reviewPackage, run, ticket]);
 

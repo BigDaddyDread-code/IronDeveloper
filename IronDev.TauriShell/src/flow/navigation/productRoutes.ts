@@ -82,11 +82,31 @@ export function parseProductRoute(pathname: string): ProductRoute {
   const boardMatch = normalized.match(/^\/projects\/(\d+)\/board$/);
   if (boardMatch) return route(normalized, 'board', { projectId: Number(boardMatch[1]) });
 
+  const workshopSessionMatch = normalized.match(/^\/projects\/(\d+)\/workshop\/sessions\/([1-9]\d*)$/);
+  if (workshopSessionMatch) {
+    return route(normalized, 'chat', {
+      projectId: Number(workshopSessionMatch[1]),
+      chatSessionId: Number(workshopSessionMatch[2])
+    });
+  }
+
+  const workshopChannelMatch = normalized.match(/^\/projects\/(\d+)\/workshop\/channels\/([^/]+)$/);
+  if (workshopChannelMatch) {
+    return route(normalized, 'chat', {
+      projectId: Number(workshopChannelMatch[1]),
+      chatChannelId: workshopChannelMatch[2]
+    });
+  }
+
+  const workshopMatch = normalized.match(/^\/projects\/(\d+)\/workshop$/);
+  if (workshopMatch) return route(normalized, 'chat', { projectId: Number(workshopMatch[1]) });
+
   const chatSessionMatch = normalized.match(/^\/projects\/(\d+)\/chat\/sessions\/([1-9]\d*)$/);
   if (chatSessionMatch) {
     return route(normalized, 'chat', {
       projectId: Number(chatSessionMatch[1]),
-      chatSessionId: Number(chatSessionMatch[2])
+      chatSessionId: Number(chatSessionMatch[2]),
+      compatibility: true
     });
   }
 
@@ -94,12 +114,13 @@ export function parseProductRoute(pathname: string): ProductRoute {
   if (chatChannelMatch) {
     return route(normalized, 'chat', {
       projectId: Number(chatChannelMatch[1]),
-      chatChannelId: chatChannelMatch[2]
+      chatChannelId: chatChannelMatch[2],
+      compatibility: true
     });
   }
 
   const chatMatch = normalized.match(/^\/projects\/(\d+)\/chat$/);
-  if (chatMatch) return route(normalized, 'chat', { projectId: Number(chatMatch[1]) });
+  if (chatMatch) return route(normalized, 'chat', { projectId: Number(chatMatch[1]), compatibility: true });
 
   const workItemMatch = normalized.match(/^\/projects\/(\d+)\/work-items\/(new|\d+)$/);
   if (workItemMatch) {
@@ -179,7 +200,8 @@ export function parseProductRoute(pathname: string): ProductRoute {
 }
 
 export function projectPath(projectId: number, destination: 'setup' | 'board' | 'chat' | 'library'): string {
-  return `/projects/${projectId}/${destination}`;
+  const canonicalDestination = destination === 'chat' ? 'workshop' : destination;
+  return `/projects/${projectId}/${canonicalDestination}`;
 }
 
 export function chatSessionPath(projectId: number, sessionId: number): string {

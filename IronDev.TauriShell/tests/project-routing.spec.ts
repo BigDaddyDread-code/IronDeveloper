@@ -13,7 +13,7 @@ test('entry resolves to a project-scoped Board with only the four product destin
   const navigation = page.getByRole('navigation', { name: 'Project' });
   await expect(navigation.getByRole('button')).toHaveCount(4);
   await expect(navigation).toContainText('Board');
-  await expect(navigation).toContainText('Chat');
+  await expect(navigation).toContainText('Workshop');
   await expect(navigation).toContainText('Work Item');
   await expect(navigation).toContainText('Library');
   await expect(navigation).not.toContainText('Batch');
@@ -21,11 +21,11 @@ test('entry resolves to a project-scoped Board with only the four product destin
   await expect(page.getByTestId('flow.nav.workitem')).toBeDisabled();
 });
 
-test('Chat and Library navigation update history and survive back navigation', async ({ page }) => {
+test('Workshop and Library navigation update history and survive back navigation', async ({ page }) => {
   await page.goto('/projects/7/board');
 
-  await page.getByTestId('flow.nav.chat').click();
-  await expect(page).toHaveURL('/projects/7/chat');
+  await page.getByTestId('flow.nav.workshop').click();
+  await expect(page).toHaveURL('/projects/7/workshop');
   await expect(page.getByTestId('chat.route')).toBeVisible();
 
   await page.getByTestId('flow.nav.library').click();
@@ -33,7 +33,7 @@ test('Chat and Library navigation update history and survive back navigation', a
   await expect(page.getByTestId('flow.library')).toBeVisible();
 
   await page.goBack();
-  await expect(page).toHaveURL('/projects/7/chat');
+  await expect(page).toHaveURL('/projects/7/workshop');
   await expect(page.getByTestId('chat.route')).toBeVisible();
 });
 
@@ -84,10 +84,17 @@ test('Documents and its upload child are functional project routes', async ({ pa
   await expect(page.getByRole('heading', { name: 'Upload a document' })).toBeVisible();
 });
 
-test('legacy Chat links are replaced with the selected project route', async ({ page }) => {
+test('legacy root Chat links are replaced with the selected project Workshop route', async ({ page }) => {
   await page.goto('/chat');
 
-  await expect(page).toHaveURL('/projects/7/chat');
+  await expect(page).toHaveURL('/projects/7/workshop');
+  await expect(page.getByTestId('chat.route')).toBeVisible();
+});
+
+test('legacy project Chat session links redirect to Workshop session routes', async ({ page }) => {
+  await page.goto('/projects/7/chat/sessions/9007');
+
+  await expect(page).toHaveURL('/projects/7/workshop/sessions/9007');
   await expect(page.getByTestId('chat.route')).toBeVisible();
 });
 

@@ -382,7 +382,7 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
         {directory.channels.length === 0 ? (
           <div className="fl-members__empty" data-testid="flow.members.channels.empty">
             <h4>No active channels</h4>
-            <p>No channel membership has been inferred. Channel creation belongs to a later Chat slice.</p>
+            <p>No channel membership has been inferred. Channel creation belongs to a later Workshop slice.</p>
           </div>
         ) : (
           <div className="fl-channel-list">

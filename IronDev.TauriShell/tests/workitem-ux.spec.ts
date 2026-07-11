@@ -252,14 +252,14 @@ test('Work Item authority names eligible humans and actor attribution', async ({
   await expect(authority).toContainText('backend project membership');
 });
 
-test('Discuss in Chat routes to the exact backend-linked session', async ({ page }) => {
+test('Discuss in Workshop routes to the exact backend-linked session', async ({ page }) => {
   await mockWorkspace(page);
   await mockProjectWorkItem(page, { linkedChatSessionId: 9007 });
 
   await page.goto('/projects/7/work-items/42');
-  await page.getByRole('button', { name: 'Discuss in Chat' }).click();
+  await page.getByRole('button', { name: 'Discuss in Workshop' }).click();
 
-  await expect(page).toHaveURL('/projects/7/chat/sessions/9007');
+  await expect(page).toHaveURL('/projects/7/workshop/sessions/9007');
 });
 
 test('Work Item ownership saves assignee, followers, waiting-on, and attributed activity', async ({ page }) => {

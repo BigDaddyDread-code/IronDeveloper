@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-test('empty Chat is conversation-first with useful starters and no backstage diagnostics', async ({ page }) => {
+test('empty Workshop is conversation-first with useful starters and no backstage diagnostics', async ({ page }) => {
   await mockChatWorkspace(page);
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
-  await expect(page.getByRole('heading', { name: 'Chat', exact: true })).toBeVisible();
-  await expect(page.getByText('BookSeller / Direct with IronDev')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Workshop', exact: true })).toBeVisible();
+  await expect(page.getByText('BookSeller / Direct with Workshop guide')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'What would you like to work on?' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Review the current project' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shape a new feature' })).toBeVisible();
@@ -24,7 +24,7 @@ test('empty Chat is conversation-first with useful starters and no backstage dia
 
 test('starter actions use the existing composer and project-review request', async ({ page }) => {
   const state = await mockChatWorkspace(page);
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await page.getByRole('button', { name: 'Shape a new feature' }).click();
   await expect(page.getByTestId('chat.composer.input')).toHaveValue('I want to shape a new feature: ');
@@ -50,7 +50,7 @@ test('a historical user message reads as conversation, not a framed inspection s
       }
     ]
   });
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await expect(page.getByTestId('chat.message.user')).toContainText('Make the ticket workspace calm and useful.');
   await expect(page.getByTestId('chat.emptyState')).toHaveCount(0);
@@ -60,7 +60,7 @@ test('a historical user message reads as conversation, not a framed inspection s
 
 test('sending keeps the compact composer attached to the active conversation', async ({ page }) => {
   await mockChatWorkspace(page, { completionDelayMs: 900 });
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await page.getByTestId('chat.composer.input').fill('Review the ticket flow.');
   await page.getByTestId('chat.command.send').click();
@@ -73,7 +73,7 @@ test('sending keeps the compact composer attached to the active conversation', a
 
 test('an answered conversation reveals sources only when the user asks', async ({ page }) => {
   await mockChatWorkspace(page);
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await page.getByTestId('chat.composer.input').fill('Where is catalog sorting implemented?');
   await page.getByTestId('chat.command.send').click();
@@ -88,7 +88,7 @@ test('an answered conversation reveals sources only when the user asks', async (
 test('a Ready exact document version is attached, disclosed, and restored from history', async ({ page }) => {
   const source = readyDocumentSource();
   const state = await mockChatWorkspace(page, { documentSources: [source] });
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await page.getByTestId('chat.documentSource.open').click();
   await expect(page.getByTestId('chat.documentSource.picker')).toContainText('Only backend-ready exact versions are available.');
@@ -122,7 +122,7 @@ test('a Ready exact document version is attached, disclosed, and restored from h
 test('a failed completion preserves the selected exact document for retry', async ({ page }) => {
   const source = readyDocumentSource();
   await mockChatWorkspace(page, { completionStatus: 500, documentSources: [source] });
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await page.getByTestId('chat.documentSource.open').click();
   await page.getByTestId(`chat.documentSource.select.${source.documentVersionId}`).click();
@@ -136,7 +136,7 @@ test('a failed completion preserves the selected exact document for retry', asyn
 
 test('the document picker reports backend empty and unavailable states honestly', async ({ page }) => {
   await mockChatWorkspace(page, { documentSources: [] });
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
   await page.getByTestId('chat.documentSource.open').click();
   await expect(page.getByTestId('chat.documentSource.picker')).toContainText('No Ready project documents are available.');
 
@@ -150,7 +150,7 @@ test('the document picker reports backend empty and unavailable states honestly'
 
 test('a backend-returned ticket draft opens its decision material without changing its gate', async ({ page }) => {
   await mockChatWorkspace(page, { includeBaDraft: true });
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await page.getByTestId('chat.composer.input').fill('Turn this idea into a ticket.');
   await page.getByTestId('chat.command.send').click();
@@ -164,19 +164,19 @@ test('a backend-returned ticket draft opens its decision material without changi
 
 test('a failed response stays in the conversation and leaves the composer usable', async ({ page }) => {
   await mockChatWorkspace(page, { completionStatus: 500 });
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await page.getByTestId('chat.composer.input').fill('Investigate the failing build.');
   await page.getByTestId('chat.command.send').click();
 
-  await expect(page).toHaveURL('/projects/7/chat/sessions/9007');
+  await expect(page).toHaveURL('/projects/7/workshop/sessions/9007');
   await expect(page.getByTestId('chat.message.user')).toContainText('Investigate the failing build.');
   await expect(page.getByTestId('chat.error')).toContainText('Chat service unavailable.');
   await expect(page.getByTestId('chat.composer')).toBeVisible();
   await expect(page.getByTestId('chat.contextPanel')).toHaveCount(0);
 });
 
-test('desktop Chat keeps one readable conversation column at 1366 and 1920 widths', async ({ page }) => {
+test('desktop Workshop keeps one readable conversation column at 1366 and 1920 widths', async ({ page }) => {
   await mockChatWorkspace(page, {
     history: [
       {
@@ -193,7 +193,7 @@ test('desktop Chat keeps one readable conversation column at 1366 and 1920 width
 
   for (const viewport of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
     await page.setViewportSize(viewport);
-    await page.goto('/projects/7/chat');
+    await page.goto('/projects/7/workshop');
     await expect(page.getByTestId('chat.message.user')).toContainText('Keep the conversation readable on wide displays.');
 
     const layout = await page.evaluate(() => {
@@ -217,14 +217,14 @@ test('desktop Chat keeps one readable conversation column at 1366 and 1920 width
   }
 });
 
-test.describe('narrow Chat', () => {
+test.describe('narrow Workshop', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('keeps header, starters, and composer coherent without horizontal overflow', async ({ page }) => {
     await mockChatWorkspace(page);
-    await page.goto('/projects/7/chat');
+    await page.goto('/projects/7/workshop');
 
-    await expect(page.getByRole('heading', { name: 'Chat', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Workshop', exact: true })).toBeVisible();
     await expect(page.getByTestId('chat.composer')).toBeVisible();
     await expect(page.getByTestId('chat.contextPanel')).toHaveCount(0);
     await page.getByTestId('chat.documentSource.open').click();

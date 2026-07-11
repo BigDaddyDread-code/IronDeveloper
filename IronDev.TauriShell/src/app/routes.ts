@@ -45,9 +45,9 @@ export const workspaceRoutes: WorkspaceRoute[] = [
   },
   {
     id: 'chat',
-    label: 'Chat',
-    route: '/chat',
-    description: 'Ask project-aware questions and inspect context used.'
+    label: 'Workshop',
+    route: '/workshop',
+    description: 'Shape ideas, investigate context, and create governed Work Items.'
   },
   {
     id: 'build',

@@ -1,9 +1,9 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { ProjectChannelChatSummary } from '../src/api/types';
 
-test('recent backend sessions form the Chat rail and the latest conversation opens', async ({ page }) => {
+test('recent backend sessions form the Workshop rail and the latest conversation opens', async ({ page }) => {
   await mockSessionWorkspace(page);
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await expect(page.getByTestId('chat.sessions')).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Recent direct conversations' })).toContainText('Catalog sorting');
@@ -16,25 +16,25 @@ test('recent backend sessions form the Chat rail and the latest conversation ope
 
 test('selecting a session uses a canonical URL and reloads backend-owned messages', async ({ page }) => {
   await mockSessionWorkspace(page);
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await page.getByTestId('chat.sessions.item.9007').click();
 
-  await expect(page).toHaveURL('/projects/7/chat/sessions/9007');
+  await expect(page).toHaveURL('/projects/7/workshop/sessions/9007');
   await expect(page.getByTestId('chat.sessions.item.9007')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('chat.message.user')).toContainText('Make the ticket cockpit calmer.');
 
   await page.reload();
-  await expect(page).toHaveURL('/projects/7/chat/sessions/9007');
+  await expect(page).toHaveURL('/projects/7/workshop/sessions/9007');
   await expect(page.getByTestId('chat.message.user')).toContainText('Make the ticket cockpit calmer.');
 });
 
 test('new conversation stays local until the first message creates a durable session', async ({ page }) => {
   const state = await mockSessionWorkspace(page);
-  await page.goto('/projects/7/chat/sessions/9007');
+  await page.goto('/projects/7/workshop/sessions/9007');
 
   await page.getByTestId('chat.sessions.new').click();
-  await expect(page).toHaveURL('/projects/7/chat');
+  await expect(page).toHaveURL('/projects/7/workshop');
   await expect(page.getByRole('heading', { name: 'What would you like to work on?' })).toBeVisible();
   expect(state.createdSessionCount).toBe(0);
 
@@ -42,27 +42,27 @@ test('new conversation stays local until the first message creates a durable ses
   await page.getByTestId('chat.command.send').click();
 
   await expect(page.getByTestId('chat.message.assistant')).toContainText('Catalog sorting is handled by CatalogService.');
-  await expect(page).toHaveURL('/projects/7/chat/sessions/9010');
+  await expect(page).toHaveURL('/projects/7/workshop/sessions/9010');
   expect(state.createdSessionCount).toBe(1);
   await expect(page.getByTestId('chat.sessions.item.9010')).toHaveAttribute('aria-current', 'page');
 });
 
 test('an unknown direct-session URL returns an honest conversation outcome', async ({ page }) => {
   await mockSessionWorkspace(page);
-  await page.goto('/projects/7/chat/sessions/9999');
+  await page.goto('/projects/7/workshop/sessions/9999');
 
   await expect(page.getByTestId('flow.routeOutcome.kind')).toContainText('404');
   await expect(page.getByRole('heading', { name: 'Conversation not found' })).toBeVisible();
   await expect(page.getByTestId('chat.composer')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Open recent conversations' }).click();
-  await expect(page).toHaveURL('/projects/7/chat');
+  await expect(page).toHaveURL('/projects/7/workshop');
   await expect(page.getByTestId('chat.workspace')).toBeVisible();
 });
 
 test('shared-channel URLs open persisted human conversation and mark durable unread state', async ({ page }) => {
   const state = await mockSessionWorkspace(page);
-  await page.goto('/projects/7/chat/channels/general');
+  await page.goto('/projects/7/workshop/channels/general');
 
   await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
   await expect(page.getByRole('heading', { name: '# General' })).toBeVisible();
@@ -80,7 +80,7 @@ test('shared-channel URLs open persisted human conversation and mark durable unr
 
 test('a read-marker failure keeps the shared channel visible and reports unknown unread state', async ({ page }) => {
   await mockSessionWorkspace(page, { failMarkRead: true });
-  await page.goto('/projects/7/chat/channels/general');
+  await page.goto('/projects/7/workshop/channels/general');
 
   await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
   await expect(page.getByTestId('chat.channel.message.7101')).toContainText('Human planning stays visible here.');
@@ -89,7 +89,7 @@ test('a read-marker failure keeps the shared channel visible and reports unknown
 
 test('a direct-session list failure does not hide a healthy shared channel', async ({ page }) => {
   await mockSessionWorkspace(page, { failSessionListOnce: true });
-  await page.goto('/projects/7/chat/channels/general');
+  await page.goto('/projects/7/workshop/channels/general');
 
   await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
   await expect(page.getByTestId('chat.channel.message.7101')).toContainText('Human planning stays visible here.');
@@ -97,7 +97,7 @@ test('a direct-session list failure does not hide a healthy shared channel', asy
 
 test('a human channel message stays human while explicit IronDev invocation persists an attributed answer', async ({ page }) => {
   const state = await mockSessionWorkspace(page);
-  await page.goto('/projects/7/chat/channels/general');
+  await page.goto('/projects/7/workshop/channels/general');
 
   await page.getByTestId('chat.channel.composer').fill('Approved as discussion only.');
   await page.getByTestId('chat.channel.send').click();
@@ -120,7 +120,7 @@ test('a human channel message stays human while explicit IronDev invocation pers
 
 test('assistant completion failure preserves the saved request and supports an explicit retry', async ({ page }) => {
   const state = await mockSessionWorkspace(page, { failAssistantCompletionOnce: true });
-  await page.goto('/projects/7/chat/channels/general');
+  await page.goto('/projects/7/workshop/channels/general');
 
   await page.getByTestId('chat.channel.composer').fill('@IronDev inspect the project boundary');
   await page.getByTestId('chat.channel.send').click();
@@ -140,7 +140,7 @@ test('assistant completion failure preserves the saved request and supports an e
 
 test('channel member suggestions insert a durable person mention token', async ({ page }) => {
   const state = await mockSessionWorkspace(page);
-  await page.goto('/projects/7/chat/channels/general');
+  await page.goto('/projects/7/workshop/channels/general');
 
   await page.getByTestId('chat.channel.composer').fill('Please review @chan');
   await expect(page.getByTestId('chat.channel.mentions')).toContainText('Channel Reader');
@@ -153,7 +153,7 @@ test('channel member suggestions insert a durable person mention token', async (
 
 test('project notification inbox acknowledges a mention and opens its channel', async ({ page }) => {
   const state = await mockSessionWorkspace(page, { withNotification: true });
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await expect(page.getByTestId('flow.notifications')).toContainText('1');
   await page.getByTestId('flow.notifications').click();
@@ -163,13 +163,13 @@ test('project notification inbox acknowledges a mention and opens its channel', 
   }
   await page.getByTestId('flow.notification.8101').click();
 
-  await expect(page).toHaveURL('/projects/7/chat/channels/general');
+  await expect(page).toHaveURL('/projects/7/workshop/channels/general');
   expect(state.markNotificationReadRequests).toBe(1);
 });
 
 test('Read-only channel membership renders the backend refusal and disables posting', async ({ page }) => {
   await mockSessionWorkspace(page);
-  await page.goto('/projects/7/chat/channels/product-planning');
+  await page.goto('/projects/7/workshop/channels/product-planning');
 
   await expect(page.getByRole('heading', { name: '# Product planning' })).toBeVisible();
   await expect(page.getByTestId('chat.channel.assistant-status')).toContainText('Read only');
@@ -179,26 +179,26 @@ test('Read-only channel membership renders the backend refusal and disables post
 
 test('authorized channel creation lands on its canonical shared route', async ({ page }) => {
   await mockSessionWorkspace(page);
-  await page.goto('/projects/7/chat');
+  await page.goto('/projects/7/workshop');
 
   await page.getByTestId('chat.channels.new.toggle').click();
   await page.getByTestId('chat.channels.new.name').fill('Release planning');
   await page.getByTestId('chat.channels.new.visibility').selectOption('MembersOnly');
   await page.getByTestId('chat.channels.new.submit').click();
 
-  await expect(page).toHaveURL('/projects/7/chat/channels/release-planning');
+  await expect(page).toHaveURL('/projects/7/workshop/channels/release-planning');
   await expect(page.getByRole('heading', { name: '# Release planning' })).toBeVisible();
 });
 
 test('session-list failure preserves the route and retries backend truth', async ({ page }) => {
   const state = await mockSessionWorkspace(page, { failSessionListOnce: true });
-  await page.goto('/projects/7/chat/sessions/9008');
+  await page.goto('/projects/7/workshop/sessions/9008');
 
   await expect(page.getByTestId('flow.routeOutcome.kind')).toContainText('503');
   await expect(page.getByRole('heading', { name: 'Conversations are unavailable' })).toBeVisible();
   await page.getByRole('button', { name: 'Retry' }).click();
 
-  await expect(page).toHaveURL('/projects/7/chat/sessions/9008');
+  await expect(page).toHaveURL('/projects/7/workshop/sessions/9008');
   await expect(page.getByTestId('chat.message.assistant')).toContainText('The catalog sorts by title.');
   expect(state.sessionListRequests).toBeGreaterThanOrEqual(2);
 });
@@ -208,7 +208,7 @@ test.describe('narrow session navigation', () => {
 
   test('opens as a drawer, selects a session, and leaves no horizontal overflow', async ({ page }) => {
     await mockSessionWorkspace(page);
-    await page.goto('/projects/7/chat');
+    await page.goto('/projects/7/workshop');
 
     const rail = page.getByTestId('chat.sessions');
     await expect(rail).toHaveClass('chat-session-rail');
@@ -218,7 +218,7 @@ test.describe('narrow session navigation', () => {
     await expect(rail).toHaveClass('chat-session-rail chat-session-rail--open');
 
     await page.getByTestId('chat.sessions.item.9007').click();
-    await expect(page).toHaveURL('/projects/7/chat/sessions/9007');
+    await expect(page).toHaveURL('/projects/7/workshop/sessions/9007');
     await expect(page.getByTestId('chat.message.user')).toContainText('Make the ticket cockpit calmer.');
 
     const dimensions = await page.evaluate(() => ({
@@ -230,7 +230,7 @@ test.describe('narrow session navigation', () => {
 
   test('keeps a shared channel thread and composer inside the narrow viewport', async ({ page }) => {
     await mockSessionWorkspace(page);
-    await page.goto('/projects/7/chat/channels/general');
+    await page.goto('/projects/7/workshop/channels/general');
 
     await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
     await expect(page.getByTestId('chat.channel.composer')).toBeVisible();
@@ -243,7 +243,7 @@ test.describe('narrow session navigation', () => {
 
   test('keeps an attributed IronDev answer and source path inside the narrow viewport', async ({ page }) => {
     await mockSessionWorkspace(page);
-    await page.goto('/projects/7/chat/channels/general');
+    await page.goto('/projects/7/workshop/channels/general');
 
     await page.getByTestId('chat.channel.composer').fill('@IronDev summarize the project boundary');
     await page.getByTestId('chat.channel.send').click();
@@ -262,7 +262,7 @@ test.describe('narrow session navigation', () => {
 
   test('keeps the notification inbox inside the narrow header', async ({ page }) => {
     await mockSessionWorkspace(page, { withNotification: true });
-    await page.goto('/projects/7/chat');
+    await page.goto('/projects/7/workshop');
 
     await page.getByTestId('flow.notifications').click();
     await expect(page.getByTestId('flow.notification.8101')).toBeVisible();
@@ -310,7 +310,7 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
       tenantId: 3,
       projectId: 7,
       title: 'Catalog sorting',
-      summary: 'Direct with IronDev',
+      summary: 'Direct with Workshop guide',
       createdDate: '2026-07-10T08:00:00Z',
       updatedDate: '2026-07-10T08:10:00Z',
       dateGroup: 'Today'
@@ -320,7 +320,7 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
       tenantId: 3,
       projectId: 7,
       title: 'Ticket cockpit',
-      summary: 'Direct with IronDev',
+      summary: 'Direct with Workshop guide',
       createdDate: '2026-07-09T07:00:00Z',
       updatedDate: '2026-07-09T07:30:00Z',
       dateGroup: 'This Week'

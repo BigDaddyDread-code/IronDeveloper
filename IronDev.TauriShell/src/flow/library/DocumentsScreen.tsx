@@ -187,7 +187,7 @@ function DocumentUpload({ projectId }: { projectId: number }) {
             <button className="fl-btn fl-pri" type="submit" disabled={uploadState === 'uploading'} data-testid="flow.documents.upload.submit">
               {uploadState === 'uploading' ? 'Uploading...' : 'Upload document'}
             </button>
-            <p>The backend validates and stores the file. Upload does not attach it to Chat or index it.</p>
+            <p>The backend validates and stores the file. Upload does not attach it to Workshop or index it.</p>
           </div>
         </form>
       )}
@@ -289,7 +289,7 @@ function DocumentList({ projectId }: { projectId: number }) {
             Upload document
           </button>
           <button className="fl-btn" type="button" onClick={() => navigateProductPath(projectPath(projectId, 'chat'))}>
-            Open Chat
+            Open Workshop
           </button>
         </div>
       </header>
@@ -299,13 +299,13 @@ function DocumentList({ projectId }: { projectId: number }) {
       ) : documents.length === 0 ? (
         <div className="fl-documents-empty" data-testid="flow.documents.empty">
           <h3>No project documents</h3>
-          <p>Upload a Markdown or text file, or save an eligible Chat response as durable project context.</p>
+          <p>Upload a Markdown or text file, or save an eligible Workshop response as durable project context.</p>
           <div className="fl-documents-actions">
             <button className="fl-btn fl-pri" type="button" onClick={() => navigateProductPath(documentUploadPath(projectId))}>
               Upload document
             </button>
             <button className="fl-btn" type="button" onClick={() => navigateProductPath(projectPath(projectId, 'chat'))}>
-              Open Chat
+              Open Workshop
             </button>
           </div>
         </div>
