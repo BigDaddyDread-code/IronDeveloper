@@ -49,6 +49,22 @@ test('the orchestrator card is honest — deterministic, no model to configure',
   await expect(page.getByTestId('flow.settings.agent.builder.provider')).toBeVisible();
 });
 
+test('agents panel shows effective profile provenance', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockAgentProfiles(page);
+
+  await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
+  await page.getByTestId('flow.nav.settings').click();
+
+  await expect(page.getByTestId('flow.settings.agent.builder.effective.summary')).toContainText('openai / gpt-4o / 60s');
+  await expect(page.getByTestId('flow.settings.agent.builder.effective.providerSource')).toContainText('DeploymentDefault');
+  await expect(page.getByTestId('flow.settings.agent.builder.effective.skillSource')).toContainText('BuiltInDefault');
+  await expect(page.getByTestId('flow.settings.agent.builder.effective.hash')).toContainText('sha256:');
+  await expect(page.getByTestId('flow.settings.agent.orchestrator.effective.summary')).toContainText('Deterministic / No model / 0s');
+  await expect(page.getByTestId('flow.settings.agent.orchestrator.effective.providerSource')).toContainText('DeterministicRole');
+});
+
 test('agents panel accepts numeric backend role values from LocalTest', async ({ page }) => {
   await mockWorkspace(page);
   await mockAgentProfiles(page, { numericRoles: true });
@@ -105,6 +121,43 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
     boundary: role === 'Analyst' || role === 4
       ? 'The Analyst is the Workshop guide. It cannot approve, start a governed build, continue workflow, disposition findings, or apply source.'
       : 'An agent profile configures voice and model, never authority.'
+  });
+  const effectiveProfile = (role: string | number) => {
+    const isOrchestrator = role === 'Orchestrator' || role === 0;
+    const sourceLayer = isOrchestrator ? 'DeterministicRole' : 'DeploymentDefault';
+    const sourceLabel = isOrchestrator ? 'Orchestrator' : 'Ai';
+
+    return {
+      role,
+      displayName: roleName(role),
+      aiConnectionId: isOrchestrator ? '' : 'deployment-default',
+      provider: isOrchestrator ? '' : (options.numericRoles ? 'OpenAI' : 'openai'),
+      model: isOrchestrator ? '' : 'gpt-4o',
+      timeoutSeconds: isOrchestrator ? 0 : 60,
+      effectiveSkill: '',
+      effectivePersonality: '',
+      fieldSources: [
+        { field: 'provider', sourceLayer, sourceLabel: isOrchestrator ? sourceLabel : `${sourceLabel}:Provider`, inherited: true, detail: '' },
+        { field: 'model', sourceLayer, sourceLabel: isOrchestrator ? sourceLabel : `${sourceLabel}:Model`, inherited: true, detail: '' },
+        { field: 'timeoutSeconds', sourceLayer, sourceLabel: isOrchestrator ? sourceLabel : `${sourceLabel}:TimeoutSeconds`, inherited: true, detail: '' },
+        { field: 'effectiveSkill', sourceLayer: isOrchestrator ? sourceLayer : 'BuiltInDefault', sourceLabel: isOrchestrator ? sourceLabel : 'IronDev Agent Defaults', inherited: true, version: isOrchestrator ? '' : 'IronDev Agent Defaults 2.5.0', detail: '' },
+        { field: 'effectivePersonality', sourceLayer: isOrchestrator ? sourceLayer : 'BuiltInDefault', sourceLabel: isOrchestrator ? sourceLabel : 'IronDev Agent Defaults', inherited: true, version: isOrchestrator ? '' : 'IronDev Agent Defaults 2.5.0', detail: '' }
+      ],
+      builtInDefaultVersion: isOrchestrator ? '' : 'IronDev Agent Defaults 2.5.0',
+      tenantProfileVersion: null,
+      projectProfileVersion: null,
+      effectiveHash: `sha256:test-effective-${String(role).toLowerCase()}`,
+      boundary: 'An agent profile configures voice and model, never authority.'
+    };
+  };
+
+  await page.route('**/irondev-api/api/v1/agent-profiles/effective**', async (route) => {
+    const roles = options.numericRoles ? [4, 1, 2, 3, 0] : ['Analyst', 'Builder', 'Tester', 'Critic', 'Orchestrator'];
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(roles.map(effectiveProfile))
+    });
   });
 
   await page.route('**/irondev-api/api/v1/agent-profiles', async (route) => {

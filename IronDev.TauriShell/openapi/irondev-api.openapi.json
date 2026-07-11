@@ -255,6 +255,54 @@
         }
       }
     },
+    "/api/v1/agent-profiles/effective": {
+      "get": {
+        "tags": [
+          "AgentProfiles"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EffectiveSkeletonAgentProfile"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EffectiveSkeletonAgentProfile"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EffectiveSkeletonAgentProfile"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/agent-profiles/{role}": {
       "get": {
         "tags": [
@@ -19426,6 +19474,80 @@
         },
         "additionalProperties": false
       },
+      "EffectiveSkeletonAgentProfile": {
+        "required": [
+          "displayName",
+          "effectiveHash",
+          "effectivePersonality",
+          "effectiveSkill",
+          "model",
+          "provider",
+          "role",
+          "timeoutSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/SkeletonAgentRole"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "aiConnectionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "effectiveSkill": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectivePersonality": {
+            "type": "string",
+            "nullable": true
+          },
+          "fieldSources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkeletonAgentProfileFieldSource"
+            },
+            "nullable": true
+          },
+          "builtInDefaultVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "tenantProfileVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectProfileVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ExternalReferenceDto": {
         "type": "object",
         "properties": {
@@ -29545,6 +29667,41 @@
             "nullable": true
           },
           "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkeletonAgentProfileFieldSource": {
+        "required": [
+          "field",
+          "inherited",
+          "sourceLabel",
+          "sourceLayer"
+        ],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceLayer": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "string",
+            "nullable": true
+          },
+          "inherited": {
+            "type": "boolean"
+          },
+          "detail": {
             "type": "string",
             "nullable": true
           }

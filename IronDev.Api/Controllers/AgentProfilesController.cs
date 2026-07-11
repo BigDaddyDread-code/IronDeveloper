@@ -39,6 +39,18 @@ public sealed class AgentProfilesController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<SkeletonAgentProfile>>> List(CancellationToken ct) =>
         Ok(await _profiles.ListAsync(ct));
 
+    [HttpGet("effective")]
+    public async Task<ActionResult<IReadOnlyList<EffectiveSkeletonAgentProfile>>> ListEffective(
+        [FromQuery] int? projectId,
+        CancellationToken ct)
+    {
+        var ctx = new CurrentUserContext(HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
+        if (ctx.TenantId is null || ctx.UserId <= 0)
+            return Forbid();
+
+        return Ok(await _profiles.ListEffectiveAsync(ctx.TenantId.Value, projectId, ct));
+    }
+
     [HttpGet("{role}")]
     public async Task<ActionResult<SkeletonAgentProfile>> Get(string role, CancellationToken ct)
     {

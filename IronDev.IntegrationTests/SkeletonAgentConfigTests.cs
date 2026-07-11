@@ -99,6 +99,64 @@ public sealed class SkeletonAgentConfigTests
     }
 
     [TestMethod]
+    public async Task EffectiveProfile_AbsentOverride_NamesInheritedFieldSources()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var effective = (await service.ListEffectiveAsync(tenantId: 3)).Single(profile => profile.Role == SkeletonAgentRole.Tester);
+
+            Assert.AreEqual("openai", effective.Provider);
+            Assert.AreEqual("gpt-4o", effective.Model);
+            Assert.AreEqual(60, effective.TimeoutSeconds);
+            Assert.AreEqual(SkeletonAgentBuiltInDefaults.Version, effective.BuiltInDefaultVersion);
+            Assert.IsNull(effective.TenantProfileVersion);
+            Assert.IsNull(effective.ProjectProfileVersion);
+            Assert.IsTrue(effective.EffectiveHash.StartsWith("sha256:", StringComparison.Ordinal), effective.EffectiveHash);
+            AssertFieldSource(effective, "provider", "DeploymentDefault", inherited: true);
+            AssertFieldSource(effective, "model", "DeploymentDefault", inherited: true);
+            AssertFieldSource(effective, "effectiveSkill", "BuiltInDefault", inherited: true);
+            AssertFieldSource(effective, "effectivePersonality", "BuiltInDefault", inherited: true);
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task EffectiveProfile_RoleOverride_NamesOverrideSourcesAndChangesHash()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var before = (await service.ListEffectiveAsync(tenantId: 3)).Single(profile => profile.Role == SkeletonAgentRole.Builder);
+
+            var outcome = await service.UpdateAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfileUpdate
+            {
+                Provider = "ollama",
+                Model = "llama3",
+                TimeoutSeconds = 45,
+                Skill = "Use the smallest coherent change.",
+                Personality = "Brief and practical."
+            });
+            Assert.IsTrue(outcome.Succeeded, outcome.FailureReason);
+
+            var effective = (await service.ListEffectiveAsync(tenantId: 3, projectId: 7)).Single(profile => profile.Role == SkeletonAgentRole.Builder);
+
+            Assert.AreEqual("ollama", effective.Provider);
+            Assert.AreEqual("llama3", effective.Model);
+            Assert.AreEqual(45, effective.TimeoutSeconds);
+            StringAssert.Contains(effective.EffectiveSkill, "smallest coherent");
+            StringAssert.Contains(effective.EffectivePersonality, "Brief");
+            Assert.AreNotEqual(before.EffectiveHash, effective.EffectiveHash);
+            AssertFieldSource(effective, "provider", "RoleOverride", inherited: false);
+            AssertFieldSource(effective, "model", "RoleOverride", inherited: false);
+            AssertFieldSource(effective, "timeoutSeconds", "RoleOverride", inherited: false);
+            AssertFieldSource(effective, "effectiveSkill", "RoleOverride", inherited: false);
+            AssertFieldSource(effective, "effectivePersonality", "RoleOverride", inherited: false);
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
     public async Task Profile_ThatLooksLikeASecret_IsRefused_NeverPersisted()
     {
         var (service, root) = Harness();
@@ -339,6 +397,18 @@ public sealed class SkeletonAgentConfigTests
     {
         try { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
         catch (IOException) { }
+    }
+
+    private static void AssertFieldSource(
+        EffectiveSkeletonAgentProfile profile,
+        string field,
+        string sourceLayer,
+        bool inherited)
+    {
+        var source = profile.FieldSources.Single(item => item.Field == field);
+        Assert.AreEqual(sourceLayer, source.SourceLayer);
+        Assert.AreEqual(inherited, source.Inherited);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(source.SourceLabel));
     }
 
     private static string RepositoryFile(params string[] parts)
