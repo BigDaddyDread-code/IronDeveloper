@@ -57,6 +57,85 @@ public static class SkeletonAgentRoles
     };
 }
 
+public sealed record SkeletonAgentBuiltInDefault
+{
+    public required string Name { get; init; }
+    public required string Version { get; init; }
+    public required string Skill { get; init; }
+    public required string Personality { get; init; }
+}
+
+public static class SkeletonAgentBuiltInDefaults
+{
+    public const string Name = "IronDev Agent Defaults";
+    public const string Version = "IronDev Agent Defaults 2.5.0";
+
+    private static readonly SkeletonAgentBuiltInDefault Empty = new()
+    {
+        Name = string.Empty,
+        Version = string.Empty,
+        Skill = string.Empty,
+        Personality = string.Empty
+    };
+
+    public static SkeletonAgentBuiltInDefault For(SkeletonAgentRole role) => role switch
+    {
+        SkeletonAgentRole.Analyst => new SkeletonAgentBuiltInDefault
+        {
+            Name = Name,
+            Version = Version,
+            Skill =
+                "Inspect available project context before making claims. Ask only questions that materially improve " +
+                "the work contract. Separate confirmed facts, assumptions, constraints, dependencies, and unresolved " +
+                "questions. Prefer precise acceptance criteria that can be tested. Preserve exact provenance for " +
+                "documents, source files, messages, and decisions. Do not imply that a draft is approved work.",
+            Personality =
+                "Curious, structured, practical, and plain-speaking. Avoid generic consultancy language. Ask one " +
+                "useful question rather than five weak ones."
+        },
+        SkeletonAgentRole.Builder => new SkeletonAgentBuiltInDefault
+        {
+            Name = Name,
+            Version = Version,
+            Skill =
+                "Read the confirmed contract, linked files, architecture context, and current project structure before " +
+                "proposing changes. Prefer the smallest coherent implementation that satisfies the acceptance criteria. " +
+                "Do not invent file paths, APIs, types, dependencies, or test outcomes. Identify scope expansion " +
+                "explicitly. Preserve existing conventions unless the contract requires change.",
+            Personality =
+                "Calm, precise, pragmatic, and economical. State uncertainty instead of bluffing. Explain decisions " +
+                "in terms of the contract and evidence."
+        },
+        SkeletonAgentRole.Tester => new SkeletonAgentBuiltInDefault
+        {
+            Name = Name,
+            Version = Version,
+            Skill =
+                "Derive tests independently from the acceptance criteria and actual implementation. Cover normal " +
+                "behavior, failure paths, boundaries, regressions, and relevant security conditions. Distinguish tests " +
+                "that were authored, discovered, compiled, and executed. Never present a green build as proof that " +
+                "tests ran.",
+            Personality =
+                "Methodical, skeptical, patient, and evidence-oriented. Prefer reproducible results over optimistic " +
+                "interpretation."
+        },
+        SkeletonAgentRole.Critic => new SkeletonAgentBuiltInDefault
+        {
+            Name = Name,
+            Version = Version,
+            Skill =
+                "Review the exact current sealed package independently. Verify claims against source, build evidence, " +
+                "executed tests, requirement coverage, and scope. Attack the weakest material claim first. Separate " +
+                "defects, risks, unsupported claims, missing evidence, and subjective preferences. Do not manufacture " +
+                "objections when the evidence is sufficient.",
+            Personality =
+                "Blunt, concise, independent, and unimpressed by confident wording. Comfortable saying either blocked " +
+                "or no material objection."
+        },
+        _ => Empty
+    };
+}
+
 /// <summary>
 /// AG-1 — a per-role agent profile: the model it runs on and the voice it runs
 /// with. Editable by the user (the whole system is meant to be configurable),
@@ -73,6 +152,12 @@ public static class SkeletonAgentRoles
 public sealed record SkeletonAgentProfile
 {
     public required SkeletonAgentRole Role { get; init; }
+
+    public string DisplayName { get; init; } = string.Empty;
+
+    public string BuiltInDefaultName { get; init; } = string.Empty;
+
+    public string BuiltInDefaultVersion { get; init; } = string.Empty;
 
     /// <summary>Provider key: "openai" | "localopenai" | "ollama" | "custom" | "fake". Falls back to the global Ai:Provider when blank.</summary>
     public string Provider { get; init; } = string.Empty;

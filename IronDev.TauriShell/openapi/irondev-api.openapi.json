@@ -29187,6 +29187,18 @@
           "role": {
             "$ref": "#/components/schemas/SkeletonAgentRole"
           },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "builtInDefaultName": {
+            "type": "string",
+            "nullable": true
+          },
+          "builtInDefaultVersion": {
+            "type": "string",
+            "nullable": true
+          },
           "provider": {
             "type": "string",
             "nullable": true

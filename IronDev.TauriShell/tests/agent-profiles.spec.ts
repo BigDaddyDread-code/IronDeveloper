@@ -14,6 +14,7 @@ test('agents panel edits a model and voice and saves through the governed endpoi
 
   await expect(page.getByTestId('flow.settings.agents')).toBeVisible();
   await expect(page.getByTestId('flow.settings.agent.analyst')).toContainText('Workshop guide');
+  await expect(page.getByTestId('flow.settings.agent.analyst.defaultVersion')).toContainText('IronDev Agent Defaults 2.5.0');
   await expect(page.getByTestId('flow.settings.agent.analyst.boundary')).toContainText('cannot approve');
   await expect(page.getByTestId('flow.settings.agent.analyst.boundary')).toContainText('apply source');
   await expect(page.getByTestId('flow.settings.agent.tester')).toBeVisible();
@@ -82,8 +83,19 @@ interface AgentState {
 
 async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; refuseSecret?: boolean } = {}): Promise<AgentState> {
   const state: AgentState = { lastUpdate: { role: '', body: {} } };
+  const roleName = (role: string | number) => {
+    if (role === 4 || role === 'Analyst') return 'Workshop guide';
+    if (role === 1) return 'Builder';
+    if (role === 2) return 'Tester';
+    if (role === 3) return 'Critic';
+    if (role === 0) return 'Orchestrator';
+    return String(role);
+  };
   const profile = (role: string | number) => ({
     role,
+    displayName: roleName(role),
+    builtInDefaultName: role === 'Orchestrator' || role === 0 ? '' : 'IronDev Agent Defaults',
+    builtInDefaultVersion: role === 'Orchestrator' || role === 0 ? '' : 'IronDev Agent Defaults 2.5.0',
     provider: options.numericRoles ? 'OpenAI' : 'openai',
     model: 'gpt-4o',
     baseUrl: '',

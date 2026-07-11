@@ -66,18 +66,22 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         }
 
         var global = _configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
+        var builtIn = SkeletonAgentBuiltInDefaults.For(role);
 
         return new SkeletonAgentProfile
         {
             Role = role,
+            DisplayName = SkeletonAgentRoles.DisplayName(role),
+            BuiltInDefaultName = builtIn.Name,
+            BuiltInDefaultVersion = builtIn.Version,
             Provider = Coalesce(settings?.Provider, global.Provider),
             Model = Coalesce(settings?.Model, global.Model),
             // BaseUrl is always the deployment's global value — never taken from
             // the profile file, so no edit (API or hand) can redirect outbound calls.
             BaseUrl = global.BaseUrl ?? string.Empty,
             TimeoutSeconds = settings?.TimeoutSeconds is > 0 ? settings.TimeoutSeconds!.Value : global.TimeoutSeconds,
-            Skill = await ReadTextAsync(Path.Combine(dir, "skill.md"), cancellationToken).ConfigureAwait(false),
-            Personality = await ReadTextAsync(Path.Combine(dir, "personality.md"), cancellationToken).ConfigureAwait(false),
+            Skill = await ReadTextOrDefaultAsync(Path.Combine(dir, "skill.md"), builtIn.Skill, cancellationToken).ConfigureAwait(false),
+            Personality = await ReadTextOrDefaultAsync(Path.Combine(dir, "personality.md"), builtIn.Personality, cancellationToken).ConfigureAwait(false),
             Boundary = SkeletonAgentRoles.CodeOwnedBoundary(role)
         };
     }
@@ -168,6 +172,9 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
 
     private static async Task<string> ReadTextAsync(string path, CancellationToken cancellationToken) =>
         File.Exists(path) ? await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false) : string.Empty;
+
+    private static async Task<string> ReadTextOrDefaultAsync(string path, string fallback, CancellationToken cancellationToken) =>
+        File.Exists(path) ? await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false) : fallback;
 
     private static string Coalesce(string? value, string? fallback) =>
         !string.IsNullOrWhiteSpace(value) ? value.Trim() : fallback?.Trim() ?? string.Empty;
