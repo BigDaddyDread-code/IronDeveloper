@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   AcceptedApprovalApiError,
   BuildReadinessResult,
+  ProjectWorkItemReadModel,
   ProjectTicket,
   SkeletonCriticPackage,
   SkeletonCriticReviewOutcome,
@@ -24,6 +25,7 @@ interface WorkItemScreenProps {
   onTicketCreated: (ticket: ProjectTicket) => void;
   onBackToBoard: () => void;
   onOpenGovernanceLibrary: () => void;
+  onDiscussInChat: (sessionId?: number | null) => void;
 }
 
 interface DiscussionEntry {
@@ -73,28 +75,28 @@ function runFromReport(report: SkeletonRunReport): TicketBuildRunDto {
   };
 }
 
-function stageFromReport(report: SkeletonRunReport): WorkItemStage {
-  const status = report.status.toLowerCase();
-  if (report.loopComplete || status.includes('applied')) {
-    return 'done';
+function stageFromProjection(stage: string | null | undefined): WorkItemStage {
+  switch (stage?.toLowerCase()) {
+    case 'shape':
+      return 'shape';
+    case 'build':
+      return 'build';
+    case 'review':
+      return 'review';
+    case 'done':
+      return 'done';
+    default:
+      return 'ticket';
   }
-  if (report.approval || report.criticPackage || report.criticReviews.length > 0 || status.includes('approval')) {
-    return 'review';
-  }
-  return 'build';
 }
 
-function stageFromLinkedRun(status: string): WorkItemStage {
-  if (status === 'needsHumanReview') {
-    return 'review';
-  }
-  if (status === 'passed') {
-    return 'build';
-  }
-  return 'ticket';
-}
-
-export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenGovernanceLibrary }: WorkItemScreenProps) {
+export function WorkItemScreen({
+  ticket,
+  onTicketCreated,
+  onBackToBoard,
+  onOpenGovernanceLibrary,
+  onDiscussInChat
+}: WorkItemScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
 
@@ -116,6 +118,9 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [gateNotice, setGateNotice] = useState<string | null>(null);
   const [criticOutcome, setCriticOutcome] = useState<SkeletonCriticReviewOutcome | null>(null);
+  const [workItem, setWorkItem] = useState<ProjectWorkItemReadModel | null>(null);
+  const [workItemLoadState, setWorkItemLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [workItemLoadError, setWorkItemLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     setStage(ticket ? 'ticket' : 'shape');
@@ -130,7 +135,45 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
     setCriticPackage(null);
     setCriticOutcome(null);
     setGateNotice(null);
+    setWorkItem(null);
+    setWorkItemLoadState(ticket ? 'loading' : 'idle');
+    setWorkItemLoadError(null);
   }, [ticket?.id]);
+
+  const refreshWorkItemProjection = useCallback(async (signal?: AbortSignal, syncStage = true) => {
+    if (project.selectedProjectId === null || ticket?.id === undefined) {
+      return null;
+    }
+
+    setWorkItemLoadState('loading');
+    setWorkItemLoadError(null);
+    try {
+      const next = await session.client.getProjectWorkItem(project.selectedProjectId, ticket.id, signal);
+      setWorkItem(next);
+      if (syncStage) {
+        setStage(stageFromProjection(next.stage));
+      }
+      setWorkItemLoadState('ready');
+      return next;
+    } catch (error: unknown) {
+      if (signal?.aborted) {
+        return null;
+      }
+      setWorkItem(null);
+      setWorkItemLoadState('error');
+      setWorkItemLoadError(error instanceof Error ? error.message : 'The Work Item projection could not be loaded.');
+      return null;
+    }
+  }, [project.selectedProjectId, session.client, ticket?.id]);
+
+  useEffect(() => {
+    if (!ticket || ticket.id === undefined) {
+      return;
+    }
+    const controller = new AbortController();
+    void refreshWorkItemProjection(controller.signal);
+    return () => controller.abort();
+  }, [refreshWorkItemProjection, ticket]);
 
   const hasUndispositionedFindings = useMemo(() => {
     const reviews = report?.criticReviews ?? [];
@@ -191,14 +234,11 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
           requiresHumanApproval: latestRun.status === 'needsHumanReview',
           message: latestRun.recommendation ?? summary.message
         });
-        setStage(stageFromLinkedRun(latestRun.status));
-
         try {
           const nextReport = await session.client.getSkeletonRunReport(projectId, ticketId, latestRun.runId, controller.signal);
           if (!controller.signal.aborted) {
             setReport(nextReport);
             setRun(runFromReport(nextReport));
-            setStage(stageFromReport(nextReport));
           }
         } catch {
           if (!controller.signal.aborted) {
@@ -260,6 +300,17 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
   }, [draft.title, draft.criteria.length, unconfirmedCriteria.length, unresolvedQuestions.length]);
 
   const gates: GateInfo[] = useMemo(() => {
+    if (workItem) {
+      const state = workItem.gate.state?.toLowerCase() ?? 'blocked';
+      return [
+        {
+          afterStage: stageFromProjection(workItem.stage),
+          label: `${state} gate`,
+          state: state === 'blocked' ? 'locked' : 'open',
+          detail: workItem.gate.reason ?? undefined
+        }
+      ];
+    }
     if (stage === 'shape') {
       return [
         {
@@ -307,7 +358,8 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
     readiness?.blockingIssues,
     readiness?.message,
     hasUndispositionedFindings,
-    report?.approval?.continuationUnblocked
+    report?.approval?.continuationUnblocked,
+    workItem
   ]);
 
   const sendPrompt = useCallback(
@@ -435,12 +487,13 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
       setRun(started);
       setStage('build');
       await refreshRunEvidence(started);
+      await refreshWorkItemProjection(undefined, false);
     } catch (error: unknown) {
       setErrorMessage(describeApiError(error, 'Could not start the build run.'));
     } finally {
       setIsStartingRun(false);
     }
-  }, [project.selectedProjectId, ticket, isStartingRun, session.client, refreshRunEvidence]);
+  }, [project.selectedProjectId, ticket, isStartingRun, session.client, refreshRunEvidence, refreshWorkItemProjection]);
 
   const requestCriticReview = useCallback(async () => {
     if (project.selectedProjectId === null || ticket?.id === undefined || run === null || busyAction !== null) {
@@ -545,12 +598,13 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
       setRun(result);
       setGateNotice(result.message ?? null);
       await refreshRunEvidence(result);
+      await refreshWorkItemProjection(undefined, false);
     } catch (error: unknown) {
       setErrorMessage(describeApiError(error, 'The continuation request failed.'));
     } finally {
       setBusyAction(null);
     }
-  }, [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence]);
+  }, [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence, refreshWorkItemProjection]);
 
   const requestApply = useCallback(async () => {
     if (project.selectedProjectId === null || ticket?.id === undefined || run === null || busyAction !== null) {
@@ -563,6 +617,7 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
       setRun(result);
       setGateNotice(result.message ?? null);
       await refreshRunEvidence(result);
+      await refreshWorkItemProjection(undefined, false);
       if (result.status === 'Applied') {
         setStage('done');
       }
@@ -571,32 +626,107 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
     } finally {
       setBusyAction(null);
     }
-  }, [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence]);
+  }, [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence, refreshWorkItemProjection]);
+
+  const performPrimaryAction = useCallback(() => {
+    switch (workItem?.primaryAction.kind) {
+      case 'StartRun':
+        void startBuildRun();
+        break;
+      case 'RefreshRun':
+        if (run) {
+          void refreshRunEvidence(run).then(() => refreshWorkItemProjection());
+        } else {
+          void refreshWorkItemProjection();
+        }
+        break;
+      case 'Review':
+      case 'Apply':
+        setStage('review');
+        break;
+      case 'RepairOrRetry':
+        setStage('build');
+        break;
+      case 'ViewOutcome':
+        setStage('done');
+        break;
+      default:
+        break;
+    }
+  }, [workItem?.primaryAction.kind, startBuildRun, run, refreshRunEvidence, refreshWorkItemProjection]);
+
+  if (ticket && workItemLoadState === 'loading' && workItem === null) {
+    return <p className="fl-empty" data-testid="flow.workItemProjection.loading">Loading current Work Item truth...</p>;
+  }
+
+  if (ticket && workItemLoadState === 'error') {
+    return (
+      <section className="fl-outcome" data-testid="flow.workItemProjection.error">
+        <p className="fl-eyebrow">Work Item unavailable</p>
+        <h1 className="fl-h1">Current lifecycle truth could not be loaded</h1>
+        <p className="fl-sub">{workItemLoadError ?? 'The backend Work Item projection returned an error.'}</p>
+        <button className="fl-btn fl-pri" type="button" onClick={() => void refreshWorkItemProjection()}>
+          Retry
+        </button>
+      </section>
+    );
+  }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
+    <div data-testid="flow.workItem">
+      <div className="fl-workitem-head">
         <div>
-          <h1 className="fl-h1">{draft.title.trim().length > 0 ? draft.title : 'New work item'}</h1>
-          <p className="fl-sub">
-            {ticket && ticket.id !== undefined ? `WI-${ticket.id} · ` : ''}
-            {stage === 'shape'
-              ? 'Shaping — discussion produces the contract.'
-              : stage === 'ticket'
-                ? 'Ticket — the contract is the gate input.'
-                : stage === 'build'
-                  ? 'Build — the run reports; it grants nothing.'
-                  : stage === 'review'
-                    ? 'Review — the critic package and the human gate.'
-                    : 'Done — the loop record, verified end to end.'}
+          <p className="fl-eyebrow">{workItem?.workItemId ? `WI-${workItem.workItemId}` : 'Work Item'}</p>
+          <h1 className="fl-h1">{workItem?.title ?? (draft.title.trim().length > 0 ? draft.title : 'New work item')}</h1>
+          <p className="fl-sub" data-testid="flow.workItem.statusSummary">
+            {workItem?.statusSummary ??
+              (stage === 'shape'
+                ? 'Shaping - discussion produces the contract.'
+                : 'The ticket contract is the next gate input.')}
           </p>
         </div>
-        <button className="fl-btn" onClick={onBackToBoard}>
-          Back to board
-        </button>
+        <div className="fl-workitem-head-actions">
+          {workItem ? (
+            <div className="fl-workitem-state" data-testid="flow.workItem.state">
+              <strong>{workItem.stage ?? 'Unknown stage'}</strong>
+              <span>{workItem.state ?? 'Unknown state'}</span>
+            </div>
+          ) : null}
+          <button className="fl-btn" onClick={onBackToBoard}>Back to board</button>
+          {workItem ? (
+            <button
+              className="fl-btn fl-pri"
+              type="button"
+              disabled={!workItem.primaryAction.allowed}
+              onClick={performPrimaryAction}
+              data-testid="flow.workItem.primaryAction"
+            >
+              {workItem.primaryAction.label ?? 'No action available'}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <StageRail activeStage={stage} gates={gates} />
+
+      {workItem ? (
+        <section
+          className={`fl-workitem-gate fl-workitem-gate-${workItem.gate.state?.toLowerCase() ?? 'blocked'}`}
+          data-testid="flow.workItem.gate"
+        >
+          <div>
+            <p className="fl-plabel">{workItem.gate.state ?? 'Gate'}</p>
+            <strong>{workItem.gate.reason ?? 'The backend returned no gate reason.'}</strong>
+            <p>{workItem.gate.nextSafeAction ?? 'Refresh backend state before acting.'}</p>
+          </div>
+          {(workItem.gate.technicalDetails?.length ?? 0) > 0 ? (
+            <details>
+              <summary>Technical details</summary>
+              <ul>{workItem.gate.technicalDetails?.map((detail) => <li key={detail}>{detail}</li>)}</ul>
+            </details>
+          ) : null}
+        </section>
+      ) : null}
 
       {errorMessage ? <div className="fl-error">{errorMessage}</div> : null}
 
@@ -696,9 +826,9 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
             </>
           ) : (
             <>
-          <p className="fl-plabel">{stage === 'shape' ? 'Shaping discussion' : 'Ticket detail'}</p>
+          <p className="fl-plabel">{ticket === null ? 'Shaping discussion' : 'Ticket detail'}</p>
 
-          {stage === 'shape' ? (
+          {ticket === null ? (
             <>
               {discussion.length === 0 ? (
                 <p className="fl-empty">Describe the requirement. The discussion produces criteria — nothing here is authority.</p>
@@ -794,12 +924,47 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
           )}
         </div>
 
-        <ContractRail
-          criteria={draft.criteria}
-          openQuestions={draft.openQuestions}
-          architectureRefs={draft.architectureRefs}
+        <div className="fl-workitem-side">
+          {workItem ? (
+            <section className="fl-panel-box fl-workitem-collaboration" data-testid="flow.workItem.collaboration">
+              <div className="fl-workitem-side-heading">
+                <p className="fl-plabel">Collaboration</p>
+                <button
+                  className="fl-btn fl-mini"
+                  type="button"
+                  onClick={() => onDiscussInChat(workItem.collaboration.linkedChatSessionId)}
+                >
+                  Discuss in Chat
+                </button>
+              </div>
+              <dl className="fl-workitem-facts">
+                <div><dt>Assignee</dt><dd>{workItem.collaboration.assignee?.displayName ?? 'Not assigned'}</dd></div>
+                <div><dt>Waiting on</dt><dd>{workItem.collaboration.waitingOn?.displayName ?? 'No actor'}</dd></div>
+                <div><dt>Followers</dt><dd>{workItem.collaboration.followers?.length ?? 0}</dd></div>
+              </dl>
+              {(workItem.collaboration.recentActivity?.length ?? 0) > 0 ? (
+                <div className="fl-workitem-activity">
+                  {workItem.collaboration.recentActivity?.slice(0, 4).map((activity) => (
+                    <div key={`${activity.timestampUtc}-${activity.kind}`}>
+                      <strong>{activity.summary ?? activity.kind ?? 'Activity'}</strong>
+                      <span>{activity.actor?.displayName ?? 'Backend event'}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="fl-empty">No attributed activity was returned.</p>}
+            </section>
+          ) : null}
+
+          <ContractRail
+            criteria={draft.criteria}
+            openQuestions={draft.openQuestions}
+            architectureRefs={draft.architectureRefs}
+            summary={workItem ? {
+              criterionCount: workItem.contract.acceptanceCriterionCount ?? 0,
+              affectedFileCount: workItem.contract.affectedFileCount ?? 0
+            } : undefined}
           onConfirmCriterion={
-            stage === 'shape'
+            ticket === null
               ? (id) =>
                   setDraft((prev) => ({
                     ...prev,
@@ -808,7 +973,7 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
               : undefined
           }
           onResolveQuestion={
-            stage === 'shape'
+            ticket === null
               ? (id) =>
                   setDraft((prev) => ({
                     ...prev,
@@ -816,11 +981,12 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
                   }))
               : undefined
           }
-        />
+          />
+        </div>
       </div>
 
       <div className="fl-foot">
-        {stage === 'shape' ? (
+        {ticket === null ? (
           <>
             <span className={shapeBlockers.length === 0 ? 'fl-gatemsg fl-okmsg' : 'fl-gatemsg'} data-testid="flow.shape.gate">
               {shapeBlockers.length === 0
@@ -838,58 +1004,14 @@ export function WorkItemScreen({ ticket, onTicketCreated, onBackToBoard, onOpenG
               {isPromoting ? 'Promoting…' : 'Promote to ticket'}
             </button>
           </>
-        ) : stage === 'ticket' ? (
-          <>
-            <span className={readiness?.isReady ? 'fl-gatemsg fl-okmsg' : 'fl-gatemsg'} data-testid="flow.ticket.gate">
-              {readiness?.isReady
-                ? 'Readiness gate: satisfied. Starting a run builds and tests in a disposable workspace — it approves nothing.'
-                : 'Readiness gate: blocked. The backend explains the block above — the UI never invents one.'}
-            </span>
-            <button
-              className="fl-btn fl-pri"
-              disabled={!readiness?.isReady || isStartingRun}
-              onClick={() => void startBuildRun()}
-              data-testid="flow.ticket.startRun"
-            >
-              {isStartingRun ? 'Running…' : 'Start build run'}
-            </button>
-          </>
-        ) : stage === 'build' ? (
-          <>
-            <span
-              className={run?.status === 'PausedForApproval' ? 'fl-gatemsg fl-okmsg' : 'fl-gatemsg'}
-              data-testid="flow.build.gate"
-            >
-              {run?.status === 'PausedForApproval'
-                ? 'Halted for approval. Halt is not approval — the review stage is where a human decides.'
-                : run?.status === 'Failed'
-                  ? 'The run blocked. The report above names the reason and the next safe action.'
-                  : 'The run reports its own state; the UI never invents one.'}
-            </span>
-            <button
-              className="fl-btn fl-pri"
-              disabled={run === null || run.status === 'Failed'}
-              onClick={() => setStage('review')}
-              data-testid="flow.build.toReview"
-            >
-              Proceed to review
-            </button>
-          </>
-        ) : stage === 'review' ? (
+        ) : workItem && gateNotice ? (
           <span
-            className={report?.approval?.continuationUnblocked ? 'fl-gatemsg fl-okmsg' : 'fl-gatemsg'}
-            data-testid="flow.review.gate"
+            className={workItem.gate.state?.toLowerCase() === 'blocked' ? 'fl-gatemsg' : 'fl-gatemsg fl-okmsg'}
+            data-testid={`flow.${stage}.gate`}
           >
-            {gateNotice ??
-              (report?.approval?.continuationUnblocked
-                ? 'Continuation unblocked by a verified approval. Approval is not apply permission — apply is verified live.'
-                : 'Human gate: locked. Only a recorded approval, verified live by the backend, unblocks continuation.')}
+            {gateNotice}
           </span>
-        ) : (
-          <span className="fl-gatemsg fl-okmsg">
-            The loop record above is reconstruction from durable evidence — it grants nothing.
-          </span>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -231,9 +231,10 @@ public sealed class DemoSeedScriptContractTests
         StringAssert.Contains(apiProof, "Assert.AreEqual(\"PausedForApproval\", started.Status)");
 
         StringAssert.Contains(flowScreen, "flow.shape.promote");
-        StringAssert.Contains(flowScreen, "flow.ticket.startRun");
+        StringAssert.Contains(flowScreen, "flow.workItem.primaryAction");
+        StringAssert.Contains(flowScreen, "disabled={!workItem.primaryAction.allowed}");
+        StringAssert.Contains(flowScreen, "getProjectWorkItem");
         StringAssert.Contains(flowScreen, "Readiness gate: satisfied. Promotion creates the ticket");
-        StringAssert.Contains(flowScreen, "Starting a run builds and tests in a disposable workspace");
 
         StringAssert.Contains(source, "[switch]$CreateLiveChatTicket");
         StringAssert.Contains(source, "Invoke-LiveChatTicketProof");

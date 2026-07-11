@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockProjectBoard } from './helpers/mockBoard';
+import { mockProjectWorkItem } from './helpers/mockWorkItem';
 
 test.beforeEach(async ({ page }) => {
   await mockRoutedProject(page);
@@ -168,6 +169,12 @@ async function mockRoutedProject(page: Page) {
   await page.route('**/irondev-api/api/projects/7/tickets/41', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticket) })
   );
+  await mockProjectWorkItem(page, {
+    workItemId: 41,
+    title: ticket.title,
+    state: ticket.status,
+    ticket
+  });
   await page.route('**/irondev-api/api/projects/7/tickets', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([ticket]) })
   );

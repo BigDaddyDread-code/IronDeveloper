@@ -4,6 +4,10 @@ interface ContractRailProps {
   criteria: DraftCriterion[];
   openQuestions: DraftOpenQuestion[];
   architectureRefs: string[];
+  summary?: {
+    criterionCount: number;
+    affectedFileCount: number;
+  };
   onConfirmCriterion?: (id: string) => void;
   onResolveQuestion?: (id: string) => void;
 }
@@ -12,6 +16,7 @@ export function ContractRail({
   criteria,
   openQuestions,
   architectureRefs,
+  summary,
   onConfirmCriterion,
   onResolveQuestion
 }: ContractRailProps) {
@@ -20,6 +25,12 @@ export function ContractRail({
   return (
     <div className="fl-panel-box" data-testid="flow.contract">
       <p className="fl-plabel">The contract</p>
+      {summary ? (
+        <p className="fl-contract-summary" data-testid="flow.contract.summary">
+          {summary.criterionCount} {summary.criterionCount === 1 ? 'criterion' : 'criteria'} · {summary.affectedFileCount}{' '}
+          affected {summary.affectedFileCount === 1 ? 'file' : 'files'}
+        </p>
+      ) : null}
 
       {criteria.length === 0 ? (
         <p className="fl-empty">No acceptance criteria yet. Shape the work in the discussion.</p>

@@ -50,6 +50,7 @@ import type {
   LoginResponse,
   PlannedSurfaceEnvelope,
   ProjectBoardReadModel,
+  ProjectWorkItemReadModel,
   ProjectProvisioningReadinessUi,
   ProjectDocument,
   ProjectDocumentProcessingResult,
@@ -361,6 +362,17 @@ class IronDevApiClient {
 
   async getProjectBoard(projectId: number, signal?: AbortSignal): Promise<ProjectBoardReadModel> {
     return this.request<ProjectBoardReadModel>(`/api/projects/${projectId}/board`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getProjectWorkItem(
+    projectId: number,
+    workItemId: number,
+    signal?: AbortSignal
+  ): Promise<ProjectWorkItemReadModel> {
+    return this.request<ProjectWorkItemReadModel>(`/api/projects/${projectId}/work-items/${workItemId}`, {
       method: 'GET',
       signal
     });
