@@ -5628,7 +5628,9 @@ export interface paths {
         post?: never;
         delete: {
             parameters: {
-                query?: never;
+                query?: {
+                    expectedRevision?: number;
+                };
                 header?: never;
                 path: {
                     projectId: number;
@@ -13074,6 +13076,8 @@ export interface components {
             userId?: number;
             channelRole?: string | null;
             notificationLevel?: string | null;
+            /** Format: int64 */
+            revision?: number;
         };
         ProjectChannelMentionCandidate: {
             /** Format: int32 */
@@ -13488,6 +13492,8 @@ export interface components {
         ProjectTicket: {
             /** Format: int64 */
             id?: number;
+            /** Format: int64 */
+            revision?: number;
             /** Format: int32 */
             tenantId?: number;
             /** Format: int32 */
@@ -14501,11 +14507,15 @@ export interface components {
         SetProjectChannelMembershipRequest: {
             channelRole?: string | null;
             notificationLevel?: string | null;
+            /** Format: int64 */
+            expectedRevision?: number;
         };
         SetProjectMembershipRequest: {
             projectRole?: string | null;
         };
         SetProjectWorkItemCollaborationRequest: {
+            /** Format: int64 */
+            expectedRevision?: number;
             /** Format: int32 */
             assigneeUserId?: number | null;
             followerUserIds?: number[] | null;

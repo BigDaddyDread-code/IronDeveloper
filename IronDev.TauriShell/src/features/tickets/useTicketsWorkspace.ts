@@ -116,6 +116,7 @@ interface TicketsWorkspaceActions {
   onEditDraftChange: (draft: TicketEditDraft) => void;
   onSaveTicket: () => void;
   onCancelEditTicket: () => void;
+  onReloadTicketAndCompare: () => void;
   onRefreshPlan: () => void;
   onRefreshReadiness: () => void;
   onRefreshEvidence: () => void;
@@ -637,6 +638,11 @@ export function useTicketsWorkspace() {
         setSaveMessage('IronDev.Api rejected the current token. Sign in again before saving tickets.');
       } else if (error instanceof IronDevApiError && error.status === 400) {
         setSaveMessage('IronDev.Api rejected the ticket update. Check required fields.');
+      } else if (error instanceof IronDevApiError && error.status === 409) {
+        const body = error.body as { code?: string; expectedRevision?: number; currentRevision?: number; nextSafeAction?: string } | null;
+        setSaveMessage(body?.code === 'StaleWrite'
+          ? `Stale write refused. Attempted version ${body.expectedRevision}; current version ${body.currentRevision}. ${body.nextSafeAction ?? 'Reload and compare.'}`
+          : 'Ticket update conflicted with a newer backend version. Reload and compare.');
       } else if (error instanceof IronDevApiError) {
         setSaveMessage(`Ticket save failed with HTTP ${error.status}.`);
       } else {
@@ -644,6 +650,15 @@ export function useTicketsWorkspace() {
       }
     }
   }, [editDraft, isEditDirty, project, selectedProjectId, selectedTicket, session.client, ticketActionBlockedReason]);
+
+  const reloadTicketAndCompare = useCallback(async () => {
+    if (!selectedProjectId || !selectedTicket?.id) return;
+    const current = await session.client.getProjectTicket(selectedProjectId, selectedTicket.id);
+    setTickets((tickets) => tickets.map((ticket) => ticket.id === current.id ? { ...ticket, ...current } : ticket));
+    setSelectedTicketDetail(current);
+    setSaveStatus('editing');
+    setSaveMessage(`Current backend version ${current.revision ?? 0} loaded. Your attempted draft remains in the editor for comparison.`);
+  }, [selectedProjectId, selectedTicket?.id, session.client]);
 
   const refreshEvidence = useCallback(async () => {
     if (!selectedTicket) {
@@ -1027,6 +1042,7 @@ export function useTicketsWorkspace() {
       onEditDraftChange: setEditDraft,
       onSaveTicket: saveTicket,
       onCancelEditTicket: cancelEditTicket,
+      onReloadTicketAndCompare: () => void reloadTicketAndCompare(),
       onRefreshPlan: refreshImplementationPlan,
       onRefreshReadiness: refreshReadiness,
       onRefreshEvidence: refreshEvidence,

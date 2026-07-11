@@ -31,7 +31,7 @@ export interface EnvironmentInfo {
   dangerRealRepoWritesEnabled: boolean;
 }
 
-export type ProjectTicket = components['schemas']['ProjectTicket'];
+export type ProjectTicket = components['schemas']['ProjectTicket'] & { revision?: number };
 export type ProjectSummary = components['schemas']['Project'];
 export type ProjectBoardReadModel = components['schemas']['ProjectBoardReadModel'];
 export type ProjectBoardItemReadModel = components['schemas']['ProjectBoardItemReadModel'];
@@ -861,6 +861,7 @@ export interface ProjectMemberDirectoryResponse {
 }
 
 export interface SetProjectWorkItemCollaborationRequest {
+  expectedRevision: number;
   assigneeUserId: number | null;
   followerUserIds: number[];
   waitingOnUserId: number | null;
@@ -872,6 +873,7 @@ export interface ProjectChannelMembershipEntry {
   userId: number;
   channelRole: string;
   notificationLevel: string;
+  revision: number;
 }
 
 export interface ProjectChannelDirectoryEntry {
@@ -891,6 +893,7 @@ export type SetProjectChannelMembershipRequest = Omit<
 > & {
   channelRole: string;
   notificationLevel: string;
+  expectedRevision: number;
 };
 
 export type ProjectChannelChatSummary = Omit<

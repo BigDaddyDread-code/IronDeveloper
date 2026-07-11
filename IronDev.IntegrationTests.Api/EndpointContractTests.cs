@@ -1006,7 +1006,7 @@ public sealed class EndpointContractTests : ApiTestBase
 
         var addMembership = await client.PutAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}",
-            new { channelRole = "Moderator", notificationLevel = "Mentions" });
+            new { channelRole = "Moderator", notificationLevel = "Mentions", expectedRevision = 0 });
         Assert.AreEqual(HttpStatusCode.OK, addMembership.StatusCode);
 
         var addProjectMembership = await client.PutAsJsonAsync(
@@ -1018,25 +1018,25 @@ public sealed class EndpointContractTests : ApiTestBase
         using var memberClient = GetAuthedClient(memberToken);
         var denied = await memberClient.PutAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}",
-            new { channelRole = "Owner", notificationLevel = "All" });
+            new { channelRole = "Owner", notificationLevel = "All", expectedRevision = 1 });
         Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
 
         var lastOwnerRefusal = await client.PutAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{channelId}/members/1",
-            new { channelRole = "Member", notificationLevel = "All" });
+            new { channelRole = "Member", notificationLevel = "All", expectedRevision = 1 });
         Assert.AreEqual(HttpStatusCode.Conflict, lastOwnerRefusal.StatusCode);
 
         var promoteMember = await client.PutAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}",
-            new { channelRole = "Owner", notificationLevel = "All" });
+            new { channelRole = "Owner", notificationLevel = "All", expectedRevision = 1 });
         Assert.AreEqual(HttpStatusCode.OK, promoteMember.StatusCode);
         var demoteOriginalOwner = await client.PutAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{channelId}/members/1",
-            new { channelRole = "Member", notificationLevel = "None" });
+            new { channelRole = "Member", notificationLevel = "None", expectedRevision = 1 });
         Assert.AreEqual(HttpStatusCode.OK, demoteOriginalOwner.StatusCode);
 
         var removeLastOwner = await client.DeleteAsync(
-            $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}");
+            $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}?expectedRevision=2");
         Assert.AreEqual(HttpStatusCode.Conflict, removeLastOwner.StatusCode);
 
         var finalResponse = await client.GetAsync($"/api/projects/{project.Id}/members");
@@ -1047,6 +1047,83 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual("None", finalChannel.Members.Single(member => member.UserId == 1).NotificationLevel);
         StringAssert.Contains(finalChannel.Boundary, "not approval");
     }
+
+    [TestMethod]
+    public async Task VersionedCollaborationWrites_ShouldRefuseStaleTicketAndAssignmentUpdates()
+    {
+        var client = GetAuthedClient(await SelectTenantAsync(await LoginAsync()));
+        var project = await CreateProjectAsync(client, "Versioned collaboration");
+        var created = await client.PostAsJsonAsync($"/api/projects/{project.Id}/tickets", new
+        {
+            title = "Original draft",
+            summary = "Shared draft",
+            acceptanceCriteria = new[] { "No silent overwrite" }
+        });
+        created.EnsureSuccessStatusCode();
+        var original = await created.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.IsNotNull(original);
+        Assert.AreEqual(1L, original!.Revision);
+
+        var firstEditor = CloneTicket(original, "First editor wins");
+        var firstSave = await client.PatchAsJsonAsync($"/api/projects/{project.Id}/tickets/{original.Id}", firstEditor);
+        firstSave.EnsureSuccessStatusCode();
+        var current = await firstSave.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.AreEqual(2L, current!.Revision);
+
+        var staleEditor = CloneTicket(original, "Stale editor must be refused");
+        var staleSave = await client.PatchAsJsonAsync($"/api/projects/{project.Id}/tickets/{original.Id}", staleEditor);
+        Assert.AreEqual(HttpStatusCode.Conflict, staleSave.StatusCode);
+        var ticketConflict = await staleSave.Content.ReadFromJsonAsync<CollaborationWriteConflictResponse>();
+        Assert.AreEqual(CollaborationWriteConflictResponse.StaleWriteCode, ticketConflict!.Code);
+        Assert.AreEqual(1L, ticketConflict.ExpectedRevision);
+        Assert.AreEqual(2L, ticketConflict.CurrentRevision);
+        StringAssert.Contains(ticketConflict.NextSafeAction, "Reload the ticket");
+        var reloaded = await client.GetFromJsonAsync<ProjectTicket>($"/api/projects/{project.Id}/tickets/{original.Id}");
+        Assert.AreEqual("First editor wins", reloaded!.Title);
+
+        var firstAssignment = await client.PutAsJsonAsync($"/api/projects/{project.Id}/work-items/{original.Id}/collaboration", new
+        {
+            expectedRevision = 0,
+            assigneeUserId = 1,
+            followerUserIds = new[] { 1 },
+            waitingOnUserId = (int?)null,
+            waitingOnKind = "Role",
+            waitingOnLabel = "Reviewer"
+        });
+        firstAssignment.EnsureSuccessStatusCode();
+        var staleAssignment = await client.PutAsJsonAsync($"/api/projects/{project.Id}/work-items/{original.Id}/collaboration", new
+        {
+            expectedRevision = 0,
+            assigneeUserId = (int?)null,
+            followerUserIds = Array.Empty<int>(),
+            waitingOnUserId = (int?)null,
+            waitingOnKind = (string?)null,
+            waitingOnLabel = (string?)null
+        });
+        Assert.AreEqual(HttpStatusCode.Conflict, staleAssignment.StatusCode);
+        var assignmentConflict = await staleAssignment.Content.ReadFromJsonAsync<CollaborationWriteConflictResponse>();
+        Assert.AreEqual(1L, assignmentConflict!.CurrentRevision);
+        StringAssert.Contains(assignmentConflict.NextSafeAction, "Reload the Work Item");
+    }
+
+    private static ProjectTicket CloneTicket(ProjectTicket source, string title) => new()
+    {
+        Id = source.Id,
+        Revision = source.Revision,
+        TenantId = source.TenantId,
+        ProjectId = source.ProjectId,
+        SessionId = source.SessionId,
+        Title = title,
+        TicketType = source.TicketType,
+        Priority = source.Priority,
+        Summary = source.Summary,
+        Background = source.Background,
+        Problem = source.Problem,
+        AcceptanceCriteria = source.AcceptanceCriteria,
+        TechnicalNotes = source.TechnicalNotes,
+        Status = source.Status,
+        Content = source.Content
+    };
 
     [TestMethod]
     public async Task ProjectChannelChat_ShouldEnforceVisibilityPersistHumanMessagesAndRefuseAssistantAuthority()
@@ -1119,7 +1196,7 @@ public sealed class EndpointContractTests : ApiTestBase
 
         var addReadOnly = await ownerClient.PutAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{privateChannel.ChannelId}/members/{memberUserId}",
-            new { channelRole = "ReadOnly", notificationLevel = "Mentions" });
+            new { channelRole = "ReadOnly", notificationLevel = "Mentions", expectedRevision = 0 });
         Assert.AreEqual(HttpStatusCode.OK, addReadOnly.StatusCode);
 
         var afterMembership = await memberClient.GetFromJsonAsync<ProjectChannelChatListResponse>(
@@ -1214,7 +1291,7 @@ public sealed class EndpointContractTests : ApiTestBase
 
         var enableAll = await ownerClient.PutAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{general.ChannelId}/members/{memberUserId}",
-            new { channelRole = "Member", notificationLevel = "All" });
+            new { channelRole = "Member", notificationLevel = "All", expectedRevision = 0 });
         Assert.AreEqual(HttpStatusCode.OK, enableAll.StatusCode);
         var postForAll = await ownerClient.PostAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
@@ -1227,7 +1304,7 @@ public sealed class EndpointContractTests : ApiTestBase
 
         var disableNotifications = await ownerClient.PutAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{general.ChannelId}/members/{memberUserId}",
-            new { channelRole = "Member", notificationLevel = "None" });
+            new { channelRole = "Member", notificationLevel = "None", expectedRevision = 1 });
         Assert.AreEqual(HttpStatusCode.OK, disableNotifications.StatusCode);
         var mutedMention = await ownerClient.PostAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{general.Slug}/messages",

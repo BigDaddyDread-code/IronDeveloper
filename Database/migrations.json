@@ -154,6 +154,11 @@
                            "id":  "2026-07-v2-project-collaboration",
                            "path":  "Database/migrate_project_collaboration.sql",
                            "description":  "Adds project-specific visibility membership plus durable Work Item assignee, followers, waiting-on, and attributed collaboration activity."
+                       },
+                       {
+                           "id":  "2026-07-v2-versioned-collaboration-writes",
+                           "path":  "Database/migrate_versioned_collaboration_writes.sql",
+                           "description":  "Adds optimistic revisions to ticket drafts and channel memberships; Work Item collaboration already carries its revision."
                        }
                    ]
 }

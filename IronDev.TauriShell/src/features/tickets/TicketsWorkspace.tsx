@@ -90,6 +90,7 @@ interface TicketsWorkspaceProps {
   onEditDraftChange: (draft: TicketEditDraft) => void;
   onSaveTicket: () => void;
   onCancelEditTicket: () => void;
+  onReloadTicketAndCompare: () => void;
   onRefreshPlan: () => void;
   onRefreshReadiness: () => void;
   onRefreshEvidence: () => void;
@@ -169,6 +170,7 @@ export function TicketsWorkspace({
   onEditDraftChange,
   onSaveTicket,
   onCancelEditTicket,
+  onReloadTicketAndCompare,
   onRefreshPlan,
   onRefreshReadiness,
   onRefreshEvidence,
@@ -315,6 +317,7 @@ export function TicketsWorkspace({
                 onEditDraftChange={onEditDraftChange}
                 onSave={onSaveTicket}
                 onCancelEdit={onCancelEditTicket}
+                onReloadTicketAndCompare={onReloadTicketAndCompare}
                 onRefreshPlan={onRefreshPlan}
                 onRefreshReadiness={onRefreshReadiness}
                 onRefreshEvidence={onRefreshEvidence}

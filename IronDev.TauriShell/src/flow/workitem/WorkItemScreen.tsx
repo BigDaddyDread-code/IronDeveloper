@@ -236,6 +236,7 @@ export function WorkItemScreen({
     setCollaborationError(null);
     try {
       await session.client.setProjectWorkItemCollaboration(project.selectedProjectId, ticket.id, {
+        expectedRevision: workItem?.collaboration.revision ?? 0,
         assigneeUserId: assigneeDraft ? Number(assigneeDraft) : null,
         followerUserIds: followerDraft,
         waitingOnUserId: waitingUserId,
@@ -245,7 +246,14 @@ export function WorkItemScreen({
       await refreshWorkItemProjection(undefined, false);
       setCollaborationEditing(false);
     } catch (error) {
-      setCollaborationError(error instanceof Error ? error.message : 'Ownership was not changed.');
+      if (error instanceof IronDevApiError && error.status === 409) {
+        const body = error.body as { code?: string; expectedRevision?: number; currentRevision?: number; nextSafeAction?: string } | null;
+        setCollaborationError(body?.code === 'StaleWrite'
+          ? `Stale write refused. Attempted version ${body.expectedRevision}; current version ${body.currentRevision}. ${body.nextSafeAction ?? 'Reload and compare.'}`
+          : 'Ownership conflict. Reload and compare before saving again.');
+      } else {
+        setCollaborationError(error instanceof Error ? error.message : 'Ownership was not changed.');
+      }
     } finally {
       setCollaborationBusy(false);
     }
@@ -1085,6 +1093,7 @@ export function WorkItemScreen({
                   <label>Waiting on<select value={waitingOnDraft} onChange={(event) => setWaitingOnDraft(event.target.value)}><option value="">No actor</option>{memberDirectory.members.filter((member) => member.isProjectMember).map((member) => <option key={member.userId} value={`user:${member.userId}`}>{member.displayName}</option>)}<option value="role:Project owner">Project owner</option><option value="role:Reviewer">Reviewer</option><option value="role:Approver">Approver</option></select></label>
                   <fieldset><legend>Followers</legend>{memberDirectory.members.filter((member) => member.isProjectMember).map((member) => <label key={member.userId}><input type="checkbox" checked={followerDraft.includes(member.userId)} onChange={(event) => setFollowerDraft((current) => event.target.checked ? [...current, member.userId] : current.filter((id) => id !== member.userId))} />{member.displayName}</label>)}</fieldset>
                   {collaborationError ? <p className="fl-error" role="alert">{collaborationError}</p> : null}
+                  {collaborationError?.startsWith('Stale write refused') ? <button className="fl-btn" type="button" onClick={() => void refreshWorkItemProjection(undefined, false)} data-testid="flow.workItem.collaboration.reload">Reload and compare</button> : null}
                   <button className="fl-btn fl-pri" type="button" disabled={collaborationBusy} onClick={() => void saveCollaboration()} data-testid="flow.workItem.collaboration.save">{collaborationBusy ? 'Saving...' : 'Save ownership'}</button>
                 </div>
               ) : null}

@@ -111,7 +111,7 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(origins)
             .WithHeaders("Authorization", "Content-Type")
-            .WithMethods("GET", "POST", "PUT", "DELETE");
+            .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE");
     });
 });
 

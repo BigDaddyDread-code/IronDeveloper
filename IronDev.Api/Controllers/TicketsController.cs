@@ -108,6 +108,8 @@ public sealed class TicketsController : ControllerBase
     public async Task<ActionResult<ProjectTicket>> SaveLegacyTicket(int projectId, ProjectTicket ticket, CancellationToken ct)
     {
         ticket.ProjectId = projectId;
+        if (ticket.Id > 0)
+            return VersionedTicketResult(await _tickets.UpdateTicketIfCurrentAsync(ticket, ticket.Revision, ct), ticket.Revision);
         ticket.Id = await _tickets.SaveTicketAsync(ticket, ct);
         return Ok(ticket);
     }
@@ -121,9 +123,20 @@ public sealed class TicketsController : ControllerBase
 
         ticket.Id = ticketId;
         ticket.ProjectId = projectId;
-        ticket.Id = await _tickets.SaveTicketAsync(ticket, ct);
-        return Ok(ticket);
+        return VersionedTicketResult(await _tickets.UpdateTicketIfCurrentAsync(ticket, ticket.Revision, ct), ticket.Revision);
     }
+
+    private ActionResult<ProjectTicket> VersionedTicketResult(TicketVersionedUpdateResult result, long expectedRevision) => result.Status switch
+    {
+        TicketVersionedUpdateStatus.Succeeded => Ok(result.Ticket),
+        TicketVersionedUpdateStatus.StaleWrite => Conflict(new CollaborationWriteConflictResponse(
+            CollaborationWriteConflictResponse.StaleWriteCode,
+            expectedRevision,
+            result.Ticket?.Revision ?? 0,
+            result.Ticket,
+            "Reload the ticket, compare the current draft with your attempted draft, then save again from the new revision.")),
+        _ => NotFound()
+    };
 
     [HttpPost("api/projects/{projectId:int}/tickets/import-external")]
     public async Task<ActionResult<ProjectTicket>> ImportExternalTicket(int projectId, ImportExternalTicketRequest request, CancellationToken ct)

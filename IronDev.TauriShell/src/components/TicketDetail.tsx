@@ -43,6 +43,7 @@ interface TicketDetailProps {
   onEditDraftChange: (draft: TicketEditDraft) => void;
   onSave: () => void;
   onCancelEdit: () => void;
+  onReloadTicketAndCompare: () => void;
   onRefreshPlan: () => void;
   onRefreshReadiness: () => void;
   onRefreshEvidence: () => void;
@@ -74,6 +75,7 @@ export function TicketDetail({
   onEditDraftChange,
   onSave,
   onCancelEdit,
+  onReloadTicketAndCompare,
   onRefreshPlan,
   onRefreshReadiness,
   onRefreshEvidence,
@@ -131,6 +133,7 @@ export function TicketDetail({
           onChange={onEditDraftChange}
           onSave={onSave}
           onCancel={onCancelEdit}
+          onReloadAndCompare={onReloadTicketAndCompare}
         />
       </SurfacePanel>
     );

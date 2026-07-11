@@ -207,6 +207,7 @@ public sealed class ProjectImplementationPlan
 public sealed class ProjectTicket
 {
     public long Id { get; set; }
+    public long Revision { get; set; } = 1;
     public int TenantId { get; set; }
     public int ProjectId { get; set; }
     public Guid SessionId { get; set; }
