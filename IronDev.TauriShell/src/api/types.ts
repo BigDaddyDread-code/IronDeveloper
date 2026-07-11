@@ -907,6 +907,30 @@ export type ProjectChannelChatMessage = Omit<
 
 export type ProjectChannelReadState = Required<components['schemas']['ProjectChannelReadState']>;
 export type ProjectChannelPresenceState = Required<components['schemas']['ProjectChannelPresenceState']>;
+export type ProjectChannelMentionCandidate = Omit<
+  Required<components['schemas']['ProjectChannelMentionCandidate']>,
+  'displayName' | 'handle'
+> & {
+  displayName: string;
+  handle: string;
+};
+
+export type ProjectNotificationSummary = Omit<
+  Required<components['schemas']['ProjectNotificationSummary']>,
+  'kind' | 'title' | 'body' | 'createdUtc' | 'boundary'
+> & {
+  kind: 'Mention' | 'ChannelMessage';
+  title: string;
+  body: string;
+  createdUtc: string;
+  boundary: string;
+};
+
+export interface ProjectNotificationListResponse {
+  unreadCount: number;
+  notifications: ProjectNotificationSummary[];
+  boundary: string;
+}
 
 export type ProjectChannelAssistantTurnState = Omit<
   Required<components['schemas']['ProjectChannelAssistantTurnState']>,
@@ -931,11 +955,12 @@ export interface ProjectChannelAssistantCompletionResult {
 
 export type ProjectChannelChatDetail = Omit<
   Required<components['schemas']['ProjectChannelChatDetail']>,
-  'channel' | 'messages' | 'assistantTurns' | 'readState' | 'presence'
+  'channel' | 'messages' | 'assistantTurns' | 'mentionCandidates' | 'readState' | 'presence'
 > & {
   channel: ProjectChannelChatSummary;
   messages: ProjectChannelChatMessage[];
   assistantTurns: ProjectChannelAssistantTurnState[];
+  mentionCandidates: ProjectChannelMentionCandidate[];
   readState: ProjectChannelReadState;
   presence: ProjectChannelPresenceState;
 };

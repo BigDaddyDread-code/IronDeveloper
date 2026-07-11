@@ -66,6 +66,7 @@ import type {
   ProjectChannelChatSummary,
   ProjectChannelPostMessageResult,
   ProjectChannelAssistantCompletionResult,
+  ProjectNotificationListResponse,
   ProjectChannelReadState,
   CreateProjectChannelRequest,
   ProjectChatSession,
@@ -588,6 +589,19 @@ class IronDevApiClient {
       `/api/projects/${projectId}/channels/${encodeURIComponent(channelReference)}/read`,
       { method: 'POST', signal }
     );
+  }
+
+  async getProjectNotifications(projectId: number, signal?: AbortSignal): Promise<ProjectNotificationListResponse> {
+    return this.request<ProjectNotificationListResponse>(`/api/projects/${projectId}/notifications`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async markProjectNotificationRead(projectId: number, notificationId: number): Promise<void> {
+    return this.request<void>(`/api/projects/${projectId}/notifications/${notificationId}/read`, {
+      method: 'POST'
+    });
   }
 
   async getDocument(documentId: number, signal?: AbortSignal): Promise<ProjectDocument | null> {

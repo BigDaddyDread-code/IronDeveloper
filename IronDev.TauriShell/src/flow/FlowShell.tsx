@@ -10,6 +10,7 @@ import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
 import { BoardScreen } from './board/BoardScreen';
 import { RouteOutcomeScreen, type RouteOutcomeKind } from './components/RouteOutcomeScreen';
+import { ProjectNotificationsMenu } from './components/ProjectNotificationsMenu';
 import { LibraryScreen } from './library/LibraryScreen';
 import {
   chatChannelPath,
@@ -454,6 +455,10 @@ export function FlowShell() {
         </nav>
 
         <div className="fl-userbit">
+          <ProjectNotificationsMenu
+            projectId={activeProjectId}
+            onOpenChannel={(slug) => navigateProductPath(chatChannelPath(activeProjectId, slug))}
+          />
           <details ref={healthMenuRef} className="fl-header-menu fl-project-health">
             <summary data-testid="flow.health">Health</summary>
             <dl>

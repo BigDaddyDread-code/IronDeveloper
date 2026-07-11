@@ -74,6 +74,8 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/channels/{channelReference}",
             "/api/projects/{projectId}/channels/{channelReference}/messages",
             "/api/projects/{projectId}/channels/{channelReference}/assistant-turns/{turnId}/complete",
+            "/api/projects/{projectId}/notifications",
+            "/api/projects/{projectId}/notifications/{notificationId}/read",
             "/api/projects/{projectId}/tools",
             "/api/projects/{projectId}/tools/{toolId}",
             "/api/projects/{projectId}/members",
@@ -1158,6 +1160,71 @@ public sealed class EndpointContractTests : ApiTestBase
             $"/api/projects/{project.Id}/channels");
         Assert.AreEqual(0, afterRead!.Channels.Single(channel => channel.Slug == general.Slug).UnreadCount);
 
+        var mentionSource = await ownerClient.GetFromJsonAsync<ProjectChannelChatDetail>(
+            $"/api/projects/{project.Id}/channels/{general.Slug}");
+        var mentionCandidate = mentionSource!.MentionCandidates.Single(candidate => candidate.UserId == memberUserId);
+        Assert.AreEqual("Channel Reader", mentionCandidate.DisplayName);
+        Assert.AreEqual("channel-reader", mentionCandidate.Handle);
+
+        var postMention = await ownerClient.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
+            new { message = $"@{mentionCandidate.Handle} please review this discussion." });
+        Assert.AreEqual(HttpStatusCode.OK, postMention.StatusCode);
+        var mentionMessage = (await postMention.Content.ReadFromJsonAsync<ProjectChannelPostMessageResult>())!.Message;
+
+        var mentionNotifications = await memberClient.GetFromJsonAsync<ProjectNotificationListResponse>(
+            $"/api/projects/{project.Id}/notifications");
+        Assert.AreEqual(1, mentionNotifications!.UnreadCount);
+        var mentionNotification = mentionNotifications.Notifications.Single();
+        Assert.AreEqual("Mention", mentionNotification.Kind);
+        Assert.AreEqual(mentionMessage.MessageId, mentionNotification.MessageId);
+        StringAssert.Contains(mentionNotification.Title, "mentioned you");
+        StringAssert.Contains(mentionNotification.Boundary, "not approval");
+
+        var wrongRecipientRead = await ownerClient.PostAsync(
+            $"/api/projects/{project.Id}/notifications/{mentionNotification.NotificationId}/read",
+            null);
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongRecipientRead.StatusCode);
+
+        var ownerNotifications = await ownerClient.GetFromJsonAsync<ProjectNotificationListResponse>(
+            $"/api/projects/{project.Id}/notifications");
+        Assert.AreEqual(0, ownerNotifications!.Notifications.Count);
+
+        var markNotificationRead = await memberClient.PostAsync(
+            $"/api/projects/{project.Id}/notifications/{mentionNotification.NotificationId}/read",
+            null);
+        Assert.AreEqual(HttpStatusCode.NoContent, markNotificationRead.StatusCode);
+        var afterNotificationRead = await memberClient.GetFromJsonAsync<ProjectNotificationListResponse>(
+            $"/api/projects/{project.Id}/notifications");
+        Assert.AreEqual(0, afterNotificationRead!.UnreadCount);
+        Assert.IsTrue(afterNotificationRead.Notifications.Single().IsRead);
+
+        var enableAll = await ownerClient.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{general.ChannelId}/members/{memberUserId}",
+            new { channelRole = "Member", notificationLevel = "All" });
+        Assert.AreEqual(HttpStatusCode.OK, enableAll.StatusCode);
+        var postForAll = await ownerClient.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
+            new { message = "Plain channel update for subscribers." });
+        Assert.AreEqual(HttpStatusCode.OK, postForAll.StatusCode);
+        var allNotifications = await memberClient.GetFromJsonAsync<ProjectNotificationListResponse>(
+            $"/api/projects/{project.Id}/notifications");
+        Assert.AreEqual(1, allNotifications!.UnreadCount);
+        Assert.AreEqual("ChannelMessage", allNotifications.Notifications.First().Kind);
+
+        var disableNotifications = await ownerClient.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{general.ChannelId}/members/{memberUserId}",
+            new { channelRole = "Member", notificationLevel = "None" });
+        Assert.AreEqual(HttpStatusCode.OK, disableNotifications.StatusCode);
+        var mutedMention = await ownerClient.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
+            new { message = $"@{mentionCandidate.Handle} this mention remains durable but muted." });
+        Assert.AreEqual(HttpStatusCode.OK, mutedMention.StatusCode);
+        var mutedMentionMessage = (await mutedMention.Content.ReadFromJsonAsync<ProjectChannelPostMessageResult>())!.Message;
+        var afterMutedMention = await memberClient.GetFromJsonAsync<ProjectNotificationListResponse>(
+            $"/api/projects/{project.Id}/notifications");
+        Assert.AreEqual(2, afterMutedMention!.Notifications.Count);
+
         var invokeAssistant = await ownerClient.PostAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
             new { message = "@IronDev summarize what this project is for. Do not change project state." });
@@ -1201,7 +1268,7 @@ public sealed class EndpointContractTests : ApiTestBase
         var detail = await ownerClient.GetFromJsonAsync<ProjectChannelChatDetail>(
             $"/api/projects/{project.Id}/channels/{general.Slug}");
         Assert.IsNotNull(detail);
-        Assert.AreEqual(3, detail!.Messages.Count);
+        Assert.AreEqual(6, detail!.Messages.Count);
         Assert.AreEqual(humanMessage, detail.Messages[0].Message);
         Assert.AreEqual("Answered", detail.AssistantTurns.Single().Status);
         Assert.AreEqual(completed.ResponseMessage.MessageId, detail.AssistantTurns.Single().ResponseMessageId);
@@ -1211,7 +1278,11 @@ public sealed class EndpointContractTests : ApiTestBase
         var persistedRoles = (await connection.QueryAsync<string>(
             "SELECT Role FROM dbo.ProjectChannelMessages WHERE ChannelId = @ChannelId ORDER BY Id",
             new { general.ChannelId })).ToArray();
-        CollectionAssert.AreEqual(new[] { "User", "User", "Assistant" }, persistedRoles);
+        CollectionAssert.AreEqual(new[] { "User", "User", "User", "User", "User", "Assistant" }, persistedRoles);
+        var persistedMentionUsers = (await connection.QueryAsync<int>(
+            "SELECT MentionedUserId FROM dbo.ProjectChannelMessageMentions WHERE MessageId IN (@MentionMessageId, @MutedMentionMessageId) ORDER BY MessageId",
+            new { MentionMessageId = mentionMessage.MessageId, MutedMentionMessageId = mutedMentionMessage.MessageId })).ToArray();
+        CollectionAssert.AreEqual(new[] { memberUserId, memberUserId }, persistedMentionUsers);
         var persistedTurn = await connection.QuerySingleAsync<(int RequestedByUserId, string Status, long RequestMessageId, long? ResponseMessageId)>(
             "SELECT RequestedByUserId, Status, RequestMessageId, ResponseMessageId FROM dbo.ProjectChannelAssistantTurns WHERE Id = @TurnId",
             new { TurnId = requested.AssistantTurn.TurnId });

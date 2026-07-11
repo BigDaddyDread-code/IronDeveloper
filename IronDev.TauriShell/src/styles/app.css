@@ -4044,6 +4044,47 @@ p {
   line-height: 1.45;
 }
 
+.chat-channel-mention-suggestions {
+  display: grid;
+  border: 1px solid var(--fl-line2);
+  border-radius: 6px;
+  background: var(--fl-panel);
+  overflow: hidden;
+}
+
+.chat-channel-mention-suggestions button {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--fl-line);
+  background: transparent;
+  color: var(--fl-ink);
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-channel-mention-suggestions button:last-child {
+  border-bottom: 0;
+}
+
+.chat-channel-mention-suggestions button:hover,
+.chat-channel-mention-suggestions button:focus-visible {
+  background: var(--fl-acc-soft);
+}
+
+.chat-channel-mention-suggestions span {
+  min-width: 0;
+  color: var(--fl-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-channel-composer textarea:focus {
   border-color: var(--fl-blue);
   outline: 2px solid rgba(58, 101, 141, 0.14);

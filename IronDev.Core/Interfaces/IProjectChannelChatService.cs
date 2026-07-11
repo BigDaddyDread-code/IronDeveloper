@@ -48,4 +48,17 @@ public interface IProjectChannelChatService
         int currentUserId,
         string channelReference,
         CancellationToken cancellationToken = default);
+
+    Task<ProjectNotificationListResponse> ListNotificationsAsync(
+        int tenantId,
+        int projectId,
+        int currentUserId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> MarkNotificationReadAsync(
+        int tenantId,
+        int projectId,
+        int currentUserId,
+        long notificationId,
+        CancellationToken cancellationToken = default);
 }

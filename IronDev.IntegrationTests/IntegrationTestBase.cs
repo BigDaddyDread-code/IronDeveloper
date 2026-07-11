@@ -294,6 +294,8 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.ProjectChannelMessageReads', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessageReads;
             IF OBJECT_ID('dbo.ProjectChannelAssistantTurns', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelAssistantTurns;
             IF OBJECT_ID('dbo.ProjectChannelMessageContextLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessageContextLinks;
+            IF OBJECT_ID('dbo.ProjectNotifications', 'U') IS NOT NULL DELETE FROM dbo.ProjectNotifications;
+            IF OBJECT_ID('dbo.ProjectChannelMessageMentions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessageMentions;
             IF OBJECT_ID('dbo.ProjectChannelMessages', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessages;
             IF OBJECT_ID('dbo.ProjectChannelMembers', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMembers;
             IF OBJECT_ID('dbo.ProjectChannels', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannels;
