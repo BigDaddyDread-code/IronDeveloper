@@ -917,7 +917,7 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
-    public async Task ProjectMembers_ShouldExposeTenantDirectoryWithoutInventingProjectMembership()
+    public async Task ProjectMembers_ShouldExposeProjectSpecificVisibilityWithoutInventingAuthority()
     {
         var baseToken = await LoginAsync();
         var tenantToken = await SelectTenantAsync(baseToken);
@@ -933,10 +933,12 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(AssignedTenantId, directory.TenantId);
         Assert.AreEqual("Owner", directory.CurrentUserTenantRole);
         Assert.IsTrue(directory.CanAdministerTenantMembership);
+        Assert.IsTrue(directory.CanAdministerProjectMembership);
         CollectionAssert.AreEqual(
             new[] { "Owner", "TenantAdmin", "Approver", "Reviewer", "Operator", "Viewer", "Member" },
             directory.AvailableTenantRoles.ToArray());
-        Assert.AreEqual("Not implemented", directory.ProjectMembershipStatus);
+        CollectionAssert.AreEqual(new[] { "Owner", "Contributor", "Viewer" }, directory.AvailableProjectRoles.ToArray());
+        Assert.AreEqual("1 active member", directory.ProjectMembershipStatus);
         Assert.AreEqual("No active channels", directory.ChannelMembershipStatus);
         Assert.IsTrue(directory.CanAdministerChannelMembership);
         Assert.AreEqual(0, directory.Channels.Count);
@@ -944,9 +946,11 @@ public sealed class EndpointContractTests : ApiTestBase
         var currentUser = directory.Members.Single(member => member.IsCurrentUser);
         Assert.AreEqual(AdminEmail, currentUser.Email);
         Assert.AreEqual("Owner", currentUser.TenantRole);
-        Assert.AreEqual("Tenant scoped", currentUser.ProjectAccessStatus);
+        Assert.AreEqual("Owner", currentUser.ProjectRole);
+        Assert.IsTrue(currentUser.IsProjectMember);
+        Assert.AreEqual("Project member", currentUser.ProjectAccessStatus);
         Assert.AreEqual("No explicit memberships", currentUser.ChannelMembershipSummary);
-        StringAssert.Contains(directory.Boundary, "Neither is project assignment");
+        StringAssert.Contains(directory.Boundary, "none of these grants approval");
 
         var unknownProject = await client.GetAsync($"/api/projects/{project.Id + 999999}/members");
         Assert.AreEqual(HttpStatusCode.NotFound, unknownProject.StatusCode);
@@ -1004,6 +1008,11 @@ public sealed class EndpointContractTests : ApiTestBase
             $"/api/projects/{project.Id}/channels/{channelId}/members/{memberUserId}",
             new { channelRole = "Moderator", notificationLevel = "Mentions" });
         Assert.AreEqual(HttpStatusCode.OK, addMembership.StatusCode);
+
+        var addProjectMembership = await client.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/members/{memberUserId}",
+            new { projectRole = "Viewer" });
+        Assert.AreEqual(HttpStatusCode.OK, addProjectMembership.StatusCode);
 
         var memberToken = await SelectTenantAsync(await LoginAsync(memberEmail, memberPassword));
         using var memberClient = GetAuthedClient(memberToken);
@@ -1089,6 +1098,10 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.Conflict, duplicate.StatusCode);
 
         var memberToken = await SelectTenantAsync(await LoginAsync(memberEmail, memberPassword));
+        var addProjectMembership = await ownerClient.PutAsJsonAsync(
+            $"/api/projects/{project.Id}/members/{memberUserId}",
+            new { projectRole = "Viewer" });
+        Assert.AreEqual(HttpStatusCode.OK, addProjectMembership.StatusCode);
         using var memberClient = GetAuthedClient(memberToken);
         var beforeMembership = await memberClient.GetFromJsonAsync<ProjectChannelChatListResponse>(
             $"/api/projects/{project.Id}/channels");
