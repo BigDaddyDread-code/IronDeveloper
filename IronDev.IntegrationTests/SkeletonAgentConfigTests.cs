@@ -50,6 +50,25 @@ public sealed class SkeletonAgentConfigTests
     }
 
     [TestMethod]
+    public async Task Profile_ListIncludesAnalystFirstWithWorkshopGuideBoundary()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var profiles = await service.ListAsync();
+
+            Assert.AreEqual(SkeletonAgentRole.Analyst, profiles[0].Role,
+                "The user-facing profile order starts with the Workshop guide role.");
+            var analyst = profiles.Single(profile => profile.Role == SkeletonAgentRole.Analyst);
+            StringAssert.Contains(SkeletonAgentRoles.DisplayName(analyst.Role), "Workshop guide");
+            StringAssert.Contains(analyst.Boundary, "Workshop guide");
+            StringAssert.Contains(analyst.Boundary, "cannot approve");
+            StringAssert.Contains(analyst.Boundary, "apply source");
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
     public async Task Profile_UpdateAndReadBack_PersistsVoiceAndModel()
     {
         var (service, root) = Harness();

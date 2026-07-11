@@ -13,6 +13,9 @@ test('agents panel edits a model and voice and saves through the governed endpoi
   await page.getByTestId('flow.nav.settings').click();
 
   await expect(page.getByTestId('flow.settings.agents')).toBeVisible();
+  await expect(page.getByTestId('flow.settings.agent.analyst')).toContainText('Workshop guide');
+  await expect(page.getByTestId('flow.settings.agent.analyst.boundary')).toContainText('cannot approve');
+  await expect(page.getByTestId('flow.settings.agent.analyst.boundary')).toContainText('apply source');
   await expect(page.getByTestId('flow.settings.agent.tester')).toBeVisible();
   await expect(page.getByTestId('flow.settings.agent.critic')).toBeVisible();
 
@@ -53,6 +56,7 @@ test('agents panel accepts numeric backend role values from LocalTest', async ({
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
 
+  await expect(page.getByTestId('flow.settings.agent.analyst')).toContainText('Workshop guide');
   await expect(page.getByTestId('flow.settings.agent.orchestrator')).toBeVisible();
   await expect(page.getByTestId('flow.settings.agent.orchestrator.deterministic')).toContainText('runs no model');
   await expect(page.getByTestId('flow.settings.agent.tester.provider')).toBeVisible();
@@ -86,11 +90,13 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
     timeoutSeconds: 60,
     skill: '',
     personality: '',
-    boundary: 'An agent profile configures voice and model, never authority.'
+    boundary: role === 'Analyst' || role === 4
+      ? 'The Analyst is the Workshop guide. It cannot approve, start a governed build, continue workflow, disposition findings, or apply source.'
+      : 'An agent profile configures voice and model, never authority.'
   });
 
   await page.route('**/irondev-api/api/v1/agent-profiles', async (route) => {
-    const roles = options.numericRoles ? [0, 1, 2, 3] : ['Orchestrator', 'Builder', 'Tester', 'Critic'];
+    const roles = options.numericRoles ? [4, 1, 2, 3, 0] : ['Analyst', 'Builder', 'Tester', 'Critic', 'Orchestrator'];
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

@@ -14722,7 +14722,7 @@ export interface components {
          * Format: int32
          * @enum {integer}
          */
-        SkeletonAgentRole: 0 | 1 | 2 | 3;
+        SkeletonAgentRole: 0 | 1 | 2 | 3 | 4;
         SkeletonApplyRecoveryBody: {
             action?: string | null;
             reason?: string | null;

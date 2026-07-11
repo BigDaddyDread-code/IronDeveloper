@@ -43,7 +43,7 @@ public sealed class AgentProfilesController : ControllerBase
     public async Task<ActionResult<SkeletonAgentProfile>> Get(string role, CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
-            return BadRequest(new { error = "Unknown agent role. Roles: orchestrator, builder, tester, critic." });
+            return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
         return Ok(await _profiles.GetAsync(parsed, ct));
     }
 
@@ -54,7 +54,7 @@ public sealed class AgentProfilesController : ControllerBase
         CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
-            return BadRequest(new { error = "Unknown agent role. Roles: orchestrator, builder, tester, critic." });
+            return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
 
         // Writing an agent's model/voice is an administering action — gate it the
         // same way tenant user administration is gated (Owner or TenantAdmin).

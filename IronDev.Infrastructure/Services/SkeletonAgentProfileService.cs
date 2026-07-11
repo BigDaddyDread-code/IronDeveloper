@@ -77,14 +77,15 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
             BaseUrl = global.BaseUrl ?? string.Empty,
             TimeoutSeconds = settings?.TimeoutSeconds is > 0 ? settings.TimeoutSeconds!.Value : global.TimeoutSeconds,
             Skill = await ReadTextAsync(Path.Combine(dir, "skill.md"), cancellationToken).ConfigureAwait(false),
-            Personality = await ReadTextAsync(Path.Combine(dir, "personality.md"), cancellationToken).ConfigureAwait(false)
+            Personality = await ReadTextAsync(Path.Combine(dir, "personality.md"), cancellationToken).ConfigureAwait(false),
+            Boundary = SkeletonAgentRoles.CodeOwnedBoundary(role)
         };
     }
 
     public async Task<IReadOnlyList<SkeletonAgentProfile>> ListAsync(CancellationToken cancellationToken = default)
     {
         var profiles = new List<SkeletonAgentProfile>();
-        foreach (var role in Enum.GetValues<SkeletonAgentRole>())
+        foreach (var role in SkeletonAgentRoles.ProfileOrder)
             profiles.Add(await GetAsync(role, cancellationToken).ConfigureAwait(false));
         return profiles;
     }
