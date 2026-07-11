@@ -52,6 +52,22 @@ public sealed class InMemoryRunStore : IRunStore
         return Task.FromResult<IReadOnlyList<RunRecord>>(runs);
     }
 
+    public Task<IReadOnlyList<RunRecord>> GetRecentForProjectAsync(
+        int projectId,
+        int limit = 200,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var take = limit <= 0 ? 200 : limit;
+        var runs = _runs.Values
+            .Where(run => run.ProjectId == projectId)
+            .OrderByDescending(run => run.UpdatedUtc)
+            .Take(take)
+            .ToArray();
+
+        return Task.FromResult<IReadOnlyList<RunRecord>>(runs);
+    }
+
     public Task<RunRecord?> TransitionAsync(
         RunStateTransition transition,
         CancellationToken cancellationToken = default)

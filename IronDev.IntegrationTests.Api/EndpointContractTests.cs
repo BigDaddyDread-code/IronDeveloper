@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Dapper;
+using IronDev.Core.Board;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
@@ -30,6 +31,7 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/tenants/select",
             "/api/projects",
             "/api/projects/{projectId}",
+            "/api/projects/{projectId}/board",
             "/api/projects/{projectId}/tickets",
             "/api/projects/{projectId}/tickets/{ticketId}",
             "/api/projects/{projectId}/tickets/{ticketId}/archive",
@@ -84,6 +86,7 @@ public sealed class EndpointContractTests : ApiTestBase
         foreach (var path in new[]
         {
             "/api/projects",
+            "/api/projects/1/board",
             "/api/projects/1/tickets",
             "/api/projects/1/documents",
             "/api/projects/1/memory/search?q=architecture",
@@ -95,6 +98,49 @@ public sealed class EndpointContractTests : ApiTestBase
             var response = await Client.GetAsync(path);
             Assert.AreEqual(HttpStatusCode.Unauthorized, response.StatusCode, $"{path} should require a token.");
         }
+    }
+
+    [TestMethod]
+    public async Task ProjectBoard_ShouldReturnBackendOwnedWorkItemAndReadinessTruth()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var createProject = await client.PostAsJsonAsync("/api/projects", new Project
+        {
+            Name = "Board Read Contract Test",
+            Description = "Exercises the project Board read projection.",
+            LocalPath = @"C:\Temp\BoardReadContractTest"
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createProject.StatusCode);
+        var project = await createProject.Content.ReadFromJsonAsync<Project>();
+        Assert.IsNotNull(project);
+
+        var createTicket = await client.PostAsJsonAsync($"/api/projects/{project!.Id}/tickets", new CreateProjectTicketRequest
+        {
+            Title = "Shape the Board projection",
+            Summary = "The server owns the stage and next safe action.",
+            Priority = "High",
+            Type = "Task"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createTicket.StatusCode);
+        var ticket = await createTicket.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.IsNotNull(ticket);
+
+        var response = await client.GetAsync($"/api/projects/{project.Id}/board");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var board = await response.Content.ReadFromJsonAsync<ProjectBoardReadModel>();
+        Assert.IsNotNull(board);
+        Assert.AreEqual(project.Id, board.ProjectId);
+        Assert.AreEqual(project.Name, board.ProjectName);
+        Assert.AreEqual(project.Id, board.Readiness.ProjectId);
+
+        var item = board.Items.Single(candidate => candidate.WorkItemId == ticket!.Id);
+        Assert.AreEqual(ProjectBoardStages.Shape, item.Stage);
+        Assert.AreEqual("Shape the requirement and confirm acceptance criteria.", item.NextSafeAction);
+        Assert.AreEqual(ProjectBoardWaitingOnKinds.Human, item.WaitingOn?.Kind);
+        Assert.IsNull(item.Assignee);
     }
 
     [TestMethod]

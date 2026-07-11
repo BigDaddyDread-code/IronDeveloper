@@ -5537,6 +5537,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectBoardReadModel"];
+                        "application/json": components["schemas"]["ProjectBoardReadModel"];
+                        "text/json": components["schemas"]["ProjectBoardReadModel"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/channels/{channelId}/members/{userId}": {
         parameters: {
             query?: never;
@@ -12455,6 +12507,16 @@ export interface components {
         PostProjectChannelMessageRequest: {
             message?: string | null;
         };
+        ProblemDetails: {
+            type?: string | null;
+            title?: string | null;
+            /** Format: int32 */
+            status?: number | null;
+            detail?: string | null;
+            instance?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         Project: {
             /** Format: int32 */
             id?: number;
@@ -12472,6 +12534,49 @@ export interface components {
             indexingStatus?: string | null;
             /** Format: int32 */
             indexedFileCount?: number | null;
+        };
+        ProjectBoardAssigneeReadModel: {
+            /** Format: int32 */
+            userId?: number;
+            displayName?: string | null;
+        };
+        ProjectBoardItemReadModel: {
+            /** Format: int64 */
+            workItemId?: number;
+            title?: string | null;
+            stage?: string | null;
+            state?: string | null;
+            priority?: string | null;
+            needsAttention?: boolean;
+            attentionReason?: string | null;
+            nextSafeAction?: string | null;
+            waitingOn?: components["schemas"]["ProjectBoardWaitingOnReadModel"];
+            assignee?: components["schemas"]["ProjectBoardAssigneeReadModel"];
+            /** Format: date-time */
+            lastMeaningfulEventUtc?: string;
+            latestRun?: components["schemas"]["ProjectBoardRunReadModel"];
+        };
+        ProjectBoardReadModel: {
+            /** Format: int32 */
+            projectId?: number;
+            projectName?: string | null;
+            /** Format: date-time */
+            generatedUtc?: string;
+            readiness: components["schemas"]["ProjectProvisioningReadiness"];
+            items?: components["schemas"]["ProjectBoardItemReadModel"][] | null;
+        };
+        ProjectBoardRunReadModel: {
+            runId?: string | null;
+            status?: string | null;
+            summary?: string | null;
+            failureReason?: string | null;
+            requiresHumanAction?: boolean;
+            /** Format: date-time */
+            updatedUtc?: string;
+        };
+        ProjectBoardWaitingOnReadModel: {
+            kind?: string | null;
+            label?: string | null;
         };
         ProjectChannelDirectoryEntry: {
             /** Format: int64 */

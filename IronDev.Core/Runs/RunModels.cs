@@ -99,6 +99,20 @@ public interface IRunStore
         int limit = 50,
         CancellationToken cancellationToken = default);
 
+    async Task<IReadOnlyList<RunRecord>> GetRecentForProjectAsync(
+        int projectId,
+        int limit = 200,
+        CancellationToken cancellationToken = default)
+    {
+        var boundedLimit = limit <= 0 ? 200 : limit;
+        var runs = await GetRecentAsync(boundedLimit, cancellationToken).ConfigureAwait(false);
+        return runs
+            .Where(run => run.ProjectId == projectId)
+            .OrderByDescending(run => run.UpdatedUtc)
+            .Take(boundedLimit)
+            .ToArray();
+    }
+
     Task<RunRecord?> TransitionAsync(
         RunStateTransition transition,
         CancellationToken cancellationToken = default);

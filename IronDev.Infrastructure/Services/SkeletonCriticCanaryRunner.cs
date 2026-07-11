@@ -288,6 +288,8 @@ public sealed class SkeletonCriticCanaryRunner : ISkeletonCriticCanaryRunner
             Task.FromResult<RunRecord?>(runId == run.RunId ? run : null);
         public Task<IReadOnlyList<RunRecord>> GetRecentAsync(int limit = 50, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<RunRecord>>([run]);
+        public Task<IReadOnlyList<RunRecord>> GetRecentForProjectAsync(int projectId, int limit = 200, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<RunRecord>>(run.ProjectId == projectId ? [run] : []);
         public Task<RunRecord?> TransitionAsync(RunStateTransition transition, CancellationToken ct = default) =>
             throw new NotSupportedException("The canary runner never transitions runs.");
     }
