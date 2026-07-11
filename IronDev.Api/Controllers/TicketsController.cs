@@ -428,9 +428,50 @@ public sealed class TicketsController : ControllerBase
         string runId,
         CancellationToken ct)
     {
-        var result = await _skeletonRuns.ApplyAsync(projectId, ticketId, runId, ct);
+        var result = await _skeletonRuns.ApplyAsAsync(projectId, ticketId, runId, CurrentUserId(), ct);
         return result is null ? NotFound() : Ok(result);
     }
+
+    [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/apply-recovery")]
+    [ProducesResponseType(typeof(TicketBuildRunDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TicketBuildRunDto>> RecoverSkeletonRunApply(
+        int projectId,
+        long ticketId,
+        string runId,
+        [FromBody] SkeletonApplyRecoveryBody body,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await _skeletonRuns.RecoverApplyAsync(projectId, ticketId, runId, new SkeletonApplyRecoveryRequest
+            {
+                Action = body.Action ?? string.Empty,
+                Reason = body.Reason ?? string.Empty,
+                RequestedByUserId = CurrentUserId()
+            }, ct);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (SkeletonApplyRecoveryRefusedException refused)
+        {
+            return Conflict(new
+            {
+                code = "ApplyRecoveryRefused",
+                message = refused.Message,
+                applyAttemptId = refused.ApplyAttemptId,
+                mutationState = refused.MutationState,
+                availableActions = refused.AvailableActions
+            });
+        }
+    }
+
+    public sealed record SkeletonApplyRecoveryBody(string? Action, string? Reason);
+
+    private string CurrentUserId() =>
+        User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+        ?? User.FindFirst("sub")?.Value
+        ?? "unknown-user";
 
     /// <summary>
     /// GET skeleton-runs/{runId}/critic-package — the full-fidelity review package a

@@ -8830,6 +8830,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/apply-recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketId: number;
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SkeletonApplyRecoveryBody"];
+                    "text/json": components["schemas"]["SkeletonApplyRecoveryBody"];
+                    "application/*+json": components["schemas"]["SkeletonApplyRecoveryBody"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketBuildRunDto"];
+                        "application/json": components["schemas"]["TicketBuildRunDto"];
+                        "text/json": components["schemas"]["TicketBuildRunDto"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{runId}/critic-package": {
         parameters: {
             query?: never;
@@ -13620,6 +13689,12 @@ export interface components {
             nextSafeAction?: string | null;
             retryAllowed?: boolean;
             humanReviewRequired?: boolean;
+            applyAttemptId?: string | null;
+            /** Format: int32 */
+            applyAttemptNumber?: number;
+            attemptStatus?: string | null;
+            mutationState?: string | null;
+            availableActions?: string[] | null;
             boundary?: string | null;
         };
         ProjectWorkItemCollaborationActivity: {
@@ -14556,6 +14631,10 @@ export interface components {
          * @enum {integer}
          */
         SkeletonAgentRole: 0 | 1 | 2 | 3;
+        SkeletonApplyRecoveryBody: {
+            action?: string | null;
+            reason?: string | null;
+        };
         SkeletonAuthoredTest: {
             relativePath: string | null;
             content: string | null;
@@ -14817,6 +14896,26 @@ export interface components {
             findingIds?: string[] | null;
             reason?: string | null;
         };
+        SkeletonRunApplyAttemptTrace: {
+            attemptId?: string | null;
+            /** Format: int32 */
+            attemptNumber?: number;
+            requestedAction?: string | null;
+            requestedByUserId?: string | null;
+            reason?: string | null;
+            status?: string | null;
+            /** Format: date-time */
+            startedUtc?: string;
+            /** Format: date-time */
+            completedUtc?: string | null;
+            workspacePath?: string | null;
+            interruptedStage?: string | null;
+            refusedReason?: string | null;
+            mutationState?: string | null;
+            stages?: components["schemas"]["SkeletonRunApplyStageTrace"][] | null;
+            receipts?: components["schemas"]["SkeletonRunReceiptRef"][] | null;
+            availableActions?: string[] | null;
+        };
         SkeletonRunApplyStageTrace: {
             stage?: string | null;
             succeeded?: boolean;
@@ -14828,6 +14927,7 @@ export interface components {
             refusedReason?: string | null;
             stages?: components["schemas"]["SkeletonRunApplyStageTrace"][] | null;
             receipts?: components["schemas"]["SkeletonRunReceiptRef"][] | null;
+            attempts?: components["schemas"]["SkeletonRunApplyAttemptTrace"][] | null;
         };
         SkeletonRunApprovalTrace: {
             targetKind?: string | null;

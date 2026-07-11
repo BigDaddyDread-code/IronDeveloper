@@ -1396,6 +1396,24 @@ export interface SkeletonRunApplyTrace {
   refusedReason: string;
   stages: SkeletonRunApplyStageTrace[];
   receipts: SkeletonRunReceiptRef[];
+  attempts: SkeletonRunApplyAttemptTrace[];
+}
+
+export interface SkeletonRunApplyAttemptTrace {
+  attemptId: string;
+  attemptNumber: number;
+  requestedAction: string;
+  requestedByUserId: string;
+  reason: string;
+  status: string;
+  startedUtc: string;
+  completedUtc?: string | null;
+  workspacePath: string;
+  interruptedStage: string;
+  refusedReason: string;
+  mutationState: string;
+  stages: SkeletonRunApplyStageTrace[];
+  availableActions: string[];
 }
 
 // REPAIR-1: one bounded repair attempt, reconstructed from durable events.

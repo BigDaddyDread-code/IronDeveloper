@@ -95,8 +95,18 @@ function applyRecoveryStatusLabel(status: string | null | undefined): string {
   switch (status) {
     case 'ApplyRefused':
       return 'Apply refused';
+    case 'ApplyInProgress':
+      return 'Apply in progress';
     case 'RecoveryEvidenceMissing':
       return 'Recovery evidence missing';
+    case 'RetryReady':
+      return 'Safe retry available';
+    case 'Interrupted':
+      return 'Attempt interrupted';
+    case 'ManualReviewRequired':
+      return 'Manual review required';
+    case 'Abandoned':
+      return 'Attempt abandoned';
     case 'Applied':
       return 'Applied';
     default:
@@ -157,6 +167,7 @@ export function WorkItemScreen({
   const [followerDraft, setFollowerDraft] = useState<number[]>([]);
   const [collaborationError, setCollaborationError] = useState<string | null>(null);
   const [collaborationBusy, setCollaborationBusy] = useState(false);
+  const [applyRecoveryReason, setApplyRecoveryReason] = useState('');
 
   useEffect(() => {
     setStage(ticket ? 'ticket' : 'shape');
@@ -177,6 +188,7 @@ export function WorkItemScreen({
     setMemberDirectory(null);
     setCollaborationEditing(false);
     setCollaborationError(null);
+    setApplyRecoveryReason('');
   }, [ticket?.id]);
 
   const refreshWorkItemProjection = useCallback(async (signal?: AbortSignal, syncStage = true) => {
@@ -712,6 +724,33 @@ export function WorkItemScreen({
     }
   }, [project.selectedProjectId, ticket, run, busyAction, session.client, refreshRunEvidence, refreshWorkItemProjection]);
 
+  const requestApplyRecovery = useCallback(async (action: string) => {
+    if (project.selectedProjectId === null || ticket?.id === undefined || run === null || busyAction !== null || !applyRecoveryReason.trim()) {
+      return;
+    }
+    setBusyAction(`apply-recovery-${action}`);
+    setErrorMessage(null);
+    try {
+      const result = await session.client.requestSkeletonRunApplyRecovery(
+        project.selectedProjectId,
+        ticket.id,
+        run.runId,
+        action,
+        applyRecoveryReason.trim()
+      );
+      setRun(result);
+      setGateNotice(result.message ?? null);
+      setApplyRecoveryReason('');
+      await refreshRunEvidence(result);
+      await refreshWorkItemProjection(undefined, false);
+      if (result.status === 'Applied') setStage('done');
+    } catch (error: unknown) {
+      setErrorMessage(describeApiError(error, 'The apply recovery decision failed.'));
+    } finally {
+      setBusyAction(null);
+    }
+  }, [project.selectedProjectId, ticket, run, busyAction, applyRecoveryReason, session.client, refreshRunEvidence, refreshWorkItemProjection]);
+
   const performPrimaryAction = useCallback(() => {
     switch (workItem?.primaryAction.kind) {
       case 'StartRun':
@@ -726,6 +765,7 @@ export function WorkItemScreen({
         break;
       case 'Review':
       case 'Apply':
+      case 'RecoverApply':
         setStage('review');
         break;
       case 'RepairOrRetry':
@@ -822,6 +862,14 @@ export function WorkItemScreen({
             <span>{applyRecoveryStatusLabel(workItem.applyRecovery.status)}</span>
           </div>
           <p>{workItem.applyRecovery.reason}</p>
+          {workItem.applyRecovery.applyAttemptId ? (
+            <dl className="fl-apply-recovery-facts">
+              <div><dt>Attempt</dt><dd>{workItem.applyRecovery.applyAttemptNumber}</dd></div>
+              <div><dt>Status</dt><dd>{workItem.applyRecovery.attemptStatus}</dd></div>
+              <div><dt>Mutation</dt><dd>{workItem.applyRecovery.mutationState}</dd></div>
+              <div><dt>Identity</dt><dd>{workItem.applyRecovery.applyAttemptId}</dd></div>
+            </dl>
+          ) : null}
           {workItem.applyRecovery.required ? (
             <dl className="fl-apply-recovery-facts">
               <div><dt>Succeeded stages</dt><dd>{workItem.applyRecovery.succeededStageCount ?? 0}</dd></div>
@@ -831,6 +879,36 @@ export function WorkItemScreen({
             </dl>
           ) : null}
           <p><strong>Next safe action:</strong> {workItem.applyRecovery.nextSafeAction}</p>
+          {(workItem.applyRecovery.availableActions?.length ?? 0) > 0 ? (
+            <div className="fl-apply-recovery-actions" data-testid="flow.workItem.applyRecovery.actions">
+              <label className="fl-field">
+                <span>Recovery reason</span>
+                <textarea
+                  value={applyRecoveryReason}
+                  onChange={(event) => setApplyRecoveryReason(event.target.value)}
+                  placeholder="Record why this is the safe next action."
+                  data-testid="flow.workItem.applyRecovery.reason"
+                />
+              </label>
+              <div className="fl-actions">
+                {workItem.applyRecovery.availableActions?.map((action) => (
+                  <button
+                    className={action === 'Abandon' ? 'fl-btn fl-danger' : 'fl-btn'}
+                    type="button"
+                    key={action}
+                    disabled={!applyRecoveryReason.trim() || busyAction !== null}
+                    onClick={() => void requestApplyRecovery(action)}
+                    data-testid={`flow.workItem.applyRecovery.${action}`}
+                  >
+                    {action === 'Resume' ? 'Resume in new attempt'
+                      : action === 'Retry' ? 'Retry in new attempt'
+                        : action === 'ManualReview' ? 'Record manual review'
+                          : 'Abandon apply'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {(workItem.applyRecovery.technicalDetails?.length ?? 0) > 0 ? (
             <details>
               <summary>Failure details</summary>

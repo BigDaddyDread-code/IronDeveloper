@@ -1098,6 +1098,20 @@ class IronDevApiClient {
     );
   }
 
+  async requestSkeletonRunApplyRecovery(
+    projectId: number,
+    ticketId: number,
+    runId: string,
+    action: string,
+    reason: string,
+    signal?: AbortSignal
+  ): Promise<TicketBuildRunDto> {
+    return this.request<TicketBuildRunDto>(
+      `/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs/${encodeURIComponent(runId)}/apply-recovery`,
+      { method: 'POST', body: { action, reason }, signal }
+    );
+  }
+
   async getSkeletonCriticPackage(
     projectId: number,
     ticketId: number,

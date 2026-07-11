@@ -57,7 +57,32 @@ public interface ITicketSkeletonRunService
     /// spine's workspace evidence chain is the receipt. Commit, push, and release
     /// remain separate governed steps this service does not have.
     /// </summary>
-    Task<TicketBuildRunDto?> ApplyAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default);
+    Task<TicketBuildRunDto?> ApplyAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        CancellationToken cancellationToken = default);
+
+    Task<TicketBuildRunDto?> ApplyAsAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        string requestedByUserId,
+        CancellationToken cancellationToken = default) =>
+        ApplyAsync(projectId, ticketId, runId, cancellationToken);
+
+    /// <summary>
+    /// Records an explicit human recovery decision for the latest apply attempt. Resume
+    /// and retry create a fresh attempt only when durable stage evidence proves source
+    /// mutation was not observed. Uncertain mutation permits manual review or abandon only.
+    /// </summary>
+    Task<TicketBuildRunDto?> RecoverApplyAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        SkeletonApplyRecoveryRequest request,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<TicketBuildRunDto?>(null);
 
     /// <summary>
     /// Reconstructs the whole governed loop for a run from durable evidence: events,
