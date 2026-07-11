@@ -128,6 +128,7 @@ public sealed record ProjectWorkItemContractReadModel
 
 public sealed record ProjectWorkItemCollaborationReadModel
 {
+    public long Revision { get; init; }
     public ProjectWorkItemActorReadModel? Assignee { get; init; }
     public IReadOnlyList<ProjectWorkItemActorReadModel> Followers { get; init; } = [];
     public ProjectWorkItemActorReadModel? WaitingOn { get; init; }
@@ -208,14 +209,15 @@ public static class ProjectWorkItemProjector
         RunRecord? latestRun,
         SkeletonRunReport? report,
         BuildReadinessResult readiness,
-        DateTimeOffset generatedUtc)
+        DateTimeOffset generatedUtc,
+        ProjectWorkItemCollaborationSnapshot? collaboration = null)
     {
         var stage = StageFor(ticket, latestRun);
         var waitingOn = WaitingOn(ticket, latestRun, readiness);
         var gate = GateFor(ticket, latestRun, report, readiness);
         var action = ActionFor(latestRun, readiness);
         var affectedFiles = SplitValues(ticket.LinkedFilePaths);
-        var activity = (report?.Timeline ?? [])
+        var runActivity = (report?.Timeline ?? [])
             .OrderByDescending(entry => entry.TimestampUtc)
             .Take(8)
             .Select(entry => new ProjectWorkItemActivityReadModel
@@ -225,6 +227,18 @@ public static class ProjectWorkItemProjector
                 Summary = entry.Message,
                 Actor = null
             })
+            .ToArray();
+        var collaborationActivity = (collaboration?.RecentActivity ?? [])
+            .Select(entry => new ProjectWorkItemActivityReadModel
+            {
+                TimestampUtc = entry.TimestampUtc,
+                Kind = entry.Kind,
+                Summary = entry.Summary,
+                Actor = MapActor(entry.Actor)
+            });
+        var activity = collaborationActivity.Concat(runActivity)
+            .OrderByDescending(entry => entry.TimestampUtc)
+            .Take(8)
             .ToArray();
 
         return new ProjectWorkItemReadModel
@@ -249,9 +263,10 @@ public static class ProjectWorkItemProjector
             },
             Collaboration = new ProjectWorkItemCollaborationReadModel
             {
-                Assignee = null,
-                Followers = [],
-                WaitingOn = waitingOn,
+                Revision = collaboration?.Revision ?? 0,
+                Assignee = MapActor(collaboration?.Assignee),
+                Followers = (collaboration?.Followers ?? []).Select(MapActor).Where(actor => actor is not null).Cast<ProjectWorkItemActorReadModel>().ToArray(),
+                WaitingOn = MapActor(collaboration?.WaitingOn) ?? waitingOn,
                 LinkedChatSessionId = ticket.SourceChatSessionId,
                 RecentActivity = activity
             },
@@ -272,6 +287,10 @@ public static class ProjectWorkItemProjector
             }
         };
     }
+
+    private static ProjectWorkItemActorReadModel? MapActor(ProjectWorkItemCollaborator? actor) => actor is null
+        ? null
+        : new ProjectWorkItemActorReadModel { Kind = actor.Kind, UserId = actor.UserId, DisplayName = actor.DisplayName };
 
     private static ProjectWorkItemExecutionProofReadModel ExecutionProofFor(RunRecord? run, SkeletonRunReport? report)
     {

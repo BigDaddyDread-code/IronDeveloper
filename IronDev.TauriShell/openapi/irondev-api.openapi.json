@@ -8120,6 +8120,87 @@
         }
       }
     },
+    "/api/projects/{projectId}/members/{userId}": {
+      "put": {
+        "tags": [
+          "ProjectMembers"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProjectMembershipRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProjectMembershipRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProjectMembershipRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ProjectMembers"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/notifications": {
       "get": {
         "tags": [
@@ -8730,6 +8811,74 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/work-items/{workItemId}/collaboration": {
+      "put": {
+        "tags": [
+          "ProjectWorkItems"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "workItemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProjectWorkItemCollaborationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProjectWorkItemCollaborationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetProjectWorkItemCollaborationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkItemCollaborationSnapshot"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkItemCollaborationSnapshot"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkItemCollaborationSnapshot"
                 }
               }
             }
@@ -24146,6 +24295,13 @@
             "type": "string",
             "nullable": true
           },
+          "projectRole": {
+            "type": "string",
+            "nullable": true
+          },
+          "isProjectMember": {
+            "type": "boolean"
+          },
           "isActive": {
             "type": "boolean"
           },
@@ -24185,10 +24341,20 @@
           "canAdministerTenantMembership": {
             "type": "boolean"
           },
+          "canAdministerProjectMembership": {
+            "type": "boolean"
+          },
           "canAdministerChannelMembership": {
             "type": "boolean"
           },
           "availableTenantRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "availableProjectRoles": {
             "type": "array",
             "items": {
               "type": "string"
@@ -25080,9 +25246,34 @@
         },
         "additionalProperties": false
       },
+      "ProjectWorkItemCollaborationActivity": {
+        "type": "object",
+        "properties": {
+          "timestampUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ProjectWorkItemCollaborator"
+          }
+        },
+        "additionalProperties": false
+      },
       "ProjectWorkItemCollaborationReadModel": {
         "type": "object",
         "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
           "assignee": {
             "$ref": "#/components/schemas/ProjectWorkItemActorReadModel"
           },
@@ -25106,6 +25297,59 @@
             "items": {
               "$ref": "#/components/schemas/ProjectWorkItemActivityReadModel"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemCollaborationSnapshot": {
+        "type": "object",
+        "properties": {
+          "workItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "assignee": {
+            "$ref": "#/components/schemas/ProjectWorkItemCollaborator"
+          },
+          "followers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorkItemCollaborator"
+            },
+            "nullable": true
+          },
+          "waitingOn": {
+            "$ref": "#/components/schemas/ProjectWorkItemCollaborator"
+          },
+          "recentActivity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorkItemCollaborationActivity"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemCollaborator": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -28379,6 +28623,48 @@
             "nullable": true
           },
           "notificationLevel": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SetProjectMembershipRequest": {
+        "type": "object",
+        "properties": {
+          "projectRole": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SetProjectWorkItemCollaborationRequest": {
+        "type": "object",
+        "properties": {
+          "assigneeUserId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "followerUserIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "nullable": true
+          },
+          "waitingOnUserId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "waitingOnKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "waitingOnLabel": {
             "type": "string",
             "nullable": true
           }

@@ -159,6 +159,8 @@ builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IProjectChatDocumentSourceService, ProjectChatDocumentSourceService>();
 builder.Services.AddScoped<IProjectToolCatalogueService, ProjectToolCatalogueService>();
 builder.Services.AddScoped<IProjectMemberDirectoryService, ProjectMemberDirectoryService>();
+builder.Services.AddScoped<IProjectMembershipService, ProjectMembershipService>();
+builder.Services.AddScoped<IProjectWorkItemCollaborationService, ProjectWorkItemCollaborationService>();
 builder.Services.AddScoped<IProjectChannelMembershipService, ProjectChannelMembershipService>();
 builder.Services.AddScoped<IProjectChannelChatService, ProjectChannelChatService>();
 builder.Services.AddScoped<IChatFeedbackService, ChatFeedbackService>();
@@ -393,6 +395,7 @@ app.UseHttpsRedirection();
 app.UseRouting();
 app.UseCors(CorsPolicyName);
 app.UseAuthentication();
+app.UseMiddleware<ProjectMembershipMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 

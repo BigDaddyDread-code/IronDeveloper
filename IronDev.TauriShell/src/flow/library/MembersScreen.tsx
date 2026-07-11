@@ -26,6 +26,7 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const [roleDrafts, setRoleDrafts] = useState<Record<number, string>>({});
+  const [projectRoleDrafts, setProjectRoleDrafts] = useState<Record<number, string>>({});
   const [channelDrafts, setChannelDrafts] = useState<Record<string, ChannelMembershipDraft>>({});
   const [channelAddDrafts, setChannelAddDrafts] = useState<Record<number, ChannelAddDraft>>({});
   const [mutationError, setMutationError] = useState('');
@@ -37,11 +38,13 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('Viewer');
   const [removeCandidateId, setRemoveCandidateId] = useState<number | null>(null);
+  const [projectRemoveCandidateId, setProjectRemoveCandidateId] = useState<number | null>(null);
   const [channelRemoveCandidate, setChannelRemoveCandidate] = useState<{ channelId: number; userId: number } | null>(null);
 
   const applyDirectory = useCallback((loaded: ProjectMemberDirectoryResponse) => {
     setDirectory(loaded);
     setRoleDrafts(Object.fromEntries(loaded.members.map((member) => [member.userId, member.tenantRole])));
+    setProjectRoleDrafts(Object.fromEntries(loaded.members.map((member) => [member.userId, member.projectRole ?? 'Viewer'])));
     setChannelDrafts(Object.fromEntries(loaded.channels.flatMap((channel) =>
       channel.members.map((member) => [channelDraftKey(channel.channelId, member.userId), {
         channelRole: member.channelRole,
@@ -100,6 +103,7 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
       );
       if (directory) {
         setRoleDrafts(Object.fromEntries(directory.members.map((member) => [member.userId, member.tenantRole])));
+        setProjectRoleDrafts(Object.fromEntries(directory.members.map((member) => [member.userId, member.projectRole ?? 'Viewer'])));
         setChannelDrafts(Object.fromEntries(directory.channels.flatMap((channel) =>
           channel.members.map((member) => [channelDraftKey(channel.channelId, member.userId), {
             channelRole: member.channelRole,
@@ -123,6 +127,10 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
     const member = directory.members.find((candidate) => candidate.userId === channelRemoveCandidate.userId);
     return channel && member ? { channel, member } : null;
   }, [channelRemoveCandidate, directory]);
+  const projectRemoveCandidate = useMemo(
+    () => directory?.members.find((member) => member.userId === projectRemoveCandidateId) ?? null,
+    [directory?.members, projectRemoveCandidateId]
+  );
 
   if (loadState === 'loading') {
     return <p className="fl-empty" data-testid="flow.members.loading">Loading members...</p>;
@@ -198,6 +206,25 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
       `${removeCandidate.displayName} was removed from the tenant.`
     );
     if (removed) setRemoveCandidateId(null);
+  };
+
+  const saveProjectMembership = (member: ProjectMemberDirectoryEntry) => {
+    const role = projectRoleDrafts[member.userId] ?? member.projectRole ?? 'Viewer';
+    void runMutation(
+      `project-role-${member.userId}`,
+      () => session.client.setProjectMembership(projectId, member.userId, role),
+      `${member.displayName}'s project role is now ${role}.`
+    );
+  };
+
+  const removeProjectMembership = async () => {
+    if (!projectRemoveCandidate) return;
+    const removed = await runMutation(
+      `project-remove-${projectRemoveCandidate.userId}`,
+      () => session.client.removeProjectMembership(projectId, projectRemoveCandidate.userId),
+      `${projectRemoveCandidate.displayName} no longer has access to ${directory.projectName}.`
+    );
+    if (removed) setProjectRemoveCandidateId(null);
   };
 
   const saveChannelMembership = (channel: ProjectChannelDirectoryEntry, membership: ProjectChannelMembershipEntry) => {
@@ -310,10 +337,16 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
               canAdminister={directory.canAdministerTenantMembership}
               roles={directory.availableTenantRoles}
               roleDraft={roleDrafts[member.userId] ?? member.tenantRole}
+              canAdministerProject={directory.canAdministerProjectMembership}
+              projectRoles={directory.availableProjectRoles}
+              projectRoleDraft={projectRoleDrafts[member.userId] ?? member.projectRole ?? 'Viewer'}
               busyAction={busyAction}
               onRoleChange={(role) => setRoleDrafts((current) => ({ ...current, [member.userId]: role }))}
               onSaveRole={() => saveRole(member)}
               onRemove={() => setRemoveCandidateId(member.userId)}
+              onProjectRoleChange={(role) => setProjectRoleDrafts((current) => ({ ...current, [member.userId]: role }))}
+              onSaveProjectRole={() => saveProjectMembership(member)}
+              onRemoveProject={() => setProjectRemoveCandidateId(member.userId)}
             />
           ))}
         </div>
@@ -375,6 +408,21 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
             <button className="fl-btn" type="button" onClick={() => setRemoveCandidateId(null)}>Cancel</button>
             <button className="fl-btn fl-danger" type="button" onClick={() => void removeMember()} disabled={busyAction === `remove-${removeCandidate.userId}`} data-testid="flow.members.remove.submit">
               {busyAction === `remove-${removeCandidate.userId}` ? 'Removing...' : 'Remove tenant membership'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {projectRemoveCandidate ? (
+        <div className="fl-member-remove" role="alertdialog" aria-labelledby="remove-project-member-heading" data-testid="flow.members.project.remove.confirm">
+          <div>
+            <h3 id="remove-project-member-heading">Remove {projectRemoveCandidate.displayName} from {directory.projectName}?</h3>
+            <p>Project access ends on the next request. Authored messages, activity, decisions, and receipts retain their attribution.</p>
+          </div>
+          <div>
+            <button className="fl-btn" type="button" onClick={() => setProjectRemoveCandidateId(null)}>Cancel</button>
+            <button className="fl-btn fl-danger" type="button" onClick={() => void removeProjectMembership()} disabled={busyAction !== null} data-testid="flow.members.project.remove.submit">
+              {busyAction === `project-remove-${projectRemoveCandidate.userId}` ? 'Removing...' : 'Remove project access'}
             </button>
           </div>
         </div>
@@ -489,21 +537,34 @@ function MemberRow({
   canAdminister,
   roles,
   roleDraft,
+  canAdministerProject,
+  projectRoles,
+  projectRoleDraft,
   busyAction,
   onRoleChange,
   onSaveRole,
-  onRemove
+  onRemove,
+  onProjectRoleChange,
+  onSaveProjectRole,
+  onRemoveProject
 }: {
   member: ProjectMemberDirectoryEntry;
   canAdminister: boolean;
   roles: string[];
   roleDraft: string;
+  canAdministerProject: boolean;
+  projectRoles: string[];
+  projectRoleDraft: string;
   busyAction: string | null;
   onRoleChange: (role: string) => void;
   onSaveRole: () => void;
   onRemove: () => void;
+  onProjectRoleChange: (role: string) => void;
+  onSaveProjectRole: () => void;
+  onRemoveProject: () => void;
 }) {
   const roleChanged = roleDraft !== member.tenantRole;
+  const projectRoleChanged = projectRoleDraft !== (member.projectRole ?? 'Viewer');
   return (
     <article className="fl-member-row" data-testid={`flow.members.row.${member.userId}`}>
       <div className="fl-member-row__identity">
@@ -517,6 +578,7 @@ function MemberRow({
       <div className="fl-member-row__facts">
         <span><small>Tenant role</small><strong>{formatRole(member.tenantRole)}</strong></span>
         <span><small>Project access</small><strong>{member.projectAccessStatus}</strong></span>
+        <span><small>Project role</small><strong>{member.projectRole ?? 'None'}</strong></span>
         <span><small>Channels</small><strong>{member.channelMembershipSummary}</strong></span>
       </div>
       {canAdminister ? (
@@ -530,6 +592,21 @@ function MemberRow({
           </label>
           <button className="fl-btn" type="button" onClick={onSaveRole} disabled={!roleChanged || busyAction !== null} data-testid={`flow.members.role.save.${member.userId}`}>Save role</button>
           <button className="fl-btn" type="button" onClick={onRemove} disabled={member.isCurrentUser || busyAction !== null} title={member.isCurrentUser ? 'You cannot remove your current tenant session here.' : 'Remove tenant membership'} data-testid={`flow.members.remove.${member.userId}`}>Remove</button>
+        </div>
+      ) : null}
+      {canAdministerProject ? (
+        <div className="fl-member-row__admin" data-testid={`flow.members.project.${member.userId}`}>
+          <label>
+            Project role
+            <select value={projectRoleDraft} onChange={(event) => onProjectRoleChange(event.target.value)} disabled={busyAction !== null} data-testid={`flow.members.project.role.${member.userId}`}>
+              {projectRoles.map(roleOption)}
+            </select>
+            <small className="fl-member-role-note">Coordinates project visibility and ownership only.</small>
+          </label>
+          <button className="fl-btn" type="button" onClick={onSaveProjectRole} disabled={(!projectRoleChanged && member.isProjectMember) || busyAction !== null} data-testid={`flow.members.project.save.${member.userId}`}>
+            {member.isProjectMember ? 'Save project role' : 'Add to project'}
+          </button>
+          {member.isProjectMember ? <button className="fl-btn" type="button" onClick={onRemoveProject} disabled={member.isCurrentUser || busyAction !== null} data-testid={`flow.members.project.remove.${member.userId}`}>Remove project access</button> : null}
         </div>
       ) : null}
     </article>

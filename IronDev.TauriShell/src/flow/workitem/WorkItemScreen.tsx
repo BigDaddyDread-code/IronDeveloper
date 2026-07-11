@@ -3,6 +3,7 @@ import type {
   AcceptedApprovalApiError,
   BuildReadinessResult,
   ProjectWorkItemReadModel,
+  ProjectMemberDirectoryResponse,
   ProjectTicket,
   SkeletonCriticPackage,
   SkeletonCriticReviewOutcome,
@@ -149,6 +150,13 @@ export function WorkItemScreen({
   const [workItem, setWorkItem] = useState<ProjectWorkItemReadModel | null>(null);
   const [workItemLoadState, setWorkItemLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [workItemLoadError, setWorkItemLoadError] = useState<string | null>(null);
+  const [memberDirectory, setMemberDirectory] = useState<ProjectMemberDirectoryResponse | null>(null);
+  const [collaborationEditing, setCollaborationEditing] = useState(false);
+  const [assigneeDraft, setAssigneeDraft] = useState('');
+  const [waitingOnDraft, setWaitingOnDraft] = useState('');
+  const [followerDraft, setFollowerDraft] = useState<number[]>([]);
+  const [collaborationError, setCollaborationError] = useState<string | null>(null);
+  const [collaborationBusy, setCollaborationBusy] = useState(false);
 
   useEffect(() => {
     setStage(ticket ? 'ticket' : 'shape');
@@ -166,6 +174,9 @@ export function WorkItemScreen({
     setWorkItem(null);
     setWorkItemLoadState(ticket ? 'loading' : 'idle');
     setWorkItemLoadError(null);
+    setMemberDirectory(null);
+    setCollaborationEditing(false);
+    setCollaborationError(null);
   }, [ticket?.id]);
 
   const refreshWorkItemProjection = useCallback(async (signal?: AbortSignal, syncStage = true) => {
@@ -178,6 +189,11 @@ export function WorkItemScreen({
     try {
       const next = await session.client.getProjectWorkItem(project.selectedProjectId, ticket.id, signal);
       setWorkItem(next);
+      setAssigneeDraft(next.collaboration.assignee?.userId ? String(next.collaboration.assignee.userId) : '');
+      setWaitingOnDraft(next.collaboration.waitingOn?.userId
+        ? `user:${next.collaboration.waitingOn.userId}`
+        : next.collaboration.waitingOn?.displayName ? `role:${next.collaboration.waitingOn.displayName}` : '');
+      setFollowerDraft((next.collaboration.followers ?? []).flatMap((follower) => follower.userId ? [follower.userId] : []));
       if (syncStage) {
         setStage(stageFromProjection(next.stage));
       }
@@ -202,6 +218,38 @@ export function WorkItemScreen({
     void refreshWorkItemProjection(controller.signal);
     return () => controller.abort();
   }, [refreshWorkItemProjection, ticket]);
+
+  useEffect(() => {
+    if (!ticket || project.selectedProjectId === null) return;
+    const controller = new AbortController();
+    session.client.getProjectMembers(project.selectedProjectId, controller.signal)
+      .then(setMemberDirectory)
+      .catch(() => { if (!controller.signal.aborted) setMemberDirectory(null); });
+    return () => controller.abort();
+  }, [project.selectedProjectId, session.client, ticket]);
+
+  const saveCollaboration = async () => {
+    if (!ticket?.id || project.selectedProjectId === null) return;
+    const waitingUserId = waitingOnDraft.startsWith('user:') ? Number(waitingOnDraft.slice(5)) : null;
+    const waitingLabel = waitingOnDraft.startsWith('role:') ? waitingOnDraft.slice(5) : null;
+    setCollaborationBusy(true);
+    setCollaborationError(null);
+    try {
+      await session.client.setProjectWorkItemCollaboration(project.selectedProjectId, ticket.id, {
+        assigneeUserId: assigneeDraft ? Number(assigneeDraft) : null,
+        followerUserIds: followerDraft,
+        waitingOnUserId: waitingUserId,
+        waitingOnKind: waitingLabel ? 'Role' : waitingUserId ? 'Human' : null,
+        waitingOnLabel: waitingLabel
+      });
+      await refreshWorkItemProjection(undefined, false);
+      setCollaborationEditing(false);
+    } catch (error) {
+      setCollaborationError(error instanceof Error ? error.message : 'Ownership was not changed.');
+    } finally {
+      setCollaborationBusy(false);
+    }
+  };
 
   const hasUndispositionedFindings = useMemo(() => {
     const reviews = report?.criticReviews ?? [];
@@ -1026,6 +1074,20 @@ export function WorkItemScreen({
                   Discuss in Chat
                 </button>
               </div>
+              {memberDirectory ? (
+                <button className="fl-btn fl-mini" type="button" onClick={() => setCollaborationEditing((current) => !current)} data-testid="flow.workItem.collaboration.edit">
+                  {collaborationEditing ? 'Cancel editing' : 'Edit ownership'}
+                </button>
+              ) : null}
+              {collaborationEditing && memberDirectory ? (
+                <div className="fl-workitem-collaboration-editor" data-testid="flow.workItem.collaboration.form">
+                  <label>Assignee<select value={assigneeDraft} onChange={(event) => setAssigneeDraft(event.target.value)}><option value="">Not assigned</option>{memberDirectory.members.filter((member) => member.isProjectMember).map((member) => <option key={member.userId} value={member.userId}>{member.displayName}</option>)}</select></label>
+                  <label>Waiting on<select value={waitingOnDraft} onChange={(event) => setWaitingOnDraft(event.target.value)}><option value="">No actor</option>{memberDirectory.members.filter((member) => member.isProjectMember).map((member) => <option key={member.userId} value={`user:${member.userId}`}>{member.displayName}</option>)}<option value="role:Project owner">Project owner</option><option value="role:Reviewer">Reviewer</option><option value="role:Approver">Approver</option></select></label>
+                  <fieldset><legend>Followers</legend>{memberDirectory.members.filter((member) => member.isProjectMember).map((member) => <label key={member.userId}><input type="checkbox" checked={followerDraft.includes(member.userId)} onChange={(event) => setFollowerDraft((current) => event.target.checked ? [...current, member.userId] : current.filter((id) => id !== member.userId))} />{member.displayName}</label>)}</fieldset>
+                  {collaborationError ? <p className="fl-error" role="alert">{collaborationError}</p> : null}
+                  <button className="fl-btn fl-pri" type="button" disabled={collaborationBusy} onClick={() => void saveCollaboration()} data-testid="flow.workItem.collaboration.save">{collaborationBusy ? 'Saving...' : 'Save ownership'}</button>
+                </div>
+              ) : null}
               <dl className="fl-workitem-facts">
                 <div><dt>Assignee</dt><dd>{workItem.collaboration.assignee?.displayName ?? 'Not assigned'}</dd></div>
                 <div><dt>Waiting on</dt><dd>{workItem.collaboration.waitingOn?.displayName ?? 'No actor'}</dd></div>

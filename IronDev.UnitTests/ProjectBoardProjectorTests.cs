@@ -2,6 +2,7 @@ using IronDev.Core.Board;
 using IronDev.Core.Provisioning;
 using IronDev.Core.Runs;
 using IronDev.Data.Models;
+using IronDev.Core.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.UnitTests;
@@ -78,6 +79,26 @@ public sealed class ProjectBoardProjectorTests
         var model = ProjectBoardProjector.Build(project, Ready(), [other, deleted], [], Now);
 
         Assert.AreEqual(0, model.Items.Count);
+    }
+
+    [TestMethod]
+    public void Build_UsesPersistedAssigneeAndWaitingOnInsteadOfInventingActors()
+    {
+        var ticket = Ticket(47, "Owned work", "Ready");
+        var collaboration = new Dictionary<long, ProjectWorkItemCollaborationSnapshot>
+        {
+            [ticket.Id] = new()
+            {
+                WorkItemId = ticket.Id,
+                Assignee = new("Human", 8, "Alice Reviewer"),
+                WaitingOn = new("Role", null, "Approver")
+            }
+        };
+
+        var model = ProjectBoardProjector.Build(Project(), Ready(), [ticket], [], Now, collaboration);
+
+        Assert.AreEqual("Alice Reviewer", model.Items.Single().Assignee?.DisplayName);
+        Assert.AreEqual("Approver", model.Items.Single().WaitingOn?.Label);
     }
 
     private static Project Project() => new() { Id = 7, Name = "Board test" };

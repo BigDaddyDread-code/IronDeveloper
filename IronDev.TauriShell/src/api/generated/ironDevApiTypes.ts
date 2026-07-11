@@ -5971,6 +5971,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    userId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetProjectMembershipRequest"];
+                    "text/json": components["schemas"]["SetProjectMembershipRequest"];
+                    "application/*+json": components["schemas"]["SetProjectMembershipRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    userId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/notifications": {
         parameters: {
             query?: never;
@@ -6507,6 +6569,52 @@ export interface paths {
             };
         };
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/work-items/{workItemId}/collaboration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    workItemId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetProjectWorkItemCollaborationRequest"];
+                    "text/json": components["schemas"]["SetProjectWorkItemCollaborationRequest"];
+                    "application/*+json": components["schemas"]["SetProjectWorkItemCollaborationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectWorkItemCollaborationSnapshot"];
+                        "application/json": components["schemas"]["ProjectWorkItemCollaborationSnapshot"];
+                        "text/json": components["schemas"]["ProjectWorkItemCollaborationSnapshot"];
+                    };
+                };
+            };
+        };
         post?: never;
         delete?: never;
         options?: never;
@@ -13224,6 +13332,8 @@ export interface components {
             displayName?: string | null;
             email?: string | null;
             tenantRole?: string | null;
+            projectRole?: string | null;
+            isProjectMember?: boolean;
             isActive?: boolean;
             isCurrentUser?: boolean;
             projectAccessStatus?: string | null;
@@ -13237,8 +13347,10 @@ export interface components {
             tenantId?: number;
             currentUserTenantRole?: string | null;
             canAdministerTenantMembership?: boolean;
+            canAdministerProjectMembership?: boolean;
             canAdministerChannelMembership?: boolean;
             availableTenantRoles?: string[] | null;
+            availableProjectRoles?: string[] | null;
             availableChannelRoles?: string[] | null;
             availableNotificationLevels?: string[] | null;
             projectMembershipStatus?: string | null;
@@ -13504,13 +13616,38 @@ export interface components {
             humanReviewRequired?: boolean;
             boundary?: string | null;
         };
+        ProjectWorkItemCollaborationActivity: {
+            /** Format: date-time */
+            timestampUtc?: string;
+            kind?: string | null;
+            summary?: string | null;
+            actor?: components["schemas"]["ProjectWorkItemCollaborator"];
+        };
         ProjectWorkItemCollaborationReadModel: {
+            /** Format: int64 */
+            revision?: number;
             assignee?: components["schemas"]["ProjectWorkItemActorReadModel"];
             followers?: components["schemas"]["ProjectWorkItemActorReadModel"][] | null;
             waitingOn?: components["schemas"]["ProjectWorkItemActorReadModel"];
             /** Format: int64 */
             linkedChatSessionId?: number | null;
             recentActivity?: components["schemas"]["ProjectWorkItemActivityReadModel"][] | null;
+        };
+        ProjectWorkItemCollaborationSnapshot: {
+            /** Format: int64 */
+            workItemId?: number;
+            /** Format: int64 */
+            revision?: number;
+            assignee?: components["schemas"]["ProjectWorkItemCollaborator"];
+            followers?: components["schemas"]["ProjectWorkItemCollaborator"][] | null;
+            waitingOn?: components["schemas"]["ProjectWorkItemCollaborator"];
+            recentActivity?: components["schemas"]["ProjectWorkItemCollaborationActivity"][] | null;
+        };
+        ProjectWorkItemCollaborator: {
+            kind?: string | null;
+            /** Format: int32 */
+            userId?: number | null;
+            displayName?: string | null;
         };
         ProjectWorkItemContractReadModel: {
             /** Format: int32 */
@@ -14364,6 +14501,18 @@ export interface components {
         SetProjectChannelMembershipRequest: {
             channelRole?: string | null;
             notificationLevel?: string | null;
+        };
+        SetProjectMembershipRequest: {
+            projectRole?: string | null;
+        };
+        SetProjectWorkItemCollaborationRequest: {
+            /** Format: int32 */
+            assigneeUserId?: number | null;
+            followerUserIds?: number[] | null;
+            /** Format: int32 */
+            waitingOnUserId?: number | null;
+            waitingOnKind?: string | null;
+            waitingOnLabel?: string | null;
         };
         SetTenantUserRoleRequest: {
             role?: string | null;

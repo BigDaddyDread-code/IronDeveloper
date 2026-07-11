@@ -7,15 +7,31 @@ test('Members shows tenant identities and backend-owned channel scope', async ({
   const directory = page.getByTestId('flow.members.directory');
   await expect(directory).toBeVisible();
   await expect(directory).toContainText('Your tenant roleOwner');
-  await expect(directory).toContainText('Project membershipNot implemented');
+  await expect(directory).toContainText('Project membership2 active members');
   await expect(directory).toContainText('Channel membership2 active channels');
   await expect(page.getByTestId('flow.members.row.7')).toContainText('Bob Developer (you)');
-  await expect(page.getByTestId('flow.members.row.7')).toContainText('Tenant scoped');
+  await expect(page.getByTestId('flow.members.row.7')).toContainText('Project member');
   await expect(page.getByTestId('flow.members.row.8')).toContainText('Alice Reviewer');
   await expect(page.getByTestId('flow.members.add.toggle')).toBeVisible();
   await expect(page.getByTestId('flow.members.channel.101')).toContainText('General');
   await expect(page.getByTestId('flow.members.channel.101')).toContainText('Project visible');
   await expect(page.getByTestId('flow.members.channel.102')).toContainText('Members only');
+});
+
+test('project owner changes role and removes access through explicit backend mutations', async ({ page }) => {
+  const state = await mockMembersWorkspace(page);
+  await page.goto('/projects/7/library/members');
+
+  await page.getByTestId('flow.members.project.role.8').selectOption('Contributor');
+  await page.getByTestId('flow.members.project.save.8').click();
+  await expect(page.getByTestId('flow.members.notice')).toContainText("Alice Reviewer's project role is now Contributor.");
+
+  await page.getByTestId('flow.members.project.remove.8').click();
+  await expect(page.getByTestId('flow.members.project.remove.confirm')).toContainText('Project access ends on the next request');
+  await page.getByTestId('flow.members.project.remove.submit').click();
+  await expect(page.getByTestId('flow.members.row.8')).toContainText('No project access');
+  expect(state.projectPutRequests).toBe(1);
+  expect(state.projectDeleteRequests).toBe(1);
 });
 
 test('channel role, notification, add, and removal use explicit backend mutations', async ({ page }) => {
@@ -189,6 +205,8 @@ interface MembersMockState {
   removeRequests: number;
   channelPutRequests: number;
   channelDeleteRequests: number;
+  projectPutRequests: number;
+  projectDeleteRequests: number;
   lastAddBody: Record<string, unknown> | null;
 }
 
@@ -202,6 +220,8 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
     removeRequests: 0,
     channelPutRequests: 0,
     channelDeleteRequests: 0,
+    projectPutRequests: 0,
+    projectDeleteRequests: 0,
     lastAddBody: null
   };
   let failuresRemaining = options.directoryFailures ?? 0;
@@ -213,9 +233,11 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       displayName: 'Bob Developer',
       email: 'bob@irondev.local',
       tenantRole: 'Owner',
+      projectRole: 'Owner' as string | null,
+      isProjectMember: true,
       isActive: true,
       isCurrentUser: currentUserId === 7,
-      projectAccessStatus: 'Tenant scoped',
+      projectAccessStatus: 'Project member',
       channelMembershipSummary: 'General, Product planning'
     },
     {
@@ -223,9 +245,11 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       displayName: 'Alice Reviewer',
       email: 'alice@irondev.local',
       tenantRole: 'Viewer',
+      projectRole: 'Viewer',
+      isProjectMember: true,
       isActive: true,
       isCurrentUser: currentUserId === 8,
-      projectAccessStatus: 'Tenant scoped',
+      projectAccessStatus: 'Project member',
       channelMembershipSummary: 'General'
     }
   ];
@@ -306,9 +330,11 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       displayName: body.displayName,
       email: body.email,
       tenantRole: body.role,
+      projectRole: null,
+      isProjectMember: false,
       isActive: true,
       isCurrentUser: false,
-      projectAccessStatus: 'Tenant scoped',
+      projectAccessStatus: 'No project access',
       channelMembershipSummary: 'No explicit memberships'
     });
     return json(route, { id: 9, ...body, isActive: true });
@@ -346,6 +372,24 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
     }
     return json(route, { message: 'Channel membership saved.' });
   });
+  await page.route(/\/irondev-api\/api\/projects\/7\/members\/(\d+)$/, (route) => {
+    const userId = Number(route.request().url().match(/members\/(\d+)$/)?.[1]);
+    const member = members.find((candidate) => candidate.userId === userId);
+    if (!member) return json(route, { error: 'Tenant member not found.' }, 404);
+    if (route.request().method() === 'DELETE') {
+      state.projectDeleteRequests += 1;
+      member.projectRole = null;
+      member.isProjectMember = false;
+      member.projectAccessStatus = 'No project access';
+      return json(route, { message: 'Project membership removed.' });
+    }
+    state.projectPutRequests += 1;
+    const body = route.request().postDataJSON() as { projectRole: string };
+    member.projectRole = body.projectRole;
+    member.isProjectMember = true;
+    member.projectAccessStatus = 'Project member';
+    return json(route, { message: 'Project membership saved.' });
+  });
   await page.route(/\/irondev-api\/api\/projects\/7\/members(?:\?[^#]*)?$/, (route) => {
     state.directoryRequests += 1;
     if (failNextDirectory) {
@@ -372,11 +416,13 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       tenantId: 3,
       currentUserTenantRole: options.currentRole ?? 'Owner',
       canAdministerTenantMembership: options.canAdminister ?? true,
+      canAdministerProjectMembership: options.canAdminister ?? true,
       canAdministerChannelMembership: options.canAdminister ?? true,
       availableTenantRoles,
+      availableProjectRoles: ['Owner', 'Contributor', 'Viewer'],
       availableChannelRoles: ['Owner', 'Moderator', 'Member', 'ReadOnly'],
       availableNotificationLevels: ['All', 'Mentions', 'None'],
-      projectMembershipStatus: 'Not implemented',
+      projectMembershipStatus: `${members.filter((member) => member.isProjectMember).length} active members`,
       channelMembershipStatus: `${visibleChannels.length} active channels`,
       members,
       channels: visibleChannels,

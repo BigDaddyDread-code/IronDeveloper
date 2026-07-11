@@ -59,6 +59,7 @@ import type {
   ProjectToolCatalogueResponse,
   ProjectToolDetailResponse,
   ProjectMemberDirectoryResponse,
+  SetProjectWorkItemCollaborationRequest,
   SetProjectChannelMembershipRequest,
   ProjectChannelChatDetail,
   ProjectChannelChatListResponse,
@@ -510,6 +511,28 @@ class IronDevApiClient {
       method: 'GET',
       signal
     });
+  }
+
+  async setProjectWorkItemCollaboration(
+    projectId: number,
+    workItemId: number,
+    request: SetProjectWorkItemCollaborationRequest
+  ): Promise<void> {
+    await this.request(`/api/projects/${projectId}/work-items/${workItemId}/collaboration`, {
+      method: 'PUT',
+      body: request
+    });
+  }
+
+  async setProjectMembership(projectId: number, userId: number, projectRole: string): Promise<void> {
+    await this.request(`/api/projects/${projectId}/members/${userId}`, {
+      method: 'PUT',
+      body: { projectRole }
+    });
+  }
+
+  async removeProjectMembership(projectId: number, userId: number): Promise<void> {
+    await this.request(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
   }
 
   async setProjectChannelMembership(

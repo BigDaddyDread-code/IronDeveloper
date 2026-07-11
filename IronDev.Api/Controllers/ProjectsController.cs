@@ -1,4 +1,8 @@
 using IronDev.Data.Models;
+using IronDev.Api.Auth;
+using IronDev.Core.Interfaces;
+using IronDev.Core.Auth;
+using IronDev.Core.Models;
 using IronDev.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,16 +16,28 @@ public sealed class ProjectsController : ControllerBase
 {
     private readonly IProjectService _projects;
     private readonly IProjectContextExportService _export;
+    private readonly IProjectMembershipService _memberships;
+    private readonly ICurrentTenantContext _tenant;
 
-    public ProjectsController(IProjectService projects, IProjectContextExportService export)
+    public ProjectsController(
+        IProjectService projects,
+        IProjectContextExportService export,
+        IProjectMembershipService memberships,
+        ICurrentTenantContext tenant)
     {
         _projects = projects;
         _export = export;
+        _memberships = memberships;
+        _tenant = tenant;
     }
 
     [HttpGet]
-    public async Task<IReadOnlyList<Project>> GetProjects(CancellationToken ct) =>
-        await _projects.GetProjectsAsync(ct);
+    public async Task<IReadOnlyList<Project>> GetProjects(CancellationToken ct)
+    {
+        var user = CurrentUser();
+        var accessible = await _memberships.GetAccessibleProjectIdsAsync(_tenant.TenantId, user.UserId, ct);
+        return (await _projects.GetProjectsAsync(ct)).Where(project => accessible.Contains(project.Id)).ToArray();
+    }
 
     [HttpGet("{projectId:int}")]
     public async Task<ActionResult<Project>> GetProject(int projectId, CancellationToken ct)
@@ -34,6 +50,10 @@ public sealed class ProjectsController : ControllerBase
     public async Task<ActionResult<Project>> Create(Project project, CancellationToken ct)
     {
         var id = await _projects.CreateProjectAsync(project, ct);
+        var user = CurrentUser();
+        var membership = await _memberships.SetMemberAsync(_tenant.TenantId, id, user.UserId, user.UserId, ProjectMemberRoles.Owner, ct);
+        if (membership != ProjectMembershipMutationStatus.Succeeded)
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Project was created, but its owner membership could not be established." });
         project.Id = id;
         return CreatedAtAction(nameof(GetProject), new { projectId = id }, project);
     }
@@ -67,6 +87,9 @@ public sealed class ProjectsController : ControllerBase
 
     public sealed record UpdateLocalPathRequest(string LocalPath);
     public sealed record MarkIndexStaleRequest(string Reason);
+
+    private CurrentUserContext CurrentUser() => new(
+        HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
 
     [HttpGet("{projectId:int}/context-pack")]
     public Task<string> ExportContextPack(int projectId) =>
