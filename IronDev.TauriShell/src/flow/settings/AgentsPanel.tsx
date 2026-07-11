@@ -97,7 +97,7 @@ export function AgentsPanel() {
       {profiles.map((profile) => {
         const draft = drafts[profile.role] ?? profile;
         const isDeterministic = DETERMINISTIC_ROLES.includes(profile.role);
-        const displayName = displayAgentRole(profile.role);
+        const displayName = profile.displayName || displayAgentRole(profile.role);
         return (
           <div className="fl-panel-box" key={profile.role} style={{ marginTop: 10 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}`}>
             <p className="fl-plabel" style={{ marginTop: 0 }}>
@@ -133,6 +133,11 @@ export function AgentsPanel() {
             <p className="fl-plabel" style={{ marginTop: 10 }}>
               skill.md
             </p>
+            {profile.builtInDefaultVersion ? (
+              <p className="fl-empty" style={{ marginTop: 0 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.defaultVersion`}>
+                {profile.builtInDefaultName || 'Built-in default'}: {profile.builtInDefaultVersion}
+              </p>
+            ) : null}
             <p className="fl-empty" style={{ marginTop: 0 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.boundary`}>
               {profile.boundary}
             </p>

@@ -1736,6 +1736,9 @@ export interface SkeletonGateRecommendation {
 
 export interface SkeletonAgentProfile {
   role: string;
+  displayName: string;
+  builtInDefaultName: string;
+  builtInDefaultVersion: string;
   provider: string;
   model: string;
   baseUrl: string;

@@ -44,6 +44,9 @@ public sealed class SkeletonAgentConfigTests
             Assert.AreEqual("openai", profile.Provider);
             Assert.AreEqual("gpt-4o", profile.Model);
             Assert.AreEqual(60, profile.TimeoutSeconds);
+            Assert.AreEqual(SkeletonAgentBuiltInDefaults.Version, profile.BuiltInDefaultVersion);
+            StringAssert.Contains(profile.Skill, "Derive tests independently");
+            StringAssert.Contains(profile.Personality, "Methodical");
             StringAssert.Contains(profile.Boundary, "never authority");
         }
         finally { TryDelete(root); }
@@ -61,6 +64,9 @@ public sealed class SkeletonAgentConfigTests
                 "The user-facing profile order starts with the Workshop guide role.");
             var analyst = profiles.Single(profile => profile.Role == SkeletonAgentRole.Analyst);
             StringAssert.Contains(SkeletonAgentRoles.DisplayName(analyst.Role), "Workshop guide");
+            Assert.AreEqual(SkeletonAgentBuiltInDefaults.Version, analyst.BuiltInDefaultVersion);
+            StringAssert.Contains(analyst.Skill, "Inspect available project context");
+            StringAssert.Contains(analyst.Personality, "plain-speaking");
             StringAssert.Contains(analyst.Boundary, "Workshop guide");
             StringAssert.Contains(analyst.Boundary, "cannot approve");
             StringAssert.Contains(analyst.Boundary, "apply source");
@@ -109,9 +115,10 @@ public sealed class SkeletonAgentConfigTests
 
             Assert.IsFalse(outcome.Succeeded, "A profile must never store a secret.");
             StringAssert.Contains(outcome.FailureReason, "secret");
-            // And nothing was written.
+            // And no override was written; the built-in default remains active.
             var reread = await service.GetAsync(SkeletonAgentRole.Builder);
-            Assert.AreEqual(string.Empty, reread.Personality);
+            StringAssert.DoesNotMatch(reread.Personality, new System.Text.RegularExpressions.Regex("api_key", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+            StringAssert.Contains(reread.Personality, "Calm");
         }
         finally { TryDelete(root); }
     }

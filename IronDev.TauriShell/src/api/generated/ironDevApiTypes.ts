@@ -14696,6 +14696,9 @@ export interface components {
         };
         SkeletonAgentProfile: {
             role: components["schemas"]["SkeletonAgentRole"];
+            displayName?: string | null;
+            builtInDefaultName?: string | null;
+            builtInDefaultVersion?: string | null;
             provider?: string | null;
             model?: string | null;
             baseUrl?: string | null;
