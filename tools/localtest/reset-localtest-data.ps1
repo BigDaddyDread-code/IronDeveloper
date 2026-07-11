@@ -325,6 +325,27 @@ function Invoke-SqlFile {
     }
 }
 
+function Invoke-MigrationManifest {
+    $migrationScript = Join-Path $repoRoot "Database\apply-migrations.ps1"
+    if (-not (Test-Path -LiteralPath $migrationScript -PathType Leaf)) {
+        throw "Migration script was not found at '$migrationScript'."
+    }
+
+    $migrationConnection = [System.Data.SqlClient.SqlConnectionStringBuilder]::new($builder.ConnectionString)
+    $migrationConnection["Data Source"] = $sqlCmdServer
+    $migrationConnection["Initial Catalog"] = $database
+
+    if ($sqlCmdServer.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase) -or $SqlServer -match '^\(localdb\)\\') {
+        $migrationConnection.Encrypt = $false
+        $migrationConnection.TrustServerCertificate = $false
+    }
+
+    & $migrationScript -ConnectionString $migrationConnection.ConnectionString
+    if ($LASTEXITCODE -ne 0) {
+        throw "Database migration manifest failed for LocalTest database '$database'."
+    }
+}
+
 Write-Host "Resetting LocalTest database '$database' on '$SqlServer'."
 
 if (-not $SkipSchema) {
@@ -389,6 +410,7 @@ GO
         Invoke-SqlFile -DatabaseName $database -Path $profileMigrationPath
         Invoke-SqlFile -DatabaseName $database -Path (Join-Path $repoRoot "Database\migrate_chat_document_sources.sql")
         Invoke-SqlFile -DatabaseName $database -Path (Join-Path $repoRoot "Database\migrate_project_channels.sql")
+        Invoke-MigrationManifest
     }
     finally {
         Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -396,6 +418,7 @@ GO
 }
 
 Invoke-SqlFile -DatabaseName $database -Path (Join-Path $PSScriptRoot "localtest-seed.sql")
+Invoke-SqlFile -DatabaseName $database -Path (Join-Path $repoRoot "Database\migrate_work_item_identity.sql")
 
 Write-Host "LocalTest reset complete."
 Write-Host "Database: $database"

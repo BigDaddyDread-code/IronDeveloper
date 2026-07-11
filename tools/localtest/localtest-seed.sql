@@ -70,6 +70,12 @@ IF OBJECT_ID('dbo.ProjectChannelMessageMentions', 'U') IS NOT NULL DELETE FROM d
 IF OBJECT_ID('dbo.ProjectChannelMessages', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessages;
 IF OBJECT_ID('dbo.ProjectChannelMembers', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMembers;
 IF OBJECT_ID('dbo.ProjectChannels', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannels;
+IF OBJECT_ID('dbo.ProjectWorkItemActivity', 'U') IS NOT NULL DELETE FROM dbo.ProjectWorkItemActivity;
+IF OBJECT_ID('dbo.ProjectWorkItemFollowers', 'U') IS NOT NULL DELETE FROM dbo.ProjectWorkItemFollowers;
+IF OBJECT_ID('dbo.ProjectWorkItemCollaboration', 'U') IS NOT NULL DELETE FROM dbo.ProjectWorkItemCollaboration;
+IF OBJECT_ID('dbo.WorkItems', 'U') IS NOT NULL UPDATE dbo.WorkItems SET CurrentContractId = NULL;
+IF OBJECT_ID('dbo.WorkItemContracts', 'U') IS NOT NULL DELETE FROM dbo.WorkItemContracts;
+IF OBJECT_ID('dbo.WorkItems', 'U') IS NOT NULL DELETE FROM dbo.WorkItems;
 IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;
 IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentVersions;
 IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocuments;
@@ -88,6 +94,7 @@ IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NOT NULL DELETE FROM dbo.ProjectTicke
 IF OBJECT_ID('dbo.ProjectFiles', 'U') IS NOT NULL DELETE FROM dbo.ProjectFiles;
 IF OBJECT_ID('dbo.ChatMessages', 'U') IS NOT NULL DELETE FROM dbo.ChatMessages;
 IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
+IF OBJECT_ID('dbo.ProjectMembers', 'U') IS NOT NULL DELETE FROM dbo.ProjectMembers;
 IF OBJECT_ID('dbo.Projects', 'U') IS NOT NULL DELETE FROM dbo.Projects;
 IF OBJECT_ID('dbo.TenantUsers', 'U') IS NOT NULL DELETE FROM dbo.TenantUsers;
 IF OBJECT_ID('dbo.Users', 'U') IS NOT NULL DELETE FROM dbo.Users;
@@ -146,6 +153,14 @@ VALUES
     2
 );
 SET IDENTITY_INSERT dbo.Projects OFF;
+GO
+
+INSERT INTO dbo.ProjectMembers
+    (TenantId, ProjectId, UserId, ProjectRole, Status, AddedByUserId)
+VALUES
+    (1, 1, 1, 'Owner', 'Active', 1),
+    (1, 2, 1, 'Owner', 'Active', 1),
+    (1, 3, 1, 'Owner', 'Active', 1);
 GO
 
 SET IDENTITY_INSERT dbo.ProjectChannels ON;

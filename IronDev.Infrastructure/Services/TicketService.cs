@@ -6,6 +6,7 @@ using Dapper;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.WorkItems;
 using IronDev.Data;
 using IronDev.Data.Models;
 
@@ -26,15 +27,18 @@ public sealed class TicketService : ITicketService
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly ICurrentTenantContext _tenant;
     private readonly IArtifactSourceReferenceService _artifactSourceReferenceService;
+    private readonly IWorkItemIdentityService _workItemIdentityService;
 
     public TicketService(
         IDbConnectionFactory connectionFactory,
         ICurrentTenantContext tenant,
-        IArtifactSourceReferenceService artifactSourceReferenceService)
+        IArtifactSourceReferenceService artifactSourceReferenceService,
+        IWorkItemIdentityService workItemIdentityService)
     {
         _connectionFactory = connectionFactory;
         _tenant = tenant;
         _artifactSourceReferenceService = artifactSourceReferenceService;
+        _workItemIdentityService = workItemIdentityService;
     }
 
     public async Task<long> SaveTicketAsync(ProjectTicket ticket, CancellationToken cancellationToken = default)
@@ -114,6 +118,7 @@ public sealed class TicketService : ITicketService
                 throw new System.InvalidOperationException("Ticket update failed or ticket not found/not owned.");
 
             await EnsureCreatedFromReferencesAsync(ticket, ticket.Id, cancellationToken);
+            await _workItemIdentityService.EnsureForTicketAsync(ticket, ticket.Id, cancellationToken);
             return ticket.Id;
         }
         else
@@ -175,6 +180,7 @@ public sealed class TicketService : ITicketService
                 cancellationToken: cancellationToken));
 
             await EnsureCreatedFromReferencesAsync(ticket, ticketId, cancellationToken);
+            await _workItemIdentityService.EnsureForTicketAsync(ticket, ticketId, cancellationToken);
             return ticketId;
         }
     }
@@ -232,6 +238,7 @@ public sealed class TicketService : ITicketService
         if (current is null) return new(TicketVersionedUpdateStatus.NotFound, null);
         if (affected == 0) return new(TicketVersionedUpdateStatus.StaleWrite, current);
         await EnsureCreatedFromReferencesAsync(ticket, ticket.Id, cancellationToken);
+        await _workItemIdentityService.EnsureForTicketAsync(current, ticket.Id, cancellationToken);
         return new(TicketVersionedUpdateStatus.Succeeded, current);
     }
 

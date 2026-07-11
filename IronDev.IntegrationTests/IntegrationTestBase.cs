@@ -13,6 +13,7 @@ using IronDev.Data;
 using IronDev.Services;
 using IronDev.AI;
 using IronDev.Core.Interfaces;
+using IronDev.Core.WorkItems;
 using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.Services;
 using IronDev.Infrastructure.Services.SemanticMemory;
@@ -88,6 +89,7 @@ public abstract class IntegrationTestBase
         services.AddScoped<IProjectMemoryMapService, ProjectMemoryMapService>();
         services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceReferenceService>();
         services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
+        services.AddScoped<IWorkItemIdentityService, WorkItemIdentityService>();
         services.AddScoped<ITicketService, TicketService>();
         services.AddScoped<ICodeIndexService, SqlCodeIndexService>();
         services.AddScoped<IPromptContextBuilder, PromptContextBuilder>();
@@ -302,6 +304,9 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.ProjectWorkItemActivity', 'U') IS NOT NULL DELETE FROM dbo.ProjectWorkItemActivity;
             IF OBJECT_ID('dbo.ProjectWorkItemFollowers', 'U') IS NOT NULL DELETE FROM dbo.ProjectWorkItemFollowers;
             IF OBJECT_ID('dbo.ProjectWorkItemCollaboration', 'U') IS NOT NULL DELETE FROM dbo.ProjectWorkItemCollaboration;
+            IF OBJECT_ID('dbo.WorkItems', 'U') IS NOT NULL UPDATE dbo.WorkItems SET CurrentContractId = NULL;
+            IF OBJECT_ID('dbo.WorkItemContracts', 'U') IS NOT NULL DELETE FROM dbo.WorkItemContracts;
+            IF OBJECT_ID('dbo.WorkItems', 'U') IS NOT NULL DELETE FROM dbo.WorkItems;
             IF OBJECT_ID('dbo.RunEvents', 'U') IS NOT NULL DELETE FROM dbo.RunEvents;
             IF OBJECT_ID('dbo.Runs', 'U') IS NOT NULL DELETE FROM dbo.Runs;
             IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DELETE FROM dbo.ArtifactSourceReferences;
@@ -331,6 +336,45 @@ public abstract class IntegrationTestBase
             """;
 
         await connection.ExecuteAsync(sql);
+        await ApplySqlFileAsync(connection, "Database", "migrate_work_item_identity.sql");
+    }
+
+    private static async Task ApplySqlFileAsync(SqlConnection connection, params string[] pathParts)
+    {
+        var sql = await File.ReadAllTextAsync(Path.Combine(RepositoryRoot(), Path.Combine(pathParts)));
+        AssertNoCatalogHijack(sql, pathParts[^1]);
+        foreach (var batch in SplitSqlBatches(sql))
+            await connection.ExecuteAsync(batch);
+    }
+
+    private static void AssertNoCatalogHijack(string sql, string fileName)
+    {
+        if (System.Text.RegularExpressions.Regex.IsMatch(sql, @"(?im)^\s*USE\s"))
+        {
+            throw new InvalidOperationException(
+                $"Refusing to apply migration '{fileName}': it contains a USE statement. " +
+                "Migrations applied by the test host must be catalog-agnostic.");
+        }
+    }
+
+    private static IReadOnlyList<string> SplitSqlBatches(string sql) =>
+        System.Text.RegularExpressions.Regex.Split(
+                sql.Replace("\r\n", "\n", StringComparison.Ordinal),
+                @"(?im)^\s*GO\s*$")
+            .Select(batch => batch.Trim())
+            .Where(batch => !string.IsNullOrWhiteSpace(batch))
+            .ToArray();
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
+            directory = directory.Parent;
+
+        if (directory is null)
+            throw new InvalidOperationException("Could not locate repository root.");
+
+        return directory.FullName;
     }
 
     private async Task AcquireDatabaseLockAsync()
