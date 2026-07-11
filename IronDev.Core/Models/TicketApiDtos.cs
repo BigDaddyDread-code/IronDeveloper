@@ -1,5 +1,16 @@
 namespace IronDev.Core.Models;
 
+public enum TicketVersionedUpdateStatus
+{
+    Succeeded = 0,
+    NotFound = 1,
+    StaleWrite = 2
+}
+
+public sealed record TicketVersionedUpdateResult(
+    TicketVersionedUpdateStatus Status,
+    IronDev.Data.Models.ProjectTicket? Ticket);
+
 public sealed class CreateProjectTicketRequest
 {
     public string Title { get; init; } = string.Empty;

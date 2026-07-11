@@ -27,9 +27,18 @@ public interface IProjectChannelMembershipService
         int actorUserId,
         string channelRole,
         string notificationLevel,
+        long expectedRevision,
         CancellationToken cancellationToken = default);
 
     Task<ProjectChannelMembershipMutationStatus> RemoveMembershipAsync(
+        int tenantId,
+        int projectId,
+        long channelId,
+        int userId,
+        long expectedRevision,
+        CancellationToken cancellationToken = default);
+
+    Task<ProjectChannelMembershipVersion?> GetMembershipAsync(
         int tenantId,
         int projectId,
         long channelId,

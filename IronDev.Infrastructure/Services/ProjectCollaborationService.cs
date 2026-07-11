@@ -161,6 +161,16 @@ public sealed class ProjectWorkItemCollaborationService : IProjectWorkItemCollab
         using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
         if (!await TicketExistsAsync(connection, transaction, tenantId, projectId, workItemId, cancellationToken))
             return new(ProjectWorkItemCollaborationMutationStatus.WorkItemNotFound);
+        var currentRevision = await connection.QuerySingleOrDefaultAsync<long?>(new CommandDefinition(
+            "SELECT Revision FROM dbo.ProjectWorkItemCollaboration WITH (UPDLOCK,HOLDLOCK) WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND WorkItemId=@WorkItemId;",
+            new { TenantId = tenantId, ProjectId = projectId, WorkItemId = workItemId },
+            transaction,
+            cancellationToken: cancellationToken)) ?? 0;
+        if (currentRevision != request.ExpectedRevision)
+        {
+            transaction.Rollback();
+            return new(ProjectWorkItemCollaborationMutationStatus.StaleWrite, await ReadAsync(connection, tenantId, projectId, workItemId, cancellationToken));
+        }
         var userIds = request.FollowerUserIds.Append(request.AssigneeUserId ?? 0).Append(request.WaitingOnUserId ?? 0).Where(id => id > 0).Distinct().ToArray();
         if (userIds.Length > 0)
         {
@@ -168,18 +178,21 @@ public sealed class ProjectWorkItemCollaborationService : IProjectWorkItemCollab
             if (validCount != userIds.Length) return new(ProjectWorkItemCollaborationMutationStatus.CollaboratorNotProjectMember);
         }
 
-        const string upsert = """
+        const string update = """
             UPDATE dbo.ProjectWorkItemCollaboration
             SET AssigneeUserId=@AssigneeUserId, WaitingOnUserId=@WaitingOnUserId, WaitingOnKind=@WaitingOnKind,
                 WaitingOnLabel=@WaitingOnLabel, Revision=Revision+1, UpdatedByUserId=@ActorUserId, UpdatedUtc=SYSUTCDATETIME()
-            WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND WorkItemId=@WorkItemId;
-            IF @@ROWCOUNT=0
-                INSERT INTO dbo.ProjectWorkItemCollaboration (TenantId,ProjectId,WorkItemId,AssigneeUserId,WaitingOnUserId,WaitingOnKind,WaitingOnLabel,Revision,UpdatedByUserId)
-                VALUES (@TenantId,@ProjectId,@WorkItemId,@AssigneeUserId,@WaitingOnUserId,@WaitingOnKind,@WaitingOnLabel,1,@ActorUserId);
+            WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND WorkItemId=@WorkItemId AND Revision=@ExpectedRevision;
             DELETE FROM dbo.ProjectWorkItemFollowers WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND WorkItemId=@WorkItemId;
             """;
-        var args = new { TenantId = tenantId, ProjectId = projectId, WorkItemId = workItemId, request.AssigneeUserId, request.WaitingOnUserId, WaitingOnKind = TextOrNull(request.WaitingOnKind), WaitingOnLabel = TextOrNull(request.WaitingOnLabel), ActorUserId = actorUserId };
-        await connection.ExecuteAsync(new CommandDefinition(upsert, args, transaction, cancellationToken: cancellationToken));
+        const string insert = """
+            INSERT INTO dbo.ProjectWorkItemCollaboration (TenantId,ProjectId,WorkItemId,AssigneeUserId,WaitingOnUserId,WaitingOnKind,WaitingOnLabel,Revision,UpdatedByUserId)
+            VALUES (@TenantId,@ProjectId,@WorkItemId,@AssigneeUserId,@WaitingOnUserId,@WaitingOnKind,@WaitingOnLabel,1,@ActorUserId);
+            """;
+        var args = new { TenantId = tenantId, ProjectId = projectId, WorkItemId = workItemId, request.AssigneeUserId, request.WaitingOnUserId, WaitingOnKind = TextOrNull(request.WaitingOnKind), WaitingOnLabel = TextOrNull(request.WaitingOnLabel), ActorUserId = actorUserId, request.ExpectedRevision };
+        await connection.ExecuteAsync(new CommandDefinition(currentRevision == 0 ? insert : update, args, transaction, cancellationToken: cancellationToken));
+        if (currentRevision == 0)
+            await connection.ExecuteAsync(new CommandDefinition("DELETE FROM dbo.ProjectWorkItemFollowers WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND WorkItemId=@WorkItemId;", args, transaction, cancellationToken: cancellationToken));
         foreach (var followerId in request.FollowerUserIds.Distinct())
             await connection.ExecuteAsync(new CommandDefinition("INSERT INTO dbo.ProjectWorkItemFollowers (TenantId,ProjectId,WorkItemId,UserId,AddedByUserId) VALUES (@TenantId,@ProjectId,@WorkItemId,@UserId,@ActorUserId);", new { TenantId = tenantId, ProjectId = projectId, WorkItemId = workItemId, UserId = followerId, ActorUserId = actorUserId }, transaction, cancellationToken: cancellationToken));
         await connection.ExecuteAsync(new CommandDefinition("INSERT INTO dbo.ProjectWorkItemActivity (TenantId,ProjectId,WorkItemId,EventKind,Summary,ActorUserId) VALUES (@TenantId,@ProjectId,@WorkItemId,N'CollaborationChanged',N'Work Item ownership and attention were updated.',@ActorUserId);", args, transaction, cancellationToken: cancellationToken));

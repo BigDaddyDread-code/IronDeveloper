@@ -7674,6 +7674,14 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "expectedRevision",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
           }
         ],
         "responses": {
@@ -23542,6 +23550,10 @@
           "notificationLevel": {
             "type": "string",
             "nullable": true
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -24805,6 +24817,10 @@
         "type": "object",
         "properties": {
           "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revision": {
             "type": "integer",
             "format": "int64"
           },
@@ -28625,6 +28641,10 @@
           "notificationLevel": {
             "type": "string",
             "nullable": true
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -28642,6 +28662,10 @@
       "SetProjectWorkItemCollaborationRequest": {
         "type": "object",
         "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
           "assigneeUserId": {
             "type": "integer",
             "format": "int32",

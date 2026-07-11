@@ -408,8 +408,9 @@ class IronDevApiClient {
   }
 
   async saveProjectTicket(projectId: number, ticket: ProjectTicket, signal?: AbortSignal): Promise<ProjectTicket> {
-    return this.request<ProjectTicket>(`/api/projects/${projectId}/tickets/legacy`, {
-      method: 'POST',
+    const ticketId = ticket.id ?? 0;
+    return this.request<ProjectTicket>(ticketId > 0 ? `/api/projects/${projectId}/tickets/${ticketId}` : `/api/projects/${projectId}/tickets/legacy`, {
+      method: ticketId > 0 ? 'PATCH' : 'POST',
       body: ticket,
       signal
     });
@@ -547,8 +548,8 @@ class IronDevApiClient {
     });
   }
 
-  async removeProjectChannelMembership(projectId: number, channelId: number, userId: number): Promise<void> {
-    await this.request(`/api/projects/${projectId}/channels/${channelId}/members/${userId}`, {
+  async removeProjectChannelMembership(projectId: number, channelId: number, userId: number, expectedRevision: number): Promise<void> {
+    await this.request(`/api/projects/${projectId}/channels/${channelId}/members/${userId}?expectedRevision=${expectedRevision}`, {
       method: 'DELETE'
     });
   }
@@ -1375,7 +1376,7 @@ function normalizeSkeletonAgentRole(role: string | number): string {
 }
 
 interface RequestOptions {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   rawBody?: BodyInit;
   signal?: AbortSignal;

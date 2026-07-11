@@ -29,6 +29,7 @@ interface TicketEditFormProps {
   onChange: (draft: TicketEditDraft) => void;
   onSave: () => void;
   onCancel: () => void;
+  onReloadAndCompare: () => void;
 }
 
 export function TicketEditForm({
@@ -40,7 +41,8 @@ export function TicketEditForm({
   blockedReason,
   onChange,
   onSave,
-  onCancel
+  onCancel,
+  onReloadAndCompare
 }: TicketEditFormProps) {
   const isSaving = status === 'saving';
   const isBlocked = Boolean(blockedReason);
@@ -91,6 +93,9 @@ export function TicketEditForm({
         )}
         {status === 'saved' ? <p className="state-success" data-testid="ticket.edit.success">{message}</p> : null}
         {status === 'error' ? <p className="state-error" data-testid="ticket.edit.error">{message}</p> : null}
+        {status === 'error' && message.startsWith('Stale write refused') ? (
+          <CommandButton type="button" variant="subtle" testId="ticket.edit.reloadConflict" onClick={onReloadAndCompare}>Reload and compare</CommandButton>
+        ) : null}
       </div>
 
       <div className="ticket-edit__form">

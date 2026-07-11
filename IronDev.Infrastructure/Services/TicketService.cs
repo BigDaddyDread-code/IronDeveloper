@@ -14,6 +14,8 @@ namespace IronDev.Services;
 public interface ITicketService
 {
     Task<long> SaveTicketAsync(ProjectTicket ticket, CancellationToken cancellationToken = default);
+    Task<TicketVersionedUpdateResult> UpdateTicketIfCurrentAsync(ProjectTicket ticket, long expectedRevision, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new TicketVersionedUpdateResult(TicketVersionedUpdateStatus.NotFound, null));
     Task<IReadOnlyList<ProjectTicket>> GetRecentTicketsAsync(int projectId, int take = 10, CancellationToken cancellationToken = default);
     Task<ProjectTicket?> GetTicketByIdAsync(long ticketId, CancellationToken cancellationToken = default);
     Task<bool> ArchiveTicketAsync(long ticketId, CancellationToken cancellationToken = default);
@@ -68,7 +70,8 @@ public sealed class TicketService : ITicketService
                     IsGenerated = @IsGenerated, GenerationNote = @GenerationNote,
                     SourceChatSessionId = @SourceChatSessionId,
                     SourceChatMessageId = @SourceChatMessageId,
-                    SourceDocumentVersionId = @SourceDocumentVersionId
+                    SourceDocumentVersionId = @SourceDocumentVersionId,
+                    Revision = Revision + 1
                 WHERE Id = @Id AND TenantId = @TenantId AND ProjectId = @ProjectId;
                 """;
 
@@ -176,11 +179,67 @@ public sealed class TicketService : ITicketService
         }
     }
 
+    public async Task<TicketVersionedUpdateResult> UpdateTicketIfCurrentAsync(ProjectTicket ticket, long expectedRevision, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE dbo.ProjectTickets
+            SET Title=@Title, TicketType=@TicketType, Priority=@Priority, Summary=@Summary, Background=@Background,
+                Problem=@Problem, AcceptanceCriteria=@AcceptanceCriteria, TechnicalNotes=@TechnicalNotes, Status=@Status,
+                Content=@Content, LinkedFilePaths=@LinkedFilePaths, LinkedCodeIndexEntryIds=@LinkedCodeIndexEntryIds,
+                LinkedSymbols=@LinkedSymbols, BlockedByTicketIds=@BlockedByTicketIds, UnitTests=@UnitTests,
+                IntegrationTests=@IntegrationTests, ManualTests=@ManualTests, RegressionTests=@RegressionTests,
+                BuildValidation=@BuildValidation, ContextSummary=@ContextSummary, IsGenerated=@IsGenerated,
+                GenerationNote=@GenerationNote, SourceChatSessionId=@SourceChatSessionId,
+                SourceChatMessageId=@SourceChatMessageId, SourceDocumentVersionId=@SourceDocumentVersionId,
+                Revision=Revision+1
+            WHERE Id=@Id AND TenantId=@TenantId AND ProjectId=@ProjectId AND IsDeleted=0 AND Revision=@ExpectedRevision;
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        await EnsureTicketSchemaAsync(connection, cancellationToken);
+        var affected = await connection.ExecuteAsync(new CommandDefinition(sql, new
+        {
+            ticket.Id,
+            TenantId = _tenant.TenantId,
+            ticket.ProjectId,
+            ticket.Title,
+            ticket.TicketType,
+            ticket.Priority,
+            ticket.Summary,
+            ticket.Background,
+            ticket.Problem,
+            ticket.AcceptanceCriteria,
+            ticket.TechnicalNotes,
+            ticket.Status,
+            ticket.Content,
+            ticket.LinkedFilePaths,
+            ticket.LinkedCodeIndexEntryIds,
+            ticket.LinkedSymbols,
+            ticket.BlockedByTicketIds,
+            ticket.UnitTests,
+            ticket.IntegrationTests,
+            ticket.ManualTests,
+            ticket.RegressionTests,
+            ticket.BuildValidation,
+            ticket.ContextSummary,
+            ticket.IsGenerated,
+            ticket.GenerationNote,
+            ticket.SourceChatSessionId,
+            ticket.SourceChatMessageId,
+            ticket.SourceDocumentVersionId,
+            ExpectedRevision = expectedRevision
+        }, cancellationToken: cancellationToken));
+        var current = await GetTicketByIdAsync(ticket.Id, cancellationToken);
+        if (current is null) return new(TicketVersionedUpdateStatus.NotFound, null);
+        if (affected == 0) return new(TicketVersionedUpdateStatus.StaleWrite, current);
+        await EnsureCreatedFromReferencesAsync(ticket, ticket.Id, cancellationToken);
+        return new(TicketVersionedUpdateStatus.Succeeded, current);
+    }
+
     public async Task<IReadOnlyList<ProjectTicket>> GetRecentTicketsAsync(int projectId, int take = 10, CancellationToken cancellationToken = default)
     {
         const string sql = """
             SELECT TOP (@Take)
-                Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
+                Id, Revision, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
                 Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
                 BlockedByTicketIds,
@@ -209,7 +268,7 @@ public sealed class TicketService : ITicketService
     {
         const string sql = """
             SELECT
-                Id, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
+                Id, Revision, TenantId, ProjectId, SessionId, Title, TicketType, Priority,
                 Summary, Background, Problem, AcceptanceCriteria, TechnicalNotes,
                 Status, Content, LinkedFilePaths, LinkedCodeIndexEntryIds, LinkedSymbols,
                 BlockedByTicketIds,
@@ -270,6 +329,11 @@ public sealed class TicketService : ITicketService
             IF COL_LENGTH('dbo.ProjectTickets', 'BlockedByTicketIds') IS NULL
             BEGIN
                 ALTER TABLE dbo.ProjectTickets ADD BlockedByTicketIds NVARCHAR(MAX) NULL;
+            END
+
+            IF COL_LENGTH('dbo.ProjectTickets', 'Revision') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ProjectTickets ADD Revision BIGINT NOT NULL CONSTRAINT DF_ProjectTickets_Revision DEFAULT 1;
             END
             """;
 

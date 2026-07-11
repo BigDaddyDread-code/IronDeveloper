@@ -16,7 +16,7 @@ interface MembersScreenProps {
 }
 
 type MemberLoadState = 'loading' | 'ready' | 'empty' | 'notFound' | 'unavailable';
-type ChannelMembershipDraft = { channelRole: string; notificationLevel: string };
+type ChannelMembershipDraft = { channelRole: string; notificationLevel: string; expectedRevision: number };
 type ChannelAddDraft = ChannelMembershipDraft & { userId: string };
 
 export function MembersScreen({ projectId }: MembersScreenProps) {
@@ -48,13 +48,15 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
     setChannelDrafts(Object.fromEntries(loaded.channels.flatMap((channel) =>
       channel.members.map((member) => [channelDraftKey(channel.channelId, member.userId), {
         channelRole: member.channelRole,
-        notificationLevel: member.notificationLevel
+        notificationLevel: member.notificationLevel,
+        expectedRevision: member.revision
       }])
     )));
     setChannelAddDrafts(Object.fromEntries(loaded.channels.map((channel) => [channel.channelId, {
       userId: '',
       channelRole: 'Member',
-      notificationLevel: 'Mentions'
+      notificationLevel: 'Mentions',
+      expectedRevision: 0
     }])));
     setLoadState(loaded.members.length === 0 ? 'empty' : 'ready');
   }, []);
@@ -96,18 +98,20 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
       setNotice(success);
       return true;
     } catch (error) {
+      const staleWrite = isStaleWrite(error);
       setMutationError(
         mutationAccepted
           ? 'The backend accepted the change, but the member directory could not be reloaded. Reload Members before making another change.'
           : describeError(error, 'The membership change was not applied.')
       );
-      if (directory) {
+      if (directory && !staleWrite) {
         setRoleDrafts(Object.fromEntries(directory.members.map((member) => [member.userId, member.tenantRole])));
         setProjectRoleDrafts(Object.fromEntries(directory.members.map((member) => [member.userId, member.projectRole ?? 'Viewer'])));
         setChannelDrafts(Object.fromEntries(directory.channels.flatMap((channel) =>
           channel.members.map((member) => [channelDraftKey(channel.channelId, member.userId), {
             channelRole: member.channelRole,
-            notificationLevel: member.notificationLevel
+            notificationLevel: member.notificationLevel,
+            expectedRevision: member.revision
           }])
         )));
       }
@@ -244,7 +248,8 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
       `channel-add-${channel.channelId}`,
       () => session.client.setProjectChannelMembership(projectId, channel.channelId, userId, {
         channelRole: draft.channelRole,
-        notificationLevel: draft.notificationLevel
+        notificationLevel: draft.notificationLevel,
+        expectedRevision: 0
       }),
       `${memberName(directory, userId)} was added to ${channel.name}.`
     );
@@ -254,7 +259,12 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
     if (!channelRemoval) return;
     const removed = await runMutation(
       `channel-remove-${channelRemoval.channel.channelId}-${channelRemoval.member.userId}`,
-      () => session.client.removeProjectChannelMembership(projectId, channelRemoval.channel.channelId, channelRemoval.member.userId),
+      () => session.client.removeProjectChannelMembership(
+        projectId,
+        channelRemoval.channel.channelId,
+        channelRemoval.member.userId,
+        channelRemoval.channel.members.find((membership) => membership.userId === channelRemoval.member.userId)?.revision ?? 0
+      ),
       `${channelRemoval.member.displayName} was removed from ${channelRemoval.channel.name}.`
     );
     if (removed) setChannelRemoveCandidate(null);
@@ -321,6 +331,9 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
       ) : null}
 
       {mutationError ? <div className="fl-error" role="alert" data-testid="flow.members.error">{mutationError}</div> : null}
+      {mutationError.startsWith('Stale write refused') ? (
+        <button className="fl-btn" type="button" onClick={() => setReloadKey((current) => current + 1)} data-testid="flow.members.conflict.reload">Reload and compare</button>
+      ) : null}
       {notice ? <div className="fl-member-notice" role="status" data-testid="flow.members.notice">{notice}</div> : null}
 
       {loadState === 'empty' ? (
@@ -382,7 +395,7 @@ export function MembersScreen({ projectId }: MembersScreenProps) {
                 roles={directory.availableChannelRoles}
                 notificationLevels={directory.availableNotificationLevels}
                 drafts={channelDrafts}
-                addDraft={channelAddDrafts[channel.channelId] ?? { userId: '', channelRole: 'Member', notificationLevel: 'Mentions' }}
+                addDraft={channelAddDrafts[channel.channelId] ?? { userId: '', channelRole: 'Member', notificationLevel: 'Mentions', expectedRevision: 0 }}
                 busyAction={busyAction}
                 onDraftChange={(userId, draft) => setChannelDrafts((current) => ({
                   ...current,
@@ -664,8 +677,13 @@ function initials(name: string) {
 
 function describeError(error: unknown, fallback: string) {
   if (error instanceof IronDevApiError) {
-    const body = error.body as { error?: string; message?: string } | null | undefined;
+    const body = error.body as { error?: string; message?: string; code?: string; expectedRevision?: number; currentRevision?: number; nextSafeAction?: string } | null | undefined;
+    if (body?.code === 'StaleWrite') return `Stale write refused. Attempted version ${body.expectedRevision}; current version ${body.currentRevision}. ${body.nextSafeAction ?? 'Reload and compare.'}`;
     return body?.error ?? body?.message ?? `${fallback} HTTP ${error.status}.`;
   }
   return error instanceof Error ? error.message : fallback;
+}
+
+function isStaleWrite(error: unknown) {
+  return error instanceof IronDevApiError && error.status === 409 && (error.body as { code?: string } | null)?.code === 'StaleWrite';
 }

@@ -52,6 +52,12 @@ public sealed class ProjectWorkItemsController : ControllerBase
         return result.Status switch
         {
             ProjectWorkItemCollaborationMutationStatus.Succeeded => Ok(result.Collaboration),
+            ProjectWorkItemCollaborationMutationStatus.StaleWrite => Conflict(new CollaborationWriteConflictResponse(
+                CollaborationWriteConflictResponse.StaleWriteCode,
+                request.ExpectedRevision,
+                result.Collaboration?.Revision ?? 0,
+                result.Collaboration,
+                "Reload the Work Item, compare current ownership with your attempted change, then submit again from the new revision.")),
             ProjectWorkItemCollaborationMutationStatus.CollaboratorNotProjectMember => Conflict(new { error = "Assignees, followers, and named waiting-on users must be active project members." }),
             _ => NotFound()
         };

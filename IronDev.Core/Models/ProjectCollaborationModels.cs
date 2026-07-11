@@ -56,6 +56,7 @@ public sealed record ProjectWorkItemCollaborationActivity(
 
 public sealed record SetProjectWorkItemCollaborationRequest
 {
+    public long ExpectedRevision { get; init; }
     public int? AssigneeUserId { get; init; }
     public IReadOnlyList<int> FollowerUserIds { get; init; } = [];
     public int? WaitingOnUserId { get; init; }
@@ -67,9 +68,20 @@ public enum ProjectWorkItemCollaborationMutationStatus
 {
     Succeeded = 0,
     WorkItemNotFound = 1,
-    CollaboratorNotProjectMember = 2
+    CollaboratorNotProjectMember = 2,
+    StaleWrite = 3
 }
 
 public sealed record ProjectWorkItemCollaborationMutationResult(
     ProjectWorkItemCollaborationMutationStatus Status,
     ProjectWorkItemCollaborationSnapshot? Collaboration = null);
+
+public sealed record CollaborationWriteConflictResponse(
+    string Code,
+    long ExpectedRevision,
+    long CurrentRevision,
+    object? CurrentState,
+    string NextSafeAction)
+{
+    public const string StaleWriteCode = "StaleWrite";
+}

@@ -39,7 +39,7 @@ public sealed class ProjectChannelMembersController : ControllerBase
         _logger = logger;
     }
 
-    public sealed record SetProjectChannelMembershipRequest(string ChannelRole, string NotificationLevel);
+    public sealed record SetProjectChannelMembershipRequest(string ChannelRole, string NotificationLevel, long ExpectedRevision);
 
     [HttpPut("{userId:int}")]
     public async Task<IActionResult> SetMembership(
@@ -71,7 +71,10 @@ public sealed class ProjectChannelMembersController : ControllerBase
             context.UserId,
             ProjectChannelRoles.All.First(role => role.Equals(request.ChannelRole, StringComparison.OrdinalIgnoreCase)),
             ProjectChannelNotificationLevels.Values.First(level => level.Equals(request.NotificationLevel, StringComparison.OrdinalIgnoreCase)),
+            request.ExpectedRevision,
             cancellationToken);
+        if (status == ProjectChannelMembershipMutationStatus.StaleWrite)
+            return await StaleWriteAsync(project.TenantId, project.Id, channelId, userId, request.ExpectedRevision, cancellationToken);
         var failure = MapFailure(status);
         if (failure is not null)
             return failure;
@@ -87,6 +90,7 @@ public sealed class ProjectChannelMembersController : ControllerBase
         int projectId,
         long channelId,
         int userId,
+        [FromQuery] long expectedRevision,
         CancellationToken cancellationToken)
     {
         var context = CurrentUser();
@@ -103,7 +107,10 @@ public sealed class ProjectChannelMembersController : ControllerBase
             project.Id,
             channelId,
             userId,
+            expectedRevision,
             cancellationToken);
+        if (status == ProjectChannelMembershipMutationStatus.StaleWrite)
+            return await StaleWriteAsync(project.TenantId, project.Id, channelId, userId, expectedRevision, cancellationToken);
         var failure = MapFailure(status);
         if (failure is not null)
             return failure;
@@ -122,6 +129,23 @@ public sealed class ProjectChannelMembersController : ControllerBase
         ProjectChannelMembershipMutationStatus.LastOwnerProtected => Conflict(new { error = "The channel's last owner cannot be demoted or removed." }),
         _ => null
     };
+
+    private async Task<IActionResult> StaleWriteAsync(
+        int tenantId,
+        int projectId,
+        long channelId,
+        int userId,
+        long expectedRevision,
+        CancellationToken cancellationToken)
+    {
+        var current = await _memberships.GetMembershipAsync(tenantId, projectId, channelId, userId, cancellationToken);
+        return Conflict(new CollaborationWriteConflictResponse(
+            CollaborationWriteConflictResponse.StaleWriteCode,
+            expectedRevision,
+            current?.Revision ?? 0,
+            current,
+            "Reload the member directory, compare the current membership with your attempted change, then submit again from the new revision."));
+    }
 
     private async Task<IActionResult> DenyAsync(
         CurrentUserContext context,

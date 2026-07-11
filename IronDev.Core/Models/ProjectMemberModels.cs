@@ -43,7 +43,8 @@ public sealed record ProjectChannelDirectoryEntry(
 public sealed record ProjectChannelMembershipEntry(
     int UserId,
     string ChannelRole,
-    string NotificationLevel);
+    string NotificationLevel,
+    long Revision);
 
 public enum ProjectChannelMembershipMutationStatus
 {
@@ -51,5 +52,12 @@ public enum ProjectChannelMembershipMutationStatus
     ChannelNotFound = 1,
     TargetUserNotTenantMember = 2,
     MembershipNotFound = 3,
-    LastOwnerProtected = 4
+    LastOwnerProtected = 4,
+    StaleWrite = 5
 }
+
+public sealed record ProjectChannelMembershipVersion(
+    int UserId,
+    string ChannelRole,
+    string NotificationLevel,
+    long Revision);

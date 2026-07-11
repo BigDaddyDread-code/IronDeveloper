@@ -53,7 +53,7 @@ public sealed class ProjectChannelMembershipService : IProjectChannelMembershipS
             return [];
 
         const string memberSql = """
-            SELECT ChannelId, UserId, ChannelRole, NotificationLevel
+            SELECT ChannelId, UserId, ChannelRole, NotificationLevel, Revision
             FROM dbo.ProjectChannelMembers
             WHERE TenantId = @TenantId
               AND ProjectId = @ProjectId
@@ -79,7 +79,8 @@ public sealed class ProjectChannelMembershipService : IProjectChannelMembershipS
                 members.Select(member => new IronDev.Core.Models.ProjectChannelMembershipEntry(
                     member.UserId,
                     member.ChannelRole,
-                    member.NotificationLevel)).ToArray(),
+                    member.NotificationLevel,
+                    member.Revision)).ToArray(),
                 channel.Boundary);
         }).ToArray();
     }
@@ -92,6 +93,7 @@ public sealed class ProjectChannelMembershipService : IProjectChannelMembershipS
         int actorUserId,
         string channelRole,
         string notificationLevel,
+        long expectedRevision,
         CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
@@ -104,33 +106,36 @@ public sealed class ProjectChannelMembershipService : IProjectChannelMembershipS
             return scopeStatus;
 
         const string currentSql = """
-            SELECT TOP (1) ChannelRole
+            SELECT TOP (1) ChannelRole, Revision
             FROM dbo.ProjectChannelMembers WITH (UPDLOCK, HOLDLOCK)
             WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND ChannelId = @ChannelId
               AND UserId = @UserId AND Status = 'Active';
             """;
-        var currentRole = await connection.QuerySingleOrDefaultAsync<string>(new CommandDefinition(
+        var current = await connection.QuerySingleOrDefaultAsync<MembershipVersionRow>(new CommandDefinition(
             currentSql,
             new { TenantId = tenantId, ProjectId = projectId, ChannelId = channelId, UserId = userId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-        if (string.Equals(currentRole, ProjectChannelRoles.Owner, StringComparison.OrdinalIgnoreCase) &&
+        if ((current is null && expectedRevision != 0) || (current is not null && current.Revision != expectedRevision))
+            return ProjectChannelMembershipMutationStatus.StaleWrite;
+
+        if (string.Equals(current?.ChannelRole, ProjectChannelRoles.Owner, StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(channelRole, ProjectChannelRoles.Owner, StringComparison.OrdinalIgnoreCase) &&
             await IsLastOwnerAsync(connection, transaction, tenantId, projectId, channelId, cancellationToken).ConfigureAwait(false))
             return ProjectChannelMembershipMutationStatus.LastOwnerProtected;
 
-        if (currentRole is not null)
+        if (current is not null)
         {
             const string updateSql = """
                 UPDATE dbo.ProjectChannelMembers
-                SET ChannelRole = @ChannelRole, NotificationLevel = @NotificationLevel
+                SET ChannelRole = @ChannelRole, NotificationLevel = @NotificationLevel, Revision = Revision + 1
                 WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND ChannelId = @ChannelId
-                  AND UserId = @UserId AND Status = 'Active';
+                  AND UserId = @UserId AND Status = 'Active' AND Revision = @ExpectedRevision;
                 """;
             await connection.ExecuteAsync(new CommandDefinition(
                 updateSql,
-                new { TenantId = tenantId, ProjectId = projectId, ChannelId = channelId, UserId = userId, ChannelRole = channelRole, NotificationLevel = notificationLevel },
+                new { TenantId = tenantId, ProjectId = projectId, ChannelId = channelId, UserId = userId, ChannelRole = channelRole, NotificationLevel = notificationLevel, ExpectedRevision = expectedRevision },
                 transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
@@ -158,6 +163,7 @@ public sealed class ProjectChannelMembershipService : IProjectChannelMembershipS
         int projectId,
         long channelId,
         int userId,
+        long expectedRevision,
         CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
@@ -170,36 +176,58 @@ public sealed class ProjectChannelMembershipService : IProjectChannelMembershipS
             return scopeStatus;
 
         const string currentSql = """
-            SELECT TOP (1) ChannelRole
+            SELECT TOP (1) ChannelRole, Revision
             FROM dbo.ProjectChannelMembers WITH (UPDLOCK, HOLDLOCK)
             WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND ChannelId = @ChannelId
               AND UserId = @UserId AND Status = 'Active';
             """;
-        var currentRole = await connection.QuerySingleOrDefaultAsync<string>(new CommandDefinition(
+        var current = await connection.QuerySingleOrDefaultAsync<MembershipVersionRow>(new CommandDefinition(
             currentSql,
             new { TenantId = tenantId, ProjectId = projectId, ChannelId = channelId, UserId = userId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
-        if (currentRole is null)
+        if (current is null)
             return ProjectChannelMembershipMutationStatus.MembershipNotFound;
 
-        if (string.Equals(currentRole, ProjectChannelRoles.Owner, StringComparison.OrdinalIgnoreCase) &&
+        if (current.Revision != expectedRevision)
+            return ProjectChannelMembershipMutationStatus.StaleWrite;
+
+        if (string.Equals(current.ChannelRole, ProjectChannelRoles.Owner, StringComparison.OrdinalIgnoreCase) &&
             await IsLastOwnerAsync(connection, transaction, tenantId, projectId, channelId, cancellationToken).ConfigureAwait(false))
             return ProjectChannelMembershipMutationStatus.LastOwnerProtected;
 
         const string removeSql = """
             UPDATE dbo.ProjectChannelMembers
-            SET Status = 'Removed', RemovedUtc = SYSUTCDATETIME()
+            SET Status = 'Removed', RemovedUtc = SYSUTCDATETIME(), Revision = Revision + 1
             WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND ChannelId = @ChannelId
-              AND UserId = @UserId AND Status = 'Active';
+              AND UserId = @UserId AND Status = 'Active' AND Revision = @ExpectedRevision;
             """;
         await connection.ExecuteAsync(new CommandDefinition(
             removeSql,
-            new { TenantId = tenantId, ProjectId = projectId, ChannelId = channelId, UserId = userId },
+            new { TenantId = tenantId, ProjectId = projectId, ChannelId = channelId, UserId = userId, ExpectedRevision = expectedRevision },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         transaction.Commit();
         return ProjectChannelMembershipMutationStatus.Succeeded;
+    }
+
+    public async Task<ProjectChannelMembershipVersion?> GetMembershipAsync(
+        int tenantId,
+        int projectId,
+        long channelId,
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT UserId, ChannelRole, NotificationLevel, Revision
+            FROM dbo.ProjectChannelMembers
+            WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND ChannelId=@ChannelId AND UserId=@UserId AND Status='Active';
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        return await connection.QuerySingleOrDefaultAsync<ProjectChannelMembershipVersion>(new CommandDefinition(
+            sql,
+            new { TenantId = tenantId, ProjectId = projectId, ChannelId = channelId, UserId = userId },
+            cancellationToken: cancellationToken));
     }
 
     private static async Task<ProjectChannelMembershipMutationStatus> ValidateScopeAsync(
@@ -277,5 +305,12 @@ public sealed class ProjectChannelMembershipService : IProjectChannelMembershipS
         public int UserId { get; init; }
         public string ChannelRole { get; init; } = ProjectChannelRoles.Member;
         public string NotificationLevel { get; init; } = ProjectChannelNotificationLevels.Mentions;
+        public long Revision { get; init; }
+    }
+
+    private sealed class MembershipVersionRow
+    {
+        public string ChannelRole { get; init; } = string.Empty;
+        public long Revision { get; init; }
     }
 }

@@ -181,7 +181,35 @@ test('Work Item ownership saves assignee, followers, waiting-on, and attributed 
   await expect(page.getByTestId('flow.workItem.collaboration')).toContainText('Alice Reviewer');
   await expect(page.getByTestId('flow.workItem.collaboration')).toContainText('Approver');
   await expect(page.getByTestId('flow.workItem.collaboration')).toContainText('Bob Developer');
-  expect(savedBody).toMatchObject({ assigneeUserId: 8, followerUserIds: [7], waitingOnKind: 'Role', waitingOnLabel: 'Approver' });
+  expect(savedBody).toMatchObject({ expectedRevision: 0, assigneeUserId: 8, followerUserIds: [7], waitingOnKind: 'Role', waitingOnLabel: 'Approver' });
+});
+
+test('stale Work Item assignment preserves the attempted edit and offers reload and compare', async ({ page }) => {
+  await mockWorkspace(page);
+  let concurrentWrite = false;
+  await mockProjectWorkItem(page, () => ({
+    collaboration: concurrentWrite ? {
+      revision: 1,
+      assignee: { kind: 'Human', userId: 7, displayName: 'Bob Developer' },
+      followers: [],
+      waitingOn: null,
+      linkedChatSessionId: null,
+      recentActivity: []
+    } : undefined
+  }));
+  await page.route('**/irondev-api/api/projects/7/work-items/42/collaboration', (route) => {
+    concurrentWrite = true;
+    return json(route, { code: 'StaleWrite', expectedRevision: 0, currentRevision: 1, currentState: {}, nextSafeAction: 'Reload the Work Item, compare current ownership with your attempted change, then submit again from the new revision.' }, 409);
+  });
+
+  await page.goto('/projects/7/work-items/42');
+  await page.getByTestId('flow.workItem.collaboration.edit').click();
+  await page.getByTestId('flow.workItem.collaboration.form').getByLabel('Assignee').selectOption('8');
+  await page.getByTestId('flow.workItem.collaboration.save').click();
+
+  await expect(page.getByTestId('flow.workItem.collaboration.form')).toContainText('Attempted version 0; current version 1');
+  await page.getByTestId('flow.workItem.collaboration.reload').click();
+  await expect(page.getByTestId('flow.workItem.collaboration')).toContainText('Bob Developer');
 });
 
 async function mockWorkspace(page: Page) {

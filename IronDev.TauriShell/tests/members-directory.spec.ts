@@ -69,6 +69,19 @@ test('the last channel owner refusal restores backend membership truth', async (
   await expect(page.getByTestId('flow.members.notice')).toHaveCount(0);
 });
 
+test('stale channel membership write is refused with reload and compare', async ({ page }) => {
+  await mockMembersWorkspace(page, { staleChannelWrite: true });
+  await page.goto('/projects/7/library/members');
+
+  await page.getByTestId('flow.members.channel.101.role.8').selectOption('Moderator');
+  await page.getByTestId('flow.members.channel.101.save.8').click();
+
+  await expect(page.getByTestId('flow.members.error')).toContainText('Attempted version 1; current version 2');
+  await expect(page.getByTestId('flow.members.conflict.reload')).toBeVisible();
+  await page.getByTestId('flow.members.conflict.reload').click();
+  await expect(page.getByTestId('flow.members.channel.101.role.8')).toHaveValue('Owner');
+});
+
 test('an eligible owner adds a tenant member through an explicit form', async ({ page }) => {
   const state = await mockMembersWorkspace(page);
   await page.goto('/projects/7/library/members');
@@ -196,6 +209,7 @@ interface MembersMockOptions {
   refuseLastOwnerDemotion?: boolean;
   failRefreshAfterMutation?: boolean;
   refuseLastChannelOwnerChange?: boolean;
+  staleChannelWrite?: boolean;
 }
 
 interface MembersMockState {
@@ -262,8 +276,8 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       visibility: 'Project',
       memberCount: 2,
       members: [
-        { userId: 7, channelRole: 'Owner', notificationLevel: 'All' },
-        { userId: 8, channelRole: 'Member', notificationLevel: 'Mentions' }
+        { userId: 7, channelRole: 'Owner', notificationLevel: 'All', revision: 1 },
+        { userId: 8, channelRole: 'Member', notificationLevel: 'Mentions', revision: 1 }
       ],
       boundary: 'Channel membership controls visibility and moderation only.'
     },
@@ -274,7 +288,7 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
       channelKind: 'Custom',
       visibility: 'MembersOnly',
       memberCount: 1,
-      members: [{ userId: 7, channelRole: 'Owner', notificationLevel: 'Mentions' }],
+      members: [{ userId: 7, channelRole: 'Owner', notificationLevel: 'Mentions', revision: 1 }],
       boundary: 'Channel membership controls visibility and moderation only.'
     }
   ];
@@ -339,8 +353,8 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
     });
     return json(route, { id: 9, ...body, isActive: true });
   });
-  await page.route(/\/irondev-api\/api\/projects\/7\/channels\/(\d+)\/members\/(\d+)$/, (route) => {
-    const match = route.request().url().match(/channels\/(\d+)\/members\/(\d+)$/);
+  await page.route(/\/irondev-api\/api\/projects\/7\/channels\/(\d+)\/members\/(\d+)(?:\?.*)?$/, (route) => {
+    const match = route.request().url().match(/channels\/(\d+)\/members\/(\d+)/);
     const channelId = Number(match?.[1]);
     const userId = Number(match?.[2]);
     const channel = channels.find((candidate) => candidate.channelId === channelId);
@@ -355,19 +369,25 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
     }
 
     state.channelPutRequests += 1;
-    const body = route.request().postDataJSON() as { channelRole: string; notificationLevel: string };
+    const body = route.request().postDataJSON() as { channelRole: string; notificationLevel: string; expectedRevision: number };
     if (!body || typeof body !== 'object' || typeof body.channelRole !== 'string' || typeof body.notificationLevel !== 'string') {
       return json(route, { error: 'Malformed channel membership body.' }, 400);
     }
     const existing = channel.members.find((membership) => membership.userId === userId);
+    if (options.staleChannelWrite && channelId === 101 && userId === 8 && existing?.revision === 1) {
+      existing.channelRole = 'Owner';
+      existing.revision = 2;
+      return json(route, { code: 'StaleWrite', expectedRevision: body.expectedRevision, currentRevision: 2, currentState: existing, nextSafeAction: 'Reload the member directory, compare the current membership with your attempted change, then submit again from the new revision.' }, 409);
+    }
     if (options.refuseLastChannelOwnerChange && channelId === 102 && userId === 7 && body.channelRole !== 'Owner') {
       return json(route, { error: "The channel's last owner cannot be demoted or removed." }, 409);
     }
     if (existing) {
       existing.channelRole = body.channelRole;
       existing.notificationLevel = body.notificationLevel;
+      existing.revision += 1;
     } else {
-      channel.members.push({ userId, ...body });
+      channel.members.push({ userId, channelRole: body.channelRole, notificationLevel: body.notificationLevel, revision: 1 });
       channel.memberCount = channel.members.length;
     }
     return json(route, { message: 'Channel membership saved.' });

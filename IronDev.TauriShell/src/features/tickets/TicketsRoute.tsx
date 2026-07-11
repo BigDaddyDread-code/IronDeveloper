@@ -170,6 +170,7 @@ function mapTicketsPropsFromState(state: TicketsWorkspaceViewModel, commands: Wo
     onEditDraftChange: state.actions.onEditDraftChange,
     onSaveTicket: () => state.actions.onSaveTicket(),
     onCancelEditTicket: state.actions.onCancelEditTicket,
+    onReloadTicketAndCompare: state.actions.onReloadTicketAndCompare,
     onRefreshPlan: state.actions.onRefreshPlan,
     onRefreshReadiness: state.actions.onRefreshReadiness,
     onRefreshEvidence: state.actions.onRefreshEvidence,
