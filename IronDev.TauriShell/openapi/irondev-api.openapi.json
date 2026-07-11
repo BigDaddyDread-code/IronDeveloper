@@ -25401,6 +25401,74 @@
         },
         "additionalProperties": false
       },
+      "ProjectWorkItemAuthorityActorReadModel": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectRole": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectWorkItemAuthorityReadModel": {
+        "type": "object",
+        "properties": {
+          "currentUserId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentUserEligibleToContinue": {
+            "type": "boolean"
+          },
+          "soloApprovalExceptionAllowed": {
+            "type": "boolean"
+          },
+          "selfApprovalPolicy": {
+            "type": "string",
+            "nullable": true
+          },
+          "acceptedApprovalActorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "acceptedApprovalActorDisplayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "continuationRequestedByUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "soloApprovalExceptionUsed": {
+            "type": "boolean"
+          },
+          "eligibleApprovers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorkItemAuthorityActorReadModel"
+            },
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ProjectWorkItemCollaborationActivity": {
         "type": "object",
         "properties": {
@@ -25669,6 +25737,7 @@
       "ProjectWorkItemReadModel": {
         "required": [
           "applyRecovery",
+          "authority",
           "collaboration",
           "contract",
           "evidenceLinks",
@@ -25715,6 +25784,9 @@
           },
           "collaboration": {
             "$ref": "#/components/schemas/ProjectWorkItemCollaborationReadModel"
+          },
+          "authority": {
+            "$ref": "#/components/schemas/ProjectWorkItemAuthorityReadModel"
           },
           "latestRun": {
             "$ref": "#/components/schemas/ProjectWorkItemRunReadModel"
@@ -30145,6 +30217,21 @@
           "acceptedApprovalId": {
             "type": "string",
             "nullable": true
+          },
+          "approvedByActorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedByActorDisplayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "continuationRequestedByUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "soloApprovalExceptionUsed": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

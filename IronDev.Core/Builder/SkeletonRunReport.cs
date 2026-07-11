@@ -143,6 +143,10 @@ public sealed record SkeletonRunApprovalTrace
 
     /// <summary>The accepted approval the continuation consumed, when one was verified.</summary>
     public string AcceptedApprovalId { get; init; } = string.Empty;
+    public string ApprovedByActorId { get; init; } = string.Empty;
+    public string ApprovedByActorDisplayName { get; init; } = string.Empty;
+    public string ContinuationRequestedByUserId { get; init; } = string.Empty;
+    public bool SoloApprovalExceptionUsed { get; init; }
 }
 
 public sealed record SkeletonRunApplyTrace

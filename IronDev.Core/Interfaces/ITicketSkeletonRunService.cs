@@ -39,6 +39,14 @@ public interface ITicketSkeletonRunService
     /// </summary>
     Task<TicketBuildRunDto?> ContinueAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default);
 
+    Task<TicketBuildRunDto?> ContinueAsAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        string requestedByUserId,
+        CancellationToken cancellationToken = default) =>
+        ContinueAsync(projectId, ticketId, runId, cancellationToken);
+
     /// <summary>
     /// REVISE-1: the human at the gate directs a bounded revision instead of
     /// approving — cited undispositioned findings plus a written instruction
