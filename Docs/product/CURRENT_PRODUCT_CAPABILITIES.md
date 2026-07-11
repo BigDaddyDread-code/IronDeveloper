@@ -31,7 +31,7 @@ This matrix describes the capability a user can reach through the current API an
 | --- | --- | --- | --- |
 | Board | Supported | Readiness header, one priority action, attention items, stage columns, and run queue. | Dedicated backend Board read model for richer waiting, assignment, and run summaries. |
 | Chat | Supported | Direct IronDev sessions, project channels, persisted messages, source/document context, reply context, and ticket-draft handoff. | Mentions, unread state, notifications, presence, and complete concurrency handling. |
-| Work Item | Supported | Shape, Ticket, Build, Review, and Done stages with backend actions and evidence. | Dedicated Work Item read model rather than assembling several endpoint responses. |
+| Work Item | Supported | Shape, Ticket, Build, Review, and Done stages consume a dedicated backend projection for lifecycle, gate, contract, collaboration, action, and evidence truth. | Assignment, follower, and attributed collaboration data remain empty until backend records exist. |
 | Library | Supported | Explorer, Documents, Tools, Members, Governance, Project setup, and Settings are live; Audit refuses as not implemented. | Unified audit ledger. |
 
 ## Governed work

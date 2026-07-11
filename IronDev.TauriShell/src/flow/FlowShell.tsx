@@ -530,6 +530,9 @@ export function FlowShell() {
             }}
             onBackToBoard={() => openProjectBoard()}
             onOpenGovernanceLibrary={() => navigateProductPath(libraryPath(activeProjectId, 'governance'))}
+            onDiscussInChat={(sessionId) => navigateProductPath(
+              sessionId ? chatSessionPath(activeProjectId, sessionId) : projectPath(activeProjectId, 'chat')
+            )}
           />
         ) : null}
         {displayedKind === 'library' ? (

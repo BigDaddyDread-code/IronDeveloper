@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockProjectBoard } from './helpers/mockBoard';
+import { mockProjectWorkItem } from './helpers/mockWorkItem';
 
 // P0-7: Build and Review stages consume the walking-skeleton loop through its
 // governed endpoints. These tests mock the backend and assert the UI's side of
@@ -15,19 +16,19 @@ test('build stage renders the halted run and review renders the matrix and gate'
   await mockSkeletonRun(page, { continuationUnblocked: false });
 
   await openTicketStage(page);
-  await page.getByTestId('flow.ticket.startRun').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   await expect(page.getByTestId('flow.build.status')).toContainText('PausedForApproval');
   await expect(page.getByTestId('flow.build.testAuthoring')).toContainText('1 test(s) authored');
   await expect(page.getByTestId('flow.build.timeline')).toContainText('ApprovalRequiredHalt');
-  await expect(page.getByTestId('flow.build.gate')).toContainText('Halt is not approval');
+  await expect(page.getByTestId('flow.workItem.gate')).toContainText('Halt is not approval');
 
-  await page.getByTestId('flow.build.toReview').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   await expect(page.getByTestId('flow.review.matrix')).toContainText('Catalog sorts by title ascending');
   await expect(page.getByTestId('flow.review.matrix')).toContainText('tests/skeleton/SortTests.cs');
   await expect(page.getByTestId('flow.review.requirement')).toContainText('skeleton-run.continue');
-  await expect(page.getByTestId('flow.review.gate')).toContainText('Human gate: locked');
+  await expect(page.getByTestId('flow.workItem.gate')).toContainText('Human gate: locked');
   await expect(page.getByTestId('flow.review.requestApply')).toBeDisabled();
 });
 
@@ -36,7 +37,7 @@ test('a self-repaired run says so honestly in build and review, and the gate is 
   await mockSkeletonRun(page, { continuationUnblocked: false, withRepair: true });
 
   await openTicketStage(page);
-  await page.getByTestId('flow.ticket.startRun').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   // Build stage: the gate proposal is explicitly the REPAIRED proposal, the
   // attempt history is listed, the failed original is preserved as history,
@@ -51,10 +52,10 @@ test('a self-repaired run says so honestly in build and review, and the gate is 
 
   // Review stage: the repaired-run note is present — and the human gate is
   // exactly the gate, still locked.
-  await page.getByTestId('flow.build.toReview').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
   await expect(page.getByTestId('flow.review.repairedNote')).toContainText('self-repaired once');
   await expect(page.getByTestId('flow.review.repairedNote')).toContainText('the gate below is unchanged');
-  await expect(page.getByTestId('flow.review.gate')).toContainText('Human gate: locked');
+  await expect(page.getByTestId('flow.workItem.gate')).toContainText('Human gate: locked');
   await expect(page.getByTestId('flow.review.requestApply')).toBeDisabled();
 });
 
@@ -63,12 +64,12 @@ test('a run with no repair renders no repair chrome at all', async ({ page }) =>
   await mockSkeletonRun(page, { continuationUnblocked: false });
 
   await openTicketStage(page);
-  await page.getByTestId('flow.ticket.startRun').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   await expect(page.getByTestId('flow.build.proposal')).not.toContainText('repaired');
   await expect(page.getByTestId('flow.build.repairAttempts')).toHaveCount(0);
 
-  await page.getByTestId('flow.build.toReview').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
   await expect(page.getByTestId('flow.review.repairedNote')).toHaveCount(0);
 });
 
@@ -77,8 +78,8 @@ test('an uncovered criterion is rendered as UNCOVERED, not elided', async ({ pag
   await mockSkeletonRun(page, { continuationUnblocked: false, uncovered: true });
 
   await openTicketStage(page);
-  await page.getByTestId('flow.ticket.startRun').click();
-  await page.getByTestId('flow.build.toReview').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   await expect(page.getByTestId('flow.review.matrix')).toContainText('Catalog paging keeps sort order');
   await expect(page.getByTestId('flow.review.uncovered')).toContainText('UNCOVERED');
@@ -90,8 +91,8 @@ test('requesting a critic review surfaces findings and the findings gate blocks 
   const state = await mockSkeletonRun(page, { continuationUnblocked: false });
 
   await openTicketStage(page);
-  await page.getByTestId('flow.ticket.startRun').click();
-  await page.getByTestId('flow.build.toReview').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   await page.getByTestId('flow.review.requestCritic').click();
   expect(state.criticReviewRequested).toBe(true);
@@ -114,8 +115,8 @@ test('a finding with no disposition warns at the human gate', async ({ page }) =
   await mockSkeletonRun(page, { continuationUnblocked: false, withFinding: true });
 
   await openTicketStage(page);
-  await page.getByTestId('flow.ticket.startRun').click();
-  await page.getByTestId('flow.build.toReview').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   await expect(page.getByTestId('flow.review.requirement')).toContainText('skeleton-run.continue');
   await expect(page.getByText('the backend will refuse continuation until every finding is answered')).toBeVisible();
@@ -126,8 +127,8 @@ test('recording an approval requires the ceremony, posts the reason as evidence,
   const state = await mockSkeletonRun(page, { continuationUnblocked: false });
 
   await openTicketStage(page);
-  await page.getByTestId('flow.ticket.startRun').click();
-  await page.getByTestId('flow.build.toReview').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   // APPROVAL-UX-1: one click opens the ceremony, it does not record. The
   // delegated-policy truth is stated at the gate.
@@ -166,8 +167,8 @@ test('a refused apply is shown honestly and the loop stays incomplete', async ({
   const state = await mockSkeletonRun(page, { continuationUnblocked: true, applyRefusedReason: 'ApplyDisabled' });
 
   await openTicketStage(page);
-  await page.getByTestId('flow.ticket.startRun').click();
-  await page.getByTestId('flow.build.toReview').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   await expect(page.getByTestId('flow.review.requestApply')).toBeEnabled();
   await page.getByTestId('flow.review.requestApply').click();
@@ -181,8 +182,8 @@ test('successful controlled apply opens the final report and receipt chain', asy
   const state = await mockSkeletonRun(page, { continuationUnblocked: true });
 
   await openTicketStage(page);
-  await page.getByTestId('flow.ticket.startRun').click();
-  await page.getByTestId('flow.build.toReview').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
+  await page.getByTestId('flow.workItem.primaryAction').click();
 
   await expect(page.getByTestId('flow.review.requestApply')).toBeEnabled();
   await page.getByTestId('flow.review.requestApply').click();
@@ -262,17 +263,19 @@ test('blocked ticket and empty board states name the next safe action', async ({
 
   await expect(page.getByTestId('flow.ticket.readiness')).toContainText('Next safe action');
   await expect(page.getByTestId('flow.ticket.linkedRun')).toContainText('No linked run evidence yet');
-  await expect(page.getByTestId('flow.ticket.startRun')).toBeDisabled();
-  await expect(page.getByTestId('flow.ticket.gate')).toContainText('backend explains the block');
+  await expect(page.getByTestId('flow.workItem.primaryAction')).toBeDisabled();
+  await expect(page.getByTestId('flow.workItem.gate')).toContainText('Project profile is missing.');
+  await expect(page.getByTestId('flow.workItem.gate')).toContainText('Resolve build readiness before starting a run.');
 });
 
 async function openTicketStage(page: Page) {
   await page.goto('/');
   await page.getByText('Add book sorting to catalog').click();
-  await expect(page.getByTestId('flow.ticket.startRun')).toBeEnabled();
+  await expect(page.getByTestId('flow.workItem.primaryAction')).toBeEnabled();
 }
 
 interface SkeletonMockState {
+  started: boolean;
   continuationUnblocked: boolean;
   applyRefusedReason?: string;
   applied: boolean;
@@ -297,6 +300,7 @@ async function mockSkeletonRun(
   }
 ): Promise<SkeletonMockState> {
   const state: SkeletonMockState = {
+    started: options.initialApplied ?? false,
     continuationUnblocked: options.continuationUnblocked,
     applyRefusedReason: options.applyRefusedReason,
     applied: options.initialApplied ?? false,
@@ -333,7 +337,38 @@ async function mockSkeletonRun(
     message
   });
 
+  await mockProjectWorkItem(page, () => {
+    if (state.applied) {
+      return {
+        stage: 'Done',
+        state: 'Applied',
+        statusSummary: 'Applied through the governed workspace spine.',
+        gateState: 'Satisfied',
+        gateReason: 'Controlled apply completed.',
+        nextSafeAction: 'Inspect the final report and receipts.',
+        primaryActionKind: 'ViewOutcome',
+        primaryActionLabel: 'View outcome'
+      };
+    }
+    if (state.started) {
+      return {
+        stage: 'Review',
+        state: state.continuationUnblocked ? 'Completed' : 'PausedForApproval',
+        statusSummary: state.continuationUnblocked ? 'Continuation completed.' : 'Halted for human approval.',
+        gateState: state.continuationUnblocked ? 'Open' : 'Blocked',
+        gateReason: state.continuationUnblocked
+          ? 'Continuation allowed by accepted approval. Approval is not apply permission.'
+          : 'Human gate: locked. Halt is not approval.',
+        nextSafeAction: state.continuationUnblocked ? 'Review controlled apply.' : 'Complete the approval ceremony.',
+        primaryActionKind: state.continuationUnblocked ? 'Apply' : 'Review',
+        primaryActionLabel: state.continuationUnblocked ? 'Review controlled apply' : 'Review waiting work'
+      };
+    }
+    return {};
+  });
+
   await page.route(`**/irondev-api/api/projects/7/tickets/42/skeleton-runs`, async (route) => {
+    state.started = true;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(runDto('PausedForApproval')) });
   });
 
@@ -667,6 +702,18 @@ async function mockTicketWorkspace(
   await page.route('**/irondev-api/api/projects/7/tickets/42', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detailTicket) })
   );
+  await mockProjectWorkItem(page, {
+    title: detailTicket.title,
+    state: detailTicket.status,
+    stage: detailTicket.status === 'Applied' ? 'Done' : 'Ticket',
+    gateState: options.readiness?.isReady === false ? 'Blocked' : 'Open',
+    gateReason: options.readiness?.message ?? 'Ready to build.',
+    nextSafeAction: options.readiness?.isReady === false ? 'Resolve build readiness before starting a run.' : undefined,
+    primaryActionKind: detailTicket.status === 'Applied' ? 'ViewOutcome' : 'StartRun',
+    primaryActionLabel: detailTicket.status === 'Applied' ? 'View outcome' : 'Start governed run',
+    primaryActionAllowed: detailTicket.status === 'Applied' || options.readiness?.isReady !== false,
+    ticket: detailTicket
+  });
   await mockProjectBoard(page, {
     projectName: 'IronDeveloper',
     tickets: boardTickets,

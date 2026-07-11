@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { mockProjectWorkItem } from './helpers/mockWorkItem';
 
 test('an incomplete backend draft opens review with honest blockers and no mutation', async ({ page }) => {
   const state = await mockTicketDraftWorkspace(page, {
@@ -221,6 +222,20 @@ async function mockTicketDraftWorkspace(
   await page.route('**/irondev-api/api/projects/7/tickets/44', (route) =>
     json(route, { id: 44, projectId: 7, title: 'Add stable catalog sorting', status: 'Draft' })
   );
+  await mockProjectWorkItem(page, {
+    workItemId: 44,
+    title: 'Add stable catalog sorting',
+    linkedChatSessionId: 9007,
+    ticket: {
+      id: 44,
+      projectId: 7,
+      title: 'Add stable catalog sorting',
+      status: 'Draft',
+      acceptanceCriteria: draft.acceptanceCriteria.join('\n'),
+      sourceChatSessionId: 9007,
+      sourceChatMessageId: 5001
+    }
+  });
   await page.route('**/irondev-api/api/projects/7/tickets', (route) => json(route, []));
 
   return state;
