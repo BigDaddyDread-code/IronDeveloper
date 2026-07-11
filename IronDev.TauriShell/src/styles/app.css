@@ -3659,6 +3659,35 @@ p {
   font-size: 11px;
 }
 
+.chat-session-rail__channel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-session-rail__channel-title > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-session-rail__unread {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--fl-acc);
+  color: #ffffff;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .chat-ticket-review__backdrop {
   position: fixed;
   inset: 0;
@@ -3870,6 +3899,15 @@ p {
 .chat-channel-header__description {
   max-width: 42rem;
   color: var(--fl-muted) !important;
+}
+
+.chat-channel-statebar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 7px;
+  color: var(--fl-muted);
+  font-size: 11.5px;
 }
 
 .chat-channel-thread {

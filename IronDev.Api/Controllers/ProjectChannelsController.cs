@@ -42,6 +42,7 @@ public sealed class ProjectChannelsController : ControllerBase
     public sealed record PostProjectChannelMessageRequest(string Message);
 
     [HttpGet]
+    [ProducesResponseType(typeof(ProjectChannelChatListResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListChannels(int projectId, CancellationToken cancellationToken)
     {
         var context = CurrentUser();
@@ -62,6 +63,8 @@ public sealed class ProjectChannelsController : ControllerBase
     }
 
     [HttpGet("{channelReference}")]
+    [ProducesResponseType(typeof(ProjectChannelChatDetail), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetChannel(
         int projectId,
         string channelReference,
@@ -85,6 +88,7 @@ public sealed class ProjectChannelsController : ControllerBase
 
     [HttpPost]
     [EnableRateLimiting("SensitiveApiPolicy")]
+    [ProducesResponseType(typeof(ProjectChannelChatSummary), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateChannel(
         int projectId,
         [FromBody] CreateProjectChannelRequest request,
@@ -131,6 +135,7 @@ public sealed class ProjectChannelsController : ControllerBase
 
     [HttpPost("{channelReference}/messages")]
     [EnableRateLimiting("SensitiveApiPolicy")]
+    [ProducesResponseType(typeof(ProjectChannelChatMessage), StatusCodes.Status200OK)]
     public async Task<IActionResult> PostMessage(
         int projectId,
         string channelReference,
@@ -166,6 +171,34 @@ public sealed class ProjectChannelsController : ControllerBase
             ProjectChannelChatMutationStatus.AssistantInvocationNotImplemented => StatusCode(StatusCodes.Status501NotImplemented, new { error = "IronDev participation in shared channels is not implemented. Remove @IronDev to post a human message." }),
             _ => NotFound(new { error = "Channel not found or not visible to this user." })
         };
+    }
+
+    [HttpPost("{channelReference}/read")]
+    [ProducesResponseType(typeof(ProjectChannelReadState), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MarkRead(
+        int projectId,
+        string channelReference,
+        CancellationToken cancellationToken)
+    {
+        var context = CurrentUser();
+        var project = await _projects.GetByIdAsync(projectId, cancellationToken);
+        if (project is null)
+            return NotFound(new { error = "Project not found in the current tenant." });
+
+        var callerRole = await _users.GetTenantRoleAsync(context.UserId, project.TenantId, cancellationToken);
+        if (callerRole is null)
+            return NotFound();
+
+        var result = await _channels.MarkReadAsync(
+            project.TenantId,
+            project.Id,
+            context.UserId,
+            channelReference,
+            cancellationToken);
+        return result.Status == ProjectChannelChatMutationStatus.Succeeded
+            ? Ok(result.ReadState)
+            : NotFound(new { error = "Channel not found or not visible to this user." });
     }
 
     private static string? ValidateCreate(CreateProjectChannelRequest request)

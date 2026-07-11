@@ -33,6 +33,7 @@ export function SharedChannelRoute({
   const [reloadKey, setReloadKey] = useState(0);
   const [draft, setDraft] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
+  const [readError, setReadError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isRailOpen, setIsRailOpen] = useState(false);
 
@@ -41,6 +42,7 @@ export function SharedChannelRoute({
     setLoadState('loading');
     setLoadError(null);
     setSendError(null);
+    setReadError(null);
     setDraft('');
 
     Promise.all([
@@ -50,6 +52,27 @@ export function SharedChannelRoute({
       setDetail(channel);
       setSessions(recentSessions);
       setLoadState('ready');
+      if (channel.readState.unreadCount > 0) {
+        void channels.markRead(channelReference, controller.signal)
+          .then((readState) => {
+            if (controller.signal.aborted) return;
+            setDetail((current) => current ? {
+              ...current,
+              channel: {
+                ...current.channel,
+                unreadCount: readState.unreadCount,
+                lastReadMessageId: readState.lastReadMessageId,
+                lastReadUtc: readState.lastReadUtc
+              },
+              readState
+            } : current);
+          })
+          .catch((error) => {
+            if (!controller.signal.aborted) {
+              setReadError(errorMessage(error, 'Unread state could not be updated.'));
+            }
+          });
+      }
     }).catch((error) => {
       if (controller.signal.aborted) return;
       setDetail(null);
@@ -63,7 +86,7 @@ export function SharedChannelRoute({
     });
 
     return () => controller.abort();
-  }, [channelReference, projectId, reloadKey, session.client]);
+  }, [channelReference, channels.markRead, projectId, reloadKey, session.client]);
 
   const postMessage = async () => {
     if (!draft.trim() || !detail?.channel.canPostMessages || isSending) return;
@@ -145,6 +168,11 @@ export function SharedChannelRoute({
                 {channel.visibility === 'MembersOnly' ? 'Members only' : 'Project'} / {channel.memberCount} member(s)
               </p>
               {channel.description ? <p className="chat-channel-header__description">{channel.description}</p> : null}
+              <div className="chat-channel-statebar" data-testid="chat.channel.collaborationState">
+                <span>{detail.readState.notificationLevel} notifications</span>
+                <span>{detail.presence.status === 'Unavailable' ? 'Presence unavailable' : `${detail.presence.activeViewerCount ?? 0} active`}</span>
+                {readError ? <span className="state-error">Unread state unavailable</span> : null}
+              </div>
             </div>
             <CommandButton
               type="button"

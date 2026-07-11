@@ -9,6 +9,7 @@ test('recent backend sessions form the Chat rail and the latest conversation ope
   await expect(page.getByRole('navigation', { name: 'Recent direct conversations' })).toContainText('Catalog sorting');
   await expect(page.getByRole('navigation', { name: 'Recent direct conversations' })).toContainText('Ticket cockpit');
   await expect(page.getByRole('navigation', { name: 'Project channels' })).toContainText('General');
+  await expect(page.getByLabel('1 unread')).toBeVisible();
   await expect(page.getByTestId('chat.sessions.item.9008')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('chat.message.assistant')).toContainText('The catalog sorts by title.');
 });
@@ -59,15 +60,31 @@ test('an unknown direct-session URL returns an honest conversation outcome', asy
   await expect(page.getByTestId('chat.workspace')).toBeVisible();
 });
 
-test('shared-channel URLs open persisted human conversation beside direct sessions', async ({ page }) => {
-  await mockSessionWorkspace(page);
+test('shared-channel URLs open persisted human conversation and mark durable unread state', async ({ page }) => {
+  const state = await mockSessionWorkspace(page);
   await page.goto('/projects/7/chat/channels/general');
 
   await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
   await expect(page.getByRole('heading', { name: '# General' })).toBeVisible();
   await expect(page.getByTestId('chat.channel.message.7101')).toContainText('Human planning stays visible here.');
   await expect(page.getByTestId('chat.channel.assistant-status')).toContainText('does not participate yet');
+  await expect(page.getByTestId('chat.channel.collaborationState')).toContainText('All notifications');
+  await expect(page.getByTestId('chat.channel.collaborationState')).toContainText('Presence unavailable');
+  await expect.poll(() => state.markReadRequests).toBe(1);
+  await expect(page.getByLabel('1 unread')).toHaveCount(0);
   await expect(page.getByTestId('chat.workspace')).toHaveCount(0);
+  if (process.env.IRONDEV_VISUAL_SMOKE === '1') {
+    await page.screenshot({ path: '../reports/visual-smoke/collab-state-1.png', fullPage: true });
+  }
+});
+
+test('a read-marker failure keeps the shared channel visible and reports unknown unread state', async ({ page }) => {
+  await mockSessionWorkspace(page, { failMarkRead: true });
+  await page.goto('/projects/7/chat/channels/general');
+
+  await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
+  await expect(page.getByTestId('chat.channel.message.7101')).toContainText('Human planning stays visible here.');
+  await expect(page.getByTestId('chat.channel.collaborationState')).toContainText('Unread state unavailable');
 });
 
 test('a direct-session list failure does not hide a healthy shared channel', async ({ page }) => {
@@ -174,16 +191,23 @@ test.describe('narrow session navigation', () => {
 
 interface SessionMockOptions {
   failSessionListOnce?: boolean;
+  failMarkRead?: boolean;
 }
 
 interface SessionMockState {
   createdSessionCount: number;
   sessionListRequests: number;
   channelMessageCount: number;
+  markReadRequests: number;
 }
 
 async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}): Promise<SessionMockState> {
-  const state: SessionMockState = { createdSessionCount: 0, sessionListRequests: 0, channelMessageCount: 1 };
+  const state: SessionMockState = {
+    createdSessionCount: 0,
+    sessionListRequests: 0,
+    channelMessageCount: 1,
+    markReadRequests: 0
+  };
   let nextSessionId = 9010;
   let nextMessageId = 9200;
   const sessions = [
@@ -250,6 +274,9 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
       currentUserRole: 'Owner',
       currentUserNotificationLevel: 'All',
       canPostMessages: true,
+      unreadCount: 1,
+      lastReadMessageId: null,
+      lastReadUtc: null,
       boundary: 'Channel membership and messages are collaboration state, not approval or execution authority.'
     },
     {
@@ -263,6 +290,9 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
       currentUserRole: 'ReadOnly',
       currentUserNotificationLevel: 'Mentions',
       canPostMessages: false,
+      unreadCount: 0,
+      lastReadMessageId: null,
+      lastReadUtc: null,
       boundary: 'Channel membership and messages are collaboration state, not approval or execution authority.'
     }
   ];
@@ -327,6 +357,9 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
       currentUserRole: 'Owner',
       currentUserNotificationLevel: 'Mentions',
       canPostMessages: true,
+      unreadCount: 0,
+      lastReadMessageId: null,
+      lastReadUtc: null,
       boundary: 'Channel collaboration is not workflow authority.'
     };
     channels.push(created);
@@ -340,9 +373,42 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     return channel ? json(route, {
       channel,
       messages: channelMessages.get(slug) ?? [],
+      readState: {
+        unreadCount: channel.unreadCount,
+        lastReadMessageId: channel.lastReadMessageId,
+        lastReadUtc: channel.lastReadUtc,
+        notificationLevel: channel.currentUserNotificationLevel,
+        boundary: 'Read markers and notification preferences are collaboration state, not workflow authority.'
+      },
+      presence: {
+        status: 'Unavailable',
+        activeViewerCount: null,
+        boundary: 'Presence is unavailable until the backend supplies durable or realtime presence truth.'
+      },
       assistantParticipationStatus: 'Not implemented. Shared channels persist human conversation only; IronDev does not participate yet.',
       boundary: 'Channel collaboration is not workflow authority.'
     }) : json(route, { error: 'Channel not found or not visible to this user.' }, 404);
+  });
+
+  await page.route(/\/irondev-api\/api\/projects\/7\/channels\/([^/]+)\/read$/, (route) => {
+    state.markReadRequests += 1;
+    if (options.failMarkRead) {
+      return json(route, { error: 'Read marker store unavailable.' }, 503);
+    }
+
+    const slug = decodeURIComponent(route.request().url().match(/\/channels\/([^/]+)\/read$/)?.[1] ?? '');
+    const channel = channels.find((item) => item.slug === slug);
+    if (!channel) return json(route, { error: 'Channel not found.' }, 404);
+    channel.unreadCount = 0;
+    channel.lastReadMessageId = 7101;
+    channel.lastReadUtc = '2026-07-10T08:01:00Z';
+    return json(route, {
+      unreadCount: 0,
+      lastReadMessageId: 7101,
+      lastReadUtc: '2026-07-10T08:01:00Z',
+      notificationLevel: channel.currentUserNotificationLevel,
+      boundary: 'Read markers and notification preferences are collaboration state, not workflow authority.'
+    });
   });
 
   await page.route(/\/irondev-api\/api\/projects\/7\/channels\/([^/]+)\/messages$/, (route) => {

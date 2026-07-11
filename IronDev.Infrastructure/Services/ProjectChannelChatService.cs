@@ -76,7 +76,23 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
             new { TenantId = tenantId, ProjectId = projectId, ChannelId = channel.ChannelId },
             cancellationToken: cancellationToken))).ToArray();
 
-        return new ProjectChannelChatDetail(MapSummary(channel), messages, AssistantStatus, ProjectChannelBoundaries.Channel);
+        var summary = MapSummary(channel);
+        return new ProjectChannelChatDetail(
+            summary,
+            messages,
+            new ProjectChannelReadState(
+                summary.UnreadCount,
+                summary.LastReadMessageId,
+                summary.LastReadUtc,
+                summary.CurrentUserNotificationLevel ?? ProjectChannelNotificationLevels.Mentions,
+                ProjectChannelBoundaries.ReadMarker),
+            new ProjectChannelPresenceState(
+                "Unavailable",
+                null,
+                "Live channel presence is not implemented; no active viewer count is inferred.",
+                ProjectChannelBoundaries.Presence),
+            AssistantStatus,
+            ProjectChannelBoundaries.Channel);
     }
 
     public async Task<ProjectChannelChatMutationResult> CreateChannelAsync(
@@ -160,6 +176,9 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
                 1,
                 ProjectChannelRoles.Owner,
                 ProjectChannelNotificationLevels.Mentions,
+                0,
+                null,
+                null,
                 true,
                 ProjectChannelBoundaries.Channel));
     }
@@ -207,6 +226,68 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
         return new ProjectChannelChatMutationResult(ProjectChannelChatMutationStatus.Succeeded, Message: saved);
     }
 
+    public async Task<ProjectChannelChatMutationResult> MarkReadAsync(
+        int tenantId,
+        int projectId,
+        int currentUserId,
+        string channelReference,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+        var channel = await connection.QuerySingleOrDefaultAsync<ChannelRow>(new CommandDefinition(
+            VisibleChannelsSql + " AND (c.Slug = @ChannelReference OR CONVERT(NVARCHAR(30), c.Id) = @ChannelReference);",
+            new { TenantId = tenantId, ProjectId = projectId, CurrentUserId = currentUserId, ChannelReference = channelReference },
+            transaction,
+            cancellationToken: cancellationToken));
+        if (channel is null)
+        {
+            transaction.Rollback();
+            return new ProjectChannelChatMutationResult(ProjectChannelChatMutationStatus.NotFound);
+        }
+
+        const string markReadSql = """
+            DECLARE @LatestMessageId BIGINT = (
+                SELECT MAX(Id)
+                FROM dbo.ProjectChannelMessages
+                WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND ChannelId = @ChannelId
+                  AND Status <> 'Deleted'
+            );
+            DECLARE @ReadUtc DATETIME2 = SYSUTCDATETIME();
+
+            UPDATE dbo.ProjectChannelMessageReads
+            SET LastReadMessageId = @LatestMessageId, LastReadUtc = @ReadUtc
+            WHERE TenantId = @TenantId AND ProjectId = @ProjectId
+              AND ChannelId = @ChannelId AND UserId = @CurrentUserId;
+
+            IF @@ROWCOUNT = 0
+            BEGIN
+                INSERT INTO dbo.ProjectChannelMessageReads
+                    (TenantId, ProjectId, ChannelId, UserId, LastReadMessageId, LastReadUtc)
+                VALUES
+                    (@TenantId, @ProjectId, @ChannelId, @CurrentUserId, @LatestMessageId, @ReadUtc);
+            END;
+
+            SELECT @LatestMessageId AS LastReadMessageId, @ReadUtc AS LastReadUtc;
+            """;
+        var marker = await connection.QuerySingleAsync<ReadMarkerRow>(new CommandDefinition(
+            markReadSql,
+            new { TenantId = tenantId, ProjectId = projectId, ChannelId = channel.ChannelId, CurrentUserId = currentUserId },
+            transaction,
+            cancellationToken: cancellationToken));
+        transaction.Commit();
+
+        return new ProjectChannelChatMutationResult(
+            ProjectChannelChatMutationStatus.Succeeded,
+            ReadState: new ProjectChannelReadState(
+                0,
+                marker.LastReadMessageId,
+                marker.LastReadUtc,
+                channel.CurrentUserNotificationLevel ?? ProjectChannelNotificationLevels.Mentions,
+                ProjectChannelBoundaries.ReadMarker));
+    }
+
     private static ProjectChannelChatSummary MapSummary(ChannelRow row) => new(
         row.ChannelId,
         row.Name,
@@ -217,6 +298,9 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
         row.MemberCount,
         row.CurrentUserRole,
         row.CurrentUserNotificationLevel,
+        row.UnreadCount,
+        row.LastReadMessageId,
+        row.LastReadUtc,
         !string.Equals(row.CurrentUserRole, ProjectChannelRoles.ReadOnly, StringComparison.OrdinalIgnoreCase),
         row.Boundary);
 
@@ -246,6 +330,12 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
         SELECT c.Id AS ChannelId, c.Name, c.Slug, c.Description, c.ChannelKind, c.Visibility,
                c.Boundary, mine.ChannelRole AS CurrentUserRole,
                mine.NotificationLevel AS CurrentUserNotificationLevel,
+               marker.LastReadMessageId, marker.LastReadUtc,
+               (SELECT COUNT(1) FROM dbo.ProjectChannelMessages unread
+                WHERE unread.TenantId = c.TenantId AND unread.ProjectId = c.ProjectId
+                  AND unread.ChannelId = c.Id AND unread.Status <> 'Deleted'
+                  AND unread.Id > COALESCE(marker.LastReadMessageId, 0)
+                  AND (unread.AuthorUserId IS NULL OR unread.AuthorUserId <> @CurrentUserId)) AS UnreadCount,
                (SELECT COUNT(1) FROM dbo.ProjectChannelMembers members
                 WHERE members.TenantId = c.TenantId AND members.ProjectId = c.ProjectId
                   AND members.ChannelId = c.Id AND members.Status = 'Active') AS MemberCount
@@ -256,6 +346,12 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
             WHERE member.TenantId = c.TenantId AND member.ProjectId = c.ProjectId
               AND member.ChannelId = c.Id AND member.UserId = @CurrentUserId AND member.Status = 'Active'
         ) mine
+        OUTER APPLY (
+            SELECT TOP (1) reads.LastReadMessageId, reads.LastReadUtc
+            FROM dbo.ProjectChannelMessageReads reads
+            WHERE reads.TenantId = c.TenantId AND reads.ProjectId = c.ProjectId
+              AND reads.ChannelId = c.Id AND reads.UserId = @CurrentUserId
+        ) marker
         WHERE c.TenantId = @TenantId AND c.ProjectId = @ProjectId AND c.Status = 'Active'
           AND (c.Visibility = 'Project' OR mine.ChannelRole IS NOT NULL)
         """;
@@ -271,6 +367,15 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
         public int MemberCount { get; init; }
         public string? CurrentUserRole { get; init; }
         public string? CurrentUserNotificationLevel { get; init; }
+        public int UnreadCount { get; init; }
+        public long? LastReadMessageId { get; init; }
+        public DateTime? LastReadUtc { get; init; }
         public string Boundary { get; init; } = ProjectChannelBoundaries.Channel;
+    }
+
+    private sealed class ReadMarkerRow
+    {
+        public long? LastReadMessageId { get; init; }
+        public DateTime LastReadUtc { get; init; }
     }
 }

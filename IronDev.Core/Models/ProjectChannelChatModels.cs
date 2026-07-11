@@ -15,13 +15,31 @@ public sealed record ProjectChannelChatSummary(
     int MemberCount,
     string? CurrentUserRole,
     string? CurrentUserNotificationLevel,
+    int UnreadCount,
+    long? LastReadMessageId,
+    DateTime? LastReadUtc,
     bool CanPostMessages,
     string Boundary);
 
 public sealed record ProjectChannelChatDetail(
     ProjectChannelChatSummary Channel,
     IReadOnlyList<ProjectChannelChatMessage> Messages,
+    ProjectChannelReadState ReadState,
+    ProjectChannelPresenceState Presence,
     string AssistantParticipationStatus,
+    string Boundary);
+
+public sealed record ProjectChannelReadState(
+    int UnreadCount,
+    long? LastReadMessageId,
+    DateTime? LastReadUtc,
+    string NotificationLevel,
+    string Boundary);
+
+public sealed record ProjectChannelPresenceState(
+    string Status,
+    int? ActiveViewerCount,
+    string Reason,
     string Boundary);
 
 public sealed record ProjectChannelChatMessage(
@@ -50,4 +68,5 @@ public enum ProjectChannelChatMutationStatus
 public sealed record ProjectChannelChatMutationResult(
     ProjectChannelChatMutationStatus Status,
     ProjectChannelChatMessage? Message = null,
-    ProjectChannelChatSummary? Channel = null);
+    ProjectChannelChatSummary? Channel = null,
+    ProjectChannelReadState? ReadState = null);

@@ -33,4 +33,11 @@ public interface IProjectChannelChatService
         string channelReference,
         string message,
         CancellationToken cancellationToken = default);
+
+    Task<ProjectChannelChatMutationResult> MarkReadAsync(
+        int tenantId,
+        int projectId,
+        int currentUserId,
+        string channelReference,
+        CancellationToken cancellationToken = default);
 }
