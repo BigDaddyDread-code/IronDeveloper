@@ -3,6 +3,7 @@ using IronDev.Core.Interfaces;
 using IronDev.Core.Runs;
 using IronDev.Core.WorkItems;
 using IronDev.Services;
+using IronDev.Core.Auth;
 
 namespace IronDev.Infrastructure.Services;
 
@@ -12,17 +13,23 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
     private readonly IRunStore _runs;
     private readonly ITicketSkeletonRunService _skeletonRuns;
     private readonly IBuilderReadinessService _readiness;
+    private readonly IProjectWorkItemCollaborationService _collaboration;
+    private readonly ICurrentTenantContext _tenant;
 
     public ProjectWorkItemReadService(
         ITicketService tickets,
         IRunStore runs,
         ITicketSkeletonRunService skeletonRuns,
-        IBuilderReadinessService readiness)
+        IBuilderReadinessService readiness,
+        IProjectWorkItemCollaborationService collaboration,
+        ICurrentTenantContext tenant)
     {
         _tickets = tickets;
         _runs = runs;
         _skeletonRuns = skeletonRuns;
         _readiness = readiness;
+        _collaboration = collaboration;
+        _tenant = tenant;
     }
 
     public async Task<ProjectWorkItemReadModel?> GetAsync(
@@ -55,6 +62,7 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
             latestRun,
             report,
             await readinessTask.ConfigureAwait(false),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            await _collaboration.GetAsync(_tenant.TenantId, projectId, workItemId, cancellationToken).ConfigureAwait(false));
     }
 }

@@ -833,6 +833,8 @@ export interface ProjectMemberDirectoryEntry {
   displayName: string;
   email: string;
   tenantRole: string;
+  projectRole: string | null;
+  isProjectMember: boolean;
   isActive: boolean;
   isCurrentUser: boolean;
   projectAccessStatus: string;
@@ -845,8 +847,10 @@ export interface ProjectMemberDirectoryResponse {
   tenantId: number;
   currentUserTenantRole: string;
   canAdministerTenantMembership: boolean;
+  canAdministerProjectMembership: boolean;
   canAdministerChannelMembership: boolean;
   availableTenantRoles: string[];
+  availableProjectRoles: string[];
   availableChannelRoles: string[];
   availableNotificationLevels: string[];
   projectMembershipStatus: string;
@@ -854,6 +858,14 @@ export interface ProjectMemberDirectoryResponse {
   members: ProjectMemberDirectoryEntry[];
   channels: ProjectChannelDirectoryEntry[];
   boundary: string;
+}
+
+export interface SetProjectWorkItemCollaborationRequest {
+  assigneeUserId: number | null;
+  followerUserIds: number[];
+  waitingOnUserId: number | null;
+  waitingOnKind: string | null;
+  waitingOnLabel: string | null;
 }
 
 export interface ProjectChannelMembershipEntry {

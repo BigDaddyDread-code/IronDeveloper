@@ -149,6 +149,11 @@
                            "id":  "2026-07-product-project-channels",
                            "path":  "Database/migrate_project_channels.sql",
                            "description":  "Promotes the bounded project-channel schema into the runtime migration manifest for channel membership administration."
+                       },
+                       {
+                           "id":  "2026-07-v2-project-collaboration",
+                           "path":  "Database/migrate_project_collaboration.sql",
+                           "description":  "Adds project-specific visibility membership plus durable Work Item assignee, followers, waiting-on, and attributed collaboration activity."
                        }
                    ]
 }

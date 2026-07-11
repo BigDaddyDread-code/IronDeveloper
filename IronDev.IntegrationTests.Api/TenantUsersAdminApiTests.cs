@@ -40,6 +40,14 @@ public class TenantUsersAdminApiTests : ApiTestBase
                 INNER JOIN dbo.Users u ON u.Id = pcm.UserId
                 WHERE u.Email IN (@NewUserEmail, @SecondUserEmail);
             END;
+            IF OBJECT_ID(N'dbo.ProjectWorkItemActivity', N'U') IS NOT NULL
+                DELETE a FROM dbo.ProjectWorkItemActivity a INNER JOIN dbo.Users u ON u.Id = a.ActorUserId WHERE u.Email IN (@NewUserEmail, @SecondUserEmail);
+            IF OBJECT_ID(N'dbo.ProjectWorkItemFollowers', N'U') IS NOT NULL
+                DELETE f FROM dbo.ProjectWorkItemFollowers f INNER JOIN dbo.Users u ON u.Id = f.UserId WHERE u.Email IN (@NewUserEmail, @SecondUserEmail);
+            IF OBJECT_ID(N'dbo.ProjectWorkItemCollaboration', N'U') IS NOT NULL
+                DELETE c FROM dbo.ProjectWorkItemCollaboration c LEFT JOIN dbo.Users au ON au.Id=c.AssigneeUserId LEFT JOIN dbo.Users wu ON wu.Id=c.WaitingOnUserId LEFT JOIN dbo.Users uu ON uu.Id=c.UpdatedByUserId WHERE au.Email IN (@NewUserEmail, @SecondUserEmail) OR wu.Email IN (@NewUserEmail, @SecondUserEmail) OR uu.Email IN (@NewUserEmail, @SecondUserEmail);
+            IF OBJECT_ID(N'dbo.ProjectMembers', N'U') IS NOT NULL
+                DELETE pm FROM dbo.ProjectMembers pm INNER JOIN dbo.Users u ON u.Id = pm.UserId WHERE u.Email IN (@NewUserEmail, @SecondUserEmail);
             DELETE tu FROM dbo.TenantUsers tu
             INNER JOIN dbo.Users u ON u.Id = tu.UserId
             WHERE u.Email IN (@NewUserEmail, @SecondUserEmail);

@@ -20,6 +20,7 @@ export interface MockWorkItemProjectionOptions {
   ticket?: Record<string, unknown>;
   applyRecovery?: Record<string, unknown>;
   executionProof?: Record<string, unknown>;
+  collaboration?: Record<string, unknown>;
 }
 
 export function workItemProjection(options: MockWorkItemProjectionOptions = {}) {
@@ -51,7 +52,8 @@ export function workItemProjection(options: MockWorkItemProjectionOptions = {}) 
       sourceChatMessageId: null,
       sourceDocumentVersionId: null
     },
-    collaboration: {
+    collaboration: options.collaboration ?? {
+      revision: 0,
       assignee: null,
       followers: [],
       waitingOn: null,

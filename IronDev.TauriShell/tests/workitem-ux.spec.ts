@@ -152,6 +152,38 @@ test('Discuss in Chat routes to the exact backend-linked session', async ({ page
   await expect(page).toHaveURL('/projects/7/chat/sessions/9007');
 });
 
+test('Work Item ownership saves assignee, followers, waiting-on, and attributed activity', async ({ page }) => {
+  await mockWorkspace(page);
+  let savedBody: Record<string, unknown> | null = null;
+  await mockProjectWorkItem(page, () => ({
+    collaboration: savedBody ? {
+      revision: 2,
+      assignee: { kind: 'Human', userId: 8, displayName: 'Alice Reviewer' },
+      followers: [{ kind: 'Human', userId: 7, displayName: 'Bob Developer' }],
+      waitingOn: { kind: 'Role', userId: null, displayName: 'Approver' },
+      linkedChatSessionId: null,
+      recentActivity: [{ timestampUtc: '2026-07-11T02:00:00Z', kind: 'CollaborationChanged', summary: 'Work Item ownership and attention were updated.', actor: { kind: 'Human', userId: 7, displayName: 'Bob Developer' } }]
+    } : undefined
+  }));
+  await page.route('**/irondev-api/api/projects/7/work-items/42/collaboration', (route) => {
+    savedBody = route.request().postDataJSON() as Record<string, unknown>;
+    return json(route, { revision: 2 });
+  });
+
+  await page.goto('/projects/7/work-items/42');
+  await page.getByTestId('flow.workItem.collaboration.edit').click();
+  const form = page.getByTestId('flow.workItem.collaboration.form');
+  await form.getByLabel('Assignee').selectOption('8');
+  await form.getByLabel('Waiting on').selectOption('role:Approver');
+  await form.getByRole('checkbox', { name: 'Bob Developer' }).check();
+  await page.getByTestId('flow.workItem.collaboration.save').click();
+
+  await expect(page.getByTestId('flow.workItem.collaboration')).toContainText('Alice Reviewer');
+  await expect(page.getByTestId('flow.workItem.collaboration')).toContainText('Approver');
+  await expect(page.getByTestId('flow.workItem.collaboration')).toContainText('Bob Developer');
+  expect(savedBody).toMatchObject({ assigneeUserId: 8, followerUserIds: [7], waitingOnKind: 'Role', waitingOnLabel: 'Approver' });
+});
+
 async function mockWorkspace(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
@@ -200,6 +232,27 @@ async function mockWorkspace(page: Page) {
     })
   );
   await page.route('**/irondev-api/api/projects/7/chat/sessions', (route) => json(route, []));
+  await page.route('**/irondev-api/api/projects/7/members', (route) => json(route, {
+    projectId: 7,
+    projectName: 'BookSeller',
+    tenantId: 3,
+    currentUserTenantRole: 'Owner',
+    canAdministerTenantMembership: true,
+    canAdministerProjectMembership: true,
+    canAdministerChannelMembership: true,
+    availableTenantRoles: ['Owner', 'Viewer'],
+    availableProjectRoles: ['Owner', 'Contributor', 'Viewer'],
+    availableChannelRoles: [],
+    availableNotificationLevels: [],
+    projectMembershipStatus: '2 active members',
+    channelMembershipStatus: 'No active channels',
+    members: [
+      { userId: 7, displayName: 'Bob Developer', email: 'bob@irondev.local', tenantRole: 'Owner', projectRole: 'Owner', isProjectMember: true, isActive: true, isCurrentUser: true, projectAccessStatus: 'Project member', channelMembershipSummary: 'No explicit memberships' },
+      { userId: 8, displayName: 'Alice Reviewer', email: 'alice@irondev.local', tenantRole: 'Reviewer', projectRole: 'Contributor', isProjectMember: true, isActive: true, isCurrentUser: false, projectAccessStatus: 'Project member', channelMembershipSummary: 'No explicit memberships' }
+    ],
+    channels: [],
+    boundary: 'Project membership controls visibility only.'
+  }));
 }
 
 function json(route: Route, body: unknown, status = 200) {

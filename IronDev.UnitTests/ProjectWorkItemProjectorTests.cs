@@ -29,6 +29,31 @@ public sealed class ProjectWorkItemProjectorTests
     }
 
     [TestMethod]
+    public void Build_ProjectsDurableOwnershipAndAttributedActivity()
+    {
+        var collaboration = new ProjectWorkItemCollaborationSnapshot
+        {
+            WorkItemId = 42,
+            Revision = 3,
+            Assignee = new("Human", 8, "Alice Reviewer"),
+            Followers = [new("Human", 7, "Bob Developer")],
+            WaitingOn = new("Role", null, "Approver"),
+            RecentActivity =
+            [
+                new(Now, "CollaborationChanged", "Ownership changed.", new("Human", 7, "Bob Developer"))
+            ]
+        };
+
+        var model = ProjectWorkItemProjector.Build(Ticket(), null, null, Ready(), Now, collaboration);
+
+        Assert.AreEqual(3, model.Collaboration.Revision);
+        Assert.AreEqual("Alice Reviewer", model.Collaboration.Assignee?.DisplayName);
+        Assert.AreEqual("Bob Developer", model.Collaboration.Followers.Single().DisplayName);
+        Assert.AreEqual("Approver", model.Collaboration.WaitingOn?.DisplayName);
+        Assert.AreEqual("Bob Developer", model.Collaboration.RecentActivity.Single().Actor?.DisplayName);
+    }
+
+    [TestMethod]
     public void Build_BlockedReadinessNamesReasonAndSafeAction()
     {
         var readiness = new BuildReadinessResult

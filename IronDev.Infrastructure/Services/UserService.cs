@@ -391,6 +391,12 @@ public sealed class UserService : IUserService
                     SET Status = 'Removed', RemovedUtc = SYSUTCDATETIME()
                     WHERE TenantId = @TenantId AND UserId = @UserId AND Status = 'Active';
                 END;
+                IF OBJECT_ID(N'dbo.ProjectMembers', N'U') IS NOT NULL
+                BEGIN
+                    UPDATE dbo.ProjectMembers
+                    SET Status = 'Removed', RemovedUtc = SYSUTCDATETIME()
+                    WHERE TenantId = @TenantId AND UserId = @UserId AND Status = 'Active';
+                END;
                 """,
                 new { TenantId = tenantId, UserId = userId }, transaction, cancellationToken: ct));
 

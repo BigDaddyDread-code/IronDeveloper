@@ -1,6 +1,7 @@
 using IronDev.Core.Provisioning;
 using IronDev.Core.Runs;
 using IronDev.Data.Models;
+using IronDev.Core.Models;
 
 namespace IronDev.Core.Board;
 
@@ -82,7 +83,8 @@ public static class ProjectBoardProjector
         ProjectProvisioningReadiness readiness,
         IReadOnlyList<ProjectTicket> tickets,
         IReadOnlyList<RunRecord> runs,
-        DateTimeOffset generatedUtc)
+        DateTimeOffset generatedUtc,
+        IReadOnlyDictionary<long, ProjectWorkItemCollaborationSnapshot>? collaboration = null)
     {
         var latestRuns = runs
             .Where(run => run.ProjectId == project.Id && run.TicketId.HasValue)
@@ -93,7 +95,7 @@ public static class ProjectBoardProjector
 
         var items = tickets
             .Where(ticket => ticket.ProjectId == project.Id && !ticket.IsDeleted)
-            .Select(ticket => BuildItem(ticket, latestRuns.GetValueOrDefault(ticket.Id)))
+            .Select(ticket => BuildItem(ticket, latestRuns.GetValueOrDefault(ticket.Id), collaboration?.GetValueOrDefault(ticket.Id)))
             .OrderBy(item => StageOrder(item.Stage))
             .ThenByDescending(item => item.LastMeaningfulEventUtc)
             .ToArray();
@@ -108,7 +110,7 @@ public static class ProjectBoardProjector
         };
     }
 
-    private static ProjectBoardItemReadModel BuildItem(ProjectTicket ticket, RunRecord? latestRun)
+    private static ProjectBoardItemReadModel BuildItem(ProjectTicket ticket, RunRecord? latestRun, ProjectWorkItemCollaborationSnapshot? collaboration)
     {
         var stage = StageFor(ticket, latestRun);
         var attention = AttentionFor(ticket, latestRun);
@@ -124,8 +126,12 @@ public static class ProjectBoardProjector
             NeedsAttention = attention.NeedsAttention,
             AttentionReason = attention.Reason,
             NextSafeAction = attention.NextSafeAction,
-            WaitingOn = attention.WaitingOn,
-            Assignee = null,
+            WaitingOn = collaboration?.WaitingOn is { } waiting
+                ? new ProjectBoardWaitingOnReadModel { Kind = waiting.Kind, Label = waiting.DisplayName }
+                : attention.WaitingOn,
+            Assignee = collaboration?.Assignee is { UserId: int assigneeId } assignee
+                ? new ProjectBoardAssigneeReadModel { UserId = assigneeId, DisplayName = assignee.DisplayName }
+                : null,
             LastMeaningfulEventUtc = lastMeaningfulEventUtc,
             LatestRun = latestRun is null
                 ? null

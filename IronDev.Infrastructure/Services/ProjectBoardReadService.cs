@@ -2,6 +2,8 @@ using IronDev.Core.Board;
 using IronDev.Core.Provisioning;
 using IronDev.Core.Runs;
 using IronDev.Services;
+using IronDev.Core.Auth;
+using IronDev.Core.Interfaces;
 
 namespace IronDev.Infrastructure.Services;
 
@@ -11,17 +13,23 @@ public sealed class ProjectBoardReadService : IProjectBoardReadService
     private readonly ITicketService _tickets;
     private readonly IRunStore _runs;
     private readonly IProjectProvisioningReadinessService _readiness;
+    private readonly IProjectWorkItemCollaborationService _collaboration;
+    private readonly ICurrentTenantContext _tenant;
 
     public ProjectBoardReadService(
         IProjectService projects,
         ITicketService tickets,
         IRunStore runs,
-        IProjectProvisioningReadinessService readiness)
+        IProjectProvisioningReadinessService readiness,
+        IProjectWorkItemCollaborationService collaboration,
+        ICurrentTenantContext tenant)
     {
         _projects = projects;
         _tickets = tickets;
         _runs = runs;
         _readiness = readiness;
+        _collaboration = collaboration;
+        _tenant = tenant;
     }
 
     public async Task<ProjectBoardReadModel?> GetAsync(
@@ -37,8 +45,9 @@ public sealed class ProjectBoardReadService : IProjectBoardReadService
         var readinessTask = _readiness.EvaluateAsync(projectId, cancellationToken);
         var ticketsTask = _tickets.GetRecentTicketsAsync(projectId, boundedTake, cancellationToken);
         var runsTask = _runs.GetRecentForProjectAsync(projectId, Math.Max(200, boundedTake * 4), cancellationToken);
+        var collaborationTask = _collaboration.GetForProjectAsync(_tenant.TenantId, projectId, cancellationToken);
 
-        await Task.WhenAll(readinessTask, ticketsTask, runsTask).ConfigureAwait(false);
+        await Task.WhenAll(readinessTask, ticketsTask, runsTask, collaborationTask).ConfigureAwait(false);
         var readiness = await readinessTask.ConfigureAwait(false);
         if (readiness is null)
             return null;
@@ -48,6 +57,7 @@ public sealed class ProjectBoardReadService : IProjectBoardReadService
             readiness,
             await ticketsTask.ConfigureAwait(false),
             await runsTask.ConfigureAwait(false),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            await collaborationTask.ConfigureAwait(false));
     }
 }

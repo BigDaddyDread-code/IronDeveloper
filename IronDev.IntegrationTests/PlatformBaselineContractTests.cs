@@ -46,7 +46,11 @@ public sealed class PlatformBaselineContractTests
         AssertOrder(source, "DELETE FROM dbo.ProjectDocumentLinks", "DELETE FROM dbo.ProjectDocumentVersions");
         AssertOrder(source, "DELETE FROM dbo.ProjectDocumentVersions", "DELETE FROM dbo.ProjectDocuments");
         AssertOrder(source, "DELETE FROM dbo.ProjectChannelMembers", "DELETE FROM dbo.ProjectChannels");
+        AssertOrder(source, "DELETE FROM dbo.ProjectWorkItemActivity", "DELETE FROM dbo.ProjectTickets");
+        AssertOrder(source, "DELETE FROM dbo.ProjectWorkItemFollowers", "DELETE FROM dbo.ProjectTickets");
+        AssertOrder(source, "DELETE FROM dbo.ProjectWorkItemCollaboration", "DELETE FROM dbo.ProjectTickets");
         AssertOrder(source, "DELETE FROM dbo.ProjectChannels", "DELETE FROM dbo.Projects");
+        AssertOrder(source, "DELETE FROM dbo.ProjectMembers", "DELETE FROM dbo.Projects");
         AssertOrder(source, "DELETE FROM dbo.Projects", "DELETE FROM dbo.TenantUsers");
         AssertOrder(source, "DELETE FROM dbo.TenantUsers", "DELETE FROM dbo.Users WHERE Id <> 1");
         StringAssert.Contains(source, "DELETE FROM dbo.SemanticSearchTraces");

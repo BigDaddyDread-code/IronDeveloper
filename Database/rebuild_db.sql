@@ -12,6 +12,9 @@ IF OBJECT_ID('dbo.ChatTurnTraces', 'U') IS NOT NULL DROP TABLE dbo.ChatTurnTrace
 IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NOT NULL DROP TABLE dbo.ChatTurnClarifications;
 IF OBJECT_ID('dbo.ChatTurnGovernance', 'U') IS NOT NULL DROP TABLE dbo.ChatTurnGovernance;
 IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DROP TABLE dbo.ArtifactSourceReferences;
+IF OBJECT_ID('dbo.ProjectWorkItemActivity', 'U') IS NOT NULL DROP TABLE dbo.ProjectWorkItemActivity;
+IF OBJECT_ID('dbo.ProjectWorkItemFollowers', 'U') IS NOT NULL DROP TABLE dbo.ProjectWorkItemFollowers;
+IF OBJECT_ID('dbo.ProjectWorkItemCollaboration', 'U') IS NOT NULL DROP TABLE dbo.ProjectWorkItemCollaboration;
 IF OBJECT_ID('dbo.ProjectTickets', 'U') IS NOT NULL DROP TABLE dbo.ProjectTickets;
 IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DROP TABLE dbo.ProjectRules;
 IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DROP TABLE dbo.ProjectImplementationPlans;
@@ -25,6 +28,7 @@ IF OBJECT_ID('dbo.CodeIndexEntries', 'U') IS NOT NULL DROP TABLE dbo.CodeIndexEn
 IF OBJECT_ID('dbo.ChatMessages', 'U') IS NOT NULL DROP TABLE dbo.ChatMessages;
 IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DROP TABLE dbo.ProjectChatSessions;
 IF OBJECT_ID('dbo.ProjectFiles', 'U') IS NOT NULL DROP TABLE dbo.ProjectFiles;
+IF OBJECT_ID('dbo.ProjectMembers', 'U') IS NOT NULL DROP TABLE dbo.ProjectMembers;
 IF OBJECT_ID('dbo.Projects', 'U') IS NOT NULL DROP TABLE dbo.Projects;
 IF OBJECT_ID('dbo.TenantUsers', 'U') IS NOT NULL DROP TABLE dbo.TenantUsers;
 IF OBJECT_ID('dbo.Users', 'U') IS NOT NULL DROP TABLE dbo.Users;
