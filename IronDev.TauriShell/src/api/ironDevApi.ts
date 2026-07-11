@@ -1374,7 +1374,8 @@ const skeletonAgentRoleNames = new Map<number, string>([
   [0, 'Orchestrator'],
   [1, 'Builder'],
   [2, 'Tester'],
-  [3, 'Critic']
+  [3, 'Critic'],
+  [4, 'Analyst']
 ]);
 
 function normalizeSkeletonAgentProfile(profile: RawSkeletonAgentProfile): SkeletonAgentProfile {

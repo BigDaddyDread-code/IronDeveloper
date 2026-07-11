@@ -11,7 +11,50 @@ public enum SkeletonAgentRole
     Orchestrator = 0,
     Builder = 1,
     Tester = 2,
-    Critic = 3
+    Critic = 3,
+    Analyst = 4
+}
+
+public static class SkeletonAgentRoles
+{
+    public static readonly IReadOnlyList<SkeletonAgentRole> ProfileOrder =
+    [
+        SkeletonAgentRole.Analyst,
+        SkeletonAgentRole.Builder,
+        SkeletonAgentRole.Tester,
+        SkeletonAgentRole.Critic,
+        SkeletonAgentRole.Orchestrator
+    ];
+
+    public static string DisplayName(SkeletonAgentRole role) => role switch
+    {
+        SkeletonAgentRole.Analyst => "Workshop guide",
+        _ => role.ToString()
+    };
+
+    public static string CodeOwnedBoundary(SkeletonAgentRole role) => $"{SkeletonAgentProfile.BoundaryText} {RoleBoundary(role)}";
+
+    private static string RoleBoundary(SkeletonAgentRole role) => role switch
+    {
+        SkeletonAgentRole.Analyst =>
+            "The Analyst is the Workshop guide. It inspects project context, asks useful questions, " +
+            "separates facts from assumptions, preserves provenance, and prepares Work Item proposals. " +
+            "It cannot approve, start a governed build without a separate action, continue workflow, " +
+            "disposition findings, or apply source.",
+        SkeletonAgentRole.Builder =>
+            "The Builder proposes bounded implementation changes from the confirmed contract. It cannot approve its own work, " +
+            "alter the Work Item contract silently, claim tests executed when they did not, or apply source without the governed apply chain.",
+        SkeletonAgentRole.Tester =>
+            "The Tester independently derives and reports test evidence. It cannot approve, suppress failed evidence, " +
+            "treat compilation as test proof, or inherit Builder conclusions as fact.",
+        SkeletonAgentRole.Critic =>
+            "The Critic independently reviews the sealed package. It cannot share agent memory, receive hidden Builder reasoning, " +
+            "approve, modify the package, or disposition its own findings.",
+        SkeletonAgentRole.Orchestrator =>
+            "The Orchestrator deterministically coordinates workflow stages and gates. It runs no model, has no editable skill, " +
+            "has no provider connection, and has no approval authority.",
+        _ => SkeletonAgentProfile.BoundaryText
+    };
 }
 
 /// <summary>
