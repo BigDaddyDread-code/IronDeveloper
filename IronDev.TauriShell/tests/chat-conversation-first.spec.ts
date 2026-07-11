@@ -85,6 +85,65 @@ test('an answered conversation reveals sources only when the user asks', async (
   await expect(page.getByTestId('chat.contextPanel')).toContainText('src/Catalog/CatalogService.cs');
 });
 
+test('details rail wraps long backend context metadata inside the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await mockChatWorkspace(page, {
+    projectName: 'IronDev Local Test Project',
+    completionResponseOverrides: {
+      auditSource: 'live',
+      routeTraceId: 'CE73B21555174E58BD381E8A02739111',
+      routeSource: 'ProjectChatContextPipeline',
+      clarification: {
+        required: true,
+        kind: 'GovernanceIntent'
+      },
+      gate: {
+        mode: 'Formalization',
+        canSaveDiscussion: true,
+        canCreateTicket: true,
+        canViewSources: true,
+        canCopyMarkdown: true,
+        reason: 'The user is explicitly requesting to create a ticket after detailed discussion about enhancing the ticket workspace with security features.',
+        confidence: 1,
+        governanceActions: ['saveDiscussion', 'viewSources', 'copyMarkdown']
+      }
+    }
+  });
+  await page.goto('/projects/7/workshop');
+
+  await page.getByTestId('chat.composer.input').fill('Make the ticket workspace feel governed.');
+  await page.getByTestId('chat.command.send').click();
+  await page.getByTestId('chat.message.viewSources').click();
+  await expect(page.getByTestId('chat.contextPanel')).toBeVisible();
+
+  const layout = await page.getByTestId('chat.contextPanel').evaluate((panel) => {
+    const panelRect = panel.getBoundingClientRect();
+    const offenders = Array.from(panel.querySelectorAll('*'))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          text: element.textContent?.trim().slice(0, 60) ?? '',
+          left: rect.left,
+          right: rect.right
+        };
+      })
+      .filter((item) => item.left < panelRect.left - 1 || item.right > panelRect.right + 1);
+
+    return {
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      panelLeft: panelRect.left,
+      panelRight: panelRect.right,
+      offenders
+    };
+  });
+
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth);
+  expect(layout.panelLeft).toBeGreaterThanOrEqual(0);
+  expect(layout.panelRight).toBeLessThanOrEqual(layout.clientWidth);
+  expect(layout.offenders).toEqual([]);
+});
+
 test('a Ready exact document version is attached, disclosed, and restored from history', async ({ page }) => {
   const source = readyDocumentSource();
   const state = await mockChatWorkspace(page, { documentSources: [source] });
@@ -249,9 +308,11 @@ interface ChatMockOptions {
   history?: Array<Record<string, unknown>>;
   completionDelayMs?: number;
   completionStatus?: number;
+  completionResponseOverrides?: Record<string, unknown>;
   includeBaDraft?: boolean;
   documentSources?: Array<Record<string, unknown>>;
   documentSourceStatus?: number;
+  projectName?: string;
 }
 
 interface ChatMockState {
@@ -308,7 +369,7 @@ async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Pro
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
+      body: JSON.stringify([{ id: 7, tenantId: 3, name: options.projectName ?? 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
     })
   );
   await page.route('**/irondev-api/api/projects/7/select', (route) =>
@@ -436,7 +497,8 @@ async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Pro
               suggestedArtifact: 'Ticket draft',
               boundary: 'Draft only. Confirmation remains a separate human action.'
             }
-          : null
+          : null,
+        ...options.completionResponseOverrides
       })
     });
   });

@@ -4445,6 +4445,7 @@ p {
 
 .chat-context-panel {
   min-width: 0;
+  max-width: 100%;
   max-height: calc(100vh - 175px);
   overflow: auto;
   border: 1px solid var(--fl-line);
@@ -4452,6 +4453,38 @@ p {
   background: var(--fl-panel);
   color: var(--fl-ink);
   padding: 14px;
+}
+
+.chat-context-panel .section-heading,
+.chat-context-panel .workflow-section,
+.chat-context-panel__header {
+  min-width: 0;
+}
+
+.chat-context-panel .metadata-row {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.chat-context-panel .metadata-row dt,
+.chat-context-panel .metadata-row dd {
+  min-width: 0;
+}
+
+.chat-context-panel .metadata-row dd {
+  max-width: 100%;
+}
+
+.chat-context-panel .status-badge {
+  max-width: 100%;
+  height: auto;
+  min-height: 1.5rem;
+  justify-content: center;
+  overflow-wrap: anywhere;
+  text-align: right;
+  white-space: normal;
 }
 
 @media (max-width: 900px) {
