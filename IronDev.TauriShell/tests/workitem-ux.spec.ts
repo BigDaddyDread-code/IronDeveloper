@@ -216,6 +216,42 @@ test('execution proof renders durable events separately from artifact evidence',
   }
 });
 
+test('Work Item authority names eligible humans and actor attribution', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockProjectWorkItem(page, {
+    stage: 'Review',
+    state: 'Completed',
+    primaryActionKind: 'Apply',
+    primaryActionLabel: 'Review controlled apply',
+    authority: {
+      currentUserId: 7,
+      currentUserEligibleToContinue: true,
+      soloApprovalExceptionAllowed: false,
+      selfApprovalPolicy: 'A different eligible human must approve before this user can continue workflow.',
+      acceptedApprovalActorId: '8',
+      acceptedApprovalActorDisplayName: 'Alice Reviewer',
+      continuationRequestedByUserId: '7',
+      soloApprovalExceptionUsed: false,
+      eligibleApprovers: [
+        { userId: 8, displayName: 'Alice Reviewer', email: 'alice@irondev.local', projectRole: 'Contributor' },
+        { userId: 7, displayName: 'Bob Developer', email: 'bob@irondev.local', projectRole: 'Owner' }
+      ],
+      boundary: 'Eligible reviewer and approver lists come from backend project membership.'
+    }
+  });
+
+  await page.goto('/projects/7/work-items/42');
+
+  const authority = page.getByTestId('flow.workItem.authority');
+  await expect(authority).toContainText('Eligible');
+  await expect(authority).toContainText('Different human required');
+  await expect(authority).toContainText('Alice Reviewer');
+  await expect(authority).toContainText('Bob Developer');
+  await expect(authority).toContainText('Continued by');
+  await expect(authority).toContainText('User 7');
+  await expect(authority).toContainText('backend project membership');
+});
+
 test('Discuss in Chat routes to the exact backend-linked session', async ({ page }) => {
   await mockWorkspace(page);
   await mockProjectWorkItem(page, { linkedChatSessionId: 9007 });

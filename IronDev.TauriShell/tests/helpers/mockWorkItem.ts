@@ -21,6 +21,7 @@ export interface MockWorkItemProjectionOptions {
   applyRecovery?: Record<string, unknown>;
   executionProof?: Record<string, unknown>;
   collaboration?: Record<string, unknown>;
+  authority?: Record<string, unknown>;
 }
 
 export function workItemProjection(options: MockWorkItemProjectionOptions = {}) {
@@ -59,6 +60,21 @@ export function workItemProjection(options: MockWorkItemProjectionOptions = {}) 
       waitingOn: null,
       linkedChatSessionId: options.linkedChatSessionId ?? null,
       recentActivity: []
+    },
+    authority: options.authority ?? {
+      currentUserId: 7,
+      currentUserEligibleToContinue: true,
+      soloApprovalExceptionAllowed: false,
+      selfApprovalPolicy: 'A different eligible human must approve before this user can continue workflow.',
+      acceptedApprovalActorId: '',
+      acceptedApprovalActorDisplayName: '',
+      continuationRequestedByUserId: '',
+      soloApprovalExceptionUsed: false,
+      eligibleApprovers: [
+        { userId: 8, displayName: 'Alice Reviewer', email: 'alice@irondev.local', projectRole: 'Contributor' },
+        { userId: 7, displayName: 'Bob Developer', email: 'bob@irondev.local', projectRole: 'Owner' }
+      ],
+      boundary: 'Eligible reviewer and approver lists come from backend project membership.'
     },
     latestRun: null,
     gate: {

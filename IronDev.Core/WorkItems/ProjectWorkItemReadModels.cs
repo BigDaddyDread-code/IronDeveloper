@@ -60,6 +60,7 @@ public sealed record ProjectWorkItemReadModel
     public required ProjectTicket Ticket { get; init; }
     public required ProjectWorkItemContractReadModel Contract { get; init; }
     public required ProjectWorkItemCollaborationReadModel Collaboration { get; init; }
+    public required ProjectWorkItemAuthorityReadModel Authority { get; init; }
     public ProjectWorkItemRunReadModel? LatestRun { get; init; }
     public required ProjectWorkItemGateReadModel Gate { get; init; }
     public required ProjectWorkItemActionReadModel PrimaryAction { get; init; }
@@ -162,6 +163,32 @@ public sealed record ProjectWorkItemActivityReadModel
     public ProjectWorkItemActorReadModel? Actor { get; init; }
 }
 
+public sealed record ProjectWorkItemAuthorityReadModel
+{
+    public int CurrentUserId { get; init; }
+    public bool CurrentUserEligibleToContinue { get; init; }
+    public bool SoloApprovalExceptionAllowed { get; init; }
+    public string SelfApprovalPolicy { get; init; } = string.Empty;
+    public string AcceptedApprovalActorId { get; init; } = string.Empty;
+    public string AcceptedApprovalActorDisplayName { get; init; } = string.Empty;
+    public string ContinuationRequestedByUserId { get; init; } = string.Empty;
+    public bool SoloApprovalExceptionUsed { get; init; }
+    public IReadOnlyList<ProjectWorkItemAuthorityActorReadModel> EligibleApprovers { get; init; } = [];
+    public string Boundary { get; init; } = BoundaryText;
+
+    public const string BoundaryText =
+        "Eligible reviewer and approver lists come from backend project membership. Visibility, assignment, and UI controls " +
+        "do not grant approval, continuation, apply, commit, push, release, or deployment authority.";
+}
+
+public sealed record ProjectWorkItemAuthorityActorReadModel
+{
+    public int UserId { get; init; }
+    public string DisplayName { get; init; } = string.Empty;
+    public string Email { get; init; } = string.Empty;
+    public string ProjectRole { get; init; } = string.Empty;
+}
+
 public sealed record ProjectWorkItemRunReadModel
 {
     public string RunId { get; init; } = string.Empty;
@@ -210,6 +237,7 @@ public interface IProjectWorkItemReadService
     Task<ProjectWorkItemReadModel?> GetAsync(
         int projectId,
         long workItemId,
+        int currentUserId,
         CancellationToken cancellationToken = default);
 }
 
@@ -221,7 +249,10 @@ public static class ProjectWorkItemProjector
         SkeletonRunReport? report,
         BuildReadinessResult readiness,
         DateTimeOffset generatedUtc,
-        ProjectWorkItemCollaborationSnapshot? collaboration = null)
+        ProjectWorkItemCollaborationSnapshot? collaboration = null,
+        ProjectMemberDirectoryResponse? members = null,
+        int currentUserId = 0,
+        bool soloApprovalExceptionAllowed = false)
     {
         var stage = StageFor(ticket, latestRun);
         var waitingOn = WaitingOn(ticket, latestRun, readiness);
@@ -281,6 +312,7 @@ public static class ProjectWorkItemProjector
                 LinkedChatSessionId = ticket.SourceChatSessionId,
                 RecentActivity = activity
             },
+            Authority = AuthorityModel(report, members, currentUserId, soloApprovalExceptionAllowed),
             LatestRun = RunModel(latestRun, report),
             Gate = gate,
             PrimaryAction = action,
@@ -302,6 +334,47 @@ public static class ProjectWorkItemProjector
     private static ProjectWorkItemActorReadModel? MapActor(ProjectWorkItemCollaborator? actor) => actor is null
         ? null
         : new ProjectWorkItemActorReadModel { Kind = actor.Kind, UserId = actor.UserId, DisplayName = actor.DisplayName };
+
+    private static ProjectWorkItemAuthorityReadModel AuthorityModel(
+        SkeletonRunReport? report,
+        ProjectMemberDirectoryResponse? members,
+        int currentUserId,
+        bool soloApprovalExceptionAllowed)
+    {
+        var eligibleApprovers = (members?.Members ?? [])
+            .Where(IsEligibleAuthorityMember)
+            .Select(member => new ProjectWorkItemAuthorityActorReadModel
+            {
+                UserId = member.UserId,
+                DisplayName = member.DisplayName,
+                Email = member.Email,
+                ProjectRole = member.ProjectRole ?? string.Empty
+            })
+            .OrderBy(member => member.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(member => member.UserId)
+            .ToArray();
+
+        return new ProjectWorkItemAuthorityReadModel
+        {
+            CurrentUserId = currentUserId,
+            CurrentUserEligibleToContinue = eligibleApprovers.Any(member => member.UserId == currentUserId),
+            SoloApprovalExceptionAllowed = soloApprovalExceptionAllowed,
+            SelfApprovalPolicy = soloApprovalExceptionAllowed
+                ? "Explicit solo exception is enabled; the backend still records it when used."
+                : "A different eligible human must approve before this user can continue workflow.",
+            AcceptedApprovalActorId = report?.Approval?.ApprovedByActorId ?? string.Empty,
+            AcceptedApprovalActorDisplayName = report?.Approval?.ApprovedByActorDisplayName ?? string.Empty,
+            ContinuationRequestedByUserId = report?.Approval?.ContinuationRequestedByUserId ?? string.Empty,
+            SoloApprovalExceptionUsed = report?.Approval?.SoloApprovalExceptionUsed == true,
+            EligibleApprovers = eligibleApprovers
+        };
+    }
+
+    private static bool IsEligibleAuthorityMember(ProjectMemberDirectoryEntry member) =>
+        member.IsActive &&
+        member.IsProjectMember &&
+        (string.Equals(member.ProjectRole, ProjectMemberRoles.Owner, StringComparison.Ordinal) ||
+         string.Equals(member.ProjectRole, ProjectMemberRoles.Contributor, StringComparison.Ordinal));
 
     private static ProjectWorkItemExecutionProofReadModel ExecutionProofFor(RunRecord? run, SkeletonRunReport? report)
     {

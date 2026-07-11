@@ -35,7 +35,8 @@ public sealed class ProjectWorkItemsController : ControllerBase
         long workItemId,
         CancellationToken cancellationToken)
     {
-        var model = await _workItems.GetAsync(projectId, workItemId, cancellationToken).ConfigureAwait(false);
+        var currentUser = new CurrentUserContext(HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
+        var model = await _workItems.GetAsync(projectId, workItemId, currentUser.UserId, cancellationToken).ConfigureAwait(false);
         return model is null ? NotFound() : Ok(model);
     }
 

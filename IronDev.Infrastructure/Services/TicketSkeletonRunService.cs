@@ -46,6 +46,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private readonly IWorkflowApprovalHaltEvaluator _approvalHalt;
     private readonly ISkeletonTestAuthoringService _testAuthoring;
     private readonly ISkeletonMutationLeaseService _mutationLeases;
+    private readonly IProjectMembershipService _projectMemberships;
     private readonly SkeletonRunDriftDetector _driftDetector;
     private readonly IConfiguration _configuration;
 
@@ -61,6 +62,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         IWorkflowApprovalHaltEvaluator approvalHalt,
         ISkeletonTestAuthoringService testAuthoring,
         ISkeletonMutationLeaseService mutationLeases,
+        IProjectMembershipService projectMemberships,
         IConfiguration configuration)
     {
         _tickets = tickets;
@@ -74,6 +76,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _approvalHalt = approvalHalt;
         _testAuthoring = testAuthoring;
         _mutationLeases = mutationLeases;
+        _projectMemberships = projectMemberships;
         _driftDetector = new SkeletonRunDriftDetector(events);
         _configuration = configuration;
     }
@@ -398,10 +401,22 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         return ToDto(updated, projectId, ticketId, requiresHumanApproval: updated.State == RunLifecycleState.PausedForApproval);
     }
 
-    public async Task<TicketBuildRunDto?> ContinueAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default)
+    public Task<TicketBuildRunDto?> ContinueAsync(int projectId, long ticketId, string runId, CancellationToken cancellationToken = default) =>
+        ContinueAsAsync(projectId, ticketId, runId, "unknown-user", cancellationToken);
+
+    public async Task<TicketBuildRunDto?> ContinueAsAsync(
+        int projectId,
+        long ticketId,
+        string runId,
+        string requestedByUserId,
+        CancellationToken cancellationToken = default)
     {
         var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
         if (ticket is null || ticket.ProjectId != projectId)
+            return null;
+
+        var project = await _projects.GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+        if (project is null)
             return null;
 
         var run = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false);
@@ -546,6 +561,31 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return ToDto(still, projectId, ticketId, requiresHumanApproval: true);
         }
 
+        var acceptedApproval = candidates.First(candidate => candidate.AcceptedApprovalId == satisfied!.AcceptedApprovalId);
+        var authority = await EvaluateContinuationAuthorityAsync(
+            project.TenantId,
+            projectId,
+            requestedByUserId,
+            acceptedApproval,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!authority.IsAllowed)
+        {
+            await PublishAsync(runId, "ContinuationRefused",
+                $"Continuation refused: {authority.RefusedBecause}",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["refusedReason"] = authority.RefusedReason,
+                    ["requestedByUserId"] = NormalizeActorId(requestedByUserId),
+                    ["approvedByActorId"] = acceptedApproval.ApprovedByActorId,
+                    ["eligibleUserIds"] = string.Join(",", authority.EligibleUserIds),
+                    ["soloApprovalExceptionAllowed"] = authority.SoloApprovalExceptionAllowed.ToString().ToLowerInvariant(),
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+            var still = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false) ?? run;
+            return ToDto(still, projectId, ticketId, requiresHumanApproval: true);
+        }
+
         await _runs.TransitionAsync(new RunStateTransition
         {
             RunId = runId,
@@ -559,6 +599,10 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             {
                 ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
                 ["approvalTargetHash"] = packageHash,
+                ["approvedByActorId"] = acceptedApproval.ApprovedByActorId,
+                ["approvedByActorDisplayName"] = acceptedApproval.ApprovedByActorDisplayName ?? string.Empty,
+                ["requestedByUserId"] = NormalizeActorId(requestedByUserId),
+                ["soloApprovalExceptionUsed"] = authority.SoloApprovalExceptionUsed.ToString().ToLowerInvariant(),
                 ["currentNode"] = "SkeletonRun"
             }, cancellationToken).ConfigureAwait(false);
 
@@ -1128,7 +1172,22 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 cancellationToken).ConfigureAwait(false);
         }
 
-        var approvedByActorId = candidates.First(candidate => candidate.AcceptedApprovalId == satisfied.AcceptedApprovalId).ApprovedByActorId;
+        var acceptedApproval = candidates.First(candidate => candidate.AcceptedApprovalId == satisfied.AcceptedApprovalId);
+        var approvedByActorId = acceptedApproval.ApprovedByActorId;
+        var applyAuthority = await EvaluateApplyAuthorityAsync(
+            project.TenantId,
+            projectId,
+            requestedByUserId,
+            acceptedApproval,
+            cancellationToken).ConfigureAwait(false);
+        if (!applyAuthority.IsAllowed)
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                applyAuthority.RefusedReason,
+                applyAuthority.RefusedBecause,
+                cancellationToken).ConfigureAwait(false);
+        }
+
         var package = JsonSerializer.Deserialize<SkeletonCriticPackage>(System.Text.Encoding.UTF8.GetString(packageBytes), JsonOptions)!;
 
         // P2-4: overlapping applies take turns. The lease covers the approved
@@ -1180,6 +1239,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                     ["applyAttemptId"] = applyAttemptId,
                     ["attemptNumber"] = attemptNumber.ToString(),
                     ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
+                    ["approvedByActorId"] = approvedByActorId,
+                    ["requestedByUserId"] = NormalizeActorId(requestedByUserId),
                     ["approvalTargetHash"] = packageHash,
                     ["mutationLeaseId"] = lease.LeaseId,
                     ["currentNode"] = "SkeletonApply"
@@ -1262,6 +1323,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                     ["applyAttemptId"] = applyAttemptId,
                     ["attemptNumber"] = attemptNumber.ToString(),
                     ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
+                    ["approvedByActorId"] = approvedByActorId,
+                    ["requestedByUserId"] = NormalizeActorId(requestedByUserId),
                     ["workspacePath"] = spineResult.WorkspacePath,
                     ["currentNode"] = "SkeletonApply"
                 }, cancellationToken).ConfigureAwait(false);
@@ -1281,6 +1344,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                     ["applyAttemptId"] = applyAttemptId,
                     ["attemptNumber"] = attemptNumber.ToString(),
                     ["acceptedApprovalId"] = satisfied.AcceptedApprovalId?.ToString("D") ?? string.Empty,
+                    ["approvedByActorId"] = approvedByActorId,
+                    ["requestedByUserId"] = NormalizeActorId(requestedByUserId),
                     ["workspacePath"] = spineResult.WorkspacePath,
                     ["evidenceChain"] = string.Join(",", spineResult.Stages.Select(stage => stage.Stage)),
                     ["currentNode"] = "SkeletonApply"
@@ -1368,6 +1433,131 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 ["stage"] = stage,
                 ["currentNode"] = "SkeletonApplyRecovery"
             }, CancellationToken.None);
+
+    private async Task<SkeletonAuthorityEvaluation> EvaluateContinuationAuthorityAsync(
+        int tenantId,
+        int projectId,
+        string requestedByUserId,
+        AcceptedApprovalRecord acceptedApproval,
+        CancellationToken cancellationToken)
+    {
+        var requestedActorId = NormalizeActorId(requestedByUserId);
+        var members = await _projectMemberships.GetMembersAsync(
+            tenantId,
+            projectId,
+            TryParseActorUserId(requestedActorId),
+            cancellationToken).ConfigureAwait(false);
+        var eligible = members.Where(IsEligibleAuthorityMember).ToArray();
+        var eligibleUserIds = eligible.Select(member => member.UserId.ToString()).ToArray();
+        var continuationActor = eligible.FirstOrDefault(member => IsActor(member, requestedActorId));
+        if (continuationActor is null)
+        {
+            return SkeletonAuthorityEvaluation.Refused(
+                "ContinuationActorNotEligible",
+                "the acting human is not an active Owner or Contributor on this project.",
+                eligibleUserIds,
+                ReadSoloApprovalExceptionAllowed());
+        }
+
+        var approvingActor = eligible.FirstOrDefault(member => IsActor(member, acceptedApproval.ApprovedByActorId));
+        if (approvingActor is null)
+        {
+            return SkeletonAuthorityEvaluation.Refused(
+                "AcceptedApprovalActorNotEligible",
+                "the accepted approval was recorded by a user who is no longer an active Owner or Contributor on this project.",
+                eligibleUserIds,
+                ReadSoloApprovalExceptionAllowed());
+        }
+
+        var sameHuman = continuationActor.UserId == approvingActor.UserId;
+        var allowSolo = ReadSoloApprovalExceptionAllowed();
+        if (sameHuman && !allowSolo)
+        {
+            return SkeletonAuthorityEvaluation.Refused(
+                "SelfApprovalRefused",
+                "the same eligible human recorded the accepted approval and requested continuation. A different eligible human is required unless the solo exception is explicitly enabled.",
+                eligibleUserIds,
+                allowSolo);
+        }
+
+        return SkeletonAuthorityEvaluation.Allowed(eligibleUserIds, allowSolo, sameHuman && allowSolo);
+    }
+
+    private async Task<SkeletonAuthorityEvaluation> EvaluateApplyAuthorityAsync(
+        int tenantId,
+        int projectId,
+        string requestedByUserId,
+        AcceptedApprovalRecord acceptedApproval,
+        CancellationToken cancellationToken)
+    {
+        var requestedActorId = NormalizeActorId(requestedByUserId);
+        var members = await _projectMemberships.GetMembersAsync(
+            tenantId,
+            projectId,
+            TryParseActorUserId(requestedActorId),
+            cancellationToken).ConfigureAwait(false);
+        var eligible = members.Where(IsEligibleAuthorityMember).ToArray();
+        var eligibleUserIds = eligible.Select(member => member.UserId.ToString()).ToArray();
+
+        if (!eligible.Any(member => IsActor(member, requestedActorId)))
+        {
+            return SkeletonAuthorityEvaluation.Refused(
+                "ApplyActorNotEligible",
+                "the acting human is not an active Owner or Contributor on this project.",
+                eligibleUserIds,
+                ReadSoloApprovalExceptionAllowed());
+        }
+
+        if (!eligible.Any(member => IsActor(member, acceptedApproval.ApprovedByActorId)))
+        {
+            return SkeletonAuthorityEvaluation.Refused(
+                "AcceptedApprovalActorNotEligible",
+                "the accepted approval was recorded by a user who is no longer an active Owner or Contributor on this project.",
+                eligibleUserIds,
+                ReadSoloApprovalExceptionAllowed());
+        }
+
+        return SkeletonAuthorityEvaluation.Allowed(eligibleUserIds, ReadSoloApprovalExceptionAllowed(), false);
+    }
+
+    private static bool IsEligibleAuthorityMember(ProjectMembershipEntry member) =>
+        string.Equals(member.ProjectRole, ProjectMemberRoles.Owner, StringComparison.Ordinal) ||
+        string.Equals(member.ProjectRole, ProjectMemberRoles.Contributor, StringComparison.Ordinal);
+
+    private static bool IsActor(ProjectMembershipEntry member, string actorId) =>
+        string.Equals(member.UserId.ToString(), NormalizeActorId(actorId), StringComparison.Ordinal) ||
+        string.Equals(member.Email, actorId, StringComparison.OrdinalIgnoreCase);
+
+    private static int TryParseActorUserId(string actorId) =>
+        int.TryParse(actorId, out var userId) ? userId : 0;
+
+    private static string NormalizeActorId(string? actorId) =>
+        string.IsNullOrWhiteSpace(actorId) ? "unknown-user" : actorId.Trim();
+
+    private bool ReadSoloApprovalExceptionAllowed() =>
+        string.Equals(_configuration["SkeletonAuthority:AllowSoloApproval"], "true", StringComparison.OrdinalIgnoreCase);
+
+    private sealed record SkeletonAuthorityEvaluation(
+        bool IsAllowed,
+        string RefusedReason,
+        string RefusedBecause,
+        IReadOnlyList<string> EligibleUserIds,
+        bool SoloApprovalExceptionAllowed,
+        bool SoloApprovalExceptionUsed)
+    {
+        public static SkeletonAuthorityEvaluation Allowed(
+            IReadOnlyList<string> eligibleUserIds,
+            bool soloApprovalExceptionAllowed,
+            bool soloApprovalExceptionUsed) =>
+            new(true, string.Empty, string.Empty, eligibleUserIds, soloApprovalExceptionAllowed, soloApprovalExceptionUsed);
+
+        public static SkeletonAuthorityEvaluation Refused(
+            string refusedReason,
+            string refusedBecause,
+            IReadOnlyList<string> eligibleUserIds,
+            bool soloApprovalExceptionAllowed) =>
+            new(false, refusedReason, refusedBecause, eligibleUserIds, soloApprovalExceptionAllowed, false);
+    }
 
     /// <summary>
     /// Deterministic governance-scope Guid for an int project id, so approvals recorded
@@ -1635,7 +1825,12 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 CapabilityCode = haltEvent is null ? string.Empty : Payload(haltEvent, "capabilityCode"),
                 HaltObserved = haltEvent is not null,
                 ContinuationUnblocked = unblockedEvent is not null,
-                AcceptedApprovalId = unblockedEvent is null ? string.Empty : Payload(unblockedEvent, "acceptedApprovalId")
+                AcceptedApprovalId = unblockedEvent is null ? string.Empty : Payload(unblockedEvent, "acceptedApprovalId"),
+                ApprovedByActorId = unblockedEvent is null ? string.Empty : Payload(unblockedEvent, "approvedByActorId"),
+                ApprovedByActorDisplayName = unblockedEvent is null ? string.Empty : Payload(unblockedEvent, "approvedByActorDisplayName"),
+                ContinuationRequestedByUserId = unblockedEvent is null ? string.Empty : Payload(unblockedEvent, "requestedByUserId"),
+                SoloApprovalExceptionUsed = unblockedEvent is not null &&
+                    string.Equals(Payload(unblockedEvent, "soloApprovalExceptionUsed"), "true", StringComparison.OrdinalIgnoreCase)
             };
 
             if (unblockedEvent is not null && haltEvent is null)

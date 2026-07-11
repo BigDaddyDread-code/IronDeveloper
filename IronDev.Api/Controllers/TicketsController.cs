@@ -382,7 +382,7 @@ public sealed class TicketsController : ControllerBase
         string runId,
         CancellationToken ct)
     {
-        var result = await _skeletonRuns.ContinueAsync(projectId, ticketId, runId, ct);
+        var result = await _skeletonRuns.ContinueAsAsync(projectId, ticketId, runId, CurrentUserId(), ct);
         return result is null ? NotFound() : Ok(result);
     }
 

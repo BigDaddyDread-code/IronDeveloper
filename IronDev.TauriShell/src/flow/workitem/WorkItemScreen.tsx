@@ -1193,6 +1193,38 @@ export function WorkItemScreen({
             </section>
           ) : null}
 
+          {workItem?.authority ? (
+            <section className="fl-panel-box fl-workitem-authority" data-testid="flow.workItem.authority">
+              <div className="fl-workitem-side-heading">
+                <p className="fl-plabel">Authority</p>
+                <span className={workItem.authority.currentUserEligibleToContinue ? 'fl-workitem-authority-badge' : 'fl-workitem-authority-badge fl-muted-badge'}>
+                  {workItem.authority.currentUserEligibleToContinue ? 'Eligible' : 'Not eligible'}
+                </span>
+              </div>
+              <dl className="fl-workitem-facts">
+                <div><dt>Self approval</dt><dd>{workItem.authority.soloApprovalExceptionAllowed ? 'Solo exception enabled' : 'Different human required'}</dd></div>
+                <div><dt>Approved by</dt><dd>{workItem.authority.acceptedApprovalActorDisplayName || (workItem.authority.acceptedApprovalActorId ? `Actor ${workItem.authority.acceptedApprovalActorId}` : 'No accepted approval')}</dd></div>
+                <div><dt>Continued by</dt><dd>{workItem.authority.continuationRequestedByUserId ? `User ${workItem.authority.continuationRequestedByUserId}` : 'Not continued'}</dd></div>
+              </dl>
+              <p>{workItem.authority.selfApprovalPolicy}</p>
+              {(workItem.authority.eligibleApprovers?.length ?? 0) > 0 ? (
+                <div className="fl-workitem-authority-list">
+                  {workItem.authority.eligibleApprovers?.map((actor) => (
+                    <span className="fl-chip" key={actor.userId}>
+                      {actor.displayName} - {actor.projectRole || 'Project member'}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="fl-empty">No eligible reviewer was returned.</p>
+              )}
+              {workItem.authority.soloApprovalExceptionUsed ? (
+                <p className="fl-workitem-authority-warning">Solo approval exception used and recorded.</p>
+              ) : null}
+              <small>{workItem.authority.boundary}</small>
+            </section>
+          ) : null}
+
           <ContractRail
             criteria={draft.criteria}
             openQuestions={draft.openQuestions}

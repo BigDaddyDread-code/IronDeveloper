@@ -13697,6 +13697,26 @@ export interface components {
             availableActions?: string[] | null;
             boundary?: string | null;
         };
+        ProjectWorkItemAuthorityActorReadModel: {
+            /** Format: int32 */
+            userId?: number;
+            displayName?: string | null;
+            email?: string | null;
+            projectRole?: string | null;
+        };
+        ProjectWorkItemAuthorityReadModel: {
+            /** Format: int32 */
+            currentUserId?: number;
+            currentUserEligibleToContinue?: boolean;
+            soloApprovalExceptionAllowed?: boolean;
+            selfApprovalPolicy?: string | null;
+            acceptedApprovalActorId?: string | null;
+            acceptedApprovalActorDisplayName?: string | null;
+            continuationRequestedByUserId?: string | null;
+            soloApprovalExceptionUsed?: boolean;
+            eligibleApprovers?: components["schemas"]["ProjectWorkItemAuthorityActorReadModel"][] | null;
+            boundary?: string | null;
+        };
         ProjectWorkItemCollaborationActivity: {
             /** Format: date-time */
             timestampUtc?: string;
@@ -13791,6 +13811,7 @@ export interface components {
             ticket: components["schemas"]["ProjectTicket"];
             contract: components["schemas"]["ProjectWorkItemContractReadModel"];
             collaboration: components["schemas"]["ProjectWorkItemCollaborationReadModel"];
+            authority: components["schemas"]["ProjectWorkItemAuthorityReadModel"];
             latestRun?: components["schemas"]["ProjectWorkItemRunReadModel"];
             gate: components["schemas"]["ProjectWorkItemGateReadModel"];
             primaryAction: components["schemas"]["ProjectWorkItemActionReadModel"];
@@ -14937,6 +14958,10 @@ export interface components {
             haltObserved?: boolean;
             continuationUnblocked?: boolean;
             acceptedApprovalId?: string | null;
+            approvedByActorId?: string | null;
+            approvedByActorDisplayName?: string | null;
+            continuationRequestedByUserId?: string | null;
+            soloApprovalExceptionUsed?: boolean;
         };
         SkeletonRunCriticPackageTrace: {
             packageId?: string | null;

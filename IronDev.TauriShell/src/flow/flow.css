@@ -1377,6 +1377,41 @@
   font-size: 11.5px;
 }
 
+.fl-workitem-authority {
+  display: grid;
+  gap: 10px;
+}
+
+.fl-workitem-authority p,
+.fl-workitem-authority small {
+  margin: 0;
+  color: var(--fl-ink2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.fl-workitem-authority-badge {
+  color: var(--fl-acc);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fl-workitem-authority-badge.fl-muted-badge {
+  color: var(--fl-muted);
+}
+
+.fl-workitem-authority-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fl-workitem-authority-warning {
+  color: var(--fl-gate-ink) !important;
+  font-weight: 650;
+}
+
 .fl-contract-summary {
   margin: -5px 0 13px;
 }

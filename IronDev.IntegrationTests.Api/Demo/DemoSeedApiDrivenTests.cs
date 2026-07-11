@@ -35,6 +35,10 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
     private const string ValidateBookKey = "validate-book";
     private const string SearchByAuthorKey = "search-by-author";
     private const string BulkDiscountKey = "bulk-discount";
+    private const int DemoReviewerUserId = 42;
+    private const string DemoReviewerEmail = "demo.reviewer@irondev.local";
+    private const string DemoReviewerPassword = "demo-reviewer-password123";
+    private const string DemoReviewerDisplayName = "DEMO Reviewer";
 
     private static readonly string[] UsabilityProbeTitles =
     [
@@ -176,12 +180,13 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             await AuthenticateAsync(client);
 
             var project = await CreateProjectAsync(client, sampleCopy);
+            using var reviewerClient = await CreateReviewerClientAsync(project.Id);
             var validateTicket = await CreateFixtureTicketAsync(client, project.Id, ValidateBookKey);
             var searchTicket = await CreateFixtureTicketAsync(client, project.Id, SearchByAuthorKey);
             ticketKinds[validateTicket.Id] = ValidateBookKey;
             ticketKinds[searchTicket.Id] = SearchByAuthorKey;
 
-            var applied = await DriveAppliedAsync(client, project.Id, validateTicket.Id);
+            var applied = await DriveAppliedAsync(client, reviewerClient, project.Id, validateTicket.Id);
             var paused = await DrivePausedForApprovalAsync(client, project.Id, searchTicket.Id);
 
             await AssertBaselineSqlPersistenceAsync(
@@ -444,6 +449,7 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                 "HERO-1 advisory finding disposition gate fixture.");
             var ticket = await CreateFixtureTicketAsync(client, project.Id, BulkDiscountKey);
             ticketKinds[ticket.Id] = BulkDiscountKey;
+            using var reviewerClient = await CreateReviewerClientAsync(project.Id);
 
             var started = await PostJsonAsync<TicketBuildRunDto>(
                 client,
@@ -470,7 +476,7 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             // Approval exists BEFORE disposition — and continuation must still refuse:
             // an accepted approval does not bypass an undispositioned finding.
             var approvalProjectId = TicketSkeletonRunService.ApprovalProjectGuid(project.Id);
-            await CreateAcceptedApprovalAsync(client, approvalProjectId, started.RunId, packageHash);
+            await CreateAcceptedApprovalAsync(reviewerClient, approvalProjectId, started.RunId, packageHash);
 
             var refusedContinue = await PostJsonAsync<TicketBuildRunDto>(
                 client,
@@ -564,7 +570,7 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
         CollectionAssert.Contains(events, "SkeletonApplied");
     }
 
-    private static async Task<DemoAppliedRun> DriveAppliedAsync(HttpClient client, int projectId, long ticketId)
+    private static async Task<DemoAppliedRun> DriveAppliedAsync(HttpClient client, HttpClient reviewerClient, int projectId, long ticketId)
     {
         var started = await PostJsonAsync<TicketBuildRunDto>(
             client,
@@ -588,7 +594,7 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
         Assert.IsTrue(criticReview.Succeeded);
 
         var approvalProjectId = TicketSkeletonRunService.ApprovalProjectGuid(projectId);
-        var approval = await CreateAcceptedApprovalAsync(client, approvalProjectId, started.RunId, packageHash);
+        var approval = await CreateAcceptedApprovalAsync(reviewerClient, approvalProjectId, started.RunId, packageHash);
 
         var continued = await PostJsonAsync<TicketBuildRunDto>(
             client,
@@ -607,6 +613,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             $"/api/projects/{projectId}/tickets/{ticketId}/skeleton-runs/{started.RunId}/report");
         Assert.AreEqual("Applied", finalReport.Status);
         Assert.IsTrue(finalReport.LoopComplete, $"Final report gaps: {string.Join(" | ", finalReport.Gaps)}");
+        Assert.AreEqual(DemoReviewerUserId.ToString(), finalReport.Approval!.ApprovedByActorId);
+        Assert.AreEqual(DemoReviewerDisplayName, finalReport.Approval.ApprovedByActorDisplayName);
         Assert.IsTrue(finalReport.Apply!.Applied);
 
         var applyReceipt = finalReport.Apply.Receipts.Single(receipt => receipt.Name == "apply-copy.json");
@@ -886,6 +894,66 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
         Assert.IsTrue(envelope.MutationOccurred);
         Assert.IsNotNull(envelope.Data);
         return envelope.Data!;
+    }
+
+    private static async Task<HttpClient> CreateReviewerClientAsync(int projectId)
+    {
+        await SeedReviewerAsync(projectId);
+        var baseToken = await LoginAsync(DemoReviewerEmail, DemoReviewerPassword);
+        var tenantToken = await SelectTenantAsync(baseToken);
+        return GetAuthedClient(tenantToken);
+    }
+
+    private static async Task SeedReviewerAsync(int projectId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        var hash = BCrypt.Net.BCrypt.HashPassword(DemoReviewerPassword, workFactor: 4);
+        await connection.ExecuteAsync("""
+            IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Id = @ReviewerUserId)
+            BEGIN
+                SET IDENTITY_INSERT dbo.Users ON;
+                INSERT INTO dbo.Users (Id, Email, DisplayName, PasswordHash, IsActive)
+                VALUES (@ReviewerUserId, @ReviewerEmail, @ReviewerDisplayName, @Hash, 1);
+                SET IDENTITY_INSERT dbo.Users OFF;
+            END
+            ELSE
+            BEGIN
+                UPDATE dbo.Users
+                SET Email = @ReviewerEmail,
+                    DisplayName = @ReviewerDisplayName,
+                    PasswordHash = @Hash,
+                    IsActive = 1
+                WHERE Id = @ReviewerUserId;
+            END
+
+            IF EXISTS (SELECT 1 FROM dbo.TenantUsers WHERE TenantId = @TenantId AND UserId = @ReviewerUserId)
+                UPDATE dbo.TenantUsers SET Role = N'Viewer' WHERE TenantId = @TenantId AND UserId = @ReviewerUserId;
+            ELSE
+                INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (@TenantId, @ReviewerUserId, N'Viewer');
+
+            IF EXISTS (SELECT 1 FROM dbo.ProjectMembers WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND UserId = @ReviewerUserId)
+                UPDATE dbo.ProjectMembers
+                SET ProjectRole = N'Contributor',
+                    Status = N'Active',
+                    AddedByUserId = @AdminUserId,
+                    AddedUtc = SYSUTCDATETIME(),
+                    RemovedByUserId = NULL,
+                    RemovedUtc = NULL
+                WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND UserId = @ReviewerUserId;
+            ELSE
+                INSERT INTO dbo.ProjectMembers (TenantId, ProjectId, UserId, ProjectRole, AddedByUserId)
+                VALUES (@TenantId, @ProjectId, @ReviewerUserId, N'Contributor', @AdminUserId);
+            """, new
+        {
+            ReviewerUserId = DemoReviewerUserId,
+            ReviewerEmail = DemoReviewerEmail,
+            ReviewerDisplayName = DemoReviewerDisplayName,
+            Hash = hash,
+            TenantId = AssignedTenantId,
+            ProjectId = projectId,
+            AdminUserId = 1
+        });
     }
 
     private static async Task AuthenticateAsync(HttpClient client)

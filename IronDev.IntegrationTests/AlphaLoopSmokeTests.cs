@@ -109,6 +109,7 @@ public sealed class AlphaLoopSmokeTests
                 new WorkflowApprovalHaltEvaluator(),
                 new EmptyTestAuthoring(),
                 new SkeletonMutationLeaseService(configuration),
+                new StubProjectMembershipService(),
                 configuration);
 
             var run = await service.StartAsync(ProjectId, TicketId);
@@ -236,6 +237,7 @@ public sealed class AlphaLoopSmokeTests
                 new WorkflowApprovalHaltEvaluator(),
                 new EmptyTestAuthoring(),
                 new SkeletonMutationLeaseService(configuration),
+                new StubProjectMembershipService(),
                 configuration);
 
             var run = await service.StartAsync(ProjectId, TicketId);
@@ -267,7 +269,7 @@ public sealed class AlphaLoopSmokeTests
             var acceptedApproval = ApprovalFor(run.RunId, packageHash);
             await approvals.SaveAsync(acceptedApproval);
 
-            var continued = await service.ContinueAsync(ProjectId, TicketId, run.RunId);
+            var continued = await service.ContinueAsAsync(ProjectId, TicketId, run.RunId, "7");
             Assert.IsNotNull(continued);
             await RequireRunStateAsync(
                 runs,
@@ -276,7 +278,7 @@ public sealed class AlphaLoopSmokeTests
                 RunLifecycleState.Completed,
                 "Accepted approval only unblocks continuation; it is still not apply permission.");
 
-            var applied = await service.ApplyAsync(ProjectId, TicketId, run.RunId);
+            var applied = await service.ApplyAsAsync(ProjectId, TicketId, run.RunId, "7");
             Assert.IsNotNull(applied);
             var appliedRun = await RequireRunStateAsync(
                 runs,
@@ -510,7 +512,8 @@ public sealed class AlphaLoopSmokeTests
             ApprovalTargetHash = targetHash,
             CapabilityCode = TicketSkeletonRunService.ContinueCapabilityCode,
             ApprovalPurpose = AcceptedApprovalPurposes.WorkflowContinuationInput,
-            ApprovedByActorId = "rel2-human-approver",
+            ApprovedByActorId = "8",
+            ApprovedByActorDisplayName = "Alice Reviewer",
             AcceptedAtUtc = DateTimeOffset.UtcNow,
             ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
             CorrelationId = $"rel2-{runId}",
@@ -544,6 +547,30 @@ public sealed class AlphaLoopSmokeTests
                 ["modelName"] = "critic-clean-fixed"
             }
         });
+
+    private sealed class StubProjectMembershipService : IProjectMembershipService
+    {
+        private static readonly DateTimeOffset AddedUtc = new(2026, 7, 11, 0, 0, 0, TimeSpan.Zero);
+
+        public Task<bool> HasAccessAsync(int tenantId, int projectId, int userId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(userId is 7 or 8);
+
+        public Task<IReadOnlySet<int>> GetAccessibleProjectIdsAsync(int tenantId, int userId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlySet<int>>(userId is 7 or 8 ? new HashSet<int> { ProjectId } : new HashSet<int>());
+
+        public Task<IReadOnlyList<ProjectMembershipEntry>> GetMembersAsync(int tenantId, int projectId, int currentUserId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ProjectMembershipEntry>>(
+            [
+                new(7, "Bob Developer", "bob@irondev.local", ProjectMemberRoles.Owner, currentUserId == 7, AddedUtc),
+                new(8, "Alice Reviewer", "alice@irondev.local", ProjectMemberRoles.Contributor, currentUserId == 8, AddedUtc)
+            ]);
+
+        public Task<ProjectMembershipMutationStatus> SetMemberAsync(int tenantId, int projectId, int userId, int actorUserId, string projectRole, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ProjectMembershipMutationStatus.Succeeded);
+
+        public Task<ProjectMembershipMutationStatus> RemoveMemberAsync(int tenantId, int projectId, int userId, int actorUserId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ProjectMembershipMutationStatus.Succeeded);
+    }
 
     private static string ExpectedApprovalPhrase(string runId, string packageHash) =>
         $"I approve continuation for run {runId} package {packageHash}";

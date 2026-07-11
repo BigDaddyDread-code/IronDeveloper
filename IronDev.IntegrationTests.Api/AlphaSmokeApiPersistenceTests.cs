@@ -32,6 +32,10 @@ namespace IronDev.IntegrationTests.Api;
 public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
 {
     private const string TicketKey = "validate-book";
+    private const int ReviewerUserId = 2;
+    private const string ReviewerEmail = "rel3.reviewer@irondev.local";
+    private const string ReviewerPassword = "reviewer-password123";
+    private const string ReviewerDisplayName = "REL-3 Reviewer";
 
     private const string ValidatedBook =
         """
@@ -99,6 +103,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
             await AuthenticateAsync(client);
 
             var project = await CreateProjectAsync(client, sampleCopy);
+            using var reviewerClient = await CreateReviewerClientAsync(project.Id);
             var ticket = await CreateTicketAsync(client, project.Id);
 
             var started = await PostJsonAsync<TicketBuildRunDto>(
@@ -131,7 +136,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
 
             var approvalProjectId = TicketSkeletonRunService.ApprovalProjectGuid(project.Id);
             var approval = await CreateAcceptedApprovalAsync(
-                client,
+                reviewerClient,
                 approvalProjectId,
                 started.RunId,
                 packageHash);
@@ -189,6 +194,9 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
             Assert.AreEqual("Applied", finalReport.Status);
             Assert.IsTrue(finalReport.LoopComplete, $"Final report gaps: {string.Join(" | ", finalReport.Gaps)}");
             Assert.AreEqual(approval.AcceptedApprovalId.ToString("D"), finalReport.Approval!.AcceptedApprovalId);
+            Assert.AreEqual(ReviewerUserId.ToString(), finalReport.Approval.ApprovedByActorId);
+            Assert.AreEqual(ReviewerDisplayName, finalReport.Approval.ApprovedByActorDisplayName);
+            Assert.AreEqual("1", finalReport.Approval.ContinuationRequestedByUserId);
             Assert.IsTrue(finalReport.Apply!.Applied);
             Assert.IsTrue(finalReport.Apply.Receipts.All(receipt => receipt.ExistsOnDisk));
             Assert.AreEqual(2, finalReport.Apply.Attempts.Count);
@@ -642,6 +650,66 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
         });
 
         return await ReadSuccessAsync<ProjectTicket>(response);
+    }
+
+    private static async Task<HttpClient> CreateReviewerClientAsync(int projectId)
+    {
+        await SeedReviewerAsync(projectId);
+        var baseToken = await LoginAsync(ReviewerEmail, ReviewerPassword);
+        var tenantToken = await SelectTenantAsync(baseToken);
+        return GetAuthedClient(tenantToken);
+    }
+
+    private static async Task SeedReviewerAsync(int projectId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        var hash = BCrypt.Net.BCrypt.HashPassword(ReviewerPassword, workFactor: 4);
+        await connection.ExecuteAsync("""
+            IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Id = @ReviewerUserId)
+            BEGIN
+                SET IDENTITY_INSERT dbo.Users ON;
+                INSERT INTO dbo.Users (Id, Email, DisplayName, PasswordHash, IsActive)
+                VALUES (@ReviewerUserId, @ReviewerEmail, @ReviewerDisplayName, @Hash, 1);
+                SET IDENTITY_INSERT dbo.Users OFF;
+            END
+            ELSE
+            BEGIN
+                UPDATE dbo.Users
+                SET Email = @ReviewerEmail,
+                    DisplayName = @ReviewerDisplayName,
+                    PasswordHash = @Hash,
+                    IsActive = 1
+                WHERE Id = @ReviewerUserId;
+            END
+
+            IF EXISTS (SELECT 1 FROM dbo.TenantUsers WHERE TenantId = @TenantId AND UserId = @ReviewerUserId)
+                UPDATE dbo.TenantUsers SET Role = N'Viewer' WHERE TenantId = @TenantId AND UserId = @ReviewerUserId;
+            ELSE
+                INSERT INTO dbo.TenantUsers (TenantId, UserId, Role) VALUES (@TenantId, @ReviewerUserId, N'Viewer');
+
+            IF EXISTS (SELECT 1 FROM dbo.ProjectMembers WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND UserId = @ReviewerUserId)
+                UPDATE dbo.ProjectMembers
+                SET ProjectRole = N'Contributor',
+                    Status = N'Active',
+                    AddedByUserId = @AdminUserId,
+                    AddedUtc = SYSUTCDATETIME(),
+                    RemovedByUserId = NULL,
+                    RemovedUtc = NULL
+                WHERE TenantId = @TenantId AND ProjectId = @ProjectId AND UserId = @ReviewerUserId;
+            ELSE
+                INSERT INTO dbo.ProjectMembers (TenantId, ProjectId, UserId, ProjectRole, AddedByUserId)
+                VALUES (@TenantId, @ProjectId, @ReviewerUserId, N'Contributor', @AdminUserId);
+            """, new
+        {
+            ReviewerUserId,
+            ReviewerEmail,
+            ReviewerDisplayName,
+            Hash = hash,
+            TenantId = AssignedTenantId,
+            ProjectId = projectId,
+            AdminUserId = 1
+        });
     }
 
     private static async Task<ChatProvenance> CreateChatProvenanceAsync(
