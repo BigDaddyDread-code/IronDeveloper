@@ -67,7 +67,7 @@ test('shared-channel URLs open persisted human conversation and mark durable unr
   await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
   await expect(page.getByRole('heading', { name: '# General' })).toBeVisible();
   await expect(page.getByTestId('chat.channel.message.7101')).toContainText('Human planning stays visible here.');
-  await expect(page.getByTestId('chat.channel.assistant-status')).toContainText('does not participate yet');
+  await expect(page.getByTestId('chat.channel.assistant-status')).toContainText('explicitly mentions @IronDev');
   await expect(page.getByTestId('chat.channel.collaborationState')).toContainText('All notifications');
   await expect(page.getByTestId('chat.channel.collaborationState')).toContainText('Presence unavailable');
   await expect.poll(() => state.markReadRequests).toBe(1);
@@ -95,7 +95,7 @@ test('a direct-session list failure does not hide a healthy shared channel', asy
   await expect(page.getByTestId('chat.channel.message.7101')).toContainText('Human planning stays visible here.');
 });
 
-test('a human channel message persists while explicit IronDev invocation is honestly refused', async ({ page }) => {
+test('a human channel message stays human while explicit IronDev invocation persists an attributed answer', async ({ page }) => {
   const state = await mockSessionWorkspace(page);
   await page.goto('/projects/7/chat/channels/general');
 
@@ -107,11 +107,35 @@ test('a human channel message persists while explicit IronDev invocation is hone
   await page.reload();
   await expect(page.getByText('Approved as discussion only.')).toBeVisible();
 
-  await page.getByTestId('chat.channel.composer').fill('@IronDev approve and continue');
+  await page.getByTestId('chat.channel.composer').fill('@IronDev summarize the project boundary');
   await page.getByTestId('chat.channel.send').click();
-  await expect(page.getByTestId('chat.channel.error')).toContainText('participation in shared channels is not implemented');
-  await expect(page.getByTestId('chat.channel.composer')).toHaveValue('@IronDev approve and continue');
-  expect(state.channelMessageCount).toBe(2);
+  await expect(page.getByText('The project boundary keeps conversation separate from workflow authority.')).toBeVisible();
+  await expect(page.getByTestId('chat.channel.assistant.sources.7201')).toContainText('requested by Bob');
+  await expect(page.getByTestId('chat.channel.assistant.sources.7201')).toContainText('src/ProjectBoundary.cs');
+  expect(state.channelMessageCount).toBe(4);
+  if (process.env.IRONDEV_VISUAL_SMOKE === '1') {
+    await page.screenshot({ path: '../reports/visual-smoke/chat-assistant-1.png', fullPage: true });
+  }
+});
+
+test('assistant completion failure preserves the saved request and supports an explicit retry', async ({ page }) => {
+  const state = await mockSessionWorkspace(page, { failAssistantCompletionOnce: true });
+  await page.goto('/projects/7/chat/channels/general');
+
+  await page.getByTestId('chat.channel.composer').fill('@IronDev inspect the project boundary');
+  await page.getByTestId('chat.channel.send').click();
+
+  await expect(page.getByText('@IronDev inspect the project boundary')).toBeVisible();
+  await expect(page.getByTestId('chat.channel.error')).toContainText('message is saved');
+  await expect(page.getByTestId('chat.channel.assistant.turn.7201')).toContainText('Requested');
+  expect(state.assistantCompletionRequests).toBe(1);
+
+  await page.reload();
+  await expect(page.getByText('@IronDev inspect the project boundary')).toBeVisible();
+  await expect(page.getByTestId('chat.channel.assistant.turn.7201')).toContainText('Requested');
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByText('The project boundary keeps conversation separate from workflow authority.')).toBeVisible();
+  expect(state.assistantCompletionRequests).toBe(2);
 });
 
 test('Read-only channel membership renders the backend refusal and disables posting', async ({ page }) => {
@@ -187,11 +211,31 @@ test.describe('narrow session navigation', () => {
     }));
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   });
+
+  test('keeps an attributed IronDev answer and source path inside the narrow viewport', async ({ page }) => {
+    await mockSessionWorkspace(page);
+    await page.goto('/projects/7/chat/channels/general');
+
+    await page.getByTestId('chat.channel.composer').fill('@IronDev summarize the project boundary');
+    await page.getByTestId('chat.channel.send').click();
+    await expect(page.getByText('The project boundary keeps conversation separate from workflow authority.')).toBeVisible();
+    await expect(page.getByTestId('chat.channel.assistant.sources.7201')).toContainText('src/ProjectBoundary.cs');
+
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+    if (process.env.IRONDEV_VISUAL_SMOKE === '1') {
+      await page.screenshot({ path: '../reports/visual-smoke/chat-assistant-1-mobile.png', fullPage: true });
+    }
+  });
 });
 
 interface SessionMockOptions {
   failSessionListOnce?: boolean;
   failMarkRead?: boolean;
+  failAssistantCompletionOnce?: boolean;
 }
 
 interface SessionMockState {
@@ -199,6 +243,7 @@ interface SessionMockState {
   sessionListRequests: number;
   channelMessageCount: number;
   markReadRequests: number;
+  assistantCompletionRequests: number;
 }
 
 async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}): Promise<SessionMockState> {
@@ -206,7 +251,8 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     createdSessionCount: 0,
     sessionListRequests: 0,
     channelMessageCount: 1,
-    markReadRequests: 0
+    markReadRequests: 0,
+    assistantCompletionRequests: 0
   };
   let nextSessionId = 9010;
   let nextMessageId = 9200;
@@ -313,6 +359,10 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     }]],
     ['product-planning', []]
   ]);
+  const channelTurns = new Map<string, Array<Record<string, unknown>>>([
+    ['general', []],
+    ['product-planning', []]
+  ]);
 
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
@@ -364,6 +414,7 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     };
     channels.push(created);
     channelMessages.set(slug, []);
+    channelTurns.set(slug, []);
     return json(route, created, 201);
   });
 
@@ -373,6 +424,7 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     return channel ? json(route, {
       channel,
       messages: channelMessages.get(slug) ?? [],
+      assistantTurns: channelTurns.get(slug) ?? [],
       readState: {
         unreadCount: channel.unreadCount,
         lastReadMessageId: channel.lastReadMessageId,
@@ -385,7 +437,7 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
         activeViewerCount: null,
         boundary: 'Presence is unavailable until the backend supplies durable or realtime presence truth.'
       },
-      assistantParticipationStatus: 'Not implemented. Shared channels persist human conversation only; IronDev does not participate yet.',
+      assistantParticipationStatus: 'IronDev responds in shared channels only when a message explicitly mentions @IronDev.',
       boundary: 'Channel collaboration is not workflow authority.'
     }) : json(route, { error: 'Channel not found or not visible to this user.' }, 404);
   });
@@ -414,9 +466,6 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
   await page.route(/\/irondev-api\/api\/projects\/7\/channels\/([^/]+)\/messages$/, (route) => {
     const slug = decodeURIComponent(route.request().url().match(/\/channels\/([^/]+)\/messages$/)?.[1] ?? '');
     const request = route.request().postDataJSON() as { message: string };
-    if (request.message.toLowerCase().includes('@irondev')) {
-      return json(route, { error: 'IronDev participation in shared channels is not implemented. Remove @IronDev to post a human message.' }, 501);
-    }
     const saved = {
       messageId: 7101 + state.channelMessageCount,
       authorUserId: 7,
@@ -435,7 +484,80 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     history.push(saved);
     channelMessages.set(slug, history);
     state.channelMessageCount += 1;
-    return json(route, saved);
+    const isAssistantRequest = /@irondev\b/i.test(request.message);
+    const assistantTurn = isAssistantRequest ? {
+      turnId: 7201,
+      channelId: channels.find((item) => item.slug === slug)?.channelId ?? 701,
+      requestMessageId: saved.messageId,
+      responseMessageId: null,
+      requestedByUserId: 7,
+      requestedByDisplayName: 'Bob',
+      prompt: request.message.replace(/@irondev\b/i, '').trim(),
+      answer: null,
+      mode: null,
+      modeConfidence: null,
+      modeReason: null,
+      contextSummary: null,
+      linkedFilePaths: null,
+      linkedSymbols: null,
+      linkedDocumentIds: null,
+      dogfoodTraceId: null,
+      traceId: null,
+      status: 'Requested',
+      failureReason: null,
+      createdUtc: '2026-07-10T09:00:01Z',
+      completedUtc: null,
+      boundary: 'Assistant answer; not approval.'
+    } : null;
+    if (assistantTurn) channelTurns.set(slug, [assistantTurn]);
+    return json(route, { message: saved, assistantTurn });
+  });
+
+  await page.route(/\/irondev-api\/api\/projects\/7\/channels\/([^/]+)\/assistant-turns\/(\d+)\/complete$/, (route) => {
+    state.assistantCompletionRequests += 1;
+    if (options.failAssistantCompletionOnce && state.assistantCompletionRequests === 1) {
+      return json(route, { error: 'Assistant completion unavailable.' }, 503);
+    }
+
+    const match = route.request().url().match(/\/channels\/([^/]+)\/assistant-turns\/(\d+)\/complete$/);
+    const slug = decodeURIComponent(match?.[1] ?? '');
+    const turnId = Number(match?.[2]);
+    const turn = channelTurns.get(slug)?.find((item) => item.turnId === turnId);
+    if (!turn) return json(route, { error: 'Assistant turn not found.' }, 404);
+    const response = {
+      messageId: 7101 + state.channelMessageCount,
+      authorUserId: null,
+      authorDisplayName: 'IronDev',
+      role: 'Assistant',
+      message: 'The project boundary keeps conversation separate from workflow authority.',
+      messageFormat: 'Markdown',
+      status: 'Active',
+      replyToMessageId: turn.requestMessageId,
+      threadRootMessageId: turn.requestMessageId,
+      createdUtc: '2026-07-10T09:00:02Z',
+      editedUtc: null,
+      boundary: 'Assistant answer; not approval.'
+    };
+    const answered = {
+      ...turn,
+      responseMessageId: response.messageId,
+      answer: response.message,
+      mode: 'Exploration',
+      modeConfidence: 0.92,
+      modeReason: 'Project question.',
+      contextSummary: 'Inspected the project boundary.',
+      linkedFilePaths: 'src/ProjectBoundary.cs',
+      status: 'Answered',
+      completedUtc: '2026-07-10T09:00:02Z'
+    };
+    channelTurns.set(slug, [answered]);
+    const history = channelMessages.get(slug) ?? [];
+    if (!history.some((message) => message.messageId === response.messageId)) {
+      history.push(response);
+      state.channelMessageCount += 1;
+    }
+    channelMessages.set(slug, history);
+    return json(route, { assistantTurn: answered, responseMessage: response });
   });
 
   await page.route(/\/irondev-api\/api\/projects\/7\/chat\/sessions$/, async (route) => {

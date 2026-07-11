@@ -64,6 +64,8 @@ import type {
   ProjectChannelChatListResponse,
   ProjectChannelChatMessage,
   ProjectChannelChatSummary,
+  ProjectChannelPostMessageResult,
+  ProjectChannelAssistantCompletionResult,
   ProjectChannelReadState,
   CreateProjectChannelRequest,
   ProjectChatSession,
@@ -559,10 +561,21 @@ class IronDevApiClient {
     projectId: number,
     channelReference: string,
     message: string
-  ): Promise<ProjectChannelChatMessage> {
-    return this.request<ProjectChannelChatMessage>(
+  ): Promise<ProjectChannelPostMessageResult> {
+    return this.request<ProjectChannelPostMessageResult>(
       `/api/projects/${projectId}/channels/${encodeURIComponent(channelReference)}/messages`,
       { method: 'POST', body: { message } }
+    );
+  }
+
+  async completeProjectChannelAssistantTurn(
+    projectId: number,
+    channelReference: string,
+    turnId: number
+  ): Promise<ProjectChannelAssistantCompletionResult> {
+    return this.request<ProjectChannelAssistantCompletionResult>(
+      `/api/projects/${projectId}/channels/${encodeURIComponent(channelReference)}/assistant-turns/${turnId}/complete`,
+      { method: 'POST' }
     );
   }
 

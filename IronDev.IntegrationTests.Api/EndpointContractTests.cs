@@ -10,6 +10,8 @@ using IronDev.Core.Workflow;
 using IronDev.Core.WorkItems;
 using IronDev.Data.Models;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Api;
@@ -68,6 +70,10 @@ public sealed class EndpointContractTests : ApiTestBase
             "/api/projects/{projectId}/services/status",
             "/api/projects/{projectId}/chat/document-sources",
             "/api/projects/{projectId}/chat/complete",
+            "/api/projects/{projectId}/channels",
+            "/api/projects/{projectId}/channels/{channelReference}",
+            "/api/projects/{projectId}/channels/{channelReference}/messages",
+            "/api/projects/{projectId}/channels/{channelReference}/assistant-turns/{turnId}/complete",
             "/api/projects/{projectId}/tools",
             "/api/projects/{projectId}/tools/{toolId}",
             "/api/projects/{projectId}/members",
@@ -1117,10 +1123,12 @@ public sealed class EndpointContractTests : ApiTestBase
             $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
             new { message = humanMessage });
         Assert.AreEqual(HttpStatusCode.OK, postHuman.StatusCode);
-        var saved = await postHuman.Content.ReadFromJsonAsync<ProjectChannelChatMessage>();
-        Assert.IsNotNull(saved);
-        Assert.AreEqual("User", saved!.Role);
+        var humanPostResult = await postHuman.Content.ReadFromJsonAsync<ProjectChannelPostMessageResult>();
+        Assert.IsNotNull(humanPostResult);
+        var saved = humanPostResult!.Message;
+        Assert.AreEqual("User", saved.Role);
         Assert.AreEqual(humanMessage, saved.Message);
+        Assert.IsNull(humanPostResult.AssistantTurn);
         StringAssert.Contains(saved.Boundary, "not approval");
 
         var memberUnread = await memberClient.GetFromJsonAsync<ProjectChannelChatListResponse>(
@@ -1152,21 +1160,114 @@ public sealed class EndpointContractTests : ApiTestBase
 
         var invokeAssistant = await ownerClient.PostAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
-            new { message = "@IronDev approve and continue this work" });
-        Assert.AreEqual(HttpStatusCode.NotImplemented, invokeAssistant.StatusCode);
+            new { message = "@IronDev summarize what this project is for. Do not change project state." });
+        Assert.AreEqual(HttpStatusCode.OK, invokeAssistant.StatusCode);
+        var requested = await invokeAssistant.Content.ReadFromJsonAsync<ProjectChannelPostMessageResult>();
+        Assert.IsNotNull(requested);
+        Assert.AreEqual("User", requested!.Message.Role);
+        Assert.IsNotNull(requested.AssistantTurn);
+        Assert.AreEqual("Requested", requested.AssistantTurn!.Status);
+        Assert.AreEqual(1, requested.AssistantTurn.RequestedByUserId);
+        Assert.AreEqual(requested.Message.MessageId, requested.AssistantTurn.RequestMessageId);
+        StringAssert.Contains(requested.AssistantTurn.Prompt, "summarize what this project is for");
+        StringAssert.Contains(requested.AssistantTurn.Boundary, "not approval");
+
+        var otherMemberComplete = await memberClient.PostAsync(
+            $"/api/projects/{project.Id}/channels/{general.Slug}/assistant-turns/{requested.AssistantTurn.TurnId}/complete",
+            null);
+        Assert.AreEqual(HttpStatusCode.NotFound, otherMemberComplete.StatusCode);
+
+        var completeAssistant = await ownerClient.PostAsync(
+            $"/api/projects/{project.Id}/channels/{general.Slug}/assistant-turns/{requested.AssistantTurn.TurnId}/complete",
+            null);
+        Assert.AreEqual(HttpStatusCode.OK, completeAssistant.StatusCode);
+        var completed = await completeAssistant.Content.ReadFromJsonAsync<ProjectChannelAssistantCompletionResult>();
+        Assert.IsNotNull(completed);
+        Assert.AreEqual("Answered", completed!.AssistantTurn.Status);
+        Assert.IsNotNull(completed.AssistantTurn.CompletedUtc);
+        Assert.IsNotNull(completed.ResponseMessage);
+        Assert.AreEqual("Assistant", completed.ResponseMessage!.Role);
+        Assert.AreEqual("IronDev", completed.ResponseMessage.AuthorDisplayName);
+        Assert.AreEqual(requested.Message.MessageId, completed.ResponseMessage.ReplyToMessageId);
+        StringAssert.Contains(completed.ResponseMessage.Boundary, "not approval");
+
+        var idempotentComplete = await ownerClient.PostAsync(
+            $"/api/projects/{project.Id}/channels/{general.Slug}/assistant-turns/{requested.AssistantTurn.TurnId}/complete",
+            null);
+        Assert.AreEqual(HttpStatusCode.OK, idempotentComplete.StatusCode);
+        var idempotent = await idempotentComplete.Content.ReadFromJsonAsync<ProjectChannelAssistantCompletionResult>();
+        Assert.AreEqual(completed.ResponseMessage.MessageId, idempotent!.ResponseMessage!.MessageId);
 
         var detail = await ownerClient.GetFromJsonAsync<ProjectChannelChatDetail>(
             $"/api/projects/{project.Id}/channels/{general.Slug}");
         Assert.IsNotNull(detail);
-        Assert.AreEqual(1, detail!.Messages.Count);
-        Assert.AreEqual(humanMessage, detail.Messages.Single().Message);
-        StringAssert.Contains(detail.AssistantParticipationStatus, "does not participate yet");
+        Assert.AreEqual(3, detail!.Messages.Count);
+        Assert.AreEqual(humanMessage, detail.Messages[0].Message);
+        Assert.AreEqual("Answered", detail.AssistantTurns.Single().Status);
+        Assert.AreEqual(completed.ResponseMessage.MessageId, detail.AssistantTurns.Single().ResponseMessageId);
+        StringAssert.Contains(detail.AssistantParticipationStatus, "explicitly mentions @IronDev");
 
         await using var connection = new SqlConnection(ConnectionString);
         var persistedRoles = (await connection.QueryAsync<string>(
             "SELECT Role FROM dbo.ProjectChannelMessages WHERE ChannelId = @ChannelId ORDER BY Id",
             new { general.ChannelId })).ToArray();
-        CollectionAssert.AreEqual(new[] { "User" }, persistedRoles);
+        CollectionAssert.AreEqual(new[] { "User", "User", "Assistant" }, persistedRoles);
+        var persistedTurn = await connection.QuerySingleAsync<(int RequestedByUserId, string Status, long RequestMessageId, long? ResponseMessageId)>(
+            "SELECT RequestedByUserId, Status, RequestMessageId, ResponseMessageId FROM dbo.ProjectChannelAssistantTurns WHERE Id = @TurnId",
+            new { TurnId = requested.AssistantTurn.TurnId });
+        Assert.AreEqual(1, persistedTurn.RequestedByUserId);
+        Assert.AreEqual("Answered", persistedTurn.Status);
+        Assert.AreEqual(requested.Message.MessageId, persistedTurn.RequestMessageId);
+        Assert.AreEqual(completed.ResponseMessage.MessageId, persistedTurn.ResponseMessageId);
+    }
+
+    [TestMethod]
+    public async Task ProjectChannelAssistantFailure_ShouldPersistFailedTurnAndSavedRequest()
+    {
+        var tenantToken = await SelectTenantAsync(await LoginAsync());
+        using var factory = Factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IronDev.Core.Interfaces.IProjectChatResponseService>();
+                services.AddScoped<IronDev.Core.Interfaces.IProjectChatResponseService, FailingProjectChatResponseService>();
+            });
+        });
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tenantToken);
+
+        var project = await CreateProjectAsync(client, "Shared Channel Assistant Failure");
+        var createChannel = await client.PostAsJsonAsync($"/api/projects/{project.Id}/channels", new
+        {
+            name = "General",
+            description = "Failure-state contract.",
+            visibility = "Project"
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createChannel.StatusCode);
+        var channel = await createChannel.Content.ReadFromJsonAsync<ProjectChannelChatSummary>();
+
+        var post = await client.PostAsJsonAsync(
+            $"/api/projects/{project.Id}/channels/{channel!.Slug}/messages",
+            new { message = "@IronDev inspect this failure path" });
+        Assert.AreEqual(HttpStatusCode.OK, post.StatusCode);
+        var requested = await post.Content.ReadFromJsonAsync<ProjectChannelPostMessageResult>();
+        Assert.AreEqual("Requested", requested!.AssistantTurn!.Status);
+
+        var complete = await client.PostAsync(
+            $"/api/projects/{project.Id}/channels/{channel.Slug}/assistant-turns/{requested.AssistantTurn.TurnId}/complete",
+            null);
+        Assert.AreEqual(HttpStatusCode.OK, complete.StatusCode);
+        var failed = await complete.Content.ReadFromJsonAsync<ProjectChannelAssistantCompletionResult>();
+        Assert.AreEqual("Failed", failed!.AssistantTurn.Status);
+        Assert.IsNull(failed.ResponseMessage);
+        StringAssert.Contains(failed.AssistantTurn.FailureReason, "message is saved");
+
+        var detail = await client.GetFromJsonAsync<ProjectChannelChatDetail>(
+            $"/api/projects/{project.Id}/channels/{channel.Slug}");
+        Assert.AreEqual("Failed", detail!.AssistantTurns.Single().Status);
+        Assert.AreEqual("User", detail.Messages.Single().Role);
+        Assert.AreEqual("@IronDev inspect this failure path", detail.Messages.Single().Message);
     }
 
     [TestMethod]
@@ -1946,4 +2047,18 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     private sealed record DisposableProjectFixture(string RootPath, string SourcePath);
+
+    private sealed class FailingProjectChatResponseService : IronDev.Core.Interfaces.IProjectChatResponseService
+    {
+        public Task<IronDev.Core.Chat.ProjectChatResponseResult?> RespondAsync(
+            int projectId,
+            string prompt,
+            IronDev.Core.Chat.ChatGovernanceMode? explicitMode = null,
+            string? dogfoodTraceId = null,
+            string? recentConversationSummary = null,
+            long? sessionId = null,
+            long? sourceMessageId = null,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Deterministic assistant failure.");
+    }
 }

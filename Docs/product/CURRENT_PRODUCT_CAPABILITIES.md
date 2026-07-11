@@ -30,7 +30,7 @@ This matrix describes the capability a user can reach through the current API an
 | Surface | Status | Current behavior | Known next contract |
 | --- | --- | --- | --- |
 | Board | Supported | Readiness header, one priority action, attention items, stage columns, and run queue. | Dedicated backend Board read model for richer waiting, assignment, and run summaries. |
-| Chat | Supported | Direct IronDev sessions, project channels, persisted messages, durable unread markers, effective notification level, source/document context, reply context, and ticket-draft handoff. | Mentions, realtime presence, complete notifications, and complete concurrency handling. |
+| Chat | Supported | Direct IronDev sessions, project channels, persisted messages, explicit attributed `@IronDev` turns, durable unread markers, effective notification level, source/document context, reply context, and ticket-draft handoff. | Person mentions, realtime presence, complete notifications, and complete concurrency handling. |
 | Work Item | Supported | Shape, Ticket, Build, Review, and Done stages consume a dedicated backend projection for lifecycle, gate, contract, collaboration, action, failed-apply recovery, execution proof, and evidence truth. | Assignment, follower, and attributed collaboration data remain empty until backend records exist. |
 | Library | Supported | Explorer, Documents, Tools, Members, Governance, Project setup, and Settings are live; Audit refuses as not implemented. | Unified audit ledger. |
 

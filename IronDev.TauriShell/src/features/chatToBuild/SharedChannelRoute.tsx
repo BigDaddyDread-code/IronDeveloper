@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { ProjectChannelChatDetail, ProjectChannelChatMessage, ProjectChatSession } from '../../api/types';
+import type {
+  ProjectChannelAssistantTurnState,
+  ProjectChannelChatDetail,
+  ProjectChannelChatMessage,
+  ProjectChatSession
+} from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
 import { RouteOutcomeScreen } from '../../flow/components/RouteOutcomeScreen';
 import { useProjectContext } from '../../state/useProjectContext';
@@ -35,6 +40,7 @@ export function SharedChannelRoute({
   const [sendError, setSendError] = useState<string | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [completingTurnId, setCompletingTurnId] = useState<number | null>(null);
   const [isRailOpen, setIsRailOpen] = useState(false);
 
   useEffect(() => {
@@ -88,14 +94,47 @@ export function SharedChannelRoute({
     return () => controller.abort();
   }, [channelReference, channels.markRead, projectId, reloadKey, session.client]);
 
+  const completeAssistantTurn = async (turnId: number) => {
+    if (completingTurnId !== null) return;
+    setCompletingTurnId(turnId);
+    setSendError(null);
+    try {
+      const completed = await session.client.completeProjectChannelAssistantTurn(projectId, channelReference, turnId);
+      setDetail((current) => current ? {
+        ...current,
+        messages: completed.responseMessage && !current.messages.some((message) => message.messageId === completed.responseMessage?.messageId)
+          ? [...current.messages, completed.responseMessage]
+          : current.messages,
+        assistantTurns: current.assistantTurns.map((turn) =>
+          turn.turnId === completed.assistantTurn.turnId ? completed.assistantTurn : turn
+        )
+      } : current);
+    } catch (error) {
+      const reason = errorMessage(error, 'Assistant completion is unavailable.');
+      setSendError(`Your message is saved. IronDev could not answer this request. ${reason}`);
+    } finally {
+      setCompletingTurnId(null);
+    }
+  };
+
   const postMessage = async () => {
-    if (!draft.trim() || !detail?.channel.canPostMessages || isSending) return;
+    if (!draft.trim() || !detail?.channel.canPostMessages || isSending || completingTurnId !== null) return;
     setIsSending(true);
     setSendError(null);
     try {
       const saved = await session.client.postProjectChannelMessage(projectId, channelReference, draft.trim());
-      setDetail((current) => current ? { ...current, messages: [...current.messages, saved] } : current);
+      setDetail((current) => current ? {
+        ...current,
+        messages: [...current.messages, saved.message],
+        assistantTurns: saved.assistantTurn
+          ? [...current.assistantTurns, saved.assistantTurn]
+          : current.assistantTurns
+      } : current);
       setDraft('');
+      setIsSending(false);
+      if (saved.assistantTurn?.status === 'Requested') {
+        await completeAssistantTurn(saved.assistantTurn.turnId);
+      }
     } catch (error) {
       setSendError(errorMessage(error, 'The message could not be posted.'));
     } finally {
@@ -191,7 +230,22 @@ export function SharedChannelRoute({
                 <h2>No messages yet</h2>
                 <p>Start the human conversation. Messages here do not approve work or change project state.</p>
               </div>
-            ) : detail.messages.map((message) => <ChannelMessage key={message.messageId} message={message} />)}
+            ) : detail.messages.map((message) => {
+              const requestedTurn = detail.assistantTurns.find((turn) => turn.requestMessageId === message.messageId);
+              const answeredTurn = detail.assistantTurns.find((turn) => turn.responseMessageId === message.messageId);
+              return (
+                <Fragment key={message.messageId}>
+                  <ChannelMessage message={message} assistantTurn={answeredTurn} />
+                  {requestedTurn && requestedTurn.status !== 'Answered' ? (
+                    <AssistantTurnNotice
+                      turn={requestedTurn}
+                      isCompleting={completingTurnId === requestedTurn.turnId}
+                      onRetry={() => void completeAssistantTurn(requestedTurn.turnId)}
+                    />
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </div>
 
           <form
@@ -208,7 +262,7 @@ export function SharedChannelRoute({
               value={draft}
               rows={3}
               maxLength={10000}
-              disabled={!channel.canPostMessages || isSending}
+              disabled={!channel.canPostMessages || isSending || completingTurnId !== null}
               onChange={(event) => setDraft(event.target.value)}
             />
             <div className="chat-channel-composer__footer">
@@ -217,9 +271,9 @@ export function SharedChannelRoute({
                 type="submit"
                 variant="primary"
                 testId="chat.channel.send"
-                disabled={!draft.trim() || !channel.canPostMessages || isSending}
+                disabled={!draft.trim() || !channel.canPostMessages || isSending || completingTurnId !== null}
               >
-                {isSending ? 'Sending...' : 'Send'}
+                {isSending ? 'Sending...' : completingTurnId !== null ? 'IronDev is responding...' : 'Send'}
               </CommandButton>
             </div>
             {sendError ? <p className="state-error" data-testid="chat.channel.error">{sendError}</p> : null}
@@ -230,7 +284,13 @@ export function SharedChannelRoute({
   );
 }
 
-function ChannelMessage({ message }: { message: ProjectChannelChatMessage }) {
+function ChannelMessage({
+  message,
+  assistantTurn
+}: {
+  message: ProjectChannelChatMessage;
+  assistantTurn?: ProjectChannelAssistantTurnState;
+}) {
   return (
     <article className="chat-channel-message" data-testid={`chat.channel.message.${message.messageId}`}>
       <header>
@@ -239,7 +299,39 @@ function ChannelMessage({ message }: { message: ProjectChannelChatMessage }) {
       </header>
       <p>{message.message}</p>
       {message.status === 'Edited' ? <small>Edited</small> : null}
+      {assistantTurn ? (
+        <div className="chat-channel-message__assistant-meta" data-testid={`chat.channel.assistant.sources.${assistantTurn.turnId}`}>
+          <small>{assistantTurn.mode ?? 'Answer'} / requested by {assistantTurn.requestedByDisplayName}</small>
+          <small>{assistantTurn.linkedFilePaths ? `Sources: ${assistantTurn.linkedFilePaths}` : 'No source paths were returned.'}</small>
+        </div>
+      ) : null}
     </article>
+  );
+}
+
+function AssistantTurnNotice({
+  turn,
+  isCompleting,
+  onRetry
+}: {
+  turn: ProjectChannelAssistantTurnState;
+  isCompleting: boolean;
+  onRetry: () => void;
+}) {
+  const canRetry = turn.status === 'Requested' || turn.status === 'Failed';
+  const message = isCompleting
+    ? 'IronDev is inspecting project context for this saved request.'
+    : turn.failureReason ?? 'This request is saved and waiting for IronDev.';
+  return (
+    <div className={`chat-channel-assistant-turn chat-channel-assistant-turn--${turn.status.toLowerCase()}`} data-testid={`chat.channel.assistant.turn.${turn.turnId}`}>
+      <div>
+        <strong>{turn.status === 'Requested' && isCompleting ? 'Inspecting context' : turn.status}</strong>
+        <p>{message}</p>
+      </div>
+      {canRetry && !isCompleting ? (
+        <CommandButton type="button" variant="subtle" onClick={onRetry}>Try again</CommandButton>
+      ) : null}
+    </div>
   );
 }
 

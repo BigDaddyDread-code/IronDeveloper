@@ -24,6 +24,7 @@ public sealed record ProjectChannelChatSummary(
 public sealed record ProjectChannelChatDetail(
     ProjectChannelChatSummary Channel,
     IReadOnlyList<ProjectChannelChatMessage> Messages,
+    IReadOnlyList<ProjectChannelAssistantTurnState> AssistantTurns,
     ProjectChannelReadState ReadState,
     ProjectChannelPresenceState Presence,
     string AssistantParticipationStatus,
@@ -56,17 +57,50 @@ public sealed record ProjectChannelChatMessage(
     DateTime? EditedUtc,
     string Boundary);
 
+public sealed record ProjectChannelAssistantTurnState(
+    long TurnId,
+    long ChannelId,
+    long RequestMessageId,
+    long? ResponseMessageId,
+    int RequestedByUserId,
+    string RequestedByDisplayName,
+    string Prompt,
+    string? Answer,
+    string? Mode,
+    double? ModeConfidence,
+    string? ModeReason,
+    string? ContextSummary,
+    string? LinkedFilePaths,
+    string? LinkedSymbols,
+    string? LinkedDocumentIds,
+    string? DogfoodTraceId,
+    long? TraceId,
+    string Status,
+    string? FailureReason,
+    DateTime CreatedUtc,
+    DateTime? CompletedUtc,
+    string Boundary);
+
+public sealed record ProjectChannelPostMessageResult(
+    ProjectChannelChatMessage Message,
+    ProjectChannelAssistantTurnState? AssistantTurn);
+
+public sealed record ProjectChannelAssistantCompletionResult(
+    ProjectChannelAssistantTurnState AssistantTurn,
+    ProjectChannelChatMessage? ResponseMessage);
+
 public enum ProjectChannelChatMutationStatus
 {
     Succeeded = 0,
     NotFound = 1,
     ReadOnly = 2,
-    AssistantInvocationNotImplemented = 3,
-    DuplicateName = 4
+    DuplicateName = 3
 }
 
 public sealed record ProjectChannelChatMutationResult(
     ProjectChannelChatMutationStatus Status,
     ProjectChannelChatMessage? Message = null,
     ProjectChannelChatSummary? Channel = null,
-    ProjectChannelReadState? ReadState = null);
+    ProjectChannelReadState? ReadState = null,
+    ProjectChannelPostMessageResult? PostMessage = null,
+    ProjectChannelAssistantCompletionResult? AssistantCompletion = null);
