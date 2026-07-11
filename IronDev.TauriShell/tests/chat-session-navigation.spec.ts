@@ -138,6 +138,35 @@ test('assistant completion failure preserves the saved request and supports an e
   expect(state.assistantCompletionRequests).toBe(2);
 });
 
+test('channel member suggestions insert a durable person mention token', async ({ page }) => {
+  const state = await mockSessionWorkspace(page);
+  await page.goto('/projects/7/chat/channels/general');
+
+  await page.getByTestId('chat.channel.composer').fill('Please review @chan');
+  await expect(page.getByTestId('chat.channel.mentions')).toContainText('Channel Reader');
+  await page.getByRole('option', { name: /Channel Reader/ }).click();
+  await expect(page.getByTestId('chat.channel.composer')).toHaveValue('Please review @channel-reader ');
+  await page.getByTestId('chat.channel.send').click();
+  await expect(page.getByText('Please review @channel-reader')).toBeVisible();
+  expect(state.channelMessageCount).toBe(2);
+});
+
+test('project notification inbox acknowledges a mention and opens its channel', async ({ page }) => {
+  const state = await mockSessionWorkspace(page, { withNotification: true });
+  await page.goto('/projects/7/chat');
+
+  await expect(page.getByTestId('flow.notifications')).toContainText('1');
+  await page.getByTestId('flow.notifications').click();
+  await expect(page.getByTestId('flow.notification.8101')).toContainText('Alice mentioned you');
+  if (process.env.IRONDEV_VISUAL_SMOKE === '1') {
+    await page.screenshot({ path: '../reports/visual-smoke/chat-mentions-1.png', fullPage: true });
+  }
+  await page.getByTestId('flow.notification.8101').click();
+
+  await expect(page).toHaveURL('/projects/7/chat/channels/general');
+  expect(state.markNotificationReadRequests).toBe(1);
+});
+
 test('Read-only channel membership renders the backend refusal and disables posting', async ({ page }) => {
   await mockSessionWorkspace(page);
   await page.goto('/projects/7/chat/channels/product-planning');
@@ -230,12 +259,29 @@ test.describe('narrow session navigation', () => {
       await page.screenshot({ path: '../reports/visual-smoke/chat-assistant-1-mobile.png', fullPage: true });
     }
   });
+
+  test('keeps the notification inbox inside the narrow header', async ({ page }) => {
+    await mockSessionWorkspace(page, { withNotification: true });
+    await page.goto('/projects/7/chat');
+
+    await page.getByTestId('flow.notifications').click();
+    await expect(page.getByTestId('flow.notification.8101')).toBeVisible();
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+    if (process.env.IRONDEV_VISUAL_SMOKE === '1') {
+      await page.screenshot({ path: '../reports/visual-smoke/chat-mentions-1-mobile.png', fullPage: true });
+    }
+  });
 });
 
 interface SessionMockOptions {
   failSessionListOnce?: boolean;
   failMarkRead?: boolean;
   failAssistantCompletionOnce?: boolean;
+  withNotification?: boolean;
 }
 
 interface SessionMockState {
@@ -244,6 +290,7 @@ interface SessionMockState {
   channelMessageCount: number;
   markReadRequests: number;
   assistantCompletionRequests: number;
+  markNotificationReadRequests: number;
 }
 
 async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}): Promise<SessionMockState> {
@@ -252,7 +299,8 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     sessionListRequests: 0,
     channelMessageCount: 1,
     markReadRequests: 0,
-    assistantCompletionRequests: 0
+    assistantCompletionRequests: 0,
+    markNotificationReadRequests: 0
   };
   let nextSessionId = 9010;
   let nextMessageId = 9200;
@@ -425,6 +473,7 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
       channel,
       messages: channelMessages.get(slug) ?? [],
       assistantTurns: channelTurns.get(slug) ?? [],
+      mentionCandidates: [{ userId: 8, displayName: 'Channel Reader', handle: 'channel-reader' }],
       readState: {
         unreadCount: channel.unreadCount,
         lastReadMessageId: channel.lastReadMessageId,
@@ -558,6 +607,35 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     }
     channelMessages.set(slug, history);
     return json(route, { assistantTurn: answered, responseMessage: response });
+  });
+
+  await page.route(/\/irondev-api\/api\/projects\/7\/notifications$/, (route) => {
+    const notifications = options.withNotification ? [{
+      notificationId: 8101,
+      kind: 'Mention',
+      channelId: 701,
+      channelName: 'General',
+      channelSlug: 'general',
+      messageId: 7101,
+      actorUserId: 8,
+      actorDisplayName: 'Alice',
+      title: 'Alice mentioned you in #general',
+      body: '@bob please review this.',
+      isRead: false,
+      createdUtc: '2026-07-10T09:05:00Z',
+      readUtc: null,
+      boundary: 'Notification attention state; not approval.'
+    }] : [];
+    return json(route, {
+      unreadCount: notifications.filter((notification) => !notification.isRead).length,
+      notifications,
+      boundary: 'Notification attention state; not approval.'
+    });
+  });
+
+  await page.route(/\/irondev-api\/api\/projects\/7\/notifications\/(\d+)\/read$/, (route) => {
+    state.markNotificationReadRequests += 1;
+    return route.fulfill({ status: 204 });
   });
 
   await page.route(/\/irondev-api\/api\/projects\/7\/chat\/sessions$/, async (route) => {

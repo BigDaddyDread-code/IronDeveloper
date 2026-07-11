@@ -23,6 +23,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
         "ProjectChannels",
         "ProjectChannelMembers",
         "ProjectChannelMessages",
+        "ProjectChannelMessageMentions",
+        "ProjectNotifications",
         "ProjectChannelMessageContextLinks",
         "ProjectChannelAssistantTurns",
         "ProjectChannelMessageReads",
@@ -60,6 +62,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
         AssertScopedEntity<ProjectChannel>();
         AssertScopedEntity<ProjectChannelMember>();
         AssertScopedEntity<ProjectChannelMessage>();
+        AssertScopedEntity<ProjectChannelMessageMention>();
+        AssertScopedEntity<ProjectNotification>();
         AssertScopedEntity<ProjectChannelMessageContextLink>();
         AssertScopedEntity<ProjectChannelAssistantTurn>();
         AssertScopedEntity<ProjectChannelMessageRead>();
@@ -70,6 +74,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
         AssertBoundary(ProjectChannelBoundaries.ContextLink);
         AssertBoundary(ProjectChannelBoundaries.AssistantTurn);
         AssertBoundary(ProjectChannelBoundaries.ReadMarker);
+        AssertBoundary(ProjectChannelBoundaries.Mention);
+        AssertBoundary(ProjectChannelBoundaries.Notification);
         AssertBoundary(ProjectChannelBoundaries.Pin);
     }
 
@@ -99,6 +105,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
                 OBJECT_ID(N'dbo.ProjectChannels'),
                 OBJECT_ID(N'dbo.ProjectChannelMembers'),
                 OBJECT_ID(N'dbo.ProjectChannelMessages'),
+                OBJECT_ID(N'dbo.ProjectChannelMessageMentions'),
+                OBJECT_ID(N'dbo.ProjectNotifications'),
                 OBJECT_ID(N'dbo.ProjectChannelMessageContextLinks'),
                 OBJECT_ID(N'dbo.ProjectChannelAssistantTurns'),
                 OBJECT_ID(N'dbo.ProjectChannelMessageReads'),
@@ -111,6 +119,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
             "FK_ProjectChannels_Projects",
             "FK_ProjectChannelMembers_Channels",
             "FK_ProjectChannelMessages_Channels",
+            "FK_ProjectChannelMessageMentions_Messages",
+            "FK_ProjectNotifications_Recipient",
             "FK_ProjectChannelMessageContextLinks_Messages",
             "FK_ProjectChannelAssistantTurns_RequestMessage",
             "FK_ProjectChannelMessageReads_LastReadMessage",
@@ -126,6 +136,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
                 OBJECT_ID(N'dbo.ProjectChannels'),
                 OBJECT_ID(N'dbo.ProjectChannelMembers'),
                 OBJECT_ID(N'dbo.ProjectChannelMessages'),
+                OBJECT_ID(N'dbo.ProjectChannelMessageMentions'),
+                OBJECT_ID(N'dbo.ProjectNotifications'),
                 OBJECT_ID(N'dbo.ProjectChannelMessageContextLinks'),
                 OBJECT_ID(N'dbo.ProjectChannelAssistantTurns')
             )
@@ -138,6 +150,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
             "CK_ProjectChannelMembers_ChannelRole",
             "CK_ProjectChannelMessages_Role",
             "CK_ProjectChannelMessages_UserRequiresAuthor",
+            "CK_ProjectChannelMessageMentions_NotSelf",
+            "CK_ProjectNotifications_Status",
             "CK_ProjectChannelMessageContextLinks_LinkKind",
             "CK_ProjectChannelAssistantTurns_Status");
 
@@ -151,6 +165,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
                 OBJECT_ID(N'dbo.ProjectChannels'),
                 OBJECT_ID(N'dbo.ProjectChannelMembers'),
                 OBJECT_ID(N'dbo.ProjectChannelMessages'),
+                OBJECT_ID(N'dbo.ProjectChannelMessageMentions'),
+                OBJECT_ID(N'dbo.ProjectNotifications'),
                 OBJECT_ID(N'dbo.ProjectChannelMessageContextLinks'),
                 OBJECT_ID(N'dbo.ProjectChannelAssistantTurns'),
                 OBJECT_ID(N'dbo.ProjectChannelMessageReads'),
@@ -165,6 +181,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
             "IX_ProjectChannels_LinkedTicket",
             "UX_ProjectChannelMembers_ChannelUser_Active",
             "IX_ProjectChannelMessages_ChannelCreated",
+            "UX_ProjectChannelMessageMentions_MessageUser",
+            "IX_ProjectNotifications_RecipientStatusCreated",
             "IX_ProjectChannelMessageContextLinks_Link",
             "IX_ProjectChannelAssistantTurns_ChannelCreated",
             "UX_ProjectChannelMessageReads_ChannelUser",
@@ -445,6 +463,8 @@ public sealed class ProjectChannelsSchemaTests : IntegrationTestBase
             IF OBJECT_ID(N'dbo.ProjectChannelAssistantTurns', N'U') IS NOT NULL DROP TABLE dbo.ProjectChannelAssistantTurns;
             IF OBJECT_ID(N'dbo.ProjectChannelMessageContextLinks', N'U') IS NOT NULL DROP TABLE dbo.ProjectChannelMessageContextLinks;
             IF OBJECT_ID(N'dbo.ProjectChannelMessageReads', N'U') IS NOT NULL DROP TABLE dbo.ProjectChannelMessageReads;
+            IF OBJECT_ID(N'dbo.ProjectNotifications', N'U') IS NOT NULL DROP TABLE dbo.ProjectNotifications;
+            IF OBJECT_ID(N'dbo.ProjectChannelMessageMentions', N'U') IS NOT NULL DROP TABLE dbo.ProjectChannelMessageMentions;
             IF OBJECT_ID(N'dbo.ProjectChannelMembers', N'U') IS NOT NULL DROP TABLE dbo.ProjectChannelMembers;
             IF OBJECT_ID(N'dbo.ProjectChannelMessages', N'U') IS NOT NULL DROP TABLE dbo.ProjectChannelMessages;
             IF OBJECT_ID(N'dbo.ProjectChannels', N'U') IS NOT NULL DROP TABLE dbo.ProjectChannels;

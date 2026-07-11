@@ -19,6 +19,9 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
     private static readonly Regex AssistantMention = new(
         @"(?<![A-Za-z0-9_])@IronDev\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex PersonMention = new(
+        @"(?<![A-Za-z0-9_])@([A-Za-z0-9][A-Za-z0-9._-]{0,63})\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IProjectChatResponseService _projectChat;
@@ -94,12 +97,18 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
             AssistantTurnSelectSql + " WHERE t.TenantId = @TenantId AND t.ProjectId = @ProjectId AND t.ChannelId = @ChannelId ORDER BY t.CreatedUtc, t.Id;",
             new { TenantId = tenantId, ProjectId = projectId, ChannelId = channel.ChannelId },
             cancellationToken: cancellationToken))).ToArray();
+        var mentionRows = await GetMentionCandidateRowsAsync(
+            connection, null, tenantId, projectId, channel.ChannelId, channel.Visibility, currentUserId, cancellationToken);
+        var mentionCandidates = BuildMentionCandidates(mentionRows)
+            .Select(candidate => new ProjectChannelMentionCandidate(candidate.UserId, candidate.DisplayName, candidate.Handle))
+            .ToArray();
 
         var summary = MapSummary(channel);
         return new ProjectChannelChatDetail(
             summary,
             messages,
             assistantTurns,
+            mentionCandidates,
             new ProjectChannelReadState(
                 summary.UnreadCount,
                 summary.LastReadMessageId,
@@ -252,6 +261,72 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
             new { TenantId = tenantId, ProjectId = projectId, ChannelId = channel.ChannelId, CurrentUserId = currentUserId, Message = normalizedMessage, AuthorDisplayName = authorDisplayName },
             transaction,
             cancellationToken: cancellationToken));
+
+        var mentionRows = await GetMentionCandidateRowsAsync(
+            connection, transaction, tenantId, projectId, channel.ChannelId, channel.Visibility, currentUserId, cancellationToken);
+        var candidates = BuildMentionCandidates(mentionRows);
+        var mentionedHandles = PersonMention.Matches(normalizedMessage)
+            .Select(match => match.Groups[1].Value)
+            .Where(handle => !handle.Equals("IronDev", StringComparison.OrdinalIgnoreCase))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var mentionedUsers = candidates
+            .Where(candidate => mentionedHandles.Contains(candidate.Handle))
+            .ToArray();
+        if (mentionedUsers.Length > 0)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                """
+                INSERT INTO dbo.ProjectChannelMessageMentions
+                    (TenantId, ProjectId, ChannelId, MessageId, MentionedUserId, MentionedByUserId)
+                VALUES
+                    (@TenantId, @ProjectId, @ChannelId, @MessageId, @MentionedUserId, @MentionedByUserId);
+                """,
+                mentionedUsers.Select(candidate => new
+                {
+                    TenantId = tenantId,
+                    ProjectId = projectId,
+                    ChannelId = channel.ChannelId,
+                    MessageId = saved.MessageId,
+                    MentionedUserId = candidate.UserId,
+                    MentionedByUserId = currentUserId
+                }),
+                transaction,
+                cancellationToken: cancellationToken));
+        }
+
+        var notificationRows = candidates
+            .Where(candidate =>
+                candidate.NotificationLevel.Equals(ProjectChannelNotificationLevels.All, StringComparison.OrdinalIgnoreCase)
+                || (mentionedUsers.Any(mentioned => mentioned.UserId == candidate.UserId)
+                    && candidate.NotificationLevel.Equals(ProjectChannelNotificationLevels.Mentions, StringComparison.OrdinalIgnoreCase)))
+            .Select(candidate => new
+            {
+                TenantId = tenantId,
+                ProjectId = projectId,
+                RecipientUserId = candidate.UserId,
+                ActorUserId = currentUserId,
+                Kind = mentionedUsers.Any(mentioned => mentioned.UserId == candidate.UserId) ? "Mention" : "ChannelMessage",
+                ChannelId = channel.ChannelId,
+                MessageId = saved.MessageId,
+                Title = mentionedUsers.Any(mentioned => mentioned.UserId == candidate.UserId)
+                    ? $"{authorDisplayName} mentioned you in #{channel.Slug}"
+                    : $"New message in #{channel.Slug}",
+                Body = normalizedMessage.Length <= 240 ? normalizedMessage : normalizedMessage[..240]
+            })
+            .ToArray();
+        if (notificationRows.Length > 0)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                """
+                INSERT INTO dbo.ProjectNotifications
+                    (TenantId, ProjectId, RecipientUserId, ActorUserId, Kind, ChannelId, MessageId, Title, Body)
+                VALUES
+                    (@TenantId, @ProjectId, @RecipientUserId, @ActorUserId, @Kind, @ChannelId, @MessageId, @Title, @Body);
+                """,
+                notificationRows,
+                transaction,
+                cancellationToken: cancellationToken));
+        }
 
         ProjectChannelAssistantTurnState? assistantTurn = null;
         if (AssistantMention.IsMatch(normalizedMessage))
@@ -465,6 +540,129 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
                 marker.LastReadUtc,
                 channel.CurrentUserNotificationLevel ?? ProjectChannelNotificationLevels.Mentions,
                 ProjectChannelBoundaries.ReadMarker));
+    }
+
+    public async Task<ProjectNotificationListResponse> ListNotificationsAsync(
+        int tenantId,
+        int projectId,
+        int currentUserId,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = """
+            SELECT TOP (50)
+                   n.Id AS NotificationId, n.Kind, n.ChannelId, c.Name AS ChannelName, c.Slug AS ChannelSlug,
+                   n.MessageId, n.ActorUserId, actor.DisplayName AS ActorDisplayName,
+                   n.Title, n.Body, CAST(CASE WHEN n.Status = 'Read' THEN 1 ELSE 0 END AS bit) AS IsRead,
+                   n.CreatedUtc, n.ReadUtc, n.Boundary
+            FROM dbo.ProjectNotifications n
+            LEFT JOIN dbo.ProjectChannels c ON c.Id = n.ChannelId AND c.TenantId = n.TenantId AND c.ProjectId = n.ProjectId
+            LEFT JOIN dbo.Users actor ON actor.Id = n.ActorUserId
+            WHERE n.TenantId = @TenantId AND n.ProjectId = @ProjectId AND n.RecipientUserId = @CurrentUserId
+            ORDER BY n.CreatedUtc DESC, n.Id DESC;
+            """;
+        var notifications = (await connection.QueryAsync<ProjectNotificationSummary>(new CommandDefinition(
+            sql,
+            new { TenantId = tenantId, ProjectId = projectId, CurrentUserId = currentUserId },
+            cancellationToken: cancellationToken))).ToArray();
+        return new ProjectNotificationListResponse(
+            notifications.Count(notification => !notification.IsRead),
+            notifications,
+            ProjectChannelBoundaries.Notification);
+    }
+
+    public async Task<bool> MarkNotificationReadAsync(
+        int tenantId,
+        int projectId,
+        int currentUserId,
+        long notificationId,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var affected = await connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE dbo.ProjectNotifications
+            SET Status = 'Read', ReadUtc = COALESCE(ReadUtc, SYSUTCDATETIME())
+            WHERE Id = @NotificationId AND TenantId = @TenantId AND ProjectId = @ProjectId
+              AND RecipientUserId = @CurrentUserId;
+            """,
+            new { NotificationId = notificationId, TenantId = tenantId, ProjectId = projectId, CurrentUserId = currentUserId },
+            cancellationToken: cancellationToken));
+        return affected == 1;
+    }
+
+    private static async Task<IReadOnlyList<MentionCandidateRow>> GetMentionCandidateRowsAsync(
+        IDbConnection connection,
+        IDbTransaction? transaction,
+        int tenantId,
+        int projectId,
+        long channelId,
+        string visibility,
+        int currentUserId,
+        CancellationToken cancellationToken)
+    {
+        var rows = await connection.QueryAsync<MentionCandidateRow>(new CommandDefinition(
+            """
+            SELECT u.Id AS UserId, u.DisplayName,
+                   COALESCE(member.NotificationLevel, 'Mentions') AS NotificationLevel
+            FROM dbo.TenantUsers tenantMember
+            JOIN dbo.Users u ON u.Id = tenantMember.UserId AND u.IsActive = 1
+            OUTER APPLY (
+                SELECT TOP (1) channelMember.NotificationLevel
+                FROM dbo.ProjectChannelMembers channelMember
+                WHERE channelMember.TenantId = @TenantId AND channelMember.ProjectId = @ProjectId
+                  AND channelMember.ChannelId = @ChannelId AND channelMember.UserId = u.Id
+                  AND channelMember.Status = 'Active'
+            ) member
+            WHERE tenantMember.TenantId = @TenantId AND u.Id <> @CurrentUserId
+              AND (@Visibility = 'Project' OR member.NotificationLevel IS NOT NULL)
+            ORDER BY u.DisplayName, u.Id;
+            """,
+            new { TenantId = tenantId, ProjectId = projectId, ChannelId = channelId, Visibility = visibility, CurrentUserId = currentUserId },
+            transaction,
+            cancellationToken: cancellationToken));
+        return rows.ToArray();
+    }
+
+    private static IReadOnlyList<MentionCandidate> BuildMentionCandidates(IReadOnlyList<MentionCandidateRow> rows)
+    {
+        var provisional = rows
+            .Select(row => new { Row = row, BaseHandle = MentionHandle(row.DisplayName, row.UserId) })
+            .ToArray();
+        var duplicates = provisional
+            .GroupBy(item => item.BaseHandle, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return provisional
+            .Select(item => new MentionCandidate(
+                item.Row.UserId,
+                item.Row.DisplayName,
+                duplicates.Contains(item.BaseHandle) ? $"{item.BaseHandle}-{item.Row.UserId}" : item.BaseHandle,
+                item.Row.NotificationLevel))
+            .ToArray();
+    }
+
+    private static string MentionHandle(string displayName, int userId)
+    {
+        var builder = new StringBuilder(displayName.Length);
+        var separatorPending = false;
+        foreach (var character in displayName.ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(character) || character is '.' or '_' or '-')
+            {
+                if (separatorPending && builder.Length > 0)
+                    builder.Append('-');
+                builder.Append(character);
+                separatorPending = false;
+            }
+            else
+            {
+                separatorPending = true;
+            }
+        }
+
+        return builder.Length == 0 ? $"user-{userId}" : builder.ToString();
     }
 
     private async Task<ProjectChannelChatMutationResult> SaveAssistantAnswerAsync(
@@ -765,4 +963,17 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
         public long? LastReadMessageId { get; init; }
         public DateTime LastReadUtc { get; init; }
     }
+
+    private sealed class MentionCandidateRow
+    {
+        public int UserId { get; init; }
+        public string DisplayName { get; init; } = string.Empty;
+        public string NotificationLevel { get; init; } = ProjectChannelNotificationLevels.Mentions;
+    }
+
+    private sealed record MentionCandidate(
+        int UserId,
+        string DisplayName,
+        string Handle,
+        string NotificationLevel);
 }

@@ -5971,6 +5971,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectNotificationListResponse"];
+                        "application/json": components["schemas"]["ProjectNotificationListResponse"];
+                        "text/json": components["schemas"]["ProjectNotificationListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/notifications/{notificationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    notificationId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -12811,6 +12897,7 @@ export interface components {
             channel?: components["schemas"]["ProjectChannelChatSummary"];
             messages?: components["schemas"]["ProjectChannelChatMessage"][] | null;
             assistantTurns?: components["schemas"]["ProjectChannelAssistantTurnState"][] | null;
+            mentionCandidates?: components["schemas"]["ProjectChannelMentionCandidate"][] | null;
             readState?: components["schemas"]["ProjectChannelReadState"];
             presence?: components["schemas"]["ProjectChannelPresenceState"];
             assistantParticipationStatus?: string | null;
@@ -12879,6 +12966,12 @@ export interface components {
             userId?: number;
             channelRole?: string | null;
             notificationLevel?: string | null;
+        };
+        ProjectChannelMentionCandidate: {
+            /** Format: int32 */
+            userId?: number;
+            displayName?: string | null;
+            handle?: string | null;
         };
         ProjectChannelPostMessageResult: {
             message?: components["schemas"]["ProjectChannelChatMessage"];
@@ -13152,6 +13245,34 @@ export interface components {
             channelMembershipStatus?: string | null;
             members?: components["schemas"]["ProjectMemberDirectoryEntry"][] | null;
             channels?: components["schemas"]["ProjectChannelDirectoryEntry"][] | null;
+            boundary?: string | null;
+        };
+        ProjectNotificationListResponse: {
+            /** Format: int32 */
+            unreadCount?: number;
+            notifications?: components["schemas"]["ProjectNotificationSummary"][] | null;
+            boundary?: string | null;
+        };
+        ProjectNotificationSummary: {
+            /** Format: int64 */
+            notificationId?: number;
+            kind?: string | null;
+            /** Format: int64 */
+            channelId?: number | null;
+            channelName?: string | null;
+            channelSlug?: string | null;
+            /** Format: int64 */
+            messageId?: number | null;
+            /** Format: int32 */
+            actorUserId?: number | null;
+            actorDisplayName?: string | null;
+            title?: string | null;
+            body?: string | null;
+            isRead?: boolean;
+            /** Format: date-time */
+            createdUtc?: string;
+            /** Format: date-time */
+            readUtc?: string | null;
             boundary?: string | null;
         };
         ProjectProfile: {

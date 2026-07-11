@@ -198,6 +198,94 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID(N'dbo.ProjectChannelMessageMentions', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProjectChannelMessageMentions
+    (
+        Id BIGINT IDENTITY(1,1) NOT NULL,
+        TenantId INT NOT NULL,
+        ProjectId INT NOT NULL,
+        ChannelId BIGINT NOT NULL,
+        MessageId BIGINT NOT NULL,
+        MentionedUserId INT NOT NULL,
+        MentionedByUserId INT NOT NULL,
+        CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ProjectChannelMessageMentions_CreatedUtc DEFAULT SYSUTCDATETIME(),
+        Boundary NVARCHAR(500) NOT NULL CONSTRAINT DF_ProjectChannelMessageMentions_Boundary DEFAULT N'A channel mention is collaboration attention state. It is not membership, approval, authority, evidence, policy satisfaction, source apply, workflow continuation, release readiness, or deployment readiness.',
+        CONSTRAINT PK_ProjectChannelMessageMentions PRIMARY KEY CLUSTERED (Id),
+        CONSTRAINT FK_ProjectChannelMessageMentions_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+        CONSTRAINT FK_ProjectChannelMessageMentions_Projects FOREIGN KEY (ProjectId, TenantId) REFERENCES dbo.Projects(Id, TenantId),
+        CONSTRAINT FK_ProjectChannelMessageMentions_Channels FOREIGN KEY (ChannelId, TenantId, ProjectId) REFERENCES dbo.ProjectChannels(Id, TenantId, ProjectId),
+        CONSTRAINT FK_ProjectChannelMessageMentions_Messages FOREIGN KEY (MessageId, TenantId, ProjectId, ChannelId) REFERENCES dbo.ProjectChannelMessages(Id, TenantId, ProjectId, ChannelId),
+        CONSTRAINT FK_ProjectChannelMessageMentions_Target FOREIGN KEY (MentionedUserId) REFERENCES dbo.Users(Id),
+        CONSTRAINT FK_ProjectChannelMessageMentions_Actor FOREIGN KEY (MentionedByUserId) REFERENCES dbo.Users(Id),
+        CONSTRAINT CK_ProjectChannelMessageMentions_NotSelf CHECK (MentionedUserId <> MentionedByUserId),
+        CONSTRAINT CK_ProjectChannelMessageMentions_Boundary_NotBlank CHECK (LEN(LTRIM(RTRIM(Boundary))) > 0)
+    );
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_ProjectChannelMessageMentions_MessageUser' AND object_id = OBJECT_ID(N'dbo.ProjectChannelMessageMentions'))
+BEGIN
+    CREATE UNIQUE INDEX UX_ProjectChannelMessageMentions_MessageUser
+    ON dbo.ProjectChannelMessageMentions (TenantId, ProjectId, ChannelId, MessageId, MentionedUserId);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ProjectChannelMessageMentions_UserCreated' AND object_id = OBJECT_ID(N'dbo.ProjectChannelMessageMentions'))
+BEGIN
+    CREATE INDEX IX_ProjectChannelMessageMentions_UserCreated
+    ON dbo.ProjectChannelMessageMentions (TenantId, ProjectId, MentionedUserId, CreatedUtc DESC);
+END;
+GO
+
+IF OBJECT_ID(N'dbo.ProjectNotifications', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProjectNotifications
+    (
+        Id BIGINT IDENTITY(1,1) NOT NULL,
+        TenantId INT NOT NULL,
+        ProjectId INT NOT NULL,
+        RecipientUserId INT NOT NULL,
+        ActorUserId INT NULL,
+        Kind NVARCHAR(50) NOT NULL,
+        ChannelId BIGINT NULL,
+        MessageId BIGINT NULL,
+        Title NVARCHAR(300) NOT NULL,
+        Body NVARCHAR(1000) NOT NULL,
+        Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectNotifications_Status DEFAULT N'Unread',
+        CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_ProjectNotifications_CreatedUtc DEFAULT SYSUTCDATETIME(),
+        ReadUtc DATETIME2 NULL,
+        Boundary NVARCHAR(500) NOT NULL CONSTRAINT DF_ProjectNotifications_Boundary DEFAULT N'A product notification is attention state. It is not approval, assignment, authority, evidence, policy satisfaction, source apply, workflow continuation, release readiness, or deployment readiness.',
+        CONSTRAINT PK_ProjectNotifications PRIMARY KEY CLUSTERED (Id),
+        CONSTRAINT FK_ProjectNotifications_Tenants FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
+        CONSTRAINT FK_ProjectNotifications_Projects FOREIGN KEY (ProjectId, TenantId) REFERENCES dbo.Projects(Id, TenantId),
+        CONSTRAINT FK_ProjectNotifications_Recipient FOREIGN KEY (RecipientUserId) REFERENCES dbo.Users(Id),
+        CONSTRAINT FK_ProjectNotifications_Actor FOREIGN KEY (ActorUserId) REFERENCES dbo.Users(Id),
+        CONSTRAINT FK_ProjectNotifications_Channel FOREIGN KEY (ChannelId, TenantId, ProjectId) REFERENCES dbo.ProjectChannels(Id, TenantId, ProjectId),
+        CONSTRAINT FK_ProjectNotifications_Message FOREIGN KEY (MessageId, TenantId, ProjectId, ChannelId) REFERENCES dbo.ProjectChannelMessages(Id, TenantId, ProjectId, ChannelId),
+        CONSTRAINT CK_ProjectNotifications_Kind CHECK (Kind IN (N'Mention', N'ChannelMessage')),
+        CONSTRAINT CK_ProjectNotifications_Status CHECK (Status IN (N'Unread', N'Read')),
+        CONSTRAINT CK_ProjectNotifications_Title_NotBlank CHECK (LEN(LTRIM(RTRIM(Title))) > 0),
+        CONSTRAINT CK_ProjectNotifications_Boundary_NotBlank CHECK (LEN(LTRIM(RTRIM(Boundary))) > 0)
+    );
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_ProjectNotifications_MessageRecipient' AND object_id = OBJECT_ID(N'dbo.ProjectNotifications'))
+BEGIN
+    CREATE UNIQUE INDEX UX_ProjectNotifications_MessageRecipient
+    ON dbo.ProjectNotifications (TenantId, ProjectId, MessageId, RecipientUserId)
+    WHERE MessageId IS NOT NULL;
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ProjectNotifications_RecipientStatusCreated' AND object_id = OBJECT_ID(N'dbo.ProjectNotifications'))
+BEGIN
+    CREATE INDEX IX_ProjectNotifications_RecipientStatusCreated
+    ON dbo.ProjectNotifications (TenantId, ProjectId, RecipientUserId, Status, CreatedUtc DESC);
+END;
+GO
+
 IF OBJECT_ID(N'dbo.ProjectChannelMessageContextLinks', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ProjectChannelMessageContextLinks

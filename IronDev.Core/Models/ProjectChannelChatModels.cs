@@ -25,9 +25,36 @@ public sealed record ProjectChannelChatDetail(
     ProjectChannelChatSummary Channel,
     IReadOnlyList<ProjectChannelChatMessage> Messages,
     IReadOnlyList<ProjectChannelAssistantTurnState> AssistantTurns,
+    IReadOnlyList<ProjectChannelMentionCandidate> MentionCandidates,
     ProjectChannelReadState ReadState,
     ProjectChannelPresenceState Presence,
     string AssistantParticipationStatus,
+    string Boundary);
+
+public sealed record ProjectChannelMentionCandidate(
+    int UserId,
+    string DisplayName,
+    string Handle);
+
+public sealed record ProjectNotificationListResponse(
+    int UnreadCount,
+    IReadOnlyList<ProjectNotificationSummary> Notifications,
+    string Boundary);
+
+public sealed record ProjectNotificationSummary(
+    long NotificationId,
+    string Kind,
+    long? ChannelId,
+    string? ChannelName,
+    string? ChannelSlug,
+    long? MessageId,
+    int? ActorUserId,
+    string? ActorDisplayName,
+    string Title,
+    string Body,
+    bool IsRead,
+    DateTime CreatedUtc,
+    DateTime? ReadUtc,
     string Boundary);
 
 public sealed record ProjectChannelReadState(

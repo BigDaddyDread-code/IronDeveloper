@@ -8120,6 +8120,98 @@
         }
       }
     },
+    "/api/projects/{projectId}/notifications": {
+      "get": {
+        "tags": [
+          "ProjectNotifications"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectNotificationListResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectNotificationListResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectNotificationListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/notifications/{notificationId}/read": {
+      "post": {
+        "tags": [
+          "ProjectNotifications"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "notificationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "tags": [
@@ -23081,6 +23173,13 @@
             },
             "nullable": true
           },
+          "mentionCandidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectChannelMentionCandidate"
+            },
+            "nullable": true
+          },
           "readState": {
             "$ref": "#/components/schemas/ProjectChannelReadState"
           },
@@ -23292,6 +23391,24 @@
             "nullable": true
           },
           "notificationLevel": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectChannelMentionCandidate": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "handle": {
             "type": "string",
             "nullable": true
           }
@@ -24112,6 +24229,92 @@
             "items": {
               "$ref": "#/components/schemas/ProjectChannelDirectoryEntry"
             },
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectNotificationListResponse": {
+        "type": "object",
+        "properties": {
+          "unreadCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectNotificationSummary"
+            },
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectNotificationSummary": {
+        "type": "object",
+        "properties": {
+          "notificationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "channelName": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelSlug": {
+            "type": "string",
+            "nullable": true
+          },
+          "messageId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "actorUserId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "actorDisplayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "createdUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readUtc": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           },
           "boundary": {
@@ -34409,6 +34612,9 @@
     },
     {
       "name": "ProjectMembers"
+    },
+    {
+      "name": "ProjectNotifications"
     },
     {
       "name": "Projects"

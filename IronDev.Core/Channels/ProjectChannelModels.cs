@@ -20,6 +20,12 @@ public static class ProjectChannelBoundaries
     public const string Presence =
         "Channel presence reports observed viewer state only. It is not membership, assignment, approval, authority, or a workflow blocker.";
 
+    public const string Mention =
+        "A channel mention is collaboration attention state. It is not membership, approval, authority, evidence, policy satisfaction, source apply, workflow continuation, release readiness, or deployment readiness.";
+
+    public const string Notification =
+        "A product notification is attention state. It is not approval, assignment, authority, evidence, policy satisfaction, source apply, workflow continuation, release readiness, or deployment readiness.";
+
     public const string Pin =
         "A pinned channel message is navigation convenience. It is not approval, policy, authority, evidence, source apply, workflow continuation, release readiness, or deployment readiness.";
 }
@@ -294,6 +300,37 @@ public sealed class ProjectChannelMessageContextLink
     public string Source { get; init; } = ProjectChannelContextLinkSources.UserLinked;
     public DateTime CreatedUtc { get; init; }
     public string Boundary { get; init; } = ProjectChannelBoundaries.ContextLink;
+}
+
+public sealed class ProjectChannelMessageMention
+{
+    public long Id { get; init; }
+    public int TenantId { get; init; }
+    public int ProjectId { get; init; }
+    public long ChannelId { get; init; }
+    public long MessageId { get; init; }
+    public int MentionedUserId { get; init; }
+    public int MentionedByUserId { get; init; }
+    public DateTime CreatedUtc { get; init; }
+    public string Boundary { get; init; } = ProjectChannelBoundaries.Mention;
+}
+
+public sealed class ProjectNotification
+{
+    public long Id { get; init; }
+    public int TenantId { get; init; }
+    public int ProjectId { get; init; }
+    public int RecipientUserId { get; init; }
+    public int? ActorUserId { get; init; }
+    public string Kind { get; init; } = string.Empty;
+    public long? ChannelId { get; init; }
+    public long? MessageId { get; init; }
+    public string Title { get; init; } = string.Empty;
+    public string Body { get; init; } = string.Empty;
+    public string Status { get; init; } = "Unread";
+    public DateTime CreatedUtc { get; init; }
+    public DateTime? ReadUtc { get; init; }
+    public string Boundary { get; init; } = ProjectChannelBoundaries.Notification;
 }
 
 public sealed class ProjectChannelAssistantTurn

@@ -178,6 +178,12 @@ export function SharedChannelRoute({
 
   const channel = detail.channel;
   const readOnlyReason = channel.canPostMessages ? null : 'Your channel role is Read only. You cannot post messages.';
+  const activeMentionQuery = mentionQuery(draft);
+  const mentionSuggestions = activeMentionQuery === null || activeMentionQuery.toLowerCase().startsWith('irondev')
+    ? []
+    : detail.mentionCandidates
+        .filter((candidate) => candidate.handle.toLowerCase().startsWith(activeMentionQuery.toLowerCase()))
+        .slice(0, 6);
 
   return (
     <main className="chat-route-workspace" data-testid="chat.channel.route">
@@ -265,6 +271,21 @@ export function SharedChannelRoute({
               disabled={!channel.canPostMessages || isSending || completingTurnId !== null}
               onChange={(event) => setDraft(event.target.value)}
             />
+            {mentionSuggestions.length > 0 ? (
+              <div className="chat-channel-mention-suggestions" role="listbox" aria-label="Mention a channel member" data-testid="chat.channel.mentions">
+                {mentionSuggestions.map((candidate) => (
+                  <button
+                    key={candidate.userId}
+                    type="button"
+                    role="option"
+                    onClick={() => setDraft(applyMention(draft, candidate.handle))}
+                  >
+                    <strong>{candidate.displayName}</strong>
+                    <span>@{candidate.handle}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="chat-channel-composer__footer">
               <p data-testid="chat.channel.assistant-status">{readOnlyReason ?? detail.assistantParticipationStatus}</p>
               <CommandButton
@@ -339,4 +360,16 @@ function formatMessageTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Time unavailable';
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function mentionQuery(value: string) {
+  const match = value.match(/(?:^|\s)@([A-Za-z0-9._-]*)$/);
+  return match ? match[1] : null;
+}
+
+function applyMention(value: string, handle: string) {
+  return value.replace(/(?:^|\s)@[A-Za-z0-9._-]*$/, (match) => {
+    const prefix = match.startsWith(' ') ? ' ' : '';
+    return `${prefix}@${handle} `;
+  });
 }
