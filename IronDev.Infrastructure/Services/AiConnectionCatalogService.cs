@@ -12,19 +12,36 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
 
     private readonly IConfiguration _configuration;
     private readonly Func<string, string?> _environmentVariableReader;
+    private readonly IAiConnectionCredentialStore? _credentialStore;
 
     public AiConnectionCatalogService(IConfiguration configuration)
-        : this(configuration, Environment.GetEnvironmentVariable)
+        : this(configuration, Environment.GetEnvironmentVariable, credentialStore: null)
+    {
+    }
+
+    public AiConnectionCatalogService(
+        IConfiguration configuration,
+        IAiConnectionCredentialStore credentialStore)
+        : this(configuration, Environment.GetEnvironmentVariable, credentialStore)
     {
     }
 
     public AiConnectionCatalogService(IConfiguration configuration, Func<string, string?> environmentVariableReader)
+        : this(configuration, environmentVariableReader, credentialStore: null)
+    {
+    }
+
+    public AiConnectionCatalogService(
+        IConfiguration configuration,
+        Func<string, string?> environmentVariableReader,
+        IAiConnectionCredentialStore? credentialStore)
     {
         _configuration = configuration;
         _environmentVariableReader = environmentVariableReader;
+        _credentialStore = credentialStore;
     }
 
-    public Task<IReadOnlyList<AiConnectionMetadata>> ListAsync(
+    public async Task<IReadOnlyList<AiConnectionMetadata>> ListAsync(
         int tenantId,
         int userId,
         CancellationToken cancellationToken = default)
@@ -33,21 +50,27 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
 
         if (tenantId <= 0)
         {
-            return Task.FromResult<IReadOnlyList<AiConnectionMetadata>>([]);
+            return [];
         }
 
         var provider = Clean(_configuration["Ai:Provider"], "openai").ToLowerInvariant();
         var model = Clean(_configuration["Ai:Model"], string.Empty);
         var endpoint = SafeEndpoint(_configuration["Ai:BaseUrl"], provider);
-        var credentialConfigured = HasCredential();
-        var credentialStatus = CredentialStatus(provider, credentialConfigured);
+        const string connectionId = "deployment-default";
+        var storedCredential = _credentialStore is null
+            ? null
+            : await _credentialStore.GetMetadataAsync(tenantId, connectionId, cancellationToken)
+                .ConfigureAwait(false);
+        var deploymentCredentialConfigured = HasCredential();
+        var credentialConfigured = storedCredential?.CredentialConfigured ?? deploymentCredentialConfigured;
+        var credentialStatus = storedCredential?.CredentialStatus ?? CredentialStatus(provider, deploymentCredentialConfigured);
         var enabled = !string.IsNullOrWhiteSpace(provider);
 
         IReadOnlyList<AiConnectionMetadata> connections =
         [
             new AiConnectionMetadata
             {
-                Id = "deployment-default",
+                Id = connectionId,
                 TenantId = tenantId,
                 DisplayName = "Deployment default",
                 ProviderKind = provider,
@@ -61,17 +84,18 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
                 Enabled = enabled,
                 TenantAvailable = enabled,
                 ProjectAvailable = enabled,
-                CredentialRotatedUtc = null,
+                CredentialRotatedUtc = storedCredential?.CredentialRotatedUtc,
+                CredentialRevokedUtc = storedCredential?.CredentialRevokedUtc,
                 CreatedByUserId = 0,
                 CreatedUtc = null,
-                UpdatedByUserId = userId,
-                UpdatedUtc = null,
+                UpdatedByUserId = storedCredential?.UpdatedByUserId ?? userId,
+                UpdatedUtc = storedCredential?.UpdatedUtc,
                 Version = ContractVersion,
                 Boundary = Boundary
             }
         ];
 
-        return Task.FromResult(connections);
+        return connections;
     }
 
     private bool HasCredential() =>

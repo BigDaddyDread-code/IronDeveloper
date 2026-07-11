@@ -1,6 +1,9 @@
 import type {
   AcceptedApprovalEnvelope,
   AcceptedApprovalReadModelUi,
+  AiConnectionCredentialMutationOutcome,
+  AiConnectionCredentialRevokeRequest,
+  AiConnectionCredentialWriteRequest,
   AiConnectionMetadata,
   ApiConnectionStatus,
   ApiStatus,
@@ -1157,6 +1160,36 @@ class IronDevApiClient {
 
   async listAiConnections(signal?: AbortSignal): Promise<AiConnectionMetadata[]> {
     return this.request<AiConnectionMetadata[]>('/api/v1/ai-connections', { method: 'GET', signal });
+  }
+
+  async configureAiConnectionCredential(
+    connectionId: string,
+    request: AiConnectionCredentialWriteRequest,
+    signal?: AbortSignal
+  ): Promise<AiConnectionCredentialMutationOutcome> {
+    return this.request<AiConnectionCredentialMutationOutcome>(
+      `/api/v1/ai-connections/${encodeURIComponent(connectionId)}/credential`,
+      {
+        method: 'PUT',
+        body: request,
+        signal
+      }
+    );
+  }
+
+  async revokeAiConnectionCredential(
+    connectionId: string,
+    request: AiConnectionCredentialRevokeRequest = {},
+    signal?: AbortSignal
+  ): Promise<AiConnectionCredentialMutationOutcome> {
+    return this.request<AiConnectionCredentialMutationOutcome>(
+      `/api/v1/ai-connections/${encodeURIComponent(connectionId)}/credential/revoke`,
+      {
+        method: 'POST',
+        body: request,
+        signal
+      }
+    );
   }
 
   async updateAgentProfile(

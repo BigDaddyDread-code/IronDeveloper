@@ -1778,6 +1778,7 @@ export interface AiConnectionMetadata {
   tenantAvailable: boolean;
   projectAvailable: boolean;
   credentialRotatedUtc?: string | null;
+  credentialRevokedUtc?: string | null;
   createdByUserId: number;
   createdUtc?: string | null;
   updatedByUserId: number;
@@ -1787,6 +1788,22 @@ export interface AiConnectionMetadata {
 }
 
 // ── PROJECT-0..3: provisioning readiness (computed server-side, never asserted) ──
+
+export interface AiConnectionCredentialWriteRequest {
+  credential: string;
+  reason?: string | null;
+}
+
+export interface AiConnectionCredentialRevokeRequest {
+  reason?: string | null;
+}
+
+export interface AiConnectionCredentialMutationOutcome {
+  succeeded: boolean;
+  failureReason?: string | null;
+  connection?: AiConnectionMetadata | null;
+  boundary: string;
+}
 
 export interface ProvisioningCheckUi {
   code: string;
