@@ -26,12 +26,20 @@ public interface IProjectChannelChatService
         string visibility,
         CancellationToken cancellationToken = default);
 
-    Task<ProjectChannelChatMutationResult> PostHumanMessageAsync(
+    Task<ProjectChannelChatMutationResult> PostMessageAsync(
         int tenantId,
         int projectId,
         int currentUserId,
         string channelReference,
         string message,
+        CancellationToken cancellationToken = default);
+
+    Task<ProjectChannelChatMutationResult> CompleteAssistantTurnAsync(
+        int tenantId,
+        int projectId,
+        int currentUserId,
+        string channelReference,
+        long turnId,
         CancellationToken cancellationToken = default);
 
     Task<ProjectChannelChatMutationResult> MarkReadAsync(

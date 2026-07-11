@@ -5805,9 +5805,72 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain": components["schemas"]["ProjectChannelChatMessage"];
-                        "application/json": components["schemas"]["ProjectChannelChatMessage"];
-                        "text/json": components["schemas"]["ProjectChannelChatMessage"];
+                        "text/plain": components["schemas"]["ProjectChannelPostMessageResult"];
+                        "application/json": components["schemas"]["ProjectChannelPostMessageResult"];
+                        "text/json": components["schemas"]["ProjectChannelPostMessageResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/channels/{channelReference}/assistant-turns/{turnId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    channelReference: string;
+                    turnId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectChannelAssistantCompletionResult"];
+                        "application/json": components["schemas"]["ProjectChannelAssistantCompletionResult"];
+                        "text/json": components["schemas"]["ProjectChannelAssistantCompletionResult"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
                     };
                 };
             };
@@ -12707,9 +12770,47 @@ export interface components {
             kind?: string | null;
             label?: string | null;
         };
+        ProjectChannelAssistantCompletionResult: {
+            assistantTurn?: components["schemas"]["ProjectChannelAssistantTurnState"];
+            responseMessage?: components["schemas"]["ProjectChannelChatMessage"];
+        };
+        ProjectChannelAssistantTurnState: {
+            /** Format: int64 */
+            turnId?: number;
+            /** Format: int64 */
+            channelId?: number;
+            /** Format: int64 */
+            requestMessageId?: number;
+            /** Format: int64 */
+            responseMessageId?: number | null;
+            /** Format: int32 */
+            requestedByUserId?: number;
+            requestedByDisplayName?: string | null;
+            prompt?: string | null;
+            answer?: string | null;
+            mode?: string | null;
+            /** Format: double */
+            modeConfidence?: number | null;
+            modeReason?: string | null;
+            contextSummary?: string | null;
+            linkedFilePaths?: string | null;
+            linkedSymbols?: string | null;
+            linkedDocumentIds?: string | null;
+            dogfoodTraceId?: string | null;
+            /** Format: int64 */
+            traceId?: number | null;
+            status?: string | null;
+            failureReason?: string | null;
+            /** Format: date-time */
+            createdUtc?: string;
+            /** Format: date-time */
+            completedUtc?: string | null;
+            boundary?: string | null;
+        };
         ProjectChannelChatDetail: {
             channel?: components["schemas"]["ProjectChannelChatSummary"];
             messages?: components["schemas"]["ProjectChannelChatMessage"][] | null;
+            assistantTurns?: components["schemas"]["ProjectChannelAssistantTurnState"][] | null;
             readState?: components["schemas"]["ProjectChannelReadState"];
             presence?: components["schemas"]["ProjectChannelPresenceState"];
             assistantParticipationStatus?: string | null;
@@ -12778,6 +12879,10 @@ export interface components {
             userId?: number;
             channelRole?: string | null;
             notificationLevel?: string | null;
+        };
+        ProjectChannelPostMessageResult: {
+            message?: components["schemas"]["ProjectChannelChatMessage"];
+            assistantTurn?: components["schemas"]["ProjectChannelAssistantTurnState"];
         };
         ProjectChannelPresenceState: {
             status?: string | null;

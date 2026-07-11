@@ -7897,17 +7897,114 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectChannelChatMessage"
+                  "$ref": "#/components/schemas/ProjectChannelPostMessageResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectChannelChatMessage"
+                  "$ref": "#/components/schemas/ProjectChannelPostMessageResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectChannelChatMessage"
+                  "$ref": "#/components/schemas/ProjectChannelPostMessageResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/channels/{channelReference}/assistant-turns/{turnId}/complete": {
+      "post": {
+        "tags": [
+          "ProjectChannels"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "channelReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "turnId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectChannelAssistantCompletionResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectChannelAssistantCompletionResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectChannelAssistantCompletionResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -22854,6 +22951,116 @@
         },
         "additionalProperties": false
       },
+      "ProjectChannelAssistantCompletionResult": {
+        "type": "object",
+        "properties": {
+          "assistantTurn": {
+            "$ref": "#/components/schemas/ProjectChannelAssistantTurnState"
+          },
+          "responseMessage": {
+            "$ref": "#/components/schemas/ProjectChannelChatMessage"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectChannelAssistantTurnState": {
+        "type": "object",
+        "properties": {
+          "turnId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "channelId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requestMessageId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "responseMessageId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "requestedByUserId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestedByDisplayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "prompt": {
+            "type": "string",
+            "nullable": true
+          },
+          "answer": {
+            "type": "string",
+            "nullable": true
+          },
+          "mode": {
+            "type": "string",
+            "nullable": true
+          },
+          "modeConfidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "modeReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "contextSummary": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkedFilePaths": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkedSymbols": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkedDocumentIds": {
+            "type": "string",
+            "nullable": true
+          },
+          "dogfoodTraceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "traceId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ProjectChannelChatDetail": {
         "type": "object",
         "properties": {
@@ -22864,6 +23071,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProjectChannelChatMessage"
+            },
+            "nullable": true
+          },
+          "assistantTurns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectChannelAssistantTurnState"
             },
             "nullable": true
           },
@@ -23080,6 +23294,18 @@
           "notificationLevel": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectChannelPostMessageResult": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/ProjectChannelChatMessage"
+          },
+          "assistantTurn": {
+            "$ref": "#/components/schemas/ProjectChannelAssistantTurnState"
           }
         },
         "additionalProperties": false

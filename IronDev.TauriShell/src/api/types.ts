@@ -908,12 +908,34 @@ export type ProjectChannelChatMessage = Omit<
 export type ProjectChannelReadState = Required<components['schemas']['ProjectChannelReadState']>;
 export type ProjectChannelPresenceState = Required<components['schemas']['ProjectChannelPresenceState']>;
 
+export type ProjectChannelAssistantTurnState = Omit<
+  Required<components['schemas']['ProjectChannelAssistantTurnState']>,
+  'requestedByDisplayName' | 'prompt' | 'status' | 'createdUtc' | 'boundary'
+> & {
+  requestedByDisplayName: string;
+  prompt: string;
+  status: 'Requested' | 'Answered' | 'Failed' | 'Refused';
+  createdUtc: string;
+  boundary: string;
+};
+
+export interface ProjectChannelPostMessageResult {
+  message: ProjectChannelChatMessage;
+  assistantTurn: ProjectChannelAssistantTurnState | null;
+}
+
+export interface ProjectChannelAssistantCompletionResult {
+  assistantTurn: ProjectChannelAssistantTurnState;
+  responseMessage: ProjectChannelChatMessage | null;
+}
+
 export type ProjectChannelChatDetail = Omit<
   Required<components['schemas']['ProjectChannelChatDetail']>,
-  'channel' | 'messages' | 'readState' | 'presence'
+  'channel' | 'messages' | 'assistantTurns' | 'readState' | 'presence'
 > & {
   channel: ProjectChannelChatSummary;
   messages: ProjectChannelChatMessage[];
+  assistantTurns: ProjectChannelAssistantTurnState[];
   readState: ProjectChannelReadState;
   presence: ProjectChannelPresenceState;
 };

@@ -3954,6 +3954,49 @@ p {
   white-space: pre-wrap;
 }
 
+.chat-channel-message__assistant-meta {
+  display: grid;
+  gap: 3px;
+  margin-top: 9px;
+}
+
+.chat-channel-message__assistant-meta small {
+  overflow-wrap: anywhere;
+}
+
+.chat-channel-assistant-turn {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--fl-line);
+  background: #f3f5f2;
+  padding: 12px;
+}
+
+.chat-channel-assistant-turn > div {
+  min-width: 0;
+}
+
+.chat-channel-assistant-turn strong {
+  color: var(--fl-ink);
+  font-size: 12px;
+}
+
+.chat-channel-assistant-turn p {
+  margin: 3px 0 0;
+  color: var(--fl-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.chat-channel-assistant-turn--failed,
+.chat-channel-assistant-turn--refused {
+  border-left: 3px solid var(--fl-red);
+}
+
 .chat-channel-empty {
   margin: auto 0;
   padding: 36px 0;

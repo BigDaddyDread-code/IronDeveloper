@@ -135,7 +135,7 @@ public sealed class ProjectChannelsController : ControllerBase
 
     [HttpPost("{channelReference}/messages")]
     [EnableRateLimiting("SensitiveApiPolicy")]
-    [ProducesResponseType(typeof(ProjectChannelChatMessage), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProjectChannelPostMessageResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> PostMessage(
         int projectId,
         string channelReference,
@@ -157,7 +157,7 @@ public sealed class ProjectChannelsController : ControllerBase
         if (callerRole is null)
             return NotFound();
 
-        var result = await _channels.PostHumanMessageAsync(
+        var result = await _channels.PostMessageAsync(
             project.TenantId,
             project.Id,
             context.UserId,
@@ -166,11 +166,50 @@ public sealed class ProjectChannelsController : ControllerBase
             cancellationToken);
         return result.Status switch
         {
-            ProjectChannelChatMutationStatus.Succeeded => Ok(result.Message),
+            ProjectChannelChatMutationStatus.Succeeded => Ok(result.PostMessage),
             ProjectChannelChatMutationStatus.ReadOnly => StatusCode(StatusCodes.Status403Forbidden, new { error = "Your channel role is Read only. You cannot post messages." }),
-            ProjectChannelChatMutationStatus.AssistantInvocationNotImplemented => StatusCode(StatusCodes.Status501NotImplemented, new { error = "IronDev participation in shared channels is not implemented. Remove @IronDev to post a human message." }),
             _ => NotFound(new { error = "Channel not found or not visible to this user." })
         };
+    }
+
+    [HttpPost("{channelReference}/assistant-turns/{turnId:long}/complete")]
+    [EnableRateLimiting("SensitiveApiPolicy")]
+    [ProducesResponseType(typeof(ProjectChannelAssistantCompletionResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CompleteAssistantTurn(
+        int projectId,
+        string channelReference,
+        long turnId,
+        CancellationToken cancellationToken)
+    {
+        var context = CurrentUser();
+        var project = await _projects.GetByIdAsync(projectId, cancellationToken);
+        if (project is null)
+            return NotFound(new { error = "Project not found in the current tenant." });
+
+        var callerRole = await _users.GetTenantRoleAsync(context.UserId, project.TenantId, cancellationToken);
+        if (callerRole is null)
+            return NotFound();
+
+        try
+        {
+            var result = await _channels.CompleteAssistantTurnAsync(
+                project.TenantId,
+                project.Id,
+                context.UserId,
+                channelReference,
+                turnId,
+                cancellationToken);
+            return result.Status == ProjectChannelChatMutationStatus.Succeeded
+                ? Ok(result.AssistantCompletion)
+                : NotFound(new { error = "Assistant turn not found or not available to this user." });
+        }
+        catch (InvalidOperationException error)
+        {
+            _logger.LogWarning(error, "Assistant turn {TurnId} could not acquire its completion lock.", turnId);
+            return Conflict(new { error = error.Message });
+        }
     }
 
     [HttpPost("{channelReference}/read")]
