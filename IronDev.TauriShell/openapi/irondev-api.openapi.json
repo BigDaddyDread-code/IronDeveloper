@@ -1426,6 +1426,112 @@
         }
       }
     },
+    "/api/v1/audit/ledger": {
+      "get": {
+        "tags": [
+          "AuditLedger"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "workItemId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "toUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLedgerResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLedgerResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLedgerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLedgerResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLedgerResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLedgerResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": [
@@ -6848,18 +6954,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/v1/audit/ledger": {
-      "get": {
-        "tags": [
-          "PlannedSurfaces"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           }
         }
       }
@@ -15994,6 +16088,174 @@
           "message": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditLedgerBoundary": {
+        "type": "object",
+        "properties": {
+          "readOnly": {
+            "type": "boolean"
+          },
+          "grantsAuthority": {
+            "type": "boolean"
+          },
+          "canApprove": {
+            "type": "boolean"
+          },
+          "canContinueWorkflow": {
+            "type": "boolean"
+          },
+          "canApplySource": {
+            "type": "boolean"
+          },
+          "exposesRawPayloadJson": {
+            "type": "boolean"
+          },
+          "boundaryStatement": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditLedgerEvidenceLink": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "href": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditLedgerIssue": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "field": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditLedgerItem": {
+        "type": "object",
+        "properties": {
+          "ledgerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "projectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "workItemId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "workItemTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorDisplayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceLinks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLedgerEvidenceLink"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditLedgerResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundary": {
+            "$ref": "#/components/schemas/AuditLedgerBoundary"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLedgerIssue"
+            },
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLedgerItem"
+            },
+            "nullable": true
+          },
+          "returnedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "take": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -35167,6 +35429,9 @@
     },
     {
       "name": "ApprovalGateDogfoodCorrelationReport"
+    },
+    {
+      "name": "AuditLedger"
     },
     {
       "name": "Auth"

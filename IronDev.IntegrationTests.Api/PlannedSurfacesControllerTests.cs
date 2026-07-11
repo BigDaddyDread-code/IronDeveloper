@@ -24,13 +24,6 @@ public sealed class PlannedSurfacesControllerTests
         };
 
     [TestMethod]
-    public void AuditLedger_Refuses501_WithFullEnvelope()
-    {
-        var result = CreateController().GetAuditLedger();
-        AssertPlannedEnvelope(result, expectedSliceFragment: "AUDIT-1");
-    }
-
-    [TestMethod]
     public void InviteTenantUser_Refuses501_WithFullEnvelope()
     {
         var result = CreateController().InviteTenantUser(tenantId: 1);

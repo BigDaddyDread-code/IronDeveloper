@@ -1,6 +1,7 @@
 import { libraryPath, navigateProductPath, type LibrarySection } from '../navigation/productRoutes';
 import { GovernanceHost } from './GovernanceHost';
-import { AuditSection, ProvisioningSection } from './PlannedSections';
+import { AuditSection } from './AuditSection';
+import { ProvisioningSection } from './PlannedSections';
 import { SolutionExplorer } from './SolutionExplorer';
 import { SettingsScreen } from '../settings/SettingsScreen';
 import { DocumentsScreen } from './DocumentsScreen';
@@ -86,7 +87,7 @@ export function LibraryScreen({
       {section === 'provisioning' ? (
         <ProvisioningSection onBackToProjects={onBackToProjects} onOpenBoard={onOpenBoard} />
       ) : null}
-      {section === 'audit' ? <AuditSection /> : null}
+      {section === 'audit' ? <AuditSection projectId={projectId} /> : null}
       {section === 'settings' ? <SettingsScreen /> : null}
       {preserveGovernancePath ? (
         <span className="fl-visually-hidden" data-testid="flow.library.compatibilityPath">

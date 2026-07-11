@@ -8,6 +8,7 @@ using IronDev.Api.Middleware;
 using IronDev.Core.Builder;
 using IronDev.Core.Chat;
 using IronDev.Core;
+using IronDev.Core.Audit;
 using IronDev.Core.Agents;
 using IronDev.Core.Agents.Audit;
 using IronDev.Core.Agents.Concrete;
@@ -308,6 +309,7 @@ builder.Services.AddScoped<IFailedWorkflowDiagnosisReportService, FailedWorkflow
 builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, ApprovalGateDogfoodCorrelationReportService>();
 builder.Services.AddScoped<IAgentRunHealthSummaryService, AgentRunHealthSummaryService>();
 builder.Services.AddScoped<IBackendOperationalHealthService, BackendOperationalHealthService>();
+builder.Services.AddScoped<IAuditLedgerReadService, SqlAuditLedgerReadService>();
 builder.Services.AddSingleton<IGovernedOperationStatusReadRepository, GovernedOperationStatusReadRepository>();
 builder.Services.AddSingleton<IEvidenceMetadataReadRepository, EvidenceMetadataReadRepository>();
 builder.Services.AddSingleton<IReceiptMetadataReadRepository, ReceiptMetadataReadRepository>();

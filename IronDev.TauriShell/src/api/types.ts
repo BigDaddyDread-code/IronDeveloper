@@ -565,6 +565,64 @@ export interface GovernanceTraceApiEnvelope<TData> {
   data?: TData | null;
 }
 
+export interface AuditLedgerQuery {
+  projectId?: number;
+  workItemId?: number;
+  actor?: string;
+  event?: string;
+  fromUtc?: string;
+  toUtc?: string;
+  take?: number;
+}
+
+export interface AuditLedgerBoundary {
+  readOnly?: boolean | null;
+  grantsAuthority?: boolean | null;
+  canApprove?: boolean | null;
+  canContinueWorkflow?: boolean | null;
+  canApplySource?: boolean | null;
+  exposesRawPayloadJson?: boolean | null;
+  boundaryStatement?: string | null;
+}
+
+export interface AuditLedgerIssue {
+  code?: string | null;
+  field?: string | null;
+  message?: string | null;
+}
+
+export interface AuditLedgerEvidenceLink {
+  label?: string | null;
+  href?: string | null;
+}
+
+export interface AuditLedgerItem {
+  ledgerId?: string | null;
+  timeUtc?: string | null;
+  projectId?: number | null;
+  projectName?: string | null;
+  workItemId?: number | null;
+  workItemTitle?: string | null;
+  source?: string | null;
+  actorId?: string | null;
+  actorDisplayName?: string | null;
+  action?: string | null;
+  outcome?: string | null;
+  summary?: string | null;
+  correlationId?: string | null;
+  evidenceLinks?: AuditLedgerEvidenceLink[] | null;
+}
+
+export interface AuditLedgerResponse {
+  status?: string | null;
+  boundary?: AuditLedgerBoundary | null;
+  warnings?: string[] | null;
+  issues?: AuditLedgerIssue[] | null;
+  items?: AuditLedgerItem[] | null;
+  returnedCount?: number | null;
+  take?: number | null;
+}
+
 export interface DogfoodLoopIssue {
   category?: string | null;
   code?: string | null;

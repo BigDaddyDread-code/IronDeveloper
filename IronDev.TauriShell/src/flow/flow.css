@@ -259,6 +259,71 @@
   justify-content: flex-end;
 }
 
+.fl-audit {
+  display: grid;
+  gap: 16px;
+}
+
+.fl-audit-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--fl-line2);
+}
+
+.fl-audit-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.fl-audit-heading p:last-child {
+  max-width: 720px;
+  margin: 4px 0 0;
+  color: var(--fl-ink2);
+}
+
+.fl-audit-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.fl-audit-filters .fl-field {
+  display: grid;
+  gap: 6px;
+  color: var(--fl-muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.fl-audit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.fl-audit-table-wrap {
+  overflow-x: auto;
+}
+
+.fl-audit-table td strong,
+.fl-audit-table td small {
+  display: block;
+}
+
+.fl-audit-table td small,
+.fl-muted {
+  color: var(--fl-muted);
+  font-size: 12px;
+}
+
 .fl-documents,
 .fl-document-detail,
 .fl-document-upload {

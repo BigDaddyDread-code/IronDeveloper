@@ -103,7 +103,7 @@ Reshape     exists but the map moves/renames it (work is re-homing, not building
 | Documents / decisions / ADRs | `KnowledgeRoute`, Documents/Decisions clients | documents CRUD+versions, decisions CRUD, memory search | Ready (Reshape) |
 | Governance viewers (17) | all exist under `features/governance` | matching V1 endpoints (receipts, patches, policies, tool gates, transitions) | Ready (Reshape as drill-downs) |
 | Reports archive | `RunReportsRoute` | `api/run-reports` (recent) | Ready (Reshape) |
-| Audit ledger | `GovernanceTimelineRoute`, `AgentRunAudit` clients | governance traces search, agent-run audit + thought ledger, workflow read-only | Partial (unify into one ledger view) |
+| Audit ledger | `LibraryScreen` Audit section, `AuditLedgerController` | project-scoped read-only ledger across run events, approvals, work item activity, chat, documents, versions, and membership | Ready (minimal unified view) |
 | Admin — users/roles | none | `tenants/{id}/users` CRUD (*survey-partial*); no invite flow, no role matrix | Partial (backend) / Missing (frontend) |
 | Settings four-way split | `SettingsRoute` (flat) | profile/commands, agent-profiles (model per role) | Partial |
 | Human-intervention dial (9.6) | none | none (AUTH-0 machinery) | Missing — Level 0 real, 1–3 as 501 |
@@ -125,7 +125,7 @@ AFFORDANCE-1  Generalize FrontendActionRequestBoundary + NextSafeActions into ON
               contract used by every screen; unify ChatGovernanceGate + UiAuthorityFirewall
               behind one renderer; introduce the 501 stub-controller convention; prove on
               the Runs surface. (Smaller than planned — the backend shape exists.)
-NAV-1         New honest-501 routes needed: Board, Projects/provisioning, Admin, Audit
+NAV-1         New honest-501 routes needed: Board, Projects/provisioning, Admin
               (unified), Dial. Everything else is Reshape, not build.
 REPAIR-2      Pure frontend: render repair attempts already present in the run report.
 FLOW SPINE    The largest frontend work is the Work Item spine itself (stage rail + contract

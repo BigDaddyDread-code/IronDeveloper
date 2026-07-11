@@ -3,6 +3,8 @@ import type {
   AcceptedApprovalReadModelUi,
   ApiConnectionStatus,
   ApiStatus,
+  AuditLedgerQuery,
+  AuditLedgerResponse,
   BuildReadinessResult,
   CreateAcceptedApprovalUiRequest,
   SkeletonAgentProfile,
@@ -879,6 +881,14 @@ class IronDevApiClient {
       `/api/v1/governance/traces${queryString}`,
       { method: 'GET', signal }
     );
+  }
+
+  async searchAuditLedger(query: AuditLedgerQuery, signal?: AbortSignal): Promise<AuditLedgerResponse> {
+    const queryString = toQueryString(query);
+    return this.request<AuditLedgerResponse>(`/api/v1/audit/ledger${queryString}`, {
+      method: 'GET',
+      signal
+    });
   }
 
   async getGovernanceTrace(
