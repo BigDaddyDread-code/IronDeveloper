@@ -33,6 +33,15 @@ public static class ProjectWorkItemApplyRecoveryStatuses
     public const string Applied = "Applied";
 }
 
+public static class ProjectWorkItemExecutionProofStatuses
+{
+    public const string NoRun = "NoRun";
+    public const string InProgress = "InProgress";
+    public const string ProofMissing = "ProofMissing";
+    public const string ExecutionObserved = "ExecutionObserved";
+    public const string LoopVerified = "LoopVerified";
+}
+
 public sealed record ProjectWorkItemReadModel
 {
     public int ProjectId { get; init; }
@@ -49,12 +58,38 @@ public sealed record ProjectWorkItemReadModel
     public required ProjectWorkItemGateReadModel Gate { get; init; }
     public required ProjectWorkItemActionReadModel PrimaryAction { get; init; }
     public required ProjectWorkItemApplyRecoveryReadModel ApplyRecovery { get; init; }
+    public required ProjectWorkItemExecutionProofReadModel ExecutionProof { get; init; }
     public required ProjectWorkItemEvidenceLinksReadModel EvidenceLinks { get; init; }
     public string Boundary { get; init; } = BoundaryText;
 
     public const string BoundaryText =
         "The Work Item projection reports ticket, run, gate, and evidence truth. It starts no run, grants no approval, " +
         "continues no workflow, and applies no source. Missing collaboration data remains empty rather than inferred.";
+}
+
+public sealed record ProjectWorkItemExecutionProofReadModel
+{
+    public string Status { get; init; } = ProjectWorkItemExecutionProofStatuses.NoRun;
+    public bool HasRunRecord { get; init; }
+    public bool ExecutionStarted { get; init; }
+    public bool ExecutionCompleted { get; init; }
+    public DateTimeOffset? StartedUtc { get; init; }
+    public DateTimeOffset? CompletedUtc { get; init; }
+    public int DurableExecutionEventCount { get; init; }
+    public IReadOnlyList<string> DurableExecutionEvents { get; init; } = [];
+    public bool BuildAndTestExecutionObserved { get; init; }
+    public bool ApplyExecutionObserved { get; init; }
+    public bool LoopVerified { get; init; }
+    public bool ArtifactEvidenceObserved { get; init; }
+    public bool ArtifactEvidenceProvesExecution { get; init; }
+    public IReadOnlyList<string> Gaps { get; init; } = [];
+    public string Reason { get; init; } = string.Empty;
+    public string NextSafeAction { get; init; } = string.Empty;
+    public string Boundary { get; init; } = BoundaryText;
+
+    public const string BoundaryText =
+        "Execution proof requires a durable run record and durable execution events. Proposals, packages, files, " +
+        "receipts, timestamps, and selected tests do not prove execution by themselves.";
 }
 
 public sealed record ProjectWorkItemApplyRecoveryReadModel
@@ -224,6 +259,7 @@ public static class ProjectWorkItemProjector
             Gate = gate,
             PrimaryAction = action,
             ApplyRecovery = ApplyRecoveryFor(report),
+            ExecutionProof = ExecutionProofFor(latestRun, report),
             EvidenceLinks = new ProjectWorkItemEvidenceLinksReadModel
             {
                 RunReportApiPath = latestRun is null
@@ -234,6 +270,95 @@ public static class ProjectWorkItemProjector
                     : $"/api/projects/{ticket.ProjectId}/tickets/{ticket.Id}/skeleton-runs/{Uri.EscapeDataString(latestRun.RunId)}/critic-package",
                 GovernanceLibraryPath = $"/projects/{ticket.ProjectId}/library/governance"
             }
+        };
+    }
+
+    private static ProjectWorkItemExecutionProofReadModel ExecutionProofFor(RunRecord? run, SkeletonRunReport? report)
+    {
+        if (run is null)
+        {
+            return new ProjectWorkItemExecutionProofReadModel
+            {
+                Status = ProjectWorkItemExecutionProofStatuses.NoRun,
+                Reason = "No durable run record exists for this Work Item.",
+                NextSafeAction = "Start a governed run when build readiness allows it."
+            };
+        }
+
+        var executionEventNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "SkeletonEvidencePackaged",
+            "SkeletonApplyStarted",
+            "SkeletonApplyStage",
+            "SkeletonApplied"
+        };
+        var executionEvents = (report?.Timeline ?? [])
+            .Where(entry => executionEventNames.Contains(entry.EventType))
+            .Select(entry => entry.EventType)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var buildAndTestObserved = executionEvents.Contains("SkeletonEvidencePackaged", StringComparer.Ordinal);
+        var applyObserved = executionEvents.Any(entry => entry is "SkeletonApplyStarted" or "SkeletonApplyStage" or "SkeletonApplied") ||
+            report?.Apply?.Stages.Count > 0 || report?.Apply?.Applied == true;
+        var artifactObserved = report is not null &&
+            (report.Proposal is not null || report.CriticPackage is not null || report.Apply?.Receipts.Count > 0);
+        var loopVerified = run.State == RunLifecycleState.Applied && report?.LoopComplete == true;
+        var inProgress = run.State is RunLifecycleState.Created or RunLifecycleState.Running;
+        var executionStarted = run.StartedUtc.HasValue || inProgress || executionEvents.Length > 0;
+        var executionCompleted = run.CompletedUtc.HasValue || run.State is
+            RunLifecycleState.Failed or RunLifecycleState.Cancelled or RunLifecycleState.Applied;
+        var gaps = report?.Gaps ?? [];
+        var status = loopVerified
+            ? ProjectWorkItemExecutionProofStatuses.LoopVerified
+            : inProgress
+                ? ProjectWorkItemExecutionProofStatuses.InProgress
+                : executionEvents.Length > 0
+                    ? ProjectWorkItemExecutionProofStatuses.ExecutionObserved
+                    : ProjectWorkItemExecutionProofStatuses.ProofMissing;
+
+        var reason = status switch
+        {
+            ProjectWorkItemExecutionProofStatuses.LoopVerified =>
+                "The durable run reached Applied and the report verified every required loop link.",
+            ProjectWorkItemExecutionProofStatuses.InProgress =>
+                "A durable run is in progress; terminal execution proof is not available yet.",
+            ProjectWorkItemExecutionProofStatuses.ExecutionObserved when gaps.Count > 0 =>
+                $"Durable execution events were observed, but the report names {gaps.Count} evidence gap(s).",
+            ProjectWorkItemExecutionProofStatuses.ExecutionObserved =>
+                "Durable execution events were observed. The governed loop is not yet fully verified.",
+            _ => artifactObserved
+                ? "Artifacts were observed, but no durable execution event proves they were executed."
+                : "The run record has no durable execution event in the current report."
+        };
+        var nextSafeAction = status switch
+        {
+            ProjectWorkItemExecutionProofStatuses.LoopVerified => "Inspect the final report and receipts.",
+            ProjectWorkItemExecutionProofStatuses.InProgress => "Wait for the run to publish its next durable state.",
+            ProjectWorkItemExecutionProofStatuses.ExecutionObserved when gaps.Count > 0 =>
+                "Inspect and resolve the named evidence gaps before treating the loop as verified.",
+            ProjectWorkItemExecutionProofStatuses.ExecutionObserved =>
+                "Continue through the current backend gate; execution observed is not loop completion.",
+            _ => "Refresh the run report or inspect the missing durable execution evidence."
+        };
+
+        return new ProjectWorkItemExecutionProofReadModel
+        {
+            Status = status,
+            HasRunRecord = true,
+            ExecutionStarted = executionStarted,
+            ExecutionCompleted = executionCompleted,
+            StartedUtc = run.StartedUtc,
+            CompletedUtc = run.CompletedUtc,
+            DurableExecutionEventCount = executionEvents.Length,
+            DurableExecutionEvents = executionEvents,
+            BuildAndTestExecutionObserved = buildAndTestObserved,
+            ApplyExecutionObserved = applyObserved,
+            LoopVerified = loopVerified,
+            ArtifactEvidenceObserved = artifactObserved,
+            ArtifactEvidenceProvesExecution = false,
+            Gaps = gaps,
+            Reason = reason,
+            NextSafeAction = nextSafeAction
         };
     }
 

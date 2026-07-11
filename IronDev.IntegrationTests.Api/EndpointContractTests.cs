@@ -192,6 +192,9 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(ProjectWorkItemApplyRecoveryStatuses.NotRequired, workItem.ApplyRecovery.Status);
         Assert.IsFalse(workItem.ApplyRecovery.Required);
         Assert.IsFalse(workItem.ApplyRecovery.RetryAllowed);
+        Assert.AreEqual(ProjectWorkItemExecutionProofStatuses.NoRun, workItem.ExecutionProof.Status);
+        Assert.IsFalse(workItem.ExecutionProof.HasRunRecord);
+        Assert.IsFalse(workItem.ExecutionProof.ArtifactEvidenceProvesExecution);
 
         var otherProjectResponse = await client.PostAsJsonAsync("/api/projects", new Project
         {

@@ -1173,6 +1173,67 @@
   font-weight: 700;
 }
 
+.fl-execution-proof {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--fl-blue);
+  border-radius: 6px;
+  background: var(--fl-blue-soft);
+  color: var(--fl-ink);
+}
+
+.fl-execution-proof-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.fl-execution-proof-head .fl-plabel {
+  margin-bottom: 4px;
+  color: var(--fl-blue);
+}
+
+.fl-execution-proof-head > span {
+  color: var(--fl-blue);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fl-execution-proof p,
+.fl-execution-proof details,
+.fl-execution-proof small {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fl-execution-proof-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.fl-execution-proof-facts div {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--fl-blue) 25%, transparent);
+  border-radius: 4px;
+}
+
+.fl-execution-proof-facts dt {
+  color: var(--fl-blue);
+  font-size: 10.5px;
+}
+
+.fl-execution-proof-facts dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .fl-workitem-side {
   display: grid;
   align-content: start;
@@ -1262,6 +1323,10 @@
   }
 
   .fl-apply-recovery-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fl-execution-proof-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
