@@ -64,6 +64,7 @@ import type {
   ProjectChannelChatListResponse,
   ProjectChannelChatMessage,
   ProjectChannelChatSummary,
+  ProjectChannelReadState,
   CreateProjectChannelRequest,
   ProjectChatSession,
   ProjectImplementationPlan,
@@ -562,6 +563,17 @@ class IronDevApiClient {
     return this.request<ProjectChannelChatMessage>(
       `/api/projects/${projectId}/channels/${encodeURIComponent(channelReference)}/messages`,
       { method: 'POST', body: { message } }
+    );
+  }
+
+  async markProjectChannelRead(
+    projectId: number,
+    channelReference: string,
+    signal?: AbortSignal
+  ): Promise<ProjectChannelReadState> {
+    return this.request<ProjectChannelReadState>(
+      `/api/projects/${projectId}/channels/${encodeURIComponent(channelReference)}/read`,
+      { method: 'POST', signal }
     );
   }
 

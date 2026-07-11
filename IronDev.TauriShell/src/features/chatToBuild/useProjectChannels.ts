@@ -53,13 +53,30 @@ export function useProjectChannels() {
     return created;
   }, [projectId, session.client]);
 
+  const markRead = useCallback(async (channelReference: string, signal?: AbortSignal) => {
+    if (!projectId) throw new Error('Select a project before updating channel read state.');
+    const readState = await session.client.markProjectChannelRead(projectId, channelReference, signal);
+    setChannels((current) => current.map((channel) =>
+      channel.slug === channelReference || String(channel.channelId) === channelReference
+        ? {
+            ...channel,
+            unreadCount: readState.unreadCount,
+            lastReadMessageId: readState.lastReadMessageId,
+            lastReadUtc: readState.lastReadUtc
+          }
+        : channel
+    ));
+    return readState;
+  }, [projectId, session.client]);
+
   return {
     channels,
     canCreateChannels,
     loadState,
     error,
     retry: () => setReloadKey((value) => value + 1),
-    createChannel
+    createChannel,
+    markRead
   };
 }
 

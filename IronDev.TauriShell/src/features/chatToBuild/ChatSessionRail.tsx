@@ -196,7 +196,14 @@ export function ChatSessionRail({
                       onClose();
                     }}
                   >
-                    <span># {channel.name}</span>
+                    <span className="chat-session-rail__channel-title">
+                      <span># {channel.name}</span>
+                      {channel.unreadCount > 0 ? (
+                        <span className="chat-session-rail__unread" aria-label={`${channel.unreadCount} unread`}>
+                          {channel.unreadCount}
+                        </span>
+                      ) : null}
+                    </span>
                     <small>{channel.visibility === 'MembersOnly' ? 'Members only' : 'Project'} / {channel.memberCount} member(s)</small>
                   </button>
                 ))}

@@ -5676,7 +5676,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ProjectChannelChatListResponse"];
+                        "application/json": components["schemas"]["ProjectChannelChatListResponse"];
+                        "text/json": components["schemas"]["ProjectChannelChatListResponse"];
+                    };
                 };
             };
         };
@@ -5698,12 +5702,16 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description Created */
+                201: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ProjectChannelChatSummary"];
+                        "application/json": components["schemas"]["ProjectChannelChatSummary"];
+                        "text/json": components["schemas"]["ProjectChannelChatSummary"];
+                    };
                 };
             };
         };
@@ -5737,7 +5745,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ProjectChannelChatDetail"];
+                        "application/json": components["schemas"]["ProjectChannelChatDetail"];
+                        "text/json": components["schemas"]["ProjectChannelChatDetail"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
                 };
             };
         };
@@ -5781,7 +5804,62 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ProjectChannelChatMessage"];
+                        "application/json": components["schemas"]["ProjectChannelChatMessage"];
+                        "text/json": components["schemas"]["ProjectChannelChatMessage"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/channels/{channelReference}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    channelReference: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectChannelReadState"];
+                        "application/json": components["schemas"]["ProjectChannelReadState"];
+                        "text/json": components["schemas"]["ProjectChannelReadState"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
                 };
             };
         };
@@ -12629,6 +12707,60 @@ export interface components {
             kind?: string | null;
             label?: string | null;
         };
+        ProjectChannelChatDetail: {
+            channel?: components["schemas"]["ProjectChannelChatSummary"];
+            messages?: components["schemas"]["ProjectChannelChatMessage"][] | null;
+            readState?: components["schemas"]["ProjectChannelReadState"];
+            presence?: components["schemas"]["ProjectChannelPresenceState"];
+            assistantParticipationStatus?: string | null;
+            boundary?: string | null;
+        };
+        ProjectChannelChatListResponse: {
+            canCreateChannels?: boolean;
+            channels?: components["schemas"]["ProjectChannelChatSummary"][] | null;
+            boundary?: string | null;
+        };
+        ProjectChannelChatMessage: {
+            /** Format: int64 */
+            messageId?: number;
+            /** Format: int32 */
+            authorUserId?: number | null;
+            authorDisplayName?: string | null;
+            role?: string | null;
+            message?: string | null;
+            messageFormat?: string | null;
+            status?: string | null;
+            /** Format: int64 */
+            replyToMessageId?: number | null;
+            /** Format: int64 */
+            threadRootMessageId?: number | null;
+            /** Format: date-time */
+            createdUtc?: string;
+            /** Format: date-time */
+            editedUtc?: string | null;
+            boundary?: string | null;
+        };
+        ProjectChannelChatSummary: {
+            /** Format: int64 */
+            channelId?: number;
+            name?: string | null;
+            slug?: string | null;
+            description?: string | null;
+            channelKind?: string | null;
+            visibility?: string | null;
+            /** Format: int32 */
+            memberCount?: number;
+            currentUserRole?: string | null;
+            currentUserNotificationLevel?: string | null;
+            /** Format: int32 */
+            unreadCount?: number;
+            /** Format: int64 */
+            lastReadMessageId?: number | null;
+            /** Format: date-time */
+            lastReadUtc?: string | null;
+            canPostMessages?: boolean;
+            boundary?: string | null;
+        };
         ProjectChannelDirectoryEntry: {
             /** Format: int64 */
             channelId?: number;
@@ -12646,6 +12778,23 @@ export interface components {
             userId?: number;
             channelRole?: string | null;
             notificationLevel?: string | null;
+        };
+        ProjectChannelPresenceState: {
+            status?: string | null;
+            /** Format: int32 */
+            activeViewerCount?: number | null;
+            reason?: string | null;
+            boundary?: string | null;
+        };
+        ProjectChannelReadState: {
+            /** Format: int32 */
+            unreadCount?: number;
+            /** Format: int64 */
+            lastReadMessageId?: number | null;
+            /** Format: date-time */
+            lastReadUtc?: string | null;
+            notificationLevel?: string | null;
+            boundary?: string | null;
         };
         ProjectChatSession: {
             /** Format: int64 */

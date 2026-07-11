@@ -17,6 +17,9 @@ public static class ProjectChannelBoundaries
     public const string ReadMarker =
         "A channel read marker is unread-count convenience. It is not approval, authority, evidence, policy satisfaction, source apply, workflow continuation, release readiness, or deployment readiness.";
 
+    public const string Presence =
+        "Channel presence reports observed viewer state only. It is not membership, assignment, approval, authority, or a workflow blocker.";
+
     public const string Pin =
         "A pinned channel message is navigation convenience. It is not approval, policy, authority, evidence, source apply, workflow continuation, release readiness, or deployment readiness.";
 }

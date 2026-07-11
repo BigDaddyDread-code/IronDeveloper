@@ -881,47 +881,42 @@ export type SetProjectChannelMembershipRequest = Omit<
   notificationLevel: string;
 };
 
-export interface ProjectChannelChatSummary {
-  channelId: number;
-  name: string;
+export type ProjectChannelChatSummary = Omit<
+  Required<components['schemas']['ProjectChannelChatSummary']>,
+  'slug' | 'visibility'
+> & {
   slug: string;
-  description: string | null;
-  channelKind: string;
   visibility: 'Project' | 'MembersOnly';
-  memberCount: number;
-  currentUserRole: string | null;
-  currentUserNotificationLevel: string | null;
-  canPostMessages: boolean;
-  boundary: string;
-}
+};
 
-export interface ProjectChannelChatListResponse {
-  canCreateChannels: boolean;
+export type ProjectChannelChatListResponse = Omit<
+  Required<components['schemas']['ProjectChannelChatListResponse']>,
+  'channels'
+> & {
   channels: ProjectChannelChatSummary[];
-  boundary: string;
-}
+};
 
-export interface ProjectChannelChatMessage {
-  messageId: number;
-  authorUserId: number | null;
-  authorDisplayName: string;
+export type ProjectChannelChatMessage = Omit<
+  Required<components['schemas']['ProjectChannelChatMessage']>,
+  'role' | 'messageFormat' | 'status'
+> & {
   role: 'User' | 'Assistant' | 'SystemNotice' | 'EventLink';
-  message: string;
   messageFormat: 'PlainText' | 'Markdown';
   status: 'Active' | 'Edited' | 'Deleted';
-  replyToMessageId: number | null;
-  threadRootMessageId: number | null;
-  createdUtc: string;
-  editedUtc: string | null;
-  boundary: string;
-}
+};
 
-export interface ProjectChannelChatDetail {
+export type ProjectChannelReadState = Required<components['schemas']['ProjectChannelReadState']>;
+export type ProjectChannelPresenceState = Required<components['schemas']['ProjectChannelPresenceState']>;
+
+export type ProjectChannelChatDetail = Omit<
+  Required<components['schemas']['ProjectChannelChatDetail']>,
+  'channel' | 'messages' | 'readState' | 'presence'
+> & {
   channel: ProjectChannelChatSummary;
   messages: ProjectChannelChatMessage[];
-  assistantParticipationStatus: string;
-  boundary: string;
-}
+  readState: ProjectChannelReadState;
+  presence: ProjectChannelPresenceState;
+};
 
 export type CreateProjectChannelRequest = Omit<
   components['schemas']['CreateProjectChannelRequest'],

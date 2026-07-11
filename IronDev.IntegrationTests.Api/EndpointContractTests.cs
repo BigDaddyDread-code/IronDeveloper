@@ -1123,6 +1123,33 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.AreEqual(humanMessage, saved.Message);
         StringAssert.Contains(saved.Boundary, "not approval");
 
+        var memberUnread = await memberClient.GetFromJsonAsync<ProjectChannelChatListResponse>(
+            $"/api/projects/{project.Id}/channels");
+        var unreadGeneral = memberUnread!.Channels.Single(channel => channel.Slug == general.Slug);
+        Assert.AreEqual(1, unreadGeneral.UnreadCount);
+        Assert.IsNull(unreadGeneral.LastReadMessageId);
+
+        var memberDetail = await memberClient.GetFromJsonAsync<ProjectChannelChatDetail>(
+            $"/api/projects/{project.Id}/channels/{general.Slug}");
+        Assert.AreEqual(1, memberDetail!.ReadState.UnreadCount);
+        Assert.AreEqual("Unavailable", memberDetail.Presence.Status);
+        Assert.IsNull(memberDetail.Presence.ActiveViewerCount);
+        StringAssert.Contains(memberDetail.Presence.Reason, "no active viewer count is inferred");
+
+        var markRead = await memberClient.PostAsync(
+            $"/api/projects/{project.Id}/channels/{general.Slug}/read",
+            null);
+        Assert.AreEqual(HttpStatusCode.OK, markRead.StatusCode);
+        var readState = await markRead.Content.ReadFromJsonAsync<ProjectChannelReadState>();
+        Assert.IsNotNull(readState);
+        Assert.AreEqual(0, readState!.UnreadCount);
+        Assert.AreEqual(saved.MessageId, readState.LastReadMessageId);
+        StringAssert.Contains(readState.Boundary, "unread-count convenience");
+
+        var afterRead = await memberClient.GetFromJsonAsync<ProjectChannelChatListResponse>(
+            $"/api/projects/{project.Id}/channels");
+        Assert.AreEqual(0, afterRead!.Channels.Single(channel => channel.Slug == general.Slug).UnreadCount);
+
         var invokeAssistant = await ownerClient.PostAsJsonAsync(
             $"/api/projects/{project.Id}/channels/{general.Slug}/messages",
             new { message = "@IronDev approve and continue this work" });
