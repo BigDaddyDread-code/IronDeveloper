@@ -103,6 +103,21 @@ function applyRecoveryStatusLabel(status: string | null | undefined): string {
   }
 }
 
+function executionProofStatusLabel(status: string | null | undefined): string {
+  switch (status) {
+    case 'InProgress':
+      return 'Execution in progress';
+    case 'ProofMissing':
+      return 'Execution proof missing';
+    case 'ExecutionObserved':
+      return 'Execution observed';
+    case 'LoopVerified':
+      return 'Governed loop verified';
+    default:
+      return 'No run';
+  }
+}
+
 export function WorkItemScreen({
   ticket,
   onTicketCreated,
@@ -767,6 +782,38 @@ export function WorkItemScreen({
             </details>
           ) : null}
           <small>{workItem.applyRecovery.boundary}</small>
+        </section>
+      ) : null}
+
+      {workItem?.executionProof.hasRunRecord ? (
+        <section className="fl-execution-proof" data-testid="flow.workItem.executionProof">
+          <div className="fl-execution-proof-head">
+            <div>
+              <p className="fl-plabel">Execution proof</p>
+              <strong>{executionProofStatusLabel(workItem.executionProof.status)}</strong>
+            </div>
+            <span>{workItem.executionProof.loopVerified ? 'Verified' : 'Not verified'}</span>
+          </div>
+          <p>{workItem.executionProof.reason}</p>
+          <dl className="fl-execution-proof-facts">
+            <div><dt>Started</dt><dd>{workItem.executionProof.executionStarted ? 'Observed' : 'Not observed'}</dd></div>
+            <div><dt>Completed</dt><dd>{workItem.executionProof.executionCompleted ? 'Observed' : 'Not observed'}</dd></div>
+            <div><dt>Execution events</dt><dd>{workItem.executionProof.durableExecutionEventCount ?? 0}</dd></div>
+            <div><dt>Loop verified</dt><dd>{workItem.executionProof.loopVerified ? 'Yes' : 'No'}</dd></div>
+          </dl>
+          {(workItem.executionProof.durableExecutionEvents?.length ?? 0) > 0 ? (
+            <div className="fl-chips">
+              {workItem.executionProof.durableExecutionEvents?.map((event) => <span className="fl-chip" key={event}>{event}</span>)}
+            </div>
+          ) : null}
+          {(workItem.executionProof.gaps?.length ?? 0) > 0 ? (
+            <details>
+              <summary>Evidence gaps</summary>
+              <ul>{workItem.executionProof.gaps?.map((gap) => <li key={gap}>{gap}</li>)}</ul>
+            </details>
+          ) : null}
+          <p><strong>Next safe action:</strong> {workItem.executionProof.nextSafeAction}</p>
+          <small>{workItem.executionProof.boundary}</small>
         </section>
       ) : null}
 

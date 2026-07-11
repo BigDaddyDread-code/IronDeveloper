@@ -13156,6 +13156,28 @@ export interface components {
             criticPackageApiPath?: string | null;
             governanceLibraryPath?: string | null;
         };
+        ProjectWorkItemExecutionProofReadModel: {
+            status?: string | null;
+            hasRunRecord?: boolean;
+            executionStarted?: boolean;
+            executionCompleted?: boolean;
+            /** Format: date-time */
+            startedUtc?: string | null;
+            /** Format: date-time */
+            completedUtc?: string | null;
+            /** Format: int32 */
+            durableExecutionEventCount?: number;
+            durableExecutionEvents?: string[] | null;
+            buildAndTestExecutionObserved?: boolean;
+            applyExecutionObserved?: boolean;
+            loopVerified?: boolean;
+            artifactEvidenceObserved?: boolean;
+            artifactEvidenceProvesExecution?: boolean;
+            gaps?: string[] | null;
+            reason?: string | null;
+            nextSafeAction?: string | null;
+            boundary?: string | null;
+        };
         ProjectWorkItemGateReadModel: {
             state?: string | null;
             reason?: string | null;
@@ -13180,6 +13202,7 @@ export interface components {
             gate: components["schemas"]["ProjectWorkItemGateReadModel"];
             primaryAction: components["schemas"]["ProjectWorkItemActionReadModel"];
             applyRecovery: components["schemas"]["ProjectWorkItemApplyRecoveryReadModel"];
+            executionProof: components["schemas"]["ProjectWorkItemExecutionProofReadModel"];
             evidenceLinks: components["schemas"]["ProjectWorkItemEvidenceLinksReadModel"];
             boundary?: string | null;
         };

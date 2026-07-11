@@ -19,6 +19,7 @@ export interface MockWorkItemProjectionOptions {
   linkedChatSessionId?: number | null;
   ticket?: Record<string, unknown>;
   applyRecovery?: Record<string, unknown>;
+  executionProof?: Record<string, unknown>;
 }
 
 export function workItemProjection(options: MockWorkItemProjectionOptions = {}) {
@@ -86,6 +87,25 @@ export function workItemProjection(options: MockWorkItemProjectionOptions = {}) 
       retryAllowed: false,
       humanReviewRequired: false,
       boundary: 'Inspection only.'
+    },
+    executionProof: options.executionProof ?? {
+      status: 'NoRun',
+      hasRunRecord: false,
+      executionStarted: false,
+      executionCompleted: false,
+      startedUtc: null,
+      completedUtc: null,
+      durableExecutionEventCount: 0,
+      durableExecutionEvents: [],
+      buildAndTestExecutionObserved: false,
+      applyExecutionObserved: false,
+      loopVerified: false,
+      artifactEvidenceObserved: false,
+      artifactEvidenceProvesExecution: false,
+      gaps: [],
+      reason: 'No durable run record exists for this Work Item.',
+      nextSafeAction: 'Start a governed run when build readiness allows it.',
+      boundary: 'Artifacts alone do not prove execution.'
     },
     evidenceLinks: {
       runReportApiPath: null,

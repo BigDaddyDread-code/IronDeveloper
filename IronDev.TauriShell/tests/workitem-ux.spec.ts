@@ -97,6 +97,51 @@ test('failed partial apply names missing recovery evidence without offering retr
   }
 });
 
+test('execution proof renders durable events separately from artifact evidence', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockProjectWorkItem(page, {
+    stage: 'Review',
+    state: 'PausedForApproval',
+    gateState: 'Blocked',
+    gateReason: 'Human review is required for the current package.',
+    nextSafeAction: 'Review findings and complete the approval ceremony.',
+    primaryActionKind: 'Review',
+    primaryActionLabel: 'Review waiting work',
+    executionProof: {
+      status: 'ExecutionObserved',
+      hasRunRecord: true,
+      executionStarted: true,
+      executionCompleted: false,
+      startedUtc: '2026-07-11T01:00:00Z',
+      completedUtc: null,
+      durableExecutionEventCount: 1,
+      durableExecutionEvents: ['SkeletonEvidencePackaged'],
+      buildAndTestExecutionObserved: true,
+      applyExecutionObserved: false,
+      loopVerified: false,
+      artifactEvidenceObserved: true,
+      artifactEvidenceProvesExecution: false,
+      gaps: ['Critic package hash could not be verified.'],
+      reason: 'Durable execution events were observed, but the report names 1 evidence gap.',
+      nextSafeAction: 'Inspect and resolve the named evidence gaps before treating the loop as verified.',
+      boundary: 'Artifacts and selected tests do not prove execution by themselves.'
+    }
+  });
+
+  await page.goto('/projects/7/work-items/42');
+
+  const proof = page.getByTestId('flow.workItem.executionProof');
+  await expect(proof).toContainText('Execution observed');
+  await expect(proof).toContainText('Not verified');
+  await expect(proof).toContainText('SkeletonEvidencePackaged');
+  await proof.getByText('Evidence gaps', { exact: true }).click();
+  await expect(proof).toContainText('Critic package hash could not be verified.');
+  await expect(proof).toContainText('do not prove execution by themselves');
+  if (process.env.IRONDEV_VISUAL_CAPTURE === '1') {
+    await page.screenshot({ path: 'reports/visual-smoke/execution-proof-1.png', fullPage: true });
+  }
+});
+
 test('Discuss in Chat routes to the exact backend-linked session', async ({ page }) => {
   await mockWorkspace(page);
   await mockProjectWorkItem(page, { linkedChatSessionId: 9007 });

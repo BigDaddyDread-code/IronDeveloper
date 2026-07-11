@@ -24,6 +24,8 @@ public sealed class ProjectWorkItemProjectorTests
         Assert.IsNull(model.Collaboration.Assignee);
         Assert.AreEqual(0, model.Collaboration.Followers.Count);
         Assert.IsNull(model.Collaboration.WaitingOn);
+        Assert.AreEqual(ProjectWorkItemExecutionProofStatuses.NoRun, model.ExecutionProof.Status);
+        Assert.IsFalse(model.ExecutionProof.HasRunRecord);
     }
 
     [TestMethod]
@@ -178,6 +180,75 @@ public sealed class ProjectWorkItemProjectorTests
         CollectionAssert.Contains(model.ApplyRecovery.TechnicalDetails.ToList(), "Tests failed.");
     }
 
+    [TestMethod]
+    public void Build_ArtifactsWithoutDurableExecutionEventRemainProofMissing()
+    {
+        var report = Report() with
+        {
+            Proposal = new SkeletonRunProposalTrace { ProposalId = "proposal-42", EvidenceExistsOnDisk = true },
+            CriticPackage = new SkeletonRunCriticPackageTrace { PackageId = "package-42", ExistsOnDisk = true }
+        };
+
+        var model = Build(Ticket(), Run(RunLifecycleState.Completed), report, Ready());
+
+        Assert.AreEqual(ProjectWorkItemExecutionProofStatuses.ProofMissing, model.ExecutionProof.Status);
+        Assert.IsTrue(model.ExecutionProof.ArtifactEvidenceObserved);
+        Assert.IsFalse(model.ExecutionProof.ArtifactEvidenceProvesExecution);
+        Assert.AreEqual(0, model.ExecutionProof.DurableExecutionEventCount);
+        StringAssert.Contains(model.ExecutionProof.Reason, "no durable execution event");
+    }
+
+    [TestMethod]
+    public void Build_DurableExecutionEventIsObservedButNamedGapsPreventLoopVerification()
+    {
+        var report = Report() with
+        {
+            Timeline =
+            [
+                new SkeletonRunTimelineEntry
+                {
+                    TimestampUtc = Now.AddMinutes(-4),
+                    EventType = "SkeletonEvidencePackaged",
+                    Message = "Build and test evidence packaged."
+                }
+            ],
+            Gaps = ["Critic package hash could not be verified."]
+        };
+
+        var model = Build(Ticket(), Run(RunLifecycleState.PausedForApproval), report, Ready());
+
+        Assert.AreEqual(ProjectWorkItemExecutionProofStatuses.ExecutionObserved, model.ExecutionProof.Status);
+        Assert.IsTrue(model.ExecutionProof.ExecutionStarted);
+        Assert.IsTrue(model.ExecutionProof.BuildAndTestExecutionObserved);
+        Assert.IsFalse(model.ExecutionProof.LoopVerified);
+        Assert.AreEqual(1, model.ExecutionProof.DurableExecutionEventCount);
+        Assert.AreEqual(1, model.ExecutionProof.Gaps.Count);
+        StringAssert.Contains(model.ExecutionProof.NextSafeAction, "evidence gaps");
+    }
+
+    [TestMethod]
+    public void Build_AppliedLoopRequiresDurableApplyEventAndCompleteReportForVerifiedStatus()
+    {
+        var report = Report() with
+        {
+            Timeline =
+            [
+                new SkeletonRunTimelineEntry { TimestampUtc = Now.AddMinutes(-3), EventType = "SkeletonEvidencePackaged" },
+                new SkeletonRunTimelineEntry { TimestampUtc = Now.AddMinutes(-1), EventType = "SkeletonApplied" }
+            ],
+            Apply = new SkeletonRunApplyTrace { Applied = true },
+            LoopComplete = true
+        };
+
+        var model = Build(Ticket(), Run(RunLifecycleState.Applied), report, Ready());
+
+        Assert.AreEqual(ProjectWorkItemExecutionProofStatuses.LoopVerified, model.ExecutionProof.Status);
+        Assert.IsTrue(model.ExecutionProof.ExecutionCompleted);
+        Assert.IsTrue(model.ExecutionProof.ApplyExecutionObserved);
+        Assert.IsTrue(model.ExecutionProof.LoopVerified);
+        Assert.IsFalse(model.ExecutionProof.ArtifactEvidenceProvesExecution);
+    }
+
     private static ProjectWorkItemReadModel Build(
         ProjectTicket ticket,
         RunRecord? run,
@@ -206,6 +277,10 @@ public sealed class ProjectWorkItemProjectorTests
         State = state,
         Summary = state.ToString(),
         CreatedUtc = Now.AddMinutes(-10),
+        StartedUtc = Now.AddMinutes(-9),
+        CompletedUtc = state is RunLifecycleState.Failed or RunLifecycleState.Cancelled or RunLifecycleState.Applied
+            ? Now
+            : null,
         UpdatedUtc = Now
     };
 

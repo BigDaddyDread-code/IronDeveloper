@@ -24361,6 +24361,80 @@
         },
         "additionalProperties": false
       },
+      "ProjectWorkItemExecutionProofReadModel": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasRunRecord": {
+            "type": "boolean"
+          },
+          "executionStarted": {
+            "type": "boolean"
+          },
+          "executionCompleted": {
+            "type": "boolean"
+          },
+          "startedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "durableExecutionEventCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "durableExecutionEvents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "buildAndTestExecutionObserved": {
+            "type": "boolean"
+          },
+          "applyExecutionObserved": {
+            "type": "boolean"
+          },
+          "loopVerified": {
+            "type": "boolean"
+          },
+          "artifactEvidenceObserved": {
+            "type": "boolean"
+          },
+          "artifactEvidenceProvesExecution": {
+            "type": "boolean"
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ProjectWorkItemGateReadModel": {
         "type": "object",
         "properties": {
@@ -24392,6 +24466,7 @@
           "collaboration",
           "contract",
           "evidenceLinks",
+          "executionProof",
           "gate",
           "primaryAction",
           "ticket"
@@ -24446,6 +24521,9 @@
           },
           "applyRecovery": {
             "$ref": "#/components/schemas/ProjectWorkItemApplyRecoveryReadModel"
+          },
+          "executionProof": {
+            "$ref": "#/components/schemas/ProjectWorkItemExecutionProofReadModel"
           },
           "evidenceLinks": {
             "$ref": "#/components/schemas/ProjectWorkItemEvidenceLinksReadModel"
