@@ -19,6 +19,7 @@ test('settings shows tenant AI connection metadata without credential material',
         tenantAvailable: true,
         projectAvailable: true,
         credentialRotatedUtc: null,
+        credentialRevokedUtc: null,
         createdByUserId: 0,
         createdUtc: null,
         updatedByUserId: 7,
@@ -44,6 +45,59 @@ test('settings shows tenant AI connection metadata without credential material',
   await expect(page.locator('body')).not.toContainText('api_key');
 });
 
+test('settings stores and revokes AI credentials without rendering the secret', async ({ page }) => {
+  const secret = 'sk-local-secret-value';
+  await mockWorkspace(page, {
+    connections: [
+      {
+        id: 'deployment-default',
+        tenantId: 3,
+        displayName: 'Deployment default',
+        providerKind: 'openai',
+        controlledEndpointId: 'deployment-default-openai',
+        controlledEndpoint: 'https://api.openai.com',
+        credentialConfigured: false,
+        credentialStatus: 'Missing',
+        lastSuccessfulTestUtc: null,
+        lastFailedTestUtc: null,
+        availableModels: ['gpt-4o'],
+        enabled: true,
+        tenantAvailable: true,
+        projectAvailable: true,
+        credentialRotatedUtc: null,
+        credentialRevokedUtc: null,
+        createdByUserId: 0,
+        createdUtc: null,
+        updatedByUserId: 7,
+        updatedUtc: null,
+        version: 'IronDev AI Connection Contract 2.5.0',
+        boundary: 'Credential values are accepted only on write, stored protected, and never returned by API responses.'
+      }
+    ]
+  });
+
+  await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
+  await page.getByTestId('flow.nav.settings').click();
+
+  await page.getByTestId('flow.settings.aiConnections.connection.0.credentialInput').fill(secret);
+  await page.getByTestId('flow.settings.aiConnections.connection.0.reason').fill('manual local test');
+  await page.getByTestId('flow.settings.aiConnections.connection.0.saveCredential').click();
+
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.0.credential')).toHaveText('Configured');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.0.rotated')).not.toHaveText('Never');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.0.credentialInput')).toHaveValue('');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.0.message')).toContainText('Credential stored');
+  await expect(page.locator('body')).not.toContainText(secret);
+
+  await page.getByTestId('flow.settings.aiConnections.connection.0.revokeCredential').click();
+
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.0.credential')).toHaveText('Revoked');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.0.revoked')).not.toHaveText('Never');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.0.message')).toContainText('Credential revoked');
+  await expect(page.locator('body')).not.toContainText(secret);
+});
+
 test('settings shows an honest empty state when no AI connections are returned', async ({ page }) => {
   await mockWorkspace(page, { connections: [] });
 
@@ -56,6 +110,8 @@ test('settings shows an honest empty state when no AI connections are returned',
 });
 
 async function mockWorkspace(page: Page, options: { connections: unknown[] }) {
+  let connections = options.connections as Array<Record<string, unknown>>;
+
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
     window.localStorage.setItem('irondev.tenantId', '3');
@@ -95,8 +151,64 @@ async function mockWorkspace(page: Page, options: { connections: unknown[] }) {
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
+  await page.route('**/irondev-api/api/v1/ai-connections/**', async (route) => {
+    const url = route.request().url();
+    const current = connections[0] ?? {
+      id: 'deployment-default',
+      tenantId: 3,
+      displayName: 'Deployment default'
+    };
+
+    if (route.request().method() === 'PUT' && url.endsWith('/credential')) {
+      const body = route.request().postDataJSON() as { credential?: string };
+      if (!body.credential?.trim()) {
+        await route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ succeeded: false, failureReason: 'Credential is required.', boundary: 'write-only' })
+        });
+        return;
+      }
+
+      const next = {
+        ...current,
+        credentialConfigured: true,
+        credentialStatus: 'Configured',
+        credentialRotatedUtc: '2026-07-12T00:00:00Z',
+        credentialRevokedUtc: null,
+        updatedUtc: '2026-07-12T00:00:00Z'
+      };
+      connections = [next];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ succeeded: true, connection: next, boundary: 'write-only' })
+      });
+      return;
+    }
+
+    if (route.request().method() === 'POST' && url.endsWith('/credential/revoke')) {
+      const next = {
+        ...current,
+        credentialConfigured: false,
+        credentialStatus: 'Revoked',
+        credentialRotatedUtc: null,
+        credentialRevokedUtc: '2026-07-12T00:01:00Z',
+        updatedUtc: '2026-07-12T00:01:00Z'
+      };
+      connections = [next];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ succeeded: true, connection: next, boundary: 'write-only' })
+      });
+      return;
+    }
+
+    await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Not found' }) });
+  });
   await page.route('**/irondev-api/api/v1/ai-connections', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(options.connections) });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connections) });
   });
   await page.route('**/irondev-api/api/v1/agent-profiles', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });

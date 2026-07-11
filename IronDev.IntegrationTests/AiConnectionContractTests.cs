@@ -1,5 +1,8 @@
 using System.Text.Json;
+using IronDev.Api.Services;
+using IronDev.Core.AiConnections;
 using IronDev.Infrastructure.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -53,20 +56,91 @@ public sealed class AiConnectionContractTests
     }
 
     [TestMethod]
-    public void AiConnectionsController_IsReadOnlyTenantScopedMetadata()
+    public async Task CredentialLifecycle_IsWriteOnlyRedactedAndReflectedInMetadata()
+    {
+        const string secret = "configured-secret-value";
+        var temp = Directory.CreateTempSubdirectory("irondev-ai-credentials-");
+        try
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Ai:Provider"] = "openai",
+                    ["Ai:Model"] = "gpt-4o",
+                    ["AiConnections:CredentialStorePath"] = temp.FullName
+                })
+                .Build();
+            var store = new FileSystemAiConnectionCredentialStore(
+                configuration,
+                DataProtectionProvider.Create(temp.FullName));
+            var catalog = new AiConnectionCatalogService(configuration, _ => null, store);
+            var service = new AiConnectionCredentialService(store, catalog);
+
+            var configure = await service.ConfigureAsync(
+                tenantId: 3,
+                userId: 7,
+                connectionId: "deployment-default",
+                new AiConnectionCredentialWriteRequest
+                {
+                    Credential = secret,
+                    Reason = "manual test credential"
+                });
+
+            Assert.IsTrue(configure.Succeeded, configure.FailureReason);
+            Assert.IsNotNull(configure.Connection);
+            Assert.IsTrue(configure.Connection!.CredentialConfigured);
+            Assert.AreEqual("Configured", configure.Connection.CredentialStatus);
+            Assert.IsNotNull(configure.Connection.CredentialRotatedUtc);
+            Assert.IsNull(configure.Connection.CredentialRevokedUtc);
+
+            var configureJson = JsonSerializer.Serialize(configure);
+            Assert.IsFalse(configureJson.Contains(secret, StringComparison.OrdinalIgnoreCase));
+            Assert.IsFalse(ReadAllStoreText(temp.FullName).Contains(secret, StringComparison.OrdinalIgnoreCase));
+
+            var revoke = await service.RevokeAsync(
+                tenantId: 3,
+                userId: 7,
+                connectionId: "deployment-default",
+                new AiConnectionCredentialRevokeRequest
+                {
+                    Reason = "manual revocation"
+                });
+
+            Assert.IsTrue(revoke.Succeeded, revoke.FailureReason);
+            Assert.IsNotNull(revoke.Connection);
+            Assert.IsFalse(revoke.Connection!.CredentialConfigured);
+            Assert.AreEqual("Revoked", revoke.Connection.CredentialStatus);
+            Assert.IsNull(revoke.Connection.CredentialRotatedUtc);
+            Assert.IsNotNull(revoke.Connection.CredentialRevokedUtc);
+
+            var revokeJson = JsonSerializer.Serialize(revoke);
+            Assert.IsFalse(revokeJson.Contains(secret, StringComparison.OrdinalIgnoreCase));
+            Assert.IsFalse(ReadAllStoreText(temp.FullName).Contains(secret, StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            temp.Delete(recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void AiConnectionsController_IsTenantScopedMetadataWithAdminCredentialWrites()
     {
         var source = File.ReadAllText(RepositoryFile("IronDev.Api", "Controllers", "AiConnectionsController.cs"));
 
         StringAssert.Contains(source, "api/v1/ai-connections");
         StringAssert.Contains(source, "HttpGet");
+        StringAssert.Contains(source, "HttpPut(\"{connectionId}/credential\")");
+        StringAssert.Contains(source, "HttpPost(\"{connectionId}/credential/revoke\")");
         StringAssert.Contains(source, "CurrentUserContext");
         StringAssert.Contains(source, "TenantId");
         StringAssert.Contains(source, "SensitiveApiPolicy");
+        StringAssert.Contains(source, "CanAdministerUsers");
 
-        foreach (var forbidden in new[] { "HttpPost", "HttpPut", "HttpPatch", "HttpDelete", "ApiKey", "SecretReference", "CredentialReference" })
+        foreach (var forbidden in new[] { "HttpPatch", "HttpDelete", "ApiKey", "SecretReference", "CredentialReference" })
         {
             Assert.IsFalse(source.Contains(forbidden, StringComparison.OrdinalIgnoreCase),
-                $"V25-06 is a read-only non-secret metadata contract; controller must not expose {forbidden}.");
+                $"AI connection routes must not expose {forbidden}.");
         }
     }
 
@@ -76,6 +150,12 @@ public sealed class AiConnectionContractTests
             .AddInMemoryCollection(values)
             .Build();
         return new AiConnectionCatalogService(configuration, _ => null);
+    }
+
+    private static string ReadAllStoreText(string root)
+    {
+        var files = Directory.GetFiles(root, "*", SearchOption.AllDirectories);
+        return string.Join(Environment.NewLine, files.Select(File.ReadAllText));
     }
 
     private static string RepositoryFile(params string[] parts)

@@ -836,6 +836,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-connections/{connectionId}/credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AiConnectionCredentialWriteRequest"];
+                    "text/json": components["schemas"]["AiConnectionCredentialWriteRequest"];
+                    "application/*+json": components["schemas"]["AiConnectionCredentialWriteRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AiConnectionCredentialMutationOutcome"];
+                        "application/json": components["schemas"]["AiConnectionCredentialMutationOutcome"];
+                        "text/json": components["schemas"]["AiConnectionCredentialMutationOutcome"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-connections/{connectionId}/credential/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AiConnectionCredentialRevokeRequest"];
+                    "text/json": components["schemas"]["AiConnectionCredentialRevokeRequest"];
+                    "application/*+json": components["schemas"]["AiConnectionCredentialRevokeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AiConnectionCredentialMutationOutcome"];
+                        "application/json": components["schemas"]["AiConnectionCredentialMutationOutcome"];
+                        "text/json": components["schemas"]["AiConnectionCredentialMutationOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflow/apply-preview/{workflowRunId}/{workflowStepId}": {
         parameters: {
             query?: never;
@@ -11183,6 +11273,19 @@ export interface components {
          * @enum {integer}
          */
         AgentRunTriggerType: 1 | 2 | 3 | 4;
+        AiConnectionCredentialMutationOutcome: {
+            succeeded: boolean;
+            failureReason?: string | null;
+            connection?: components["schemas"]["AiConnectionMetadata"];
+            boundary: string | null;
+        };
+        AiConnectionCredentialRevokeRequest: {
+            reason?: string | null;
+        };
+        AiConnectionCredentialWriteRequest: {
+            credential: string | null;
+            reason?: string | null;
+        };
         AiConnectionMetadata: {
             id: string | null;
             /** Format: int32 */
@@ -11203,6 +11306,8 @@ export interface components {
             projectAvailable: boolean;
             /** Format: date-time */
             credentialRotatedUtc?: string | null;
+            /** Format: date-time */
+            credentialRevokedUtc?: string | null;
             /** Format: int32 */
             createdByUserId: number;
             /** Format: date-time */

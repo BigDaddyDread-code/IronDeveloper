@@ -1275,6 +1275,122 @@
         }
       }
     },
+    "/api/v1/ai-connections/{connectionId}/credential": {
+      "put": {
+        "tags": [
+          "AiConnections"
+        ],
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiConnectionCredentialWriteRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiConnectionCredentialWriteRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiConnectionCredentialWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConnectionCredentialMutationOutcome"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConnectionCredentialMutationOutcome"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConnectionCredentialMutationOutcome"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai-connections/{connectionId}/credential/revoke": {
+      "post": {
+        "tags": [
+          "AiConnections"
+        ],
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiConnectionCredentialRevokeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiConnectionCredentialRevokeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiConnectionCredentialRevokeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConnectionCredentialMutationOutcome"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConnectionCredentialMutationOutcome"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConnectionCredentialMutationOutcome"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workflow/apply-preview/{workflowRunId}/{workflowStepId}": {
       "get": {
         "tags": [
@@ -16069,6 +16185,57 @@
         "type": "integer",
         "format": "int32"
       },
+      "AiConnectionCredentialMutationOutcome": {
+        "required": [
+          "boundary",
+          "succeeded"
+        ],
+        "type": "object",
+        "properties": {
+          "succeeded": {
+            "type": "boolean"
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "connection": {
+            "$ref": "#/components/schemas/AiConnectionMetadata"
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AiConnectionCredentialRevokeRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AiConnectionCredentialWriteRequest": {
+        "required": [
+          "credential"
+        ],
+        "type": "object",
+        "properties": {
+          "credential": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AiConnectionMetadata": {
         "required": [
           "boundary",
@@ -16147,6 +16314,11 @@
             "type": "boolean"
           },
           "credentialRotatedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "credentialRevokedUtc": {
             "type": "string",
             "format": "date-time",
             "nullable": true
