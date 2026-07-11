@@ -141,14 +141,14 @@ public sealed class ProjectWorkItemCollaborationService : IProjectWorkItemCollab
     public async Task<ProjectWorkItemCollaborationSnapshot?> GetAsync(int tenantId, int projectId, long workItemId, CancellationToken cancellationToken = default)
     {
         using var connection = _connections.CreateConnection();
-        if (!await TicketExistsAsync(connection, null, tenantId, projectId, workItemId, cancellationToken)) return null;
+        if (!await WorkItemExistsAsync(connection, null, tenantId, projectId, workItemId, cancellationToken)) return null;
         return await ReadAsync(connection, tenantId, projectId, workItemId, cancellationToken);
     }
 
     public async Task<IReadOnlyDictionary<long, ProjectWorkItemCollaborationSnapshot>> GetForProjectAsync(int tenantId, int projectId, CancellationToken cancellationToken = default)
     {
         using var connection = _connections.CreateConnection();
-        var ids = await connection.QueryAsync<long>(new CommandDefinition("SELECT Id FROM dbo.ProjectTickets WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND IsDeleted=0;", new { TenantId = tenantId, ProjectId = projectId }, cancellationToken: cancellationToken));
+        var ids = await connection.QueryAsync<long>(new CommandDefinition("SELECT Id FROM dbo.WorkItems WHERE TenantId=@TenantId AND ProjectId=@ProjectId;", new { TenantId = tenantId, ProjectId = projectId }, cancellationToken: cancellationToken));
         var result = new Dictionary<long, ProjectWorkItemCollaborationSnapshot>();
         foreach (var id in ids) result[id] = await ReadAsync(connection, tenantId, projectId, id, cancellationToken);
         return result;
@@ -159,7 +159,7 @@ public sealed class ProjectWorkItemCollaborationService : IProjectWorkItemCollab
         using var connection = _connections.CreateConnection();
         connection.Open();
         using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
-        if (!await TicketExistsAsync(connection, transaction, tenantId, projectId, workItemId, cancellationToken))
+        if (!await WorkItemExistsAsync(connection, transaction, tenantId, projectId, workItemId, cancellationToken))
             return new(ProjectWorkItemCollaborationMutationStatus.WorkItemNotFound);
         var currentRevision = await connection.QuerySingleOrDefaultAsync<long?>(new CommandDefinition(
             "SELECT Revision FROM dbo.ProjectWorkItemCollaboration WITH (UPDLOCK,HOLDLOCK) WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND WorkItemId=@WorkItemId;",
@@ -200,8 +200,8 @@ public sealed class ProjectWorkItemCollaborationService : IProjectWorkItemCollab
         return new(ProjectWorkItemCollaborationMutationStatus.Succeeded, await ReadAsync(connection, tenantId, projectId, workItemId, cancellationToken));
     }
 
-    private static async Task<bool> TicketExistsAsync(IDbConnection connection, IDbTransaction? transaction, int tenantId, int projectId, long workItemId, CancellationToken cancellationToken) =>
-        await connection.ExecuteScalarAsync<int>(new CommandDefinition("SELECT COUNT(1) FROM dbo.ProjectTickets WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@WorkItemId AND IsDeleted=0;", new { TenantId = tenantId, ProjectId = projectId, WorkItemId = workItemId }, transaction, cancellationToken: cancellationToken)) > 0;
+    private static async Task<bool> WorkItemExistsAsync(IDbConnection connection, IDbTransaction? transaction, int tenantId, int projectId, long workItemId, CancellationToken cancellationToken) =>
+        await connection.ExecuteScalarAsync<int>(new CommandDefinition("SELECT COUNT(1) FROM dbo.WorkItems WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@WorkItemId;", new { TenantId = tenantId, ProjectId = projectId, WorkItemId = workItemId }, transaction, cancellationToken: cancellationToken)) > 0;
 
     private static async Task<ProjectWorkItemCollaborationSnapshot> ReadAsync(IDbConnection connection, int tenantId, int projectId, long workItemId, CancellationToken cancellationToken)
     {

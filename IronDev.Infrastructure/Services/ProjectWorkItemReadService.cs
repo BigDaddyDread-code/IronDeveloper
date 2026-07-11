@@ -10,6 +10,7 @@ namespace IronDev.Infrastructure.Services;
 
 public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
 {
+    private readonly IWorkItemIdentityService _identity;
     private readonly ITicketService _tickets;
     private readonly IRunStore _runs;
     private readonly ITicketSkeletonRunService _skeletonRuns;
@@ -20,6 +21,7 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
     private readonly IConfiguration _configuration;
 
     public ProjectWorkItemReadService(
+        IWorkItemIdentityService identity,
         ITicketService tickets,
         IRunStore runs,
         ITicketSkeletonRunService skeletonRuns,
@@ -29,6 +31,7 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
         ICurrentTenantContext tenant,
         IConfiguration configuration)
     {
+        _identity = identity;
         _tickets = tickets;
         _runs = runs;
         _skeletonRuns = skeletonRuns;
@@ -45,14 +48,18 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
         int currentUserId,
         CancellationToken cancellationToken = default)
     {
-        var ticket = await _tickets.GetTicketByIdAsync(workItemId, cancellationToken).ConfigureAwait(false);
+        var identity = await _identity.GetByWorkItemIdAsync(projectId, workItemId, cancellationToken).ConfigureAwait(false);
+        if (identity is null || identity.LegacyTicketId is not long legacyTicketId)
+            return null;
+
+        var ticket = await _tickets.GetTicketByIdAsync(legacyTicketId, cancellationToken).ConfigureAwait(false);
         if (ticket is null || ticket.ProjectId != projectId)
             return null;
 
-        var readinessTask = _readiness.EvaluateReadinessAsync(projectId, workItemId, cancellationToken);
+        var readinessTask = _readiness.EvaluateReadinessAsync(projectId, legacyTicketId, cancellationToken);
         var projectRuns = await _runs.GetRecentForProjectAsync(projectId, 500, cancellationToken).ConfigureAwait(false);
         var latestRun = projectRuns
-            .Where(run => run.TicketId == workItemId)
+            .Where(run => run.TicketId == legacyTicketId)
             .OrderByDescending(run => run.UpdatedUtc)
             .ThenByDescending(run => run.CreatedUtc)
             .FirstOrDefault();
@@ -61,7 +68,7 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
         if (latestRun is not null)
         {
             report = await _skeletonRuns
-                .GetRunReportAsync(projectId, workItemId, latestRun.RunId, cancellationToken)
+                .GetRunReportAsync(projectId, legacyTicketId, latestRun.RunId, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -73,10 +80,11 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
             report,
             await readinessTask.ConfigureAwait(false),
             DateTimeOffset.UtcNow,
-            await _collaboration.GetAsync(_tenant.TenantId, projectId, workItemId, cancellationToken).ConfigureAwait(false),
+            await _collaboration.GetAsync(_tenant.TenantId, projectId, identity.WorkItemId, cancellationToken).ConfigureAwait(false),
             members,
             currentUserId,
-            ReadSoloApprovalExceptionAllowed());
+            ReadSoloApprovalExceptionAllowed(),
+            identity);
     }
 
     private bool ReadSoloApprovalExceptionAllowed() =>

@@ -218,6 +218,83 @@ public sealed class EndpointContractTests : ApiTestBase
     }
 
     [TestMethod]
+    public async Task ProjectWorkItem_ShouldReadDurableWorkItemContractBeforeLegacyTicketShape()
+    {
+        var baseToken = await LoginAsync();
+        var tenantToken = await SelectTenantAsync(baseToken);
+        using var client = GetAuthedClient(tenantToken);
+
+        var createProject = await client.PostAsJsonAsync("/api/projects", new Project
+        {
+            Name = "Durable Work Item Contract Test",
+            Description = "Proves Work Item reads use current durable contract truth.",
+            LocalPath = @"C:\Temp\DurableWorkItemContractTest"
+        });
+        Assert.AreEqual(HttpStatusCode.Created, createProject.StatusCode);
+        var project = await createProject.Content.ReadFromJsonAsync<Project>();
+        Assert.IsNotNull(project);
+
+        var createTicket = await client.PostAsJsonAsync($"/api/projects/{project!.Id}/tickets", new CreateProjectTicketRequest
+        {
+            Title = "Legacy title should not win",
+            Summary = "The old ticket row is compatibility evidence.",
+            AcceptanceCriteria = ["Legacy criterion"],
+            LinkedFilePaths = ["legacy/File.cs"],
+            Priority = "High",
+            Type = "Task"
+        });
+        Assert.AreEqual(HttpStatusCode.OK, createTicket.StatusCode);
+        var ticket = await createTicket.Content.ReadFromJsonAsync<ProjectTicket>();
+        Assert.IsNotNull(ticket);
+
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            await connection.OpenAsync();
+            await connection.ExecuteAsync("""
+                UPDATE dbo.ProjectTickets
+                SET Title = N'Stale legacy title',
+                    Status = N'Ready',
+                    AcceptanceCriteria = N'- stale legacy criterion',
+                    LinkedFilePaths = N'legacy/Only.cs'
+                WHERE Id = @TicketId;
+
+                UPDATE dbo.WorkItems
+                SET Title = N'Durable Work Item title',
+                    CurrentStage = N'Ticket',
+                    CurrentState = N'ReadyToRun'
+                WHERE Id = @TicketId;
+
+                UPDATE dbo.WorkItemContracts
+                SET Title = N'Durable contract title',
+                    AcceptanceCriteria = N'- durable criterion one' + CHAR(10) + N'- durable criterion two',
+                    LinkedFilePaths = N'src/DurableOne.cs;src/DurableTwo.cs',
+                    SourceWorkshopSessionId = 4010,
+                    SourceWorkshopMessageIds = N'5010',
+                    SourceDocumentVersionIds = N'6010'
+                WHERE Id = (SELECT CurrentContractId FROM dbo.WorkItems WHERE Id = @TicketId);
+                """, new { TicketId = ticket!.Id });
+        }
+
+        var response = await client.GetAsync($"/api/projects/{project.Id}/work-items/{ticket.Id}");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        var workItem = await response.Content.ReadFromJsonAsync<ProjectWorkItemReadModel>();
+
+        Assert.IsNotNull(workItem);
+        Assert.AreEqual(ticket.Id, workItem.WorkItemId);
+        Assert.AreEqual("Durable contract title", workItem.Title);
+        Assert.AreEqual(ProjectWorkItemStages.Ticket, workItem.Stage);
+        Assert.AreEqual("ReadyToRun", workItem.State);
+        Assert.AreEqual(2, workItem.Contract.AcceptanceCriterionCount);
+        CollectionAssert.AreEquivalent(
+            new[] { "src/DurableOne.cs", "src/DurableTwo.cs" },
+            workItem.Contract.AffectedFiles.ToArray());
+        Assert.AreEqual(4010, workItem.Contract.SourceChatSessionId);
+        Assert.AreEqual(5010, workItem.Contract.SourceChatMessageId);
+        Assert.AreEqual(6010, workItem.Contract.SourceDocumentVersionId);
+        Assert.AreEqual("Stale legacy title", workItem.Ticket.Title);
+    }
+
+    [TestMethod]
     public async Task ProjectsTicketsMemoryAndChat_ShouldRoundTripThroughApiBoundary()
     {
         var baseToken = await LoginAsync();
