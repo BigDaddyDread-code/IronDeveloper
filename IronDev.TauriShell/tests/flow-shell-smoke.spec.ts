@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { mockProjectBoard } from './helpers/mockBoard';
 
 // Flow-shell smoke: sign-in gate, board, shape stage, settings users, and a
 // governance deep link rendering inside the Library. Replaces the old
@@ -191,6 +192,9 @@ async function mockHealthyApi(page: import('@playwright/test').Page) {
 }
 
 async function mockSelectedProject(page: import('@playwright/test').Page) {
+  const boardTickets = [
+    { id: 42, tenantId: 3, projectId: 7, title: 'Add book sorting to catalog', status: 'Draft', acceptanceCriteria: null }
+  ];
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
     window.localStorage.setItem('irondev.tenantId', '3');
@@ -229,11 +233,10 @@ async function mockSelectedProject(page: import('@playwright/test').Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([
-        { id: 42, tenantId: 3, projectId: 7, title: 'Add book sorting to catalog', status: 'Draft', acceptanceCriteria: null }
-      ])
+      body: JSON.stringify(boardTickets)
     });
   });
+  await mockProjectBoard(page, { projectName: 'IronDeveloper', tickets: boardTickets });
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
     await route.fulfill({
       status: 200,
@@ -305,4 +308,5 @@ async function mockLoginToSingleTenantChooser(page: import('@playwright/test').P
       })
     });
   });
+  await mockProjectBoard(page, { projectName: 'BookSeller' });
 }

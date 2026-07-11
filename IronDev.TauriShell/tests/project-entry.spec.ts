@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockProjectBoard } from './helpers/mockBoard';
 
 const READY_READINESS = {
   projectId: 7,
@@ -303,6 +304,11 @@ async function mockCommonApi(page: Page, options: MockOptions) {
         body: JSON.stringify(ticketsByProject[projectId] ?? [])
       });
     });
+    for (const ticket of ticketsByProject[projectId] ?? []) {
+      await page.route(`**/irondev-api/api/projects/${projectId}/tickets/${ticket.id}`, (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticket) })
+      );
+    }
     await page.route(`**/irondev-api/api/projects/${projectId}/provisioning/readiness`, (route) => {
       if (options.readinessFailures?.includes(projectId)) {
         return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'readiness failed' }) });
@@ -310,6 +316,13 @@ async function mockCommonApi(page: Page, options: MockOptions) {
 
       const readiness = options.readinessByProject?.[projectId] ?? (projectId === 8 || projectId === 9 ? { ...SETUP_READINESS, projectId } : { ...READY_READINESS, projectId });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(readiness) });
+    });
+    const boardReadiness = options.readinessByProject?.[projectId] ?? (projectId === 8 || projectId === 9 ? { ...SETUP_READINESS, projectId } : { ...READY_READINESS, projectId });
+    await mockProjectBoard(page, {
+      projectId,
+      projectName: candidate.name,
+      tickets: ticketsByProject[projectId] ?? [],
+      readiness: boardReadiness
     });
   }
 

@@ -385,6 +385,11 @@ export function FlowShell() {
     navigateProductPath(workItemPath(activeProjectId, ticket?.id ?? 'new'));
   };
 
+  const openBoardWorkItem = (workItemId: number | null) => {
+    setActiveTicket(null);
+    navigateProductPath(workItemPath(activeProjectId, workItemId ?? 'new'));
+  };
+
   const renderWorkItemOutcome = (kind: RouteOutcomeKind, title: string, message: string) => (
     <RouteOutcomeScreen
       kind={kind}
@@ -483,7 +488,7 @@ export function FlowShell() {
 
       <main className="fl-main">
         {displayedKind === 'board' ? (
-          <BoardScreen onOpenWorkItem={openWorkItem} onOpenProvisioning={() => openProjectSetup()} />
+          <BoardScreen onOpenWorkItem={openBoardWorkItem} onOpenProvisioning={() => openProjectSetup()} />
         ) : null}
         {displayedKind === 'chat' && currentRoute.chatChannelId ? (
           <SharedChannelRoute

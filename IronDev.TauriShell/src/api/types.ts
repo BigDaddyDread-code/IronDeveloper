@@ -33,6 +33,8 @@ export interface EnvironmentInfo {
 
 export type ProjectTicket = components['schemas']['ProjectTicket'];
 export type ProjectSummary = components['schemas']['Project'];
+export type ProjectBoardReadModel = components['schemas']['ProjectBoardReadModel'];
+export type ProjectBoardItemReadModel = components['schemas']['ProjectBoardItemReadModel'];
 export type ProjectDocument = components['schemas']['ProjectDocument'] & {
   origin?: string | null;
   processingStatus?: string | null;

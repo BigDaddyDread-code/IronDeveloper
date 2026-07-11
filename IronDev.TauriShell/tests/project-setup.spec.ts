@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { projectBoardResponse } from './helpers/mockBoard';
 
 type Readiness = Record<string, unknown>;
 
@@ -126,6 +127,13 @@ async function mockSetup(page: Page, options: SetupMockOptions) {
     }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(options.readiness()) });
   });
+  await page.route('**/irondev-api/api/projects/7/board', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(projectBoardResponse({ projectName: 'SecondRepo', readiness: options.readiness() }))
+    })
+  );
   await page.route('**/irondev-api/api/projects/7/profile/commands', async (route) => {
     const body = route.request().postDataJSON() as { commandType: string; commandText: string };
     const result = options.onCommand ? await options.onCommand(body) : { status: 200 };
@@ -266,7 +274,7 @@ test('Open Board for shaping works while governed runs remain blocked', async ({
 
   await page.getByTestId('flow.projectSetup.openBoardForShaping').click();
   await expect(page.getByTestId('flow.board.columns')).toBeVisible();
-  await expect(page.getByTestId('flow.cockpit.setup')).toContainText('backend will refuse governed runs');
+  await expect(page.getByTestId('flow.cockpit.setup')).toContainText('Governed runs are blocked until project setup is complete');
 });
 
 test('Open Board from Ready state uses the normal project Board', async ({ page }) => {
