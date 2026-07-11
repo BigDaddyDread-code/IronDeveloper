@@ -20,7 +20,7 @@ const columns = [
 ] as const;
 
 function emptyColumnMessage(stage: string): string {
-  if (stage === 'Shape') return 'No draft work items. Next safe action: start new work from Chat or the Board.';
+  if (stage === 'Shape') return 'No draft work items. Next safe action: start new work from Workshop or the Board.';
   if (stage === 'Ticket') return 'No confirmed tickets. Next safe action: confirm acceptance criteria on shaped work.';
   if (stage === 'Build') return 'No governed runs are building. Next safe action: open an eligible ticket.';
   if (stage === 'Review') return 'No work is waiting at review. Next safe action: inspect active builds.';

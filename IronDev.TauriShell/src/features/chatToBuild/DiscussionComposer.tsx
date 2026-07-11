@@ -24,7 +24,7 @@ export function DiscussionComposer({
     <Surface className="chat-build-panel" testId="chat-build.discussionComposer">
       <div className="section-heading">
         <p className="eyebrow">Discussion</p>
-        <h2>Chat input</h2>
+        <h2>Workshop input</h2>
       </div>
       <label className="field-stack">
         <span>Title</span>

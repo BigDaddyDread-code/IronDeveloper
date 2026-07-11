@@ -49,8 +49,8 @@ test('an empty project has a distinct Documents state with a real safe action', 
 
   await expect(page.getByTestId('flow.documents.empty')).toContainText('No project documents');
   await expect(page.getByTestId('flow.documents.empty')).toContainText('Upload a Markdown or text file');
-  await page.getByTestId('flow.documents.empty').getByRole('button', { name: 'Open Chat', exact: true }).click();
-  await expect(page).toHaveURL('/projects/7/chat');
+  await page.getByTestId('flow.documents.empty').getByRole('button', { name: 'Open Workshop', exact: true }).click();
+  await expect(page).toHaveURL('/projects/7/workshop');
 });
 
 test('Documents list failure preserves the route and retries backend truth', async ({ page }) => {
@@ -106,7 +106,7 @@ test('upload stores a backend-owned immutable Draft and opens its canonical docu
 
   await expect(page.getByTestId('flow.documents.upload.success')).toContainText('Document uploaded as Draft');
   await expect(page.getByTestId('flow.documents.upload.success')).toContainText('immutable v0.1');
-  await expect(page.getByTestId('flow.documents.upload.success')).toContainText('not attached to Chat');
+  await expect(page.getByTestId('flow.documents.upload.success')).toContainText('not attached to Workshop');
   await expect(page.getByTestId('flow.documents.upload.success')).not.toContainText('Ready');
   expect(state.uploadRequests).toBe(1);
   expect(state.lastUploadBody).toContain('API Boundary Notes');
@@ -393,7 +393,7 @@ async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions 
       document: uploadedDocument,
       version: uploadedVersion,
       processingStatus: 'Draft',
-      boundary: 'The uploaded file is an immutable Draft document. It is not attached to Chat, indexed for retrieval, approved, or source-mutation authority.'
+      boundary: 'The uploaded file is an immutable Draft document. It is not attached to Workshop, indexed for retrieval, approved, or source-mutation authority.'
     }, 201);
   });
 

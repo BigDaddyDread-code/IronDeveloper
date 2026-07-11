@@ -55,7 +55,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const projectId = project.selectedProjectId;
   const disabledReason =
     getChatBlockedReason(session.tokenConfigured, projectId, session.apiStatus.status, project.accessStatus) ??
-    (isHistoryLoading ? 'Chat history is loading.' : null);
+    (isHistoryLoading ? 'Workshop history is loading.' : null);
   const sendDisabledReason = disabledReason ?? getChatSendBlockedReason(draft, isSending);
   const projectLabel = project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required');
 
@@ -158,7 +158,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
               ? 'notFound'
               : 'unavailable'
           );
-          setSessionLoadError(describeApiError(error, 'Chat history failed to load.'));
+          setSessionLoadError(describeApiError(error, 'Workshop history failed to load.'));
         }
       } finally {
         if (!isCancelled) {
@@ -189,7 +189,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     if (!projectId || !session.tokenConfigured || session.apiStatus.status !== 'connected') {
       setDocumentSources([]);
       setDocumentSourceLoadState('error');
-      setDocumentSourceError('Project document sources are unavailable until Chat is connected.');
+      setDocumentSourceError('Project document sources are unavailable until Workshop is connected.');
       return;
     }
 
@@ -244,7 +244,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     async (request?: ChatSendRequest) => {
       const prompt = (request?.prompt ?? draft).trim();
       const displayText = request?.displayText ?? prompt;
-      const blockedReason = disabledReason ?? (request ? (isSending ? 'Chat request is already sending.' : null) : getChatSendBlockedReason(draft, isSending));
+      const blockedReason = disabledReason ?? (request ? (isSending ? 'Workshop request is already sending.' : null) : getChatSendBlockedReason(draft, isSending));
 
       if (!projectId || blockedReason || !prompt) {
         return;
@@ -458,7 +458,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const createTicketFromBaDraft = useCallback(
     async (baDraft: BaWorkingDraft): Promise<ProjectTicket> => {
       if (!projectId || !sessionId) {
-        throw new Error('Create ticket failed. A project Chat session is required.');
+        throw new Error('Create ticket failed. A project Workshop session is required.');
       }
 
       let ticket: ProjectTicket;
@@ -806,7 +806,7 @@ function getChatBlockedReason(tokenConfigured: boolean, projectId: number | null
 
 function getChatSendBlockedReason(value: string, isSending: boolean) {
   if (isSending) {
-    return 'Chat request is already sending.';
+    return 'Workshop request is already sending.';
   }
 
   if (!value.trim()) {

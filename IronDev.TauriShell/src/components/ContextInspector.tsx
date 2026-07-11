@@ -160,8 +160,8 @@ export function ContextInspector({
         <div data-testid="ticket.inspector.traceLinks">
           {ticket?.sourceChatSessionId || ticket?.sourceChatMessageId ? (
             <>
-              <MetadataRow label="Chat session" value={ticket.sourceChatSessionId ?? 'Unavailable'} />
-              <MetadataRow label="Chat message" value={ticket.sourceChatMessageId ?? 'Unavailable'} />
+              <MetadataRow label="Workshop session" value={ticket.sourceChatSessionId ?? 'Unavailable'} />
+              <MetadataRow label="Workshop message" value={ticket.sourceChatMessageId ?? 'Unavailable'} />
             </>
           ) : (
             <p className="state-muted">Context trace links are not exposed for this ticket yet.</p>

@@ -7,7 +7,7 @@ test('an incomplete backend draft opens review with honest blockers and no mutat
     openQuestions: ['Which sort order becomes the default?'],
     conflicts: ['The current API exposes no stable sort key.']
   });
-  await page.goto('/projects/7/chat/sessions/9007');
+  await page.goto('/projects/7/workshop/sessions/9007');
 
   await page.getByTestId('chat.baDraft.review').click();
 
@@ -23,7 +23,7 @@ test('an incomplete backend draft opens review with honest blockers and no mutat
 
 test('a ready reviewed draft creates one backend ticket and opens the real Work Item', async ({ page }) => {
   const state = await mockTicketDraftWorkspace(page, { readyForConfirmation: true });
-  await page.goto('/projects/7/chat/sessions/9007');
+  await page.goto('/projects/7/workshop/sessions/9007');
 
   await page.getByTestId('chat.baDraft.review').click();
   await expect(page.getByTestId('chat.ticketDraft.create')).toBeEnabled();
@@ -49,7 +49,7 @@ test('backend refusal remains in review and never renders fake ticket success', 
     confirmStatus: 400,
     confirmError: 'BA draft source chat message 5001 was not found in the source session.'
   });
-  await page.goto('/projects/7/chat/sessions/9007');
+  await page.goto('/projects/7/workshop/sessions/9007');
 
   await page.getByTestId('chat.baDraft.review').click();
   await page.getByTestId('chat.ticketDraft.create').click();
@@ -62,14 +62,14 @@ test('backend refusal remains in review and never renders fake ticket success', 
 
 test('a success response without a real ticket ID is treated as failure', async ({ page }) => {
   await mockTicketDraftWorkspace(page, { readyForConfirmation: true, omitTicketId: true });
-  await page.goto('/projects/7/chat/sessions/9007');
+  await page.goto('/projects/7/workshop/sessions/9007');
 
   await page.getByTestId('chat.baDraft.review').click();
   await page.getByTestId('chat.ticketDraft.create').click();
 
   await expect(page.getByTestId('chat.ticketDraft.error')).toContainText('did not include a ticket identifier');
   await expect(page.getByTestId('chat.ticketDraft.success')).toHaveCount(0);
-  await expect(page).toHaveURL('/projects/7/chat/sessions/9007');
+  await expect(page).toHaveURL('/projects/7/workshop/sessions/9007');
 });
 
 test.describe('narrow ticket draft review', () => {
@@ -77,7 +77,7 @@ test.describe('narrow ticket draft review', () => {
 
   test('uses the full viewport without overflow and closes back to the conversation', async ({ page }) => {
     await mockTicketDraftWorkspace(page, { readyForConfirmation: true });
-    await page.goto('/projects/7/chat/sessions/9007');
+    await page.goto('/projects/7/workshop/sessions/9007');
 
     await page.getByTestId('chat.baDraft.review').click();
     await expect(page.getByRole('dialog', { name: 'Review ticket draft' })).toBeVisible();

@@ -128,9 +128,9 @@ export function ChatWorkspace({
       <div className="chat-conversation">
         <header className="chat-page-header">
           <div>
-            <h1>Chat</h1>
+            <h1>Workshop</h1>
             <p>
-              {projectLabel} <span aria-hidden="true">/</span> Direct with IronDev
+              {projectLabel} <span aria-hidden="true">/</span> Direct with Workshop guide
             </p>
           </div>
           <div className="chat-page-header__actions">

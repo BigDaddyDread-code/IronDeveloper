@@ -3350,7 +3350,7 @@ p {
   }
 }
 
-/* CHAT-UX-1: the active Chat route belongs to the light flow shell. The
+/* CHAT-UX-1: the active Workshop route belongs to the light flow shell. The
    legacy tokens stay scoped so behavior components do not carry the retired
    dark inspection workspace into the product shell. */
 .chat-route-workspace {

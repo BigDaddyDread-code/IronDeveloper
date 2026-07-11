@@ -212,7 +212,7 @@ export function ChatSessionRail({
           </section>
 
           <section className="chat-session-rail__section">
-            <h3>Direct with IronDev</h3>
+            <h3>Direct with Workshop guide</h3>
             {sessions.length === 0 ? (
               <p className="chat-session-rail__empty">No saved direct conversations yet.</p>
             ) : (

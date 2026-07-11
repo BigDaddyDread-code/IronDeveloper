@@ -122,7 +122,16 @@ export function FlowShell() {
     }
 
     if (!currentRoute.compatibility || selectedProjectId === null || !hasProjectAccess) return;
-    if (currentRoute.kind === 'chat') navigateProductPath(projectPath(selectedProjectId, 'chat'), true);
+    if (currentRoute.kind === 'chat') {
+      const routeProjectId = currentRoute.projectId ?? selectedProjectId;
+      if (currentRoute.chatSessionId !== null) {
+        navigateProductPath(chatSessionPath(routeProjectId, currentRoute.chatSessionId), true);
+      } else if (currentRoute.chatChannelId !== null) {
+        navigateProductPath(chatChannelPath(routeProjectId, currentRoute.chatChannelId), true);
+      } else {
+        navigateProductPath(projectPath(routeProjectId, 'chat'), true);
+      }
+    }
     if (currentRoute.kind === 'board') navigateProductPath(projectPath(selectedProjectId, 'board'), true);
     if (currentRoute.kind === 'settings') navigateProductPath(libraryPath(selectedProjectId, 'settings'), true);
     if (currentRoute.kind === 'library' && currentRoute.pathname === '/knowledge') {
@@ -426,9 +435,9 @@ export function FlowShell() {
             className={displayedKind === 'chat' ? 'fl-on' : ''}
             type="button"
             onClick={() => navigateProductPath(projectPath(activeProjectId, 'chat'))}
-            data-testid="flow.nav.chat"
+            data-testid="flow.nav.workshop"
           >
-            Chat
+            Workshop
           </button>
           <button
             className={displayedKind === 'workItem' ? 'fl-on' : ''}

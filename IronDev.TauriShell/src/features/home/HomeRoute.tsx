@@ -64,7 +64,7 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
             <div className="home-project-picker" data-testid="home.projectSelector">
               <div>
                 <h3>Select a project to continue</h3>
-                <p className="state-muted">Project-scoped workspaces use this selected project for Chat, Build, Tickets, Knowledge, and Runs.</p>
+                <p className="state-muted">Project-scoped workspaces use this selected project for Workshop, Build, Tickets, Knowledge, and Runs.</p>
               </div>
               <ProjectSelector
                 projects={project.projects}
@@ -83,7 +83,7 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
           </div>
           <p className="state-muted">
             {project.selectedProjectId
-              ? 'Open Tickets for planned work, Build for sandbox execution, or Chat to ask a project-aware question.'
+              ? 'Open Tickets for planned work, Build for sandbox execution, or Workshop to ask a project-aware question.'
               : 'Select a project before starting project-aware work.'}
           </p>
         </Surface>
@@ -102,7 +102,7 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
               title={projectActionBlockedReason ?? undefined}
               onClick={() => navigation.navigateToWorkspace('chat')}
             >
-              Open Chat
+              Open Workshop
             </CommandButton>
             <CommandButton
               type="button"
@@ -126,7 +126,7 @@ export function HomeRoute({ route, onRouteReady }: HomeRouteProps) {
             </CommandButton>
           </div>
           <p className="state-muted" data-testid="home.flowActions.hint">
-            {projectActionBlockedReason ?? 'Start with Chat, continue the discussion into Build, then review the sandbox evidence before approval.'}
+            {projectActionBlockedReason ?? 'Start with Workshop, continue the discussion into Build, then review the sandbox evidence before approval.'}
           </p>
         </Surface>
       </div>

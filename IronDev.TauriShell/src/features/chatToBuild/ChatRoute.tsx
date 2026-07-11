@@ -74,7 +74,7 @@ export function ChatRoute({
         <RouteOutcomeScreen
           kind="unavailable"
           title="Conversations are unavailable"
-          message={chat.sessionLoadError ?? 'The Chat session API did not return conversation history.'}
+          message={chat.sessionLoadError ?? 'The Workshop session API did not return conversation history.'}
           nextSafeAction="Retry the backend-owned session list. Your current URL has been preserved."
           actionLabel="Retry"
           onAction={chat.retrySessionLoad}

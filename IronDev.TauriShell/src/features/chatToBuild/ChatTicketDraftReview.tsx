@@ -116,7 +116,7 @@ export function ChatTicketDraftReview({
                     {blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
                   </ul>
                 ) : (
-                  <p>The backend draft is ready and its Chat provenance is present.</p>
+                  <p>The backend draft is ready and its Workshop provenance is present.</p>
                 )}
                 <ReviewList title="Open questions" items={openQuestions} testId="chat.ticketDraft.questions" />
                 <ReviewList title="Potential conflicts" items={conflicts} testId="chat.ticketDraft.conflicts" />
@@ -181,8 +181,8 @@ function ticketCreationBlockers(
   const blockers: string[] = [];
   if (!draft.candidateTitle?.trim()) blockers.push('The draft needs a title.');
   if (draft.readyForConfirmation !== true) blockers.push('The backend draft is not ready for confirmation.');
-  if (!sourceSessionId) blockers.push('A source Chat session is required.');
-  if (sourceMessageIds.length === 0) blockers.push('At least one source Chat message is required.');
+  if (!sourceSessionId) blockers.push('A source Workshop session is required.');
+  if (sourceMessageIds.length === 0) blockers.push('At least one source Workshop message is required.');
   if (conflicts.length > 0) blockers.push('Resolve every potential conflict before creating the ticket.');
   return blockers;
 }
