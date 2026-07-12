@@ -323,6 +323,7 @@ builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, Approva
 builder.Services.AddScoped<IAgentRunHealthSummaryService, AgentRunHealthSummaryService>();
 builder.Services.AddScoped<IBackendOperationalHealthService, BackendOperationalHealthService>();
 builder.Services.AddScoped<IAuditLedgerReadService, SqlAuditLedgerReadService>();
+builder.Services.AddScoped<IProjectAuditExportService, ProjectAuditExportService>();
 builder.Services.AddSingleton<IGovernedOperationStatusReadRepository, GovernedOperationStatusReadRepository>();
 builder.Services.AddSingleton<IEvidenceMetadataReadRepository, EvidenceMetadataReadRepository>();
 builder.Services.AddSingleton<IReceiptMetadataReadRepository, ReceiptMetadataReadRepository>();

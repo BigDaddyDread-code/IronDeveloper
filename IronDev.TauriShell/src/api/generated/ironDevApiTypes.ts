@@ -6200,6 +6200,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    workItemId?: number;
+                    actor?: string;
+                    event?: string;
+                    fromUtc?: string;
+                    toUtc?: string;
+                    take?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectAuditExport"];
+                        "application/json": components["schemas"]["ProjectAuditExport"];
+                        "text/json": components["schemas"]["ProjectAuditExport"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectAuditExportOutcome"];
+                        "application/json": components["schemas"]["ProjectAuditExportOutcome"];
+                        "text/json": components["schemas"]["ProjectAuditExportOutcome"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/board": {
         parameters: {
             query?: never;
@@ -13892,6 +13971,41 @@ export interface components {
             indexingStatus?: string | null;
             /** Format: int32 */
             indexedFileCount?: number | null;
+        };
+        ProjectAuditExport: {
+            schemaVersion?: string | null;
+            /** Format: int32 */
+            projectId?: number;
+            projectName?: string | null;
+            /** Format: date-time */
+            generatedUtc?: string;
+            filters: components["schemas"]["ProjectAuditExportFilters"];
+            /** Format: int32 */
+            returnedCount?: number;
+            /** Format: int32 */
+            take?: number;
+            truncated?: boolean;
+            itemsSha256?: string | null;
+            items?: components["schemas"]["AuditLedgerItem"][] | null;
+            warnings?: string[] | null;
+            boundary?: components["schemas"]["AuditLedgerBoundary"];
+        };
+        ProjectAuditExportFilters: {
+            /** Format: int64 */
+            workItemId?: number | null;
+            actor?: string | null;
+            event?: string | null;
+            /** Format: date-time */
+            fromUtc?: string | null;
+            /** Format: date-time */
+            toUtc?: string | null;
+            /** Format: int32 */
+            take?: number;
+        };
+        ProjectAuditExportOutcome: {
+            status?: string | null;
+            export?: components["schemas"]["ProjectAuditExport"];
+            issues?: components["schemas"]["AuditLedgerIssue"][] | null;
         };
         ProjectBoardAssigneeReadModel: {
             /** Format: int32 */
