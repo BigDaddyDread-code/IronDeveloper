@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// UX-START-0/1 — the session front door and the project cockpit. The project is
+// UX-START-0/1 — the session front door and the project-scoped Board. The project is
 // the authority boundary: no project, no work item; no readiness, no run. These
 // tests mock the backend and assert the UI's side of the contract: named
 // preflight instead of a mute error chip, a chooser whose badges are backend
 // readiness (never inference), create-project landing on readiness, and a
-// cockpit whose single primary action follows backend facts.
+// Board whose single primary action follows backend facts.
 
 test('an unreachable API gets a named preflight with a retry, not a dead chip', async ({ page }) => {
   await page.addInitScript(() => {
@@ -29,7 +29,7 @@ test('signed in without a project lands on the chooser; badges are backend readi
   await expect(page.getByTestId('flow.chooser.readiness.7')).toContainText('Ready');
   await expect(page.getByTestId('flow.chooser.readiness.8')).toContainText('Setup required, 2 items');
 
-  // Selecting a project changes context — the cockpit renders with the same truth.
+  // Selecting a project changes context — the Board renders with the same truth.
   await page.getByTestId('flow.chooser.project.7').click();
   await expect(page.getByTestId('flow.board.columns')).toBeVisible();
   await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Ready to run');
@@ -58,7 +58,7 @@ test('creating a project lands on the readiness screen, never straight into work
   await expect(page.getByTestId('flow.projectSetup')).toBeVisible();
 });
 
-test('cockpit: a gate-waiting item outranks new work, with the reason named', async ({ page }) => {
+test('Board: a gate-waiting item outranks new work, with the reason named', async ({ page }) => {
   await mockStart(page, {
     selectedProjectId: 7,
     tickets: [
@@ -74,7 +74,7 @@ test('cockpit: a gate-waiting item outranks new work, with the reason named', as
   await expect(page.getByTestId('flow.cockpit.attention')).toContainText('Review the waiting run');
 });
 
-test('cockpit: blocked readiness switches the primary action to setup and names every blocker with its remedy', async ({ page }) => {
+test('Board: blocked readiness switches the primary action to setup and names every blocker with its remedy', async ({ page }) => {
   await mockStart(page, {
     selectedProjectId: 7,
     readiness: {

@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **615 files** after CLN-05. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **617 files** after CLN-06. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **615 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 42 |
+| `Canonical` | 43 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 394 |
+| `HistoricalReceipt` | 395 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **615** |
+| **Total** | **617** |
 
 ## Inventory
 
@@ -648,6 +648,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **615 f
 | `Docs/receipts/README.md` | Receipts | Evidence | `Canonical` | 2026-07-13 structure review | `-` | Keep current; preserve receipt immutability rules | Evidence and audit |
 | `Docs/testing/README.md` | Testing Documentation | Testing | `Canonical` | 2026-07-13 structure review | `-` | Keep current; update with test-platform ownership | Test platform |
 | `Docs/receipts/CLN_05_DOCUMENTATION_STRUCTURE.md` | CLN-05 Documentation Structure Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/TERMINOLOGY_DEPRECATION_MAP.md` | Terminology Deprecation Map | Cleanup | `Canonical` | 2026-07-13 terminology review | `-` | Keep current; enforce in active product language | Cleanup programme |
+| `Docs/receipts/CLN_06_TERMINOLOGY_DEPRECATION.md` | CLN-06 Terminology Deprecation Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

@@ -6,7 +6,7 @@
 
 IronDev is structured as a multi-tenant client-server system.
 
-The product boundary is the REST API. The desktop UI is a cockpit, not the owner of persistence, tenancy, memory, tickets, documents, or AI workflow state.
+The product boundary is the REST API. The desktop UI is a thin product client, not the owner of persistence, tenancy, memory, tickets, documents, or AI workflow state.
 
 IronDev uses a thin product-client boundary. New product work targets `IronDev.Api`, `IronDev.Client`, `tools/IronDev.Cli`, and the Tauri shell path.
 
@@ -96,7 +96,7 @@ Disallowed transitions:
 
 Any refactor touching one stage must update this matrix in this section before merge.
 
-## Chat Cockpit Modes
+## Workshop Chat Modes
 
 Chat completion must never assume governance intent. Mode authority is explicit and single-owner:
 

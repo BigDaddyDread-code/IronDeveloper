@@ -27,7 +27,7 @@ public sealed class PlannedSurfacesController : ControllerBase
         detail: $"Tenant {tenantId} supports direct user creation by an admin today; the invite/pending/accept flow is gated on tenant-scope proof and the role/visibility matrix.",
         nextSafeAction: "Admins can add users directly in Settings > Users and roles.");
 
-    /// <summary>Human-intervention dial (full-ux-map section 9.6). The cockpit's dial is a labeled local draft until AUTH-0.</summary>
+    /// <summary>Human-intervention dial from the superseded UX map. The settings control is a labeled local draft until AUTH-0.</summary>
     [HttpGet("api/projects/{projectId:int}/authority/intervention-dial")]
     public IActionResult GetInterventionDial(int projectId) => Planned(
         surface: "Human-intervention dial",
