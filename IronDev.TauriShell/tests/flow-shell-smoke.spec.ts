@@ -233,6 +233,40 @@ test('audit export previews applied filters before enabling JSON download', asyn
   expect(new URL(exportRequests[0]).searchParams.get('take')).toBe('250');
 });
 
+test('audit event inspection uses a canonical route and keeps unsafe evidence inert', async ({ page }) => {
+  await mockSelectedProject(page);
+  const response = auditLedgerResponse();
+  response.items[0].evidenceLinks = [
+    { label: 'Other project', href: '/projects/99/library/members' },
+    { label: 'External target', href: 'https://example.com/evidence' }
+  ];
+  await page.route('**/irondev-api/api/v1/audit/ledger**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
+  });
+  await page.goto('/projects/7/library/audit');
+
+  await page.getByTestId('flow.audit.inspect').first().click();
+  await expect(page).toHaveURL('/projects/7/library/audit/events/accepted-approval%3Aaaa');
+  await expect(page.getByTestId('flow.audit.detail')).toContainText('AcceptedApprovalRecorded');
+  await expect(page.getByTestId('flow.audit.detail')).toContainText('run-42');
+  await expect(page.getByTestId('flow.audit.evidence.unavailable')).toHaveCount(2);
+  await expect(page.getByTestId('flow.audit.detail').locator('a')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Back to Audit' }).click();
+  await expect(page).toHaveURL('/projects/7/library/audit');
+});
+
+test('audit event deep link reports an event outside the bounded result honestly', async ({ page }) => {
+  await mockSelectedProject(page);
+  await page.route('**/irondev-api/api/v1/audit/ledger**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(auditLedgerResponse()) });
+  });
+
+  await page.goto('/projects/7/library/audit/events/not-returned');
+  await expect(page.getByTestId('flow.audit.detail.missing')).toContainText('Event not in the current bounded result');
+  await expect(page.getByTestId('flow.audit.detail.missing')).toContainText('No details have been inferred');
+});
+
 async function mockHealthyApi(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/health', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) });

@@ -40,6 +40,7 @@ export interface ProductRoute {
   libraryDocumentVersionId: number | null;
   libraryDocumentAction: 'upload' | null;
   libraryToolId: string | null;
+  libraryAuditLedgerId: string | null;
   compatibility: boolean;
 }
 
@@ -63,6 +64,7 @@ function route(
     libraryDocumentVersionId: options.libraryDocumentVersionId ?? null,
     libraryDocumentAction: options.libraryDocumentAction ?? null,
     libraryToolId: options.libraryToolId ?? null,
+    libraryAuditLedgerId: options.libraryAuditLedgerId ?? null,
     compatibility: options.compatibility ?? false
   };
 }
@@ -184,6 +186,15 @@ export function parseProductRoute(pathname: string): ProductRoute {
     });
   }
 
+  const auditEventMatch = normalized.match(/^\/projects\/(\d+)\/library\/audit\/events\/([^/]+)$/);
+  if (auditEventMatch) {
+    return route(normalized, 'library', {
+      projectId: Number(auditEventMatch[1]),
+      librarySection: 'audit',
+      libraryAuditLedgerId: decodeURIComponent(auditEventMatch[2])
+    });
+  }
+
   const libraryMatch = normalized.match(/^\/projects\/(\d+)\/library(?:\/(explorer|documents|tools|members|provisioning|audit|settings))?$/);
   if (libraryMatch) {
     return route(normalized, 'library', {
@@ -248,6 +259,10 @@ export function documentVersionPath(projectId: number, documentId: number, versi
 
 export function toolPath(projectId: number, toolId: string): string {
   return `${libraryPath(projectId, 'tools')}/${encodeURIComponent(toolId)}`;
+}
+
+export function auditEventPath(projectId: number, ledgerId: string): string {
+  return `${libraryPath(projectId, 'audit')}/events/${encodeURIComponent(ledgerId)}`;
 }
 
 export function navigateProductPath(pathname: string, replace = false): void {

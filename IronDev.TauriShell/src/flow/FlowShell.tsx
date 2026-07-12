@@ -563,6 +563,7 @@ export function FlowShell() {
             documentVersionId={currentRoute.libraryDocumentVersionId}
             documentAction={currentRoute.libraryDocumentAction}
             toolId={currentRoute.libraryToolId}
+            auditLedgerId={currentRoute.libraryAuditLedgerId}
             preserveGovernancePath={currentRoute.compatibility && currentRoute.librarySection === 'governance'}
             onBackToProjects={openProjectEntry}
             onOpenBoard={() => openProjectBoard()}
