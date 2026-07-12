@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { routeForId } from '../../app/routes';
 import { governanceViewers, viewerForPath } from './governanceRoutes';
 import { GovernanceOverview } from './GovernanceOverview';
+import type { GovernanceSection } from '../navigation/productRoutes';
 
 // Hosts the 17 read-only governance viewers inside the Library surface at their
 // original URLs, so deep links and existing tests keep working. Pathname is real
@@ -9,10 +10,11 @@ import { GovernanceOverview } from './GovernanceOverview';
 // during render, which React could not track.
 interface GovernanceHostProps {
   projectId: number;
+  section?: GovernanceSection;
   preserveCompatibilityPath?: boolean;
 }
 
-export function GovernanceHost({ projectId, preserveCompatibilityPath = false }: GovernanceHostProps) {
+export function GovernanceHost({ projectId, section = 'overview', preserveCompatibilityPath = false }: GovernanceHostProps) {
   const [pathname, setPathname] = useState(() => window.location.pathname);
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export function GovernanceHost({ projectId, preserveCompatibilityPath = false }:
   const governanceRoute = routeForId('governance');
 
   if (!preserveCompatibilityPath) {
-    return <GovernanceOverview projectId={projectId} />;
+    return <GovernanceOverview projectId={projectId} section={section} />;
   }
 
   return (

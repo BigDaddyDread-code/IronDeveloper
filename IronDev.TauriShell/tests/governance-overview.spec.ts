@@ -84,6 +84,36 @@ test('governance overview is keyboard reachable and does not overflow at 390px',
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
 });
 
+test('canonical Governance drilldowns reuse backend truth and return to overview', async ({ page }) => {
+  await prepareSelectedProject(page);
+  await mockOverview(page, overviewFixture('AttentionRequired'));
+  await page.goto('/projects/7/library/governance/controls');
+
+  await expect(page.getByRole('button', { name: 'Controls', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('flow.governance.controls')).toContainText('Controlled apply only');
+  await expect(page.getByTestId('flow.governance.attention')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Back to overview' }).click();
+  await expect(page).toHaveURL('/projects/7/library/governance');
+  await expect(page.getByTestId('flow.governance.attention')).toBeVisible();
+});
+
+test('technical evidence groups compatibility viewers and preserves their deep links', async ({ page }) => {
+  await prepareSelectedProject(page);
+  await mockOverview(page, overviewFixture('AttentionRequired'));
+  await page.route('**/irondev-api/api/v1/governance/traces**', async (route) => fulfillJson(route, {
+    status: 'governance_traces_found', data: { items: [], totalCount: 0 }, boundary: {}, warnings: [], errors: []
+  }));
+  await page.goto('/projects/7/library/governance/technical');
+
+  await expect(page.getByTestId('flow.governance.technical')).toContainText('Runs and operations');
+  await expect(page.getByTestId('flow.governance.technical')).toContainText('Approvals and policy');
+  await expect(page.getByTestId('flow.governance.technical')).toContainText('Tools and memory');
+  await expect(page.getByTestId('flow.governanceHost')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Governance timeline Audit technical traces' }).click();
+  await expect(page).toHaveURL('/governance/timeline');
+  await expect(page.getByTestId('flow.governanceHost')).toBeVisible();
+});
+
 async function prepareSelectedProject(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
