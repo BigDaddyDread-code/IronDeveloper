@@ -1,4 +1,5 @@
 import type { TenantSummary } from '../../api/types';
+import { IronDevBrand } from '../../components/IronDevBrand';
 import { useProjectContext } from '../../state/useProjectContext';
 
 interface TenantChooserProps {
@@ -12,10 +13,7 @@ export function TenantChooser({ onOpenSettings }: TenantChooserProps) {
   return (
     <main className="fl-root fl-auth-root" data-testid="flow.tenantChooser" aria-label="Choose tenant">
       <header className="fl-auth-header">
-        <div className="fl-brand">
-          <span className="fl-brand-mark">I</span>
-          <span>IronDev</span>
-        </div>
+        <IronDevBrand />
       </header>
 
       <section className="fl-auth-frame" aria-labelledby="tenant-title">

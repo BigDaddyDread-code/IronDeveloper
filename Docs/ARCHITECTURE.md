@@ -247,7 +247,7 @@ These exceptions must not persist product state directly to SQL or Infrastructur
 
 - `IronDev.Client` has no `IronDev.Infrastructure` project reference.
 - `tools/IronDev.Cli` references `IronDev.Client`, does not reference `IronDev.Infrastructure`, and does not construct direct `HttpClient` calls.
-- `IronDev.TauriShell` is a TypeScript shell spike that calls API routes and generated OpenAPI types; it does not reference Infrastructure, SQL, repositories, or Weaviate directly.
+- `IronDev.TauriShell` is the IronDev desktop app. It calls API routes and generated OpenAPI types; it does not reference Infrastructure, SQL, repositories, or Weaviate directly.
 - `IronDeveloper` WPF is removed from the repository and from `IronDev.slnx`.
 
 The executable boundary checks live in `IronDev.IntegrationTests/ApiBoundaryTests.cs`.

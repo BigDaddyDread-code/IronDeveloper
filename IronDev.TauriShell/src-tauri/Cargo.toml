@@ -1,12 +1,12 @@
 [package]
-name = "irondev-tauri-shell"
-version = "0.1.0"
-description = "IronDev Tauri shell spike"
+name = "irondev-desktop"
+version = "0.5.0"
+description = "IronDev governed engineering desktop application"
 authors = ["IronDev"]
 edition = "2021"
 
 [lib]
-name = "irondev_tauri_shell_lib"
+name = "irondev_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

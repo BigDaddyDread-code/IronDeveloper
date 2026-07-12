@@ -3,6 +3,7 @@ import { useProjectContext } from '../../state/useProjectContext';
 import { NotImplementedPanel } from '../components/NotImplementedPanel';
 import { AgentsPanel } from './AgentsPanel';
 import { AiConnectionsPanel } from './AiConnectionsPanel';
+import { AboutPanel } from './AboutPanel';
 import {
   ApprovalPolicyDraft,
   autonomyProfiles,
@@ -121,6 +122,11 @@ export function SettingsScreen() {
 
       <div style={{ marginTop: 16 }}>
         <AgentsPanel />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <p className="fl-plabel">Advanced</p>
+        <AboutPanel />
       </div>
     </div>
   );

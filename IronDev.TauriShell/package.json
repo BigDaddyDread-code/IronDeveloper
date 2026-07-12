@@ -1,6 +1,6 @@
 {
-  "name": "irondev-tauri-shell",
-  "version": "0.1.0",
+  "name": "irondev-desktop",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.13.0",

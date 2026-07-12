@@ -3,6 +3,7 @@ import './flow.css';
 import { IronDevApiError } from '../api/ironDevApi';
 import type { ProjectTicket } from '../api/types';
 import { routeForId } from '../app/routes';
+import { IronDevBrand } from '../components/IronDevBrand';
 import { SignInRoute } from '../features/auth/SignInRoute';
 import { ChatRoute } from '../features/chatToBuild/ChatRoute';
 import { SharedChannelRoute } from '../features/chatToBuild/SharedChannelRoute';
@@ -69,6 +70,11 @@ export function FlowShell() {
   const previousProjectId = useRef<number | null>(project.selectedProjectId);
   const healthMenuRef = useRef<HTMLDetailsElement | null>(null);
   const userMenuRef = useRef<HTMLDetailsElement | null>(null);
+
+  useEffect(() => {
+    document.title = project.selectedProjectName ? `IronDev — ${project.selectedProjectName}` : 'IronDev';
+    return () => { document.title = 'IronDev'; };
+  }, [project.selectedProjectName]);
 
   const selectedProjectId = project.selectedProjectId;
   const hasProjectAccess =
@@ -414,9 +420,8 @@ export function FlowShell() {
   return (
     <div className="fl-root" data-testid="flow.shell">
       <header className="fl-appbar">
-        <div className="fl-brand">
-          <span className="fl-brand-mark">I</span>
-          IronDev <span className="fl-brand-separator">/</span>
+        <div className="fl-brand-with-project">
+          <IronDevBrand /> <span className="fl-brand-separator">/</span>
           <button className="fl-project-switcher" data-testid="flow.projectSwitcher" type="button" onClick={openProjectEntry}>
             {projectName}
           </button>

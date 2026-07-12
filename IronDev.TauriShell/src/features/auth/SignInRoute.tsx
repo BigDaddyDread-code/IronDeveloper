@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { IronDevBrand } from '../../components/IronDevBrand';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 
@@ -39,10 +40,7 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
   return (
     <main className="fl-root fl-auth-root" data-testid="auth.route" aria-label="Sign in">
       <header className="fl-auth-header">
-        <div className="fl-brand">
-          <span className="fl-brand-mark">I</span>
-          <span>IronDev</span>
-        </div>
+        <IronDevBrand descriptor />
         <span className="fl-auth-environment" data-testid="auth.apiStatusChip">
           {session.environmentInfo?.environment ? `${session.environmentInfo.environment} · ` : ''}
           {apiStatusLabel(session.apiStatus.status)}

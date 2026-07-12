@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="IronDev mark">
+  <path fill="#20252b" d="M204 72 72 184v144l132 112 44-52-108-92v-80l108-92-44-52Z"/>
+  <path fill="#20252b" d="m308 72 132 112v144L308 440l-44-52 108-92v-80l-108-92 44-52Z"/>
+  <path fill="#20252b" d="M228 92h56v130h-56zM228 290h56v130h-56z"/>
+  <path fill="#d28a2c" d="M228 238h56v36h-56z"/>
+</svg>
