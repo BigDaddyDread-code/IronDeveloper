@@ -6597,6 +6597,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/governance/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectGovernanceOverview"];
+                        "application/json": components["schemas"]["ProjectGovernanceOverview"];
+                        "text/json": components["schemas"]["ProjectGovernanceOverview"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/members": {
         parameters: {
             query?: never;
@@ -14223,6 +14273,95 @@ export interface components {
             fileExtension?: string | null;
             /** Format: date-time */
             lastIndexedDate?: string;
+        };
+        ProjectGovernanceAttentionItem: {
+            /** Format: int64 */
+            workItemId?: number;
+            workItemReference?: string | null;
+            title?: string | null;
+            kind?: string | null;
+            severity?: string | null;
+            summary?: string | null;
+            waitingOn?: string | null;
+            /** Format: date-time */
+            recordedUtc?: string;
+            nextSafeAction?: string | null;
+            targetRoute?: string | null;
+        };
+        ProjectGovernanceControl: {
+            id?: string | null;
+            group?: string | null;
+            label?: string | null;
+            effectiveValue?: string | null;
+            explanation?: string | null;
+            source?: string | null;
+            configurable?: boolean;
+            detailRoute?: string | null;
+            remedyRoute?: string | null;
+        };
+        ProjectGovernanceDecision: {
+            id?: string | null;
+            kind?: string | null;
+            summary?: string | null;
+            actorDisplayName?: string | null;
+            /** Format: int64 */
+            workItemId?: number;
+            /** Format: date-time */
+            recordedUtc?: string;
+            targetRoute?: string | null;
+        };
+        ProjectGovernanceException: {
+            id?: string | null;
+            category?: string | null;
+            severity?: string | null;
+            title?: string | null;
+            summary?: string | null;
+            /** Format: date-time */
+            recordedUtc?: string;
+            /** Format: int64 */
+            workItemId?: number | null;
+            targetRoute?: string | null;
+        };
+        ProjectGovernanceNavigation: {
+            overview?: string | null;
+            controls?: string | null;
+            exceptions?: string | null;
+            decisions?: string | null;
+            technical?: string | null;
+            audit?: string | null;
+            settings?: string | null;
+        };
+        ProjectGovernanceOverview: {
+            /** Format: int32 */
+            projectId?: number;
+            projectName?: string | null;
+            overallStatus?: string | null;
+            statusSummary?: string | null;
+            /** Format: date-time */
+            generatedUtc?: string;
+            version?: string | null;
+            primaryAction: components["schemas"]["ProjectGovernancePrimaryAction"];
+            attentionItems?: components["schemas"]["ProjectGovernanceAttentionItem"][] | null;
+            controls?: components["schemas"]["ProjectGovernanceControl"][] | null;
+            exceptions?: components["schemas"]["ProjectGovernanceException"][] | null;
+            recentDecisions?: components["schemas"]["ProjectGovernanceDecision"][] | null;
+            navigation: components["schemas"]["ProjectGovernanceNavigation"];
+            sectionIssues?: components["schemas"]["ProjectGovernanceSectionIssue"][] | null;
+            boundary?: string | null;
+        };
+        ProjectGovernancePrimaryAction: {
+            kind?: string | null;
+            label?: string | null;
+            summary?: string | null;
+            /** Format: int64 */
+            workItemId?: number | null;
+            targetRoute?: string | null;
+        };
+        ProjectGovernanceSectionIssue: {
+            section?: string | null;
+            status?: string | null;
+            summary?: string | null;
+            retryable?: boolean;
         };
         ProjectImplementationPlan: {
             /** Format: int64 */

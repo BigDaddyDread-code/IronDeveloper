@@ -9069,6 +9069,66 @@
         }
       }
     },
+    "/api/projects/{projectId}/governance/overview": {
+      "get": {
+        "tags": [
+          "ProjectGovernance"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectGovernanceOverview"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectGovernanceOverview"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectGovernanceOverview"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/members": {
       "get": {
         "tags": [
@@ -26007,6 +26067,327 @@
         },
         "additionalProperties": false
       },
+      "ProjectGovernanceAttentionItem": {
+        "type": "object",
+        "properties": {
+          "workItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "workItemReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "waitingOn": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordedUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetRoute": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectGovernanceControl": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "group": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "explanation": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "configurable": {
+            "type": "boolean"
+          },
+          "detailRoute": {
+            "type": "string",
+            "nullable": true
+          },
+          "remedyRoute": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectGovernanceDecision": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorDisplayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "workItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recordedUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "targetRoute": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectGovernanceException": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordedUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "workItemId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "targetRoute": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectGovernanceNavigation": {
+        "type": "object",
+        "properties": {
+          "overview": {
+            "type": "string",
+            "nullable": true
+          },
+          "controls": {
+            "type": "string",
+            "nullable": true
+          },
+          "exceptions": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisions": {
+            "type": "string",
+            "nullable": true
+          },
+          "technical": {
+            "type": "string",
+            "nullable": true
+          },
+          "audit": {
+            "type": "string",
+            "nullable": true
+          },
+          "settings": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectGovernanceOverview": {
+        "required": [
+          "navigation",
+          "primaryAction"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "projectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "overallStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "statusSummary": {
+            "type": "string",
+            "nullable": true
+          },
+          "generatedUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "string",
+            "nullable": true
+          },
+          "primaryAction": {
+            "$ref": "#/components/schemas/ProjectGovernancePrimaryAction"
+          },
+          "attentionItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectGovernanceAttentionItem"
+            },
+            "nullable": true
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectGovernanceControl"
+            },
+            "nullable": true
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectGovernanceException"
+            },
+            "nullable": true
+          },
+          "recentDecisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectGovernanceDecision"
+            },
+            "nullable": true
+          },
+          "navigation": {
+            "$ref": "#/components/schemas/ProjectGovernanceNavigation"
+          },
+          "sectionIssues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectGovernanceSectionIssue"
+            },
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectGovernancePrimaryAction": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "workItemId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "targetRoute": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectGovernanceSectionIssue": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "ProjectImplementationPlan": {
         "type": "object",
         "properties": {
@@ -37429,6 +37810,9 @@
     },
     {
       "name": "ProjectChannels"
+    },
+    {
+      "name": "ProjectGovernance"
     },
     {
       "name": "ProjectMembers"
