@@ -233,8 +233,7 @@ class IronDevApiClient {
   async getEnvironment(signal?: AbortSignal): Promise<EnvironmentInfo> {
     return this.request<EnvironmentInfo>('/api/environment', {
       method: 'GET',
-      signal,
-      skipAuth: true
+      signal
     });
   }
 

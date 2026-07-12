@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using IronDev.Core.AiConnections;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace IronDev.Infrastructure.Services;
 
@@ -16,6 +17,7 @@ public sealed class AiConnectionTestService : IAiConnectionTestService
     private readonly HttpClient _httpClient;
     private readonly Func<string, string?> _environmentVariableReader;
 
+    [ActivatorUtilitiesConstructor]
     public AiConnectionTestService(
         IAiConnectionCatalogService catalog,
         IAiConnectionCredentialStore credentials,
