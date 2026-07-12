@@ -15,5 +15,6 @@ This directory owns active cleanup inventories and remediation maps. Start with:
 - [Actor Attribution Audit](ACTOR_ATTRIBUTION_AUDIT.md)
 - [Canonical Governed Refusal Envelope](CANONICAL_REFUSAL_ENVELOPE.md)
 - [Generated Contract Determinism](GENERATED_CONTRACT_DETERMINISM.md)
+- [Authentication And Tenant Token Contract](AUTHENTICATION_TENANT_TOKEN_CONTRACT.md)
 
 Cleanup documents may classify and schedule behavior changes. They do not themselves grant runtime authority.

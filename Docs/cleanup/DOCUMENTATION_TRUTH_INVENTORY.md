@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **632 files** after CLN-14. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **634 files** after CLN-15. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **632 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 50 |
+| `Canonical` | 51 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 403 |
+| `HistoricalReceipt` | 404 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **632** |
+| **Total** | **634** |
 
 ## Inventory
 
@@ -109,6 +109,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **632 f
 | `Docs/cleanup/ACTOR_ATTRIBUTION_AUDIT.md` | Actor Attribution Audit | Cleanup | `Canonical` | 2026-07-13 middleware, durable ledger, and audit projection proof | `-` | Keep aligned with authenticated write attribution | API and audit |
 | `Docs/cleanup/CANONICAL_REFUSAL_ENVELOPE.md` | Canonical Governed Refusal Envelope | Cleanup | `Canonical` | 2026-07-13 governed controller and route-scope refusal proof | `-` | Keep aligned with governed HTTP refusal contracts | API and governance |
 | `Docs/cleanup/GENERATED_CONTRACT_DETERMINISM.md` | Generated Contract Determinism | Cleanup | `Canonical` | 2026-07-13 twice-generated hash and CI proof | `-` | Keep aligned with the contract generator and frontend CI | API and clients |
+| `Docs/cleanup/AUTHENTICATION_TENANT_TOKEN_CONTRACT.md` | Authentication And Tenant Token Contract | Cleanup | `Canonical` | 2026-07-13 middleware and SQL-backed API token-stage proof | `-` | Keep aligned with login, tenant selection, and product access middleware | Auth and security |
 | `Docs/cli/CLI_COMMAND_INVENTORY.md` | CLI Command Inventory | API and clients | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | API and clients |
 | `Docs/cli/IRONDEV_CLI_CONTRACT.md` | IronDev CLI Contract (PR-2) | API and clients | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | API and clients |
 | `Docs/cli/WORKSPACE_COMMAND_BOUNDARY_INVENTORY.md` | Workspace Command Boundary Inventory | Apply and workspaces | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Governed apply |
@@ -665,6 +666,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **632 f
 | `Docs/receipts/CLN_12_ACTOR_ATTRIBUTION.md` | CLN-12 Actor Attribution Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_13_CANONICAL_REFUSAL_ENVELOPE.md` | CLN-13 Canonical Governed Refusal Envelope Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_14_GENERATED_CONTRACT_DETERMINISM.md` | CLN-14 Generated Contract Determinism Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/receipts/CLN_15_AUTHENTICATION_TENANT_TOKEN_CONTRACT.md` | CLN-15 Authentication And Tenant Token Contract Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
