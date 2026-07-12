@@ -16,6 +16,7 @@ interface LibraryScreenProps {
   documentVersionId?: number | null;
   documentAction?: 'upload' | null;
   toolId?: string | null;
+  auditLedgerId?: string | null;
   preserveGovernancePath?: boolean;
   onBackToProjects: () => void;
   onOpenBoard: () => void;
@@ -40,6 +41,7 @@ export function LibraryScreen({
   documentVersionId = null,
   documentAction = null,
   toolId = null,
+  auditLedgerId = null,
   preserveGovernancePath = false,
   onBackToProjects,
   onOpenBoard
@@ -95,7 +97,7 @@ export function LibraryScreen({
       {section === 'provisioning' ? (
         <ProvisioningSection onBackToProjects={onBackToProjects} onOpenBoard={onOpenBoard} />
       ) : null}
-      {section === 'audit' ? <AuditSection projectId={projectId} /> : null}
+      {section === 'audit' ? <AuditSection projectId={projectId} ledgerId={auditLedgerId} /> : null}
       {section === 'settings' ? <SettingsScreen /> : null}
       {preserveGovernancePath ? (
         <span className="fl-visually-hidden" data-testid="flow.library.compatibilityPath">

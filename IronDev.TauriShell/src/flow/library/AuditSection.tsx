@@ -3,9 +3,11 @@ import { IronDevApiError } from '../../api/ironDevApi';
 import type { AuditLedgerItem, AuditLedgerResponse, ProjectAuditExport } from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useSessionContext } from '../../state/useSessionContext';
+import { auditEventPath, libraryPath, navigateProductPath, parseProductRoute } from '../navigation/productRoutes';
 
 interface AuditSectionProps {
   projectId: number;
+  ledgerId?: string | null;
 }
 
 type AuditLedgerLoadState = 'loading' | 'ready' | 'empty' | 'unavailable';
@@ -27,7 +29,7 @@ const emptyAuditFilters: AuditFilters = {
   toUtc: ''
 };
 
-export function AuditSection({ projectId }: AuditSectionProps) {
+export function AuditSection({ projectId, ledgerId = null }: AuditSectionProps) {
   const session = useSessionContext();
   const [filters, setFilters] = useState<AuditFilters>(emptyAuditFilters);
   const [appliedFilters, setAppliedFilters] = useState<AuditFilters>(emptyAuditFilters);
@@ -129,6 +131,17 @@ export function AuditSection({ projectId }: AuditSectionProps) {
     );
   }
 
+
+  if (ledgerId) {
+    const item = (ledger?.items ?? []).find((candidate) => candidate.ledgerId === ledgerId);
+    return (
+      <section className="fl-audit" data-testid="flow.library.auditLedger" aria-labelledby="audit-heading">
+        <AuditHeader ledger={ledger} onExport={() => setExportOpen(true)} />
+        <AuditEventDetail projectId={projectId} ledger={ledger} item={item} ledgerId={ledgerId} />
+      </section>
+    );
+  }
+
   return (
     <section className="fl-audit" data-testid="flow.library.auditLedger" aria-labelledby="audit-heading">
       <AuditHeader ledger={ledger} onExport={() => setExportOpen(true)} />
@@ -196,7 +209,7 @@ export function AuditSection({ projectId }: AuditSectionProps) {
       {loadState === 'empty' ? (
         <p className="fl-empty" data-testid="flow.audit.empty">No audit rows matched the current filters.</p>
       ) : (
-        <AuditRows items={ledger?.items ?? []} />
+        <AuditRows projectId={projectId} items={ledger?.items ?? []} />
       )}
 
       {exportOpen ? (
@@ -267,7 +280,7 @@ function AuditHeader({ ledger, onExport }: { ledger: AuditLedgerResponse | null;
   );
 }
 
-function AuditRows({ items }: { items: AuditLedgerItem[] }) {
+function AuditRows({ projectId, items }: { projectId: number; items: AuditLedgerItem[] }) {
   return (
     <div className="fl-audit-table-wrap" data-testid="flow.audit.rows">
       <table className="fl-table fl-audit-table">
@@ -279,6 +292,7 @@ function AuditRows({ items }: { items: AuditLedgerItem[] }) {
             <th>Event</th>
             <th>Outcome</th>
             <th>Evidence</th>
+            <th><span className="fl-visually-hidden">Inspect</span></th>
           </tr>
         </thead>
         <tbody>
@@ -305,11 +319,19 @@ function AuditRows({ items }: { items: AuditLedgerItem[] }) {
               </td>
               <td>{safeText(item.outcome, 'Recorded')}</td>
               <td>
-                {(item.evidenceLinks ?? []).map((link) => (
-                  <a key={`${link.label}-${link.href}`} href={link.href ?? '#'} data-testid="flow.audit.evidence">
-                    {safeText(link.label, 'Evidence')}
-                  </a>
-                ))}
+                <EvidenceLinks projectId={projectId} links={item.evidenceLinks ?? []} />
+              </td>
+              <td>
+                {item.ledgerId ? (
+                  <button
+                    className="fl-audit__inspect"
+                    type="button"
+                    onClick={() => navigateProductPath(auditEventPath(projectId, item.ledgerId!))}
+                    data-testid="flow.audit.inspect"
+                  >
+                    Inspect
+                  </button>
+                ) : <span className="fl-muted">Unavailable</span>}
               </td>
             </tr>
           ))}
@@ -317,6 +339,97 @@ function AuditRows({ items }: { items: AuditLedgerItem[] }) {
       </table>
     </div>
   );
+}
+
+function AuditEventDetail({
+  projectId,
+  ledger,
+  item,
+  ledgerId
+}: {
+  projectId: number;
+  ledger: AuditLedgerResponse | null;
+  item: AuditLedgerItem | undefined;
+  ledgerId: string;
+}) {
+  if (!item) {
+    return (
+      <div className="fl-audit-detail" data-testid="flow.audit.detail.missing">
+        <button className="fl-btn" type="button" onClick={() => navigateProductPath(libraryPath(projectId, 'audit'))}>Back to Audit</button>
+        <div className="fl-empty">
+          <h3>Event not in the current bounded result</h3>
+          <p>The event <code>{ledgerId}</code> was not returned by the current Audit query. No details have been inferred.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <article className="fl-audit-detail" data-testid="flow.audit.detail">
+      <header>
+        <button className="fl-btn" type="button" onClick={() => navigateProductPath(libraryPath(projectId, 'audit'))}>Back to Audit</button>
+        <StatusBadge status="ready">{safeText(item.outcome, 'Recorded')}</StatusBadge>
+      </header>
+      <div>
+        <p className="fl-plabel">Audit event</p>
+        <h3>{safeText(item.action, 'Recorded event')}</h3>
+        <p>{safeText(item.summary, 'No event summary was returned.')}</p>
+      </div>
+      <dl className="fl-audit-detail__facts">
+        <div><dt>Time</dt><dd>{formatTime(item.timeUtc)}</dd></div>
+        <div><dt>Actor</dt><dd>{safeText(item.actorDisplayName, 'Unknown actor')} <small>{safeText(item.actorId, 'unknown')}</small></dd></div>
+        <div><dt>Scope</dt><dd>{item.workItemId ? `WI-${item.workItemId} ${safeText(item.workItemTitle, '')}` : safeText(item.projectName, `Project ${projectId}`)}</dd></div>
+        <div><dt>Source</dt><dd>{safeText(item.source, 'Unknown source')}</dd></div>
+        <div><dt>Correlation</dt><dd><code>{safeText(item.correlationId, 'Not returned')}</code></dd></div>
+        <div><dt>Ledger ID</dt><dd><code>{safeText(item.ledgerId, ledgerId)}</code></dd></div>
+      </dl>
+      <section className="fl-audit-detail__evidence">
+        <h4>Evidence</h4>
+        {(item.evidenceLinks?.length ?? 0) > 0
+          ? <EvidenceLinks projectId={projectId} links={item.evidenceLinks ?? []} />
+          : <p className="fl-muted">No evidence target was returned for this event.</p>}
+      </section>
+      <p className="fl-audit-export__boundary">
+        {ledger?.boundary?.boundaryStatement ?? 'Audit inspection is read-only. It grants no authority.'}
+      </p>
+    </article>
+  );
+}
+
+function EvidenceLinks({ projectId, links }: { projectId: number; links: AuditLedgerItem['evidenceLinks'] }) {
+  return (
+    <div className="fl-audit__evidence-links">
+      {(links ?? []).map((link) => {
+        const target = safeEvidenceTarget(link.href, projectId);
+        const label = safeText(link.label, 'Evidence');
+        return target ? (
+          <a
+            key={`${label}-${link.href}`}
+            href={target}
+            onClick={(event) => { event.preventDefault(); navigateProductPath(target); }}
+            data-testid="flow.audit.evidence"
+          >
+            {label}
+          </a>
+        ) : (
+          <span key={`${label}-${link.href}`} className="fl-muted" data-testid="flow.audit.evidence.unavailable">
+            {label}: unavailable evidence target
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function safeEvidenceTarget(href: string | null | undefined, projectId: number) {
+  const candidate = href?.trim();
+  if (!candidate?.startsWith('/') || candidate.startsWith('//')) return null;
+  const url = new URL(candidate, window.location.origin);
+  if (url.origin !== window.location.origin) return null;
+  if (/^\/governance(?:\/|$)/.test(url.pathname)) return `${url.pathname}${url.search}${url.hash}`;
+  const route = parseProductRoute(url.pathname);
+  if (route.kind === 'notFound' || route.projectId !== projectId) return null;
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 function textOrUndefined(value: string) {
