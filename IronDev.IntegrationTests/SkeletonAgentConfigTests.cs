@@ -315,6 +315,113 @@ public sealed class SkeletonAgentConfigTests
         finally { TryDelete(root); }
     }
 
+    [TestMethod]
+    public async Task Reset_FieldAndAgentCreateNewPublishedVersions()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var saved = await service.SaveDraftAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfileDraftWriteRequest
+            {
+                ExpectedRevision = 0,
+                Provider = "ollama",
+                Model = "llama3",
+                TimeoutSeconds = 30,
+                Skill = "Custom skill",
+                Personality = "Custom voice"
+            });
+            var published = await service.PublishDraftAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfilePublishRequest
+            {
+                ExpectedRevision = saved.CurrentRevision,
+                Reason = "Initial override"
+            }, actorUserId: 7);
+
+            var fieldReset = await service.ResetAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfileResetRequest
+            {
+                ExpectedRevision = published.CurrentRevision,
+                Scope = SkeletonAgentProfileResetScopes.Field,
+                Field = "skill",
+                Reason = "Return skill to the built-in default"
+            }, actorUserId: 9);
+            Assert.IsTrue(fieldReset.Succeeded);
+            Assert.AreEqual(2L, fieldReset.PublishedVersion?.Version);
+            Assert.AreEqual("ollama", fieldReset.Profile?.Provider);
+            StringAssert.Contains(fieldReset.Profile?.Skill, "Read the confirmed contract");
+
+            var agentReset = await service.ResetAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfileResetRequest
+            {
+                ExpectedRevision = fieldReset.CurrentRevision,
+                Scope = SkeletonAgentProfileResetScopes.Agent,
+                Reason = "Return the complete agent to defaults"
+            }, actorUserId: 9);
+            Assert.AreEqual("openai", agentReset.Profile?.Provider);
+            Assert.AreEqual("gpt-4o", agentReset.Profile?.Model);
+            Assert.AreEqual(3, (await service.ListHistoryAsync(SkeletonAgentRole.Builder)).Count);
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task Restore_CopiesAnImmutableVersionIntoANewCurrentVersion()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var draft = await service.SaveDraftAsync(SkeletonAgentRole.Tester, new SkeletonAgentProfileDraftWriteRequest
+            {
+                ExpectedRevision = 0,
+                Provider = "ollama",
+                Model = "llama3",
+                TimeoutSeconds = 30
+            });
+            var first = await service.PublishDraftAsync(SkeletonAgentRole.Tester, new SkeletonAgentProfilePublishRequest
+            {
+                ExpectedRevision = draft.CurrentRevision,
+                Reason = "First version"
+            }, actorUserId: 7);
+            var reset = await service.ResetAsync(SkeletonAgentRole.Tester, new SkeletonAgentProfileResetRequest
+            {
+                ExpectedRevision = first.CurrentRevision,
+                Scope = SkeletonAgentProfileResetScopes.Agent,
+                Reason = "Test reset"
+            }, actorUserId: 8);
+
+            var restored = await service.RestoreAsync(SkeletonAgentRole.Tester, 1, new SkeletonAgentProfileRestoreRequest
+            {
+                ExpectedRevision = reset.CurrentRevision,
+                Reason = "Restore the known working local model"
+            }, actorUserId: 9);
+
+            Assert.IsTrue(restored.Succeeded);
+            Assert.AreEqual(3L, restored.PublishedVersion?.Version);
+            Assert.AreEqual("ollama", restored.Profile?.Provider);
+            Assert.AreEqual("llama3", restored.Profile?.Model);
+            Assert.AreEqual(3, (await service.ListHistoryAsync(SkeletonAgentRole.Tester)).Count);
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task Reset_UnimplementedScopeIsRefusedWithoutChangingTheProfile()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var outcome = await service.ResetAsync(SkeletonAgentRole.Critic, new SkeletonAgentProfileResetRequest
+            {
+                ExpectedRevision = 0,
+                Scope = SkeletonAgentProfileResetScopes.Tenant,
+                Reason = "Tenant reset"
+            }, actorUserId: 7);
+
+            Assert.IsFalse(outcome.Succeeded);
+            Assert.AreEqual("ScopeUnavailable", outcome.Code);
+            Assert.AreEqual(0, (await service.ListHistoryAsync(SkeletonAgentRole.Critic)).Count);
+            Assert.AreEqual("openai", (await service.GetAsync(SkeletonAgentRole.Critic)).Provider);
+        }
+        finally { TryDelete(root); }
+    }
+
     // ── AG-2: resolver + prompt composition ───────────────────────────────────
 
     [TestMethod]

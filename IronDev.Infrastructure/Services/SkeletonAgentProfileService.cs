@@ -262,6 +262,91 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
             .OrderByDescending(item => item.Version)
             .ToArray();
 
+    public async Task<SkeletonAgentProfileDraftOutcome> ResetAsync(
+        SkeletonAgentRole role,
+        SkeletonAgentProfileResetRequest request,
+        int actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (role == SkeletonAgentRole.Orchestrator)
+            return Refused("DeterministicRole", "The Orchestrator has no editable model profile.", 0);
+
+        var gate = StateLock(role);
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var state = await ReadStateAsync(role, cancellationToken).ConfigureAwait(false);
+            if (request.ExpectedRevision != state.Revision)
+                return Refused("StaleWrite", $"Stale profile revision {request.ExpectedRevision}; current revision is {state.Revision}. Reload and compare before resetting.", state.Revision, state.Draft);
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                return Refused("ResetReasonRequired", "A reset reason is required.", state.Revision, state.Draft);
+            if (request.Scope.Equals(SkeletonAgentProfileResetScopes.Project, StringComparison.OrdinalIgnoreCase) ||
+                request.Scope.Equals(SkeletonAgentProfileResetScopes.Tenant, StringComparison.OrdinalIgnoreCase))
+                return Refused("ScopeUnavailable", $"{request.Scope} profile storage is not implemented. No reset was performed.", state.Revision, state.Draft);
+
+            var defaults = DefaultUpdate(role);
+            SkeletonAgentProfileUpdate replacement;
+            if (request.Scope.Equals(SkeletonAgentProfileResetScopes.Field, StringComparison.OrdinalIgnoreCase))
+            {
+                var current = ToUpdate(await GetAsync(role, cancellationToken).ConfigureAwait(false));
+                replacement = request.Field.Trim().ToLowerInvariant() switch
+                {
+                    "provider" => current with { Provider = defaults.Provider },
+                    "model" => current with { Model = defaults.Model },
+                    "timeoutseconds" => current with { TimeoutSeconds = defaults.TimeoutSeconds },
+                    "skill" => current with { Skill = defaults.Skill },
+                    "personality" => current with { Personality = defaults.Personality },
+                    _ => null!
+                };
+                if (replacement is null)
+                    return Refused("ResetFieldInvalid", "Reset field must be provider, model, timeoutSeconds, skill, or personality.", state.Revision, state.Draft);
+            }
+            else if (request.Scope.Equals(SkeletonAgentProfileResetScopes.Agent, StringComparison.OrdinalIgnoreCase) ||
+                     request.Scope.Equals(SkeletonAgentProfileResetScopes.BuiltIn, StringComparison.OrdinalIgnoreCase))
+            {
+                replacement = defaults;
+            }
+            else
+            {
+                return Refused("ResetScopeInvalid", "Reset scope must be Field, Agent, BuiltIn, Project, or Tenant.", state.Revision, state.Draft);
+            }
+
+            return await PublishReplacementAsync(role, replacement, request.Reason, actorUserId, state, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    public async Task<SkeletonAgentProfileDraftOutcome> RestoreAsync(
+        SkeletonAgentRole role,
+        long version,
+        SkeletonAgentProfileRestoreRequest request,
+        int actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var gate = StateLock(role);
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var state = await ReadStateAsync(role, cancellationToken).ConfigureAwait(false);
+            if (request.ExpectedRevision != state.Revision)
+                return Refused("StaleWrite", $"Stale profile revision {request.ExpectedRevision}; current revision is {state.Revision}. Reload and compare before restoring.", state.Revision, state.Draft);
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                return Refused("RestoreReasonRequired", "A restore reason is required.", state.Revision, state.Draft);
+            var selected = state.History.SingleOrDefault(item => item.Version == version);
+            if (selected is null)
+                return Refused("VersionNotFound", $"Published profile version {version} was not found.", state.Revision, state.Draft);
+
+            return await PublishReplacementAsync(role, selected.Values, request.Reason, actorUserId, state, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     private string ProfilesRoot()
     {
         var configured = _configuration["AgentProfiles:Root"];
@@ -369,6 +454,54 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         long revision,
         SkeletonAgentProfileDraft? draft = null) =>
         new() { Succeeded = false, Code = code, FailureReason = reason, CurrentRevision = revision, Draft = draft };
+
+    private SkeletonAgentProfileUpdate DefaultUpdate(SkeletonAgentRole role)
+    {
+        var global = _configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
+        var builtIn = SkeletonAgentBuiltInDefaults.For(role);
+        return new SkeletonAgentProfileUpdate
+        {
+            Provider = global.Provider?.Trim() ?? string.Empty,
+            Model = global.Model?.Trim() ?? string.Empty,
+            TimeoutSeconds = global.TimeoutSeconds,
+            Skill = builtIn.Skill,
+            Personality = builtIn.Personality
+        };
+    }
+
+    private async Task<SkeletonAgentProfileDraftOutcome> PublishReplacementAsync(
+        SkeletonAgentRole role,
+        SkeletonAgentProfileUpdate replacement,
+        string reason,
+        int actorUserId,
+        AgentProfileState state,
+        CancellationToken cancellationToken)
+    {
+        var issues = Validate(replacement);
+        if (issues.Count > 0)
+            return Refused("ValidationFailed", issues[0].Message, state.Revision, state.Draft);
+
+        await WriteProfileAsync(role, replacement, cancellationToken).ConfigureAwait(false);
+        var published = new SkeletonAgentProfilePublishedVersion
+        {
+            Version = state.CurrentVersion + 1,
+            Role = role,
+            Values = replacement,
+            Reason = reason.Trim(),
+            ActorUserId = actorUserId,
+            PublishedAtUtc = DateTimeOffset.UtcNow
+        };
+        var next = state with
+        {
+            Revision = state.Revision + 1,
+            CurrentVersion = published.Version,
+            Draft = null,
+            History = [.. state.History, published],
+            UpdatedAtUtc = published.PublishedAtUtc
+        };
+        await WriteStateAsync(role, next, cancellationToken).ConfigureAwait(false);
+        return Accepted(next.Revision, publishedVersion: published, profile: await GetAsync(role, cancellationToken).ConfigureAwait(false));
+    }
 
     private async Task<EffectiveSkeletonAgentProfile> GetEffectiveAsync(
         SkeletonAgentRole role,

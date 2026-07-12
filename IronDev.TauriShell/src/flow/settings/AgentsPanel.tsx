@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { EffectiveSkeletonAgentProfile, SkeletonAgentProfile, SkeletonAgentProfileDraft } from '../../api/types';
+import type { EffectiveSkeletonAgentProfile, SkeletonAgentProfile, SkeletonAgentProfileDraft, SkeletonAgentProfilePublishedVersion } from '../../api/types';
 import { useSessionContext } from '../../state/useSessionContext';
 
 // AG-5 — per-agent configuration: the model each agent runs on and its skill +
@@ -28,6 +28,9 @@ export function AgentsPanel() {
   const [draftState, setDraftState] = useState<Record<string, SkeletonAgentProfileDraft>>({});
   const [publishReasons, setPublishReasons] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<Record<string, string>>({});
+  const [histories, setHistories] = useState<Record<string, SkeletonAgentProfilePublishedVersion[]>>({});
+  const [resetFields, setResetFields] = useState<Record<string, string>>({});
+  const [recoveryReasons, setRecoveryReasons] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setState('loading');
@@ -38,9 +41,11 @@ export function AgentsPanel() {
       ]);
       const editable = result.filter((profile) => !DETERMINISTIC_ROLES.includes(profile.role));
       const persistedDrafts = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.getAgentProfileDraft(profile.role)] as const));
+      const publishedHistory = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.listAgentProfileHistory(profile.role)] as const));
       setProfiles(result);
       setEffectiveProfiles(Object.fromEntries(effective.map((profile) => [profile.role, profile])));
       setDraftState(Object.fromEntries(persistedDrafts));
+      setHistories(Object.fromEntries(publishedHistory));
       setDrafts(Object.fromEntries(result.map((profile) => {
         const persisted = persistedDrafts.find(([role]) => role === profile.role)?.[1];
         return [profile.role, persisted ? { ...profile, ...persisted.values } : profile];
@@ -133,6 +138,48 @@ export function AgentsPanel() {
       setSavingRole(null);
     }
   }, [draftState, load, publishReasons, savingRole, session.client]);
+
+  const resetProfile = useCallback(async (role: string, scope: 'Field' | 'Agent') => {
+    if (savingRole) return;
+    setSavingRole(role);
+    setError(null);
+    try {
+      const outcome = await session.client.resetAgentProfile(role, {
+        expectedRevision: draftState[role]?.revision ?? 0,
+        scope,
+        field: scope === 'Field' ? (resetFields[role] || 'skill') : '',
+        reason: recoveryReasons[role]?.trim() ?? ''
+      });
+      setNotice((previous) => ({ ...previous, [role]: `Reset published as version ${outcome.publishedVersion?.version ?? ''}.` }));
+      setRecoveryReasons((previous) => ({ ...previous, [role]: '' }));
+      await load();
+    } catch (e) {
+      const body = e instanceof IronDevApiError ? (e.body as { failureReason?: string } | undefined) : undefined;
+      setError(body?.failureReason ?? (e instanceof Error ? e.message : 'Reset failed.'));
+    } finally {
+      setSavingRole(null);
+    }
+  }, [draftState, load, recoveryReasons, resetFields, savingRole, session.client]);
+
+  const restoreProfile = useCallback(async (role: string, version: number) => {
+    if (savingRole) return;
+    setSavingRole(role);
+    setError(null);
+    try {
+      const outcome = await session.client.restoreAgentProfile(role, version, {
+        expectedRevision: draftState[role]?.revision ?? 0,
+        reason: recoveryReasons[role]?.trim() ?? ''
+      });
+      setNotice((previous) => ({ ...previous, [role]: `Version ${version} restored as new version ${outcome.publishedVersion?.version ?? ''}.` }));
+      setRecoveryReasons((previous) => ({ ...previous, [role]: '' }));
+      await load();
+    } catch (e) {
+      const body = e instanceof IronDevApiError ? (e.body as { failureReason?: string } | undefined) : undefined;
+      setError(body?.failureReason ?? (e instanceof Error ? e.message : 'Restore failed.'));
+    } finally {
+      setSavingRole(null);
+    }
+  }, [draftState, load, recoveryReasons, savingRole, session.client]);
 
   if (state === 'loading') {
     return <p className="fl-empty">Loading agents…</p>;
@@ -263,6 +310,58 @@ export function AgentsPanel() {
               </ul>
             ) : null}
             {notice[profile.role] ? <p className="fl-empty" data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.notice`}>{notice[profile.role]}</p> : null}
+            <div style={{ marginTop: 12, borderTop: '1px solid var(--fl-line)', paddingTop: 10 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.recovery`}>
+              <p className="fl-plabel" style={{ marginTop: 0 }}>Reset and restore</p>
+              <p className="fl-empty" style={{ marginTop: 0 }}>A reset or restore publishes a new version. Existing history is never rewritten.</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select
+                  className="fl-select"
+                  value={resetFields[profile.role] || 'skill'}
+                  onChange={(event) => setResetFields((previous) => ({ ...previous, [profile.role]: event.target.value }))}
+                  data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.resetField`}
+                >
+                  <option value="provider">Provider</option>
+                  <option value="model">Model</option>
+                  <option value="timeoutSeconds">Timeout</option>
+                  <option value="skill">Skill</option>
+                  <option value="personality">Personality</option>
+                </select>
+                <input
+                  style={{ flex: '1 1 240px' }}
+                  value={recoveryReasons[profile.role] ?? ''}
+                  onChange={(event) => setRecoveryReasons((previous) => ({ ...previous, [profile.role]: event.target.value }))}
+                  placeholder="Reason for reset or restore"
+                  data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.recoveryReason`}
+                />
+                <button
+                  className="fl-btn"
+                  disabled={savingRole !== null || !(recoveryReasons[profile.role]?.trim())}
+                  onClick={() => void resetProfile(profile.role, 'Field')}
+                  data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.resetFieldAction`}
+                >Reset field</button>
+                <button
+                  className="fl-btn"
+                  disabled={savingRole !== null || !(recoveryReasons[profile.role]?.trim())}
+                  onClick={() => void resetProfile(profile.role, 'Agent')}
+                  data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.resetAgent`}
+                >Reset agent</button>
+              </div>
+              {histories[profile.role]?.length ? (
+                <div style={{ marginTop: 10 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.history`}>
+                  {histories[profile.role].map((version) => (
+                    <div key={version.version} style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '5px 0' }}>
+                      <span className="fl-empty">v{version.version} · {version.reason} · user {version.actorUserId}</span>
+                      <button
+                        className="fl-btn"
+                        disabled={savingRole !== null || !(recoveryReasons[profile.role]?.trim())}
+                        onClick={() => void restoreProfile(profile.role, version.version)}
+                        data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.restore.${version.version}`}
+                      >Restore</button>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="fl-empty">No published profile versions yet.</p>}
+            </div>
             </>
             )}
           </div>
