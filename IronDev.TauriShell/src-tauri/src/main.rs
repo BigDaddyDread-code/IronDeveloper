@@ -1,3 +1,3 @@
 fn main() {
-    irondev_tauri_shell_lib::run();
+    irondev_desktop_lib::run();
 }

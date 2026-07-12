@@ -1,5 +1,7 @@
 # Tauri Shell Spike
 
+> **Superseded historical document.** This records the original shell-spike decision and is retained as implementation history. The supported product is now the IronDev desktop app in `IronDev.TauriShell`; current identity and assets live in `IronDev.TauriShell/brand/BRAND_GUIDE.md`.
+
 IronDev is evaluating a future desktop shell built with Tauri, React, TypeScript, and Playwright.
 This spike proves the shell direction without moving product logic out of `IronDev.Api`.
 

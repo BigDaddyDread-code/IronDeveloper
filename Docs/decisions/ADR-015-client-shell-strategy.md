@@ -18,7 +18,7 @@ Tauri / Product CLI / Future Clients
 ## Consequences
 
 - `IronDeveloper` WPF is retired and removed from the repo/product solution. It must not be restored as a supported shell.
-- `IronDev.TauriShell` is a forward shell spike. It uses API/OpenAPI calls and must not reference storage/provider internals.
+- `IronDev.TauriShell` is the forward IronDev desktop app. It uses API/OpenAPI calls and must not reference storage/provider internals.
 - `tools/IronDev.Cli` is the public product CLI. Its current ticket/run commands route through `IronDev.Client`/`IIronDevApiClient`; future product commands must follow the same boundary.
 - `tools/IronDev.ReplayRunner` is internal dogfood/replay infrastructure. It may keep smoke, replay, campaign, benchmark, and diagnostics commands, but they are not public product CLI commands.
 - Direct disk report reads are allowed inside dogfood/internal tooling only. Product clients read run status, report, and events through `/api/runs/{runId}`, `/api/runs/{runId}/report`, and `/api/runs/{runId}/events`. Live run events are persisted through SQL-backed event history; durable resumable workflow state remains a follow-up.

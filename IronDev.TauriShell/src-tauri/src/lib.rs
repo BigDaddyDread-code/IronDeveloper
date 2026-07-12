@@ -4,5 +4,5 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .run(tauri::generate_context!())
-        .expect("error while running IronDev Tauri shell");
+        .expect("error while running IronDev desktop");
 }

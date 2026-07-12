@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 160" role="img" aria-label="IronDev">
+  <g transform="translate(12 12) scale(.265625)">
+    <path fill="#20252b" d="M204 72 72 184v144l132 112 44-52-108-92v-80l108-92-44-52ZM308 72l-44 52 108 92v80l-108 92 44 52 132-112V184L308 72ZM228 92h56v130h-56zM228 290h56v130h-56z"/>
+    <path fill="#d28a2c" d="M228 238h56v36h-56z"/>
+  </g>
+  <text x="168" y="110" fill="#20252b" font-family="Segoe UI, Arial, sans-serif" font-size="86" font-weight="700">IronDev</text>
+</svg>

@@ -112,6 +112,23 @@ test('agents panel resets fields and restores immutable published versions', asy
   await expect(page.getByTestId('flow.settings.agent.builder.notice')).toContainText('restored as new version');
 });
 
+test('settings advanced shows honest product and runtime identity', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockAgentProfiles(page);
+
+  await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
+  await page.getByTestId('flow.nav.settings').click();
+
+  await expect(page.getByTestId('flow.settings.about')).toContainText('IronDev');
+  await expect(page.getByTestId('flow.settings.about')).toContainText('0.5.0');
+  await expect(page.getByTestId('flow.settings.about')).toContainText('Reported: IronDeveloper_Test');
+  await expect(page.getByTestId('flow.settings.about')).toContainText('Worker');
+  await expect(page.getByTestId('flow.settings.about')).toContainText('Not reported');
+  await page.getByTestId('flow.settings.about.diagnostics').click();
+  await expect(page.getByText('IronDev 0.5.0 (development)')).toBeVisible();
+});
+
 interface AgentState {
   lastUpdate: { role: string; body: Record<string, unknown> };
   revision: number;

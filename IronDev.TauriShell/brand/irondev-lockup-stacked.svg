@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 620" role="img" aria-label="IronDev, governed engineering">
+  <g transform="translate(68 26) scale(.75)">
+    <path fill="#20252b" d="M204 72 72 184v144l132 112 44-52-108-92v-80l108-92-44-52ZM308 72l-44 52 108 92v80l-108 92 44 52 132-112V184L308 72ZM228 92h56v130h-56zM228 290h56v130h-56z"/>
+    <path fill="#d28a2c" d="M228 238h56v36h-56z"/>
+  </g>
+  <text x="260" y="500" text-anchor="middle" fill="#20252b" font-family="Segoe UI, Arial, sans-serif" font-size="84" font-weight="700">IronDev</text>
+  <text x="260" y="550" text-anchor="middle" fill="#4a5057" font-family="Segoe UI, Arial, sans-serif" font-size="27">Governed engineering</text>
+</svg>

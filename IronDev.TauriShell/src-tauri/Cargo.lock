@@ -1727,8 +1727,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 
 [[package]]
-name = "irondev-tauri-shell"
-version = "0.1.0"
+name = "irondev-desktop"
+version = "0.5.0"
 dependencies = [
  "serde",
  "serde_json",

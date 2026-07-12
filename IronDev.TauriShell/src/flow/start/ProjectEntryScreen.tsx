@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProjectSummary } from '../../api/types';
+import { IronDevBrand } from '../../components/IronDevBrand';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { ConnectProjectScreen } from './ConnectProjectScreen';
@@ -147,10 +148,7 @@ export function ProjectEntryScreen({
   return (
     <main className="fl-root fl-project-entry" data-testid="flow.chooser">
       <header className="fl-project-entry__header">
-        <div className="fl-brand">
-          <span className="fl-brand-mark">I</span>
-          <span>IronDev</span>
-        </div>
+        <IronDevBrand />
         <div className="fl-userbit">
           <details className="fl-project-health">
             <summary data-testid="flow.projectEntry.health">{healthLabel}</summary>
