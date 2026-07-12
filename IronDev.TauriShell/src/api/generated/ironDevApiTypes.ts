@@ -505,6 +505,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-profiles/{role}/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    role: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SkeletonAgentProfileResetRequest"];
+                    "text/json": components["schemas"]["SkeletonAgentProfileResetRequest"];
+                    "application/*+json": components["schemas"]["SkeletonAgentProfileResetRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                        "application/json": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                        "text/json": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-profiles/{role}/history/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    role: string;
+                    version: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SkeletonAgentProfileRestoreRequest"];
+                    "text/json": components["schemas"]["SkeletonAgentProfileRestoreRequest"];
+                    "application/*+json": components["schemas"]["SkeletonAgentProfileRestoreRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                        "application/json": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                        "text/json": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/agent-runs": {
         parameters: {
             query?: never;
@@ -15198,6 +15289,18 @@ export interface components {
             actorUserId: number;
             /** Format: date-time */
             publishedAtUtc: string;
+        };
+        SkeletonAgentProfileResetRequest: {
+            /** Format: int64 */
+            expectedRevision: number;
+            scope?: string | null;
+            field?: string | null;
+            reason?: string | null;
+        };
+        SkeletonAgentProfileRestoreRequest: {
+            /** Format: int64 */
+            expectedRevision: number;
+            reason?: string | null;
         };
         SkeletonAgentProfileUpdate: {
             provider?: string | null;

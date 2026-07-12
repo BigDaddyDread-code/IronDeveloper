@@ -118,6 +118,39 @@ public sealed class AgentProfilesController : ControllerBase
         return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
     }
 
+    [HttpPost("{role}/reset")]
+    public async Task<ActionResult<SkeletonAgentProfileDraftOutcome>> Reset(
+        string role,
+        [FromBody] SkeletonAgentProfileResetRequest request,
+        CancellationToken ct)
+    {
+        if (!TryParseRole(role, out var parsed))
+            return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
+        var ctx = CurrentUser();
+        if (!await CanAdministerAsync(ct))
+            return Forbid();
+
+        var outcome = await _profiles.ResetAsync(parsed, request, ctx.UserId, ct);
+        return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
+    }
+
+    [HttpPost("{role}/history/{version:long}/restore")]
+    public async Task<ActionResult<SkeletonAgentProfileDraftOutcome>> Restore(
+        string role,
+        long version,
+        [FromBody] SkeletonAgentProfileRestoreRequest request,
+        CancellationToken ct)
+    {
+        if (!TryParseRole(role, out var parsed))
+            return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
+        var ctx = CurrentUser();
+        if (!await CanAdministerAsync(ct))
+            return Forbid();
+
+        var outcome = await _profiles.RestoreAsync(parsed, version, request, ctx.UserId, ct);
+        return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
+    }
+
     [HttpPut("{role}")]
     public async Task<ActionResult<SkeletonAgentProfileOutcome>> Update(
         string role,

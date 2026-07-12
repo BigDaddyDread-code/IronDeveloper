@@ -293,6 +293,29 @@ public sealed record SkeletonAgentProfileDraftTestOutcome
     public string Boundary { get; init; } = SkeletonAgentProfile.BoundaryText;
 }
 
+public static class SkeletonAgentProfileResetScopes
+{
+    public const string Field = "Field";
+    public const string Agent = "Agent";
+    public const string BuiltIn = "BuiltIn";
+    public const string Project = "Project";
+    public const string Tenant = "Tenant";
+}
+
+public sealed record SkeletonAgentProfileResetRequest
+{
+    public required long ExpectedRevision { get; init; }
+    public string Scope { get; init; } = SkeletonAgentProfileResetScopes.Agent;
+    public string Field { get; init; } = string.Empty;
+    public string Reason { get; init; } = string.Empty;
+}
+
+public sealed record SkeletonAgentProfileRestoreRequest
+{
+    public required long ExpectedRevision { get; init; }
+    public string Reason { get; init; } = string.Empty;
+}
+
 public sealed record SkeletonAgentProfileFieldSource
 {
     public required string Field { get; init; }
@@ -341,4 +364,6 @@ public interface ISkeletonAgentProfileService
     Task<SkeletonAgentProfileDraftTestOutcome> TestDraftAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileDraftOutcome> PublishDraftAsync(SkeletonAgentRole role, SkeletonAgentProfilePublishRequest request, int actorUserId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SkeletonAgentProfilePublishedVersion>> ListHistoryAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftOutcome> ResetAsync(SkeletonAgentRole role, SkeletonAgentProfileResetRequest request, int actorUserId, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftOutcome> RestoreAsync(SkeletonAgentRole role, long version, SkeletonAgentProfileRestoreRequest request, int actorUserId, CancellationToken cancellationToken = default);
 }

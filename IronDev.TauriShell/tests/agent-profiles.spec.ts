@@ -93,6 +93,25 @@ test('a secret in a profile is refused and shown honestly', async ({ page }) => 
   await expect(page.getByTestId('flow.settings.agents.error')).toContainText('secret');
 });
 
+test('agents panel resets fields and restores immutable published versions', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockAgentProfiles(page);
+
+  await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
+  await page.getByTestId('flow.nav.settings').click();
+
+  await expect(page.getByTestId('flow.settings.agent.builder.history')).toContainText('v1');
+  await page.getByTestId('flow.settings.agent.builder.recoveryReason').fill('Return to the known baseline');
+  await page.getByTestId('flow.settings.agent.builder.resetField').selectOption('skill');
+  await page.getByTestId('flow.settings.agent.builder.resetFieldAction').click();
+  await expect(page.getByTestId('flow.settings.agent.builder.notice')).toContainText('Reset published');
+
+  await page.getByTestId('flow.settings.agent.builder.recoveryReason').fill('Restore the prior working version');
+  await page.getByTestId('flow.settings.agent.builder.restore.1').click();
+  await expect(page.getByTestId('flow.settings.agent.builder.notice')).toContainText('restored as new version');
+});
+
 interface AgentState {
   lastUpdate: { role: string; body: Record<string, unknown> };
   revision: number;
@@ -238,6 +257,25 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
     state.revision += 1;
     state.publishedVersion += 1;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ succeeded: true, code: '', failureReason: '', currentRevision: state.revision, publishedVersion: { version: state.publishedVersion, role, values: {}, reason: 'test', actorUserId: 7, publishedAtUtc: '2026-07-12T00:03:00Z' }, profile: profile(role) }) });
+  });
+
+  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/history$/i, async (route) => {
+    const role = route.request().url().split('/agent-profiles/')[1].split('/')[0];
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ version: 1, role, values: {}, reason: 'Known working profile', actorUserId: 7, publishedAtUtc: '2026-07-12T00:03:00Z' }]) });
+  });
+
+  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/reset$/i, async (route) => {
+    const role = route.request().url().split('/agent-profiles/')[1].split('/')[0];
+    state.revision += 1;
+    state.publishedVersion += 1;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ succeeded: true, code: '', failureReason: '', currentRevision: state.revision, publishedVersion: { version: state.publishedVersion, role, values: {}, reason: 'reset', actorUserId: 7, publishedAtUtc: '2026-07-12T00:04:00Z' }, profile: profile(role) }) });
+  });
+
+  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/history\/\d+\/restore$/i, async (route) => {
+    const role = route.request().url().split('/agent-profiles/')[1].split('/')[0];
+    state.revision += 1;
+    state.publishedVersion += 1;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ succeeded: true, code: '', failureReason: '', currentRevision: state.revision, publishedVersion: { version: state.publishedVersion, role, values: {}, reason: 'restore', actorUserId: 7, publishedAtUtc: '2026-07-12T00:05:00Z' }, profile: profile(role) }) });
   });
 
   await page.route(/\/api\/v1\/agent-profiles\/[a-z]+$/i, async (route) => {

@@ -1842,6 +1842,18 @@ export interface SkeletonAgentProfileDraftTestOutcome {
   boundary: string;
 }
 
+export interface SkeletonAgentProfileResetRequest {
+  expectedRevision: number;
+  scope: 'Field' | 'Agent' | 'BuiltIn' | 'Project' | 'Tenant';
+  field: string;
+  reason: string;
+}
+
+export interface SkeletonAgentProfileRestoreRequest {
+  expectedRevision: number;
+  reason: string;
+}
+
 export interface AiConnectionMetadata {
   id: string;
   tenantId: number;
