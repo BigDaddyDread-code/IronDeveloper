@@ -1,6 +1,6 @@
 param(
     [string]$ApiBaseUrl = "http://localhost:5000",
-    [int]$ProjectId = 1,
+    [int]$ProjectId = 0,
     [int]$UiPort = 5173,
     [switch]$Reset,
     [switch]$FreshSession,
@@ -10,6 +10,12 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+. (Join-Path $PSScriptRoot "localtest-seed-contract.ps1")
+$seedContract = Get-LocalTestSeedContract
+$baselineProject = $seedContract.projects | Where-Object key -eq "baseline" | Select-Object -First 1
+if ($ProjectId -le 0) {
+    $ProjectId = [int]$baselineProject.id
+}
 $shellRoot = Join-Path $repoRoot "IronDev.TauriShell"
 $apiOut = Join-Path $env:TEMP "irondev-localtest-api.out.log"
 $apiErr = Join-Path $env:TEMP "irondev-localtest-api.err.log"
@@ -220,7 +226,7 @@ function Test-LocalTestAuthenticationContract {
         $login = Invoke-JsonRequest `
             -Method "POST" `
             -Uri "$BaseUrl/api/auth/login" `
-            -Body @{ email = "bob@irondev.local"; password = "change-me-local-only" } `
+            -Body @{ email = $seedContract.credentials.email; password = $seedContract.credentials.password } `
             -TimeoutSeconds $TimeoutSeconds
 
         if ($null -eq $login -or [string]::IsNullOrWhiteSpace($login.token)) {
@@ -374,7 +380,9 @@ Wait-HttpOk -Uri "$ApiBaseUrl/health" -TimeoutSeconds 90
 $login = Test-LocalTestAuthenticationContract -BaseUrl $ApiBaseUrl
 $environment = Get-LocalTestEnvironment -BaseUrl $ApiBaseUrl -Token $login.token
 
-if ($environment.environment -ne "LocalTest" -or $environment.database -notmatch "Test" -or -not $environment.isTestEnvironment) {
+if ($environment.environment -ne $seedContract.environment -or
+    $environment.database -ne $seedContract.database.name -or
+    -not $environment.isTestEnvironment) {
     Stop-Listener -Port $apiPort
     throw "API environment check failed. Refusing to start UI against $($environment.environment)/$($environment.database)."
 }
@@ -391,7 +399,7 @@ Write-Host "  Environment: $($environment.environment)"
 Write-Host "  Database: $($environment.database)"
 Write-Host "  Workspace: $($environment.workspaceRoot)"
 Write-Host "PASS LocalTest authentication contract"
-Write-Host "  Login: bob@irondev.local"
+Write-Host "  Login: $($seedContract.credentials.email)"
 if ($FreshSession) {
     Write-Host "PASS LocalTest fresh client session requested"
     Write-Host "  Clears only: irondev.token, irondev.tenantId, irondev.selectedProjectId"

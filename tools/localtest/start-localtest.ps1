@@ -5,6 +5,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+. (Join-Path $PSScriptRoot "localtest-seed-contract.ps1")
+$seedContract = Get-LocalTestSeedContract
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
     $ConfigPath = Join-Path $repoRoot "IronDev.Api\appsettings.LocalTest.json"
 }
@@ -15,9 +17,11 @@ if (-not (Test-Path $ConfigPath)) {
 
 $config = Get-Content -Path $ConfigPath -Raw | ConvertFrom-Json
 $database = ([System.Data.SqlClient.SqlConnectionStringBuilder]::new($config.ConnectionStrings.IronDeveloperDb)).InitialCatalog
-if ([string]::IsNullOrWhiteSpace($database) -or $database -notmatch "Test") {
-    throw "Refusing to start LocalTest against database '$database'."
-}
+Assert-LocalTestSeedTarget `
+    -Contract $seedContract `
+    -DatabaseName $database `
+    -WorkspaceRoot $config.LocalTest.WorkspaceRoot `
+    -LogsRoot $config.LocalTest.LogsRoot
 
 New-Item -ItemType Directory -Force -Path $config.LocalTest.WorkspaceRoot, $config.LocalTest.LogsRoot | Out-Null
 

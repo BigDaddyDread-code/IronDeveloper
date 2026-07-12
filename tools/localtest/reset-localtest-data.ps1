@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+. (Join-Path $PSScriptRoot "localtest-seed-contract.ps1")
+$seedContract = Get-LocalTestSeedContract
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
     $ConfigPath = Join-Path $repoRoot "IronDev.Api\appsettings.LocalTest.json"
 }
@@ -23,9 +25,6 @@ if ([string]::IsNullOrWhiteSpace($connectionString)) {
 
 $builder = [System.Data.SqlClient.SqlConnectionStringBuilder]::new($connectionString)
 $database = $builder.InitialCatalog
-if ([string]::IsNullOrWhiteSpace($database) -or $database -notmatch "Test") {
-    throw "Refusing to reset database '$database'. LocalTest database name must contain 'Test'."
-}
 
 if ([string]::IsNullOrWhiteSpace($SqlServer)) {
     $SqlServer = $builder.DataSource
@@ -119,13 +118,11 @@ function Resolve-SqlCmdDataSource {
 
 $workspaceRoot = $config.LocalTest.WorkspaceRoot
 $logsRoot = $config.LocalTest.LogsRoot
-if ([string]::IsNullOrWhiteSpace($workspaceRoot) -or $workspaceRoot -notmatch "Test") {
-    throw "Refusing to use workspace root '$workspaceRoot'. LocalTest workspace root must contain 'Test'."
-}
-
-if ([string]::IsNullOrWhiteSpace($logsRoot) -or $logsRoot -notmatch "Test") {
-    throw "Refusing to use logs root '$logsRoot'. LocalTest logs root must contain 'Test'."
-}
+Assert-LocalTestSeedTarget `
+    -Contract $seedContract `
+    -DatabaseName $database `
+    -WorkspaceRoot $workspaceRoot `
+    -LogsRoot $logsRoot
 
 New-Item -ItemType Directory -Force -Path $workspaceRoot, $logsRoot | Out-Null
 
@@ -166,13 +163,20 @@ function Initialize-FixtureGitRepository {
         throw "git add failed for '$Path'."
     }
 
-    & $git.Source -C $Path -c user.email=bob@irondev.local -c user.name="LocalTest Seed" commit -m "Seed LocalTest fixture" -q
+    & $git.Source -C $Path -c "user.email=$($seedContract.credentials.email)" -c user.name="LocalTest Seed" commit -m "Seed LocalTest fixture" -q
     if ($LASTEXITCODE -ne 0) {
         throw "git commit failed for '$Path'."
     }
 }
 
-$localTestProjectPath = Join-Path $workspaceRoot "IronDevLocalTestProject"
+$baselineProject = $seedContract.projects | Where-Object key -eq "baseline" | Select-Object -First 1
+$setupProject = $seedContract.projects | Where-Object key -eq "setup" | Select-Object -First 1
+$bookSellerProject = $seedContract.projects | Where-Object key -eq "bookseller" | Select-Object -First 1
+if ($null -eq $baselineProject -or $null -eq $setupProject -or $null -eq $bookSellerProject) {
+    throw "LocalTest seed contract must define baseline, setup, and bookseller projects."
+}
+
+$localTestProjectPath = Join-Path $workspaceRoot $baselineProject.fixtureDirectory
 Reset-FixtureDirectory -Root $workspaceRoot -Path $localTestProjectPath
 @"
 <Project Sdk="Microsoft.NET.Sdk">
@@ -194,7 +198,7 @@ public static class LocalTestMarker
 
 Initialize-FixtureGitRepository -Path $localTestProjectPath
 
-$setupProjectPath = Join-Path $workspaceRoot "IronDevSetupTestProject"
+$setupProjectPath = Join-Path $workspaceRoot $setupProject.fixtureDirectory
 Reset-FixtureDirectory -Root $workspaceRoot -Path $setupProjectPath
 @"
 <Project Sdk="Microsoft.NET.Sdk">
@@ -216,7 +220,7 @@ public static class SetupMarker
 
 Initialize-FixtureGitRepository -Path $setupProjectPath
 
-$bookSellerPath = Join-Path $workspaceRoot "BookSellerTestFixture"
+$bookSellerPath = Join-Path $workspaceRoot $bookSellerProject.fixtureDirectory
 Reset-FixtureDirectory -Root $workspaceRoot -Path $bookSellerPath
 @"
 <Project Sdk="Microsoft.NET.Sdk">
@@ -420,10 +424,20 @@ GO
 Invoke-SqlFile -DatabaseName $database -Path (Join-Path $PSScriptRoot "localtest-seed.sql")
 Invoke-SqlFile -DatabaseName $database -Path (Join-Path $repoRoot "Database\migrate_work_item_identity.sql")
 
+$validationPath = Join-Path ([System.IO.Path]::GetTempPath()) ("irondev-localtest-seed-contract-" + [Guid]::NewGuid().ToString("N") + ".sql")
+try {
+    New-LocalTestSeedValidationSql -Contract $seedContract -WorkspaceRoot $workspaceRoot |
+        Set-Content -LiteralPath $validationPath -Encoding UTF8
+    Invoke-SqlFile -DatabaseName $database -Path $validationPath
+}
+finally {
+    Remove-Item -LiteralPath $validationPath -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "LocalTest reset complete."
 Write-Host "Database: $database"
 Write-Host "Workspace root: $workspaceRoot"
 Write-Host "Logs root: $logsRoot"
-Write-Host "Ready fixture: IronDev Local Test Project"
-Write-Host "Setup fixture: IronDev Setup Test Project"
-Write-Host "Login: bob@irondev.local / change-me-local-only"
+Write-Host "Ready fixture: $($baselineProject.name)"
+Write-Host "Setup fixture: $($setupProject.name)"
+Write-Host "Login: $($seedContract.credentials.email) / $($seedContract.credentials.password)"

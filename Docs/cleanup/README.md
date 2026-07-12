@@ -10,5 +10,6 @@ This directory owns active cleanup inventories and remediation maps. Start with:
 - [Documentation Structure](DOCUMENTATION_STRUCTURE.md)
 - [Terminology Deprecation Map](TERMINOLOGY_DEPRECATION_MAP.md)
 - [Test Reliability Inventory](TEST_RELIABILITY_INVENTORY.md)
+- [LocalTest Test Data And Seed Contract](../testing/LOCALTEST_SEED_CONTRACT.md)
 
 Cleanup documents may classify and schedule behavior changes. They do not themselves grant runtime authority.

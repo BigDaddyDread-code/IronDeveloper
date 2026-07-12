@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "environment": "LocalTest",
+  "productionEnabled": false,
+  "resetAllowed": true,
+  "database": {
+    "name": "IronDeveloper_Test",
+    "requiredNamePattern": "_Test$"
+  },
+  "paths": {
+    "workspaceRoot": "C:\\IronDevTestWorkspaces",
+    "logsRoot": "C:\\IronDevTestLogs"
+  },
+  "credentials": {
+    "email": "bob@irondev.local",
+    "password": "change-me-local-only",
+    "scope": "LocalTest only"
+  },
+  "tenant": {
+    "id": 1,
+    "name": "Local Test Tenant",
+    "slug": "local-test"
+  },
+  "users": [
+    {
+      "id": 1,
+      "email": "bob@irondev.local",
+      "displayName": "Bob Developer",
+      "tenantRole": "Owner"
+    }
+  ],
+  "projects": [
+    {
+      "key": "baseline",
+      "id": 1,
+      "name": "IronDev Local Test Project",
+      "fixtureDirectory": "IronDevLocalTestProject",
+      "purpose": "Tiny deterministic baseline required for every PR manual test."
+    },
+    {
+      "key": "bookseller",
+      "id": 2,
+      "name": "BookSeller Test Fixture",
+      "fixtureDirectory": "BookSellerTestFixture",
+      "purpose": "Realistic provisioning, build, review, and apply journey."
+    },
+    {
+      "key": "setup",
+      "id": 3,
+      "name": "IronDev Setup Test Project",
+      "fixtureDirectory": "IronDevSetupTestProject",
+      "purpose": "Guided setup and refusal-state fixture."
+    }
+  ],
+  "seededTickets": [
+    { "id": 3001, "projectId": 1, "title": "Add Governed Tool Architecture", "status": "Ready" },
+    { "id": 3002, "projectId": 1, "title": "Wire Start Sandbox Run", "status": "In Review" },
+    { "id": 3003, "projectId": 1, "title": "Improve Ticket Workspace UI", "status": "Draft" },
+    { "id": 3101, "projectId": 2, "title": "Add Search By Author", "status": "Ready" }
+  ],
+  "seededRuns": [
+    {
+      "runId": "localtest-run-ticket-3002",
+      "projectId": 1,
+      "ticketId": 3002,
+      "state": "Completed",
+      "isDisposable": true
+    }
+  ],
+  "knownArtifacts": [
+    { "kind": "ProjectChannel", "id": 101, "projectId": 1, "label": "General" },
+    { "kind": "ProjectChannel", "id": 102, "projectId": 1, "label": "Product planning" },
+    { "kind": "ProjectChannel", "id": 103, "projectId": 2, "label": "General" },
+    { "kind": "ProjectChannelMessage", "id": 10001, "projectId": 1, "label": "Baseline general message" },
+    { "kind": "ProjectChannelMessage", "id": 10002, "projectId": 1, "label": "Baseline product message" },
+    { "kind": "ProjectChannelMessage", "id": 10003, "projectId": 2, "label": "BookSeller general message" },
+    { "kind": "ProjectChatSession", "id": 4001, "projectId": 1, "label": "LocalTest cockpit planning" },
+    { "kind": "ProjectChatSession", "id": 4002, "projectId": 2, "label": "BookSeller fixture planning" },
+    { "kind": "ChatMessage", "id": 5001, "projectId": 1, "label": "Baseline source message" },
+    { "kind": "ChatMessage", "id": 5002, "projectId": 2, "label": "BookSeller source message" },
+    { "kind": "ProjectDocument", "id": 1001, "projectId": 1, "label": "Workspace Manual Test Notes" },
+    { "kind": "ProjectDocument", "id": 1002, "projectId": 1, "label": "Code Standards Draft" },
+    { "kind": "ProjectDocument", "id": 1003, "projectId": 1, "label": "Testing Companion Direction" },
+    { "kind": "ProjectDocumentVersion", "id": 2001, "label": "Workspace Manual Test Notes v0.1" },
+    { "kind": "ProjectDocumentVersion", "id": 2002, "label": "Code Standards Draft v0.1" },
+    { "kind": "ProjectDocumentVersion", "id": 2003, "label": "Testing Companion Direction v0.1" }
+  ]
+}

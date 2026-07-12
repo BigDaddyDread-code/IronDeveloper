@@ -1,12 +1,17 @@
 param(
     [string]$ApiBaseUrl = "http://localhost:5000",
-    [int]$ProjectId = 1,
+    [int]$ProjectId = 0,
     [switch]$BrowserOnly
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+. (Join-Path $PSScriptRoot "localtest-seed-contract.ps1")
+$seedContract = Get-LocalTestSeedContract
+if ($ProjectId -le 0) {
+    $ProjectId = [int](($seedContract.projects | Where-Object key -eq "baseline" | Select-Object -First 1).id)
+}
 $shellRoot = Join-Path $repoRoot "IronDev.TauriShell"
 
 if (-not (Test-Path $shellRoot)) {
