@@ -150,7 +150,7 @@ public sealed class TesterCriterionCoverageContractTests
             .ToArray();
 
         CollectionAssert.AreEquivalent(
-            new[] { "AcceptanceCriteria", "Problem", "ProjectId", "TicketId", "TicketTitle" },
+            new[] { "AcceptanceCriteria", "Problem", "ProjectId", "TenantId", "TicketId", "TicketTitle" },
             properties);
 
         foreach (var forbidden in new[]

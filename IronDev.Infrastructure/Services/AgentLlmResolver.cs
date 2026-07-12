@@ -1,5 +1,6 @@
 using IronDev.Core;
 using IronDev.Core.Agents;
+using IronDev.Core.AiConnections;
 using IronDev.Core.Models;
 using Microsoft.Extensions.Configuration;
 
@@ -15,11 +16,25 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
 {
     private readonly ISkeletonAgentProfileService _profiles;
     private readonly IConfiguration _configuration;
+    private readonly IAiConnectionCatalogService? _connections;
+    private readonly IAiConnectionCredentialStore? _credentials;
 
     public AgentLlmResolver(ISkeletonAgentProfileService profiles, IConfiguration configuration)
     {
         _profiles = profiles;
         _configuration = configuration;
+    }
+
+    public AgentLlmResolver(
+        ISkeletonAgentProfileService profiles,
+        IConfiguration configuration,
+        IAiConnectionCatalogService connections,
+        IAiConnectionCredentialStore credentials)
+    {
+        _profiles = profiles;
+        _configuration = configuration;
+        _connections = connections;
+        _credentials = credentials;
     }
 
     public async Task<SkeletonAgentLlm> ResolveAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default)
@@ -54,6 +69,60 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
             ApiKey = global.ApiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
         };
 
+        return Create(role, options);
+    }
+
+    public async Task<SkeletonAgentLlm> ResolveAsync(
+        SkeletonAgentRole role,
+        int tenantId,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        if (IsDeterministicAlphaSmoke())
+        {
+            return new SkeletonAgentLlm
+            {
+                Role = role,
+                Llm = new DeterministicAlphaSmokeLlmService(role, _configuration),
+                Provider = DeterministicAlphaSmokeLlmService.ProviderName,
+                Model = $"deterministic-{role.ToString().ToLowerInvariant()}"
+            };
+        }
+        if (tenantId <= 0 || projectId <= 0)
+            throw new InvalidOperationException("A governed project run requires tenant and project identity before resolving an agent model.");
+
+        var profile = (await _profiles.ListEffectiveAsync(tenantId, projectId, cancellationToken).ConfigureAwait(false))
+            .Single(item => item.Role == role);
+        var global = _configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
+        var provider = profile.Provider.Trim();
+        var baseUrl = global.BaseUrl;
+        var apiKey = global.ApiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
+        if (_connections is not null && _credentials is not null)
+        {
+            var connection = (await _connections.ListAsync(tenantId, userId: 0, cancellationToken).ConfigureAwait(false))
+                .FirstOrDefault(item => string.Equals(item.Id, profile.AiConnectionId, StringComparison.OrdinalIgnoreCase));
+            if (connection is null || !connection.Enabled || !connection.TenantAvailable || !connection.ProjectAvailable)
+                throw new InvalidOperationException($"The effective {role} AI connection '{profile.AiConnectionId}' is not enabled and available for this project.");
+            provider = connection.ProviderKind.Trim();
+            if (Uri.TryCreate(connection.ControlledEndpoint, UriKind.Absolute, out var endpoint) && endpoint.Scheme is "http" or "https")
+                baseUrl = endpoint.ToString().TrimEnd('/');
+            apiKey = await _credentials.GetCredentialForUseAsync(tenantId, connection.Id, cancellationToken).ConfigureAwait(false) ?? apiKey;
+        }
+
+        return Create(role, new LlmOptions
+        {
+            Provider = provider,
+            Model = profile.Model,
+            BaseUrl = baseUrl,
+            TimeoutSeconds = profile.TimeoutSeconds > 0 ? profile.TimeoutSeconds : global.TimeoutSeconds,
+            ApiKey = apiKey
+        });
+    }
+
+    private static SkeletonAgentLlm Create(SkeletonAgentRole role, LlmOptions options)
+    {
+        var provider = options.Provider?.Trim() ?? string.Empty;
         // Fail closed: a typo or hostile profile edit must NOT silently become a
         // fake or unknown model. Only explicit, known providers resolve.
         ILLMService llm = provider.ToLowerInvariant() switch
@@ -73,8 +142,8 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
         {
             Role = role,
             Llm = llm,
-            Provider = options.Provider,
-            Model = options.Model
+            Provider = provider,
+            Model = options.Model ?? string.Empty
         };
     }
 

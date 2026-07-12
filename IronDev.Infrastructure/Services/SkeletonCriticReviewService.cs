@@ -116,8 +116,9 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
         // input is still blind by contract (the package + ground truth only), and
         // the code-owned prompt body always wins over the profile. A skill.md
         // cannot hand the critic the builder's reasoning.
-        var agent = await _llmResolver.ResolveAsync(SkeletonAgentRole.Critic, cancellationToken).ConfigureAwait(false);
-        var profile = await _profiles.GetAsync(SkeletonAgentRole.Critic, cancellationToken).ConfigureAwait(false);
+        var agent = await _llmResolver.ResolveAsync(SkeletonAgentRole.Critic, ticket.TenantId, request.ProjectId, cancellationToken).ConfigureAwait(false);
+        var profile = (await _profiles.ListEffectiveAsync(ticket.TenantId, request.ProjectId, cancellationToken).ConfigureAwait(false))
+            .Single(item => item.Role == SkeletonAgentRole.Critic);
         var prompt = SkeletonAgentPromptComposer.Compose(profile, BuildPrompt(package, verification));
 
         string response;

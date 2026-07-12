@@ -12,6 +12,7 @@ namespace IronDev.Core.Builder;
 /// </summary>
 public sealed record SkeletonTestAuthoringRequest
 {
+    public int TenantId { get; init; }
     public required long TicketId { get; init; }
     public required int ProjectId { get; init; }
     public required string TicketTitle { get; init; }
