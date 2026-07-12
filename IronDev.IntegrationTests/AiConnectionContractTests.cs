@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Net;
 using IronDev.Api.Services;
 using IronDev.Core.AiConnections;
 using IronDev.Infrastructure.Services;
@@ -124,6 +125,72 @@ public sealed class AiConnectionContractTests
     }
 
     [TestMethod]
+    public async Task ConnectionTest_UsesProtectedCredentialInternallyAndPersistsOnlyNonSecretHealth()
+    {
+        const string secret = "provider-test-secret";
+        var temp = Directory.CreateTempSubdirectory("irondev-ai-test-");
+        try
+        {
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Ai:Provider"] = "openai",
+                ["Ai:Model"] = "gpt-4o",
+                ["Ai:BaseUrl"] = "https://controlled.test",
+                ["AiConnections:CredentialStorePath"] = Path.Combine(temp.FullName, "credentials"),
+                ["AiConnections:HealthStorePath"] = Path.Combine(temp.FullName, "health")
+            }).Build();
+            var credentials = new FileSystemAiConnectionCredentialStore(configuration, DataProtectionProvider.Create(Path.Combine(temp.FullName, "keys")));
+            await credentials.StoreAsync(3, "deployment-default", secret, 7, "test", CancellationToken.None);
+            var health = new FileSystemAiConnectionTestHealthStore(configuration);
+            var catalog = new AiConnectionCatalogService(configuration, _ => null, credentials, health);
+            var handler = new RecordingHandler(HttpStatusCode.OK);
+            var service = new AiConnectionTestService(catalog, credentials, health, configuration, new HttpClient(handler), _ => null);
+
+            var outcome = await service.TestAsync(3, 7, "deployment-default");
+
+            Assert.IsTrue(outcome.Succeeded, outcome.FailureReason);
+            Assert.AreEqual("Passed", outcome.Status);
+            Assert.AreEqual("https://controlled.test/v1/models", handler.RequestUri?.ToString());
+            Assert.AreEqual("Bearer", handler.AuthorizationScheme);
+            Assert.AreEqual(secret, handler.AuthorizationParameter, "The protected credential is available only at the provider-use boundary.");
+            Assert.IsNotNull(outcome.Connection?.LastSuccessfulTestUtc);
+            var serialized = JsonSerializer.Serialize(outcome) + ReadAllStoreText(Path.Combine(temp.FullName, "health"));
+            Assert.IsFalse(serialized.Contains(secret, StringComparison.Ordinal), "Credential material must not enter outcomes or durable health.");
+        }
+        finally { temp.Delete(recursive: true); }
+    }
+
+    [TestMethod]
+    public async Task ConnectionTest_MissingRequiredCredentialFailsWithoutCallingTheProvider()
+    {
+        var temp = Directory.CreateTempSubdirectory("irondev-ai-test-missing-");
+        try
+        {
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Ai:Provider"] = "openai",
+                ["Ai:Model"] = "gpt-4o",
+                ["Ai:BaseUrl"] = "https://controlled.test",
+                ["AiConnections:CredentialStorePath"] = Path.Combine(temp.FullName, "credentials"),
+                ["AiConnections:HealthStorePath"] = Path.Combine(temp.FullName, "health")
+            }).Build();
+            var credentials = new FileSystemAiConnectionCredentialStore(configuration, DataProtectionProvider.Create(Path.Combine(temp.FullName, "keys")));
+            var health = new FileSystemAiConnectionTestHealthStore(configuration);
+            var catalog = new AiConnectionCatalogService(configuration, _ => null, credentials, health);
+            var handler = new RecordingHandler(HttpStatusCode.OK);
+            var service = new AiConnectionTestService(catalog, credentials, health, configuration, new HttpClient(handler), _ => null);
+
+            var outcome = await service.TestAsync(3, 7, "deployment-default");
+
+            Assert.IsFalse(outcome.Succeeded);
+            Assert.AreEqual("MissingCredential", outcome.Status);
+            Assert.AreEqual(0, handler.CallCount);
+            Assert.IsNotNull(outcome.Connection?.LastFailedTestUtc);
+        }
+        finally { temp.Delete(recursive: true); }
+    }
+
+    [TestMethod]
     public void AiConnectionsController_IsTenantScopedMetadataWithAdminCredentialWrites()
     {
         var source = File.ReadAllText(RepositoryFile("IronDev.Api", "Controllers", "AiConnectionsController.cs"));
@@ -132,6 +199,7 @@ public sealed class AiConnectionContractTests
         StringAssert.Contains(source, "HttpGet");
         StringAssert.Contains(source, "HttpPut(\"{connectionId}/credential\")");
         StringAssert.Contains(source, "HttpPost(\"{connectionId}/credential/revoke\")");
+        StringAssert.Contains(source, "HttpPost(\"{connectionId}/test\")");
         StringAssert.Contains(source, "CurrentUserContext");
         StringAssert.Contains(source, "TenantId");
         StringAssert.Contains(source, "SensitiveApiPolicy");
@@ -168,5 +236,22 @@ public sealed class AiConnectionContractTests
 
         Assert.IsNotNull(root, "Repository root not found.");
         return Path.Combine(root!, Path.Combine(parts));
+    }
+
+    private sealed class RecordingHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    {
+        public int CallCount { get; private set; }
+        public Uri? RequestUri { get; private set; }
+        public string? AuthorizationScheme { get; private set; }
+        public string? AuthorizationParameter { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            CallCount++;
+            RequestUri = request.RequestUri;
+            AuthorizationScheme = request.Headers.Authorization?.Scheme;
+            AuthorizationParameter = request.Headers.Authorization?.Parameter;
+            return Task.FromResult(new HttpResponseMessage(statusCode));
+        }
     }
 }

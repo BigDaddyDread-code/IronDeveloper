@@ -5,6 +5,7 @@ import type {
   AiConnectionCredentialRevokeRequest,
   AiConnectionCredentialWriteRequest,
   AiConnectionMetadata,
+  AiConnectionTestOutcome,
   ApiConnectionStatus,
   ApiStatus,
   AuditLedgerQuery,
@@ -1190,6 +1191,13 @@ class IronDevApiClient {
         signal
       }
     );
+  }
+
+  async testAiConnection(connectionId: string, signal?: AbortSignal): Promise<AiConnectionTestOutcome> {
+    return this.request<AiConnectionTestOutcome>(`/api/v1/ai-connections/${encodeURIComponent(connectionId)}/test`, {
+      method: 'POST',
+      signal
+    });
   }
 
   async revokeAiConnectionCredential(

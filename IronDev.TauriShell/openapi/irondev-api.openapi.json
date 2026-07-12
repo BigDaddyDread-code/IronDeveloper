@@ -1909,6 +1909,45 @@
         }
       }
     },
+    "/api/v1/ai-connections/{connectionId}/test": {
+      "post": {
+        "tags": [
+          "AiConnections"
+        ],
+        "parameters": [
+          {
+            "name": "connectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConnectionTestOutcome"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConnectionTestOutcome"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConnectionTestOutcome"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workflow/apply-preview/{workflowRunId}/{workflowStepId}": {
       "get": {
         "tags": [
@@ -16862,6 +16901,45 @@
           "version": {
             "type": "string",
             "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AiConnectionTestOutcome": {
+        "required": [
+          "boundary",
+          "status",
+          "succeeded",
+          "testedAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "succeeded": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "httpStatusCode": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "testedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "connection": {
+            "$ref": "#/components/schemas/AiConnectionMetadata"
           },
           "boundary": {
             "type": "string",

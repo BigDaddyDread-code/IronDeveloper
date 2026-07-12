@@ -1942,6 +1942,16 @@ export interface AiConnectionCredentialMutationOutcome {
   boundary: string;
 }
 
+export interface AiConnectionTestOutcome {
+  succeeded: boolean;
+  status: string;
+  failureReason?: string | null;
+  httpStatusCode?: number | null;
+  testedAtUtc: string;
+  connection?: AiConnectionMetadata | null;
+  boundary: string;
+}
+
 export interface ProvisioningCheckUi {
   code: string;
   name: string;

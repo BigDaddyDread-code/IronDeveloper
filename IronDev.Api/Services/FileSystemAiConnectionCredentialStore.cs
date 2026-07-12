@@ -68,6 +68,23 @@ public sealed class FileSystemAiConnectionCredentialStore : IAiConnectionCredent
         };
     }
 
+    public async Task<string?> GetCredentialForUseAsync(
+        int tenantId,
+        string connectionId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var path = PathFor(tenantId, connectionId);
+        if (!File.Exists(path))
+            return null;
+        await using var stream = File.OpenRead(path);
+        var envelope = await JsonSerializer.DeserializeAsync<CredentialEnvelope>(stream, JsonOptions, cancellationToken)
+            .ConfigureAwait(false);
+        return envelope is { CredentialConfigured: true, ProtectedCredential: not null }
+            ? _protector.Unprotect(envelope.ProtectedCredential)
+            : null;
+    }
+
     public Task StoreAsync(
         int tenantId,
         string connectionId,
