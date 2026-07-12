@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { routeForId } from '../../app/routes';
-import { governanceViewers, viewerForPath } from './governanceRoutes';
+import { viewerForPath, type GovernanceViewerEntry } from './governanceRoutes';
 import { GovernanceOverview } from './GovernanceOverview';
-import type { GovernanceSection } from '../navigation/productRoutes';
+import { governancePath, libraryPath, navigateProductPath, projectPath, type GovernanceSection } from '../navigation/productRoutes';
 
 // Hosts the 17 read-only governance viewers inside the Library surface at their
 // original URLs, so deep links and existing tests keep working. Pathname is real
@@ -23,11 +23,6 @@ export function GovernanceHost({ projectId, section = 'overview', preserveCompat
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  const navigate = useCallback((path: string) => {
-    window.history.pushState(null, '', path);
-    setPathname(path);
-  }, []);
-
   const active = viewerForPath(pathname);
   const ActiveViewer = active.component;
   const governanceRoute = routeForId('governance');
@@ -38,25 +33,46 @@ export function GovernanceHost({ projectId, section = 'overview', preserveCompat
 
   return (
     <div data-testid="flow.governanceHost">
-      {/* Viewer switchers are links, not buttons: they navigate to read-only URLs and
-          must never read as action controls on evidence surfaces. */}
-      <div className="fl-chips" style={{ marginBottom: 14 }}>
-        {governanceViewers.map((entry) => (
+      <aside className="fl-governance-compatibility" data-testid="flow.governance.compatibilityNotice">
+        <div>
+          <p className="fl-plabel">Legacy evidence view</p>
+          <strong>{active.label}</strong>
+          <span>This direct link remains available for read-only evidence inspection.</span>
+        </div>
+        <nav aria-label="Evidence viewer destinations">
           <a
-            key={entry.id}
-            className={entry.id === active.id ? 'fl-chip fl-ok' : 'fl-chip'}
-            style={{ cursor: 'pointer', textDecoration: 'none', background: entry.id === active.id ? undefined : 'transparent' }}
-            href={entry.entryPath}
+            href={governancePath(projectId)}
             onClick={(event) => {
               event.preventDefault();
-              navigate(entry.entryPath);
+              navigateProductPath(governancePath(projectId));
             }}
           >
-            {entry.label}
+            Back to Governance
           </a>
-        ))}
-      </div>
+          <a
+            href={canonicalDestination(active, projectId)}
+            onClick={(event) => {
+              event.preventDefault();
+              navigateProductPath(canonicalDestination(active, projectId));
+            }}
+          >
+            Open canonical surface
+          </a>
+        </nav>
+      </aside>
       <ActiveViewer key={active.id} route={governanceRoute} onRouteReady={() => undefined} />
     </div>
   );
+}
+
+function canonicalDestination(viewer: GovernanceViewerEntry, projectId: number) {
+  if (viewer.canonicalOwner === 'board') return projectPath(projectId, 'board');
+  if (viewer.canonicalOwner === 'audit') return libraryPath(projectId, 'audit');
+  if (viewer.canonicalOwner === 'governance') {
+    return governancePath(projectId, viewer.id === 'accepted-approvals' ? 'decisions' : 'controls');
+  }
+  if (viewer.canonicalOwner === 'library' || viewer.canonicalOwner === 'developerEvidence' || viewer.canonicalOwner === 'release') {
+    return governancePath(projectId, 'technical');
+  }
+  return governancePath(projectId);
 }

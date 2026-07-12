@@ -58,7 +58,7 @@ test('UiAuthorityFirewall_detects_claims_after_allowed_negative_boundary_text', 
 });
 
 test('UiAuthorityFirewall_scans_expected_governance_evidence_ui_files', async () => {
-  expect(UiAuthorityFirewall.governanceEvidenceUiFileAllowList).toHaveLength(16);
+  expect(UiAuthorityFirewall.governanceEvidenceUiFileAllowList).toHaveLength(18);
 
   for (const file of UiAuthorityFirewall.governanceEvidenceUiFileAllowList) {
     expect(existsSync(join(process.cwd(), file)), `${file} should exist`).toBe(true);

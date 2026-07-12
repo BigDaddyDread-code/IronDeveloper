@@ -112,6 +112,11 @@ test('technical evidence groups compatibility viewers and preserves their deep l
   await page.getByRole('button', { name: 'Governance timeline Audit technical traces' }).click();
   await expect(page).toHaveURL('/governance/timeline');
   await expect(page.getByTestId('flow.governanceHost')).toBeVisible();
+  await expect(page.getByTestId('flow.governance.compatibilityNotice')).toContainText('Legacy evidence view');
+  await expect(page.locator('.fl-chips')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Back to Governance' }).click();
+  await expect(page).toHaveURL('/projects/7/library/governance');
+  await expect(page.getByTestId('flow.governance.overview')).toBeVisible();
 });
 
 async function prepareSelectedProject(page: Page) {

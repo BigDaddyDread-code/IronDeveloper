@@ -55,8 +55,9 @@ test.describe('LocalTest manual flow-shell smoke', () => {
 
     await page.getByTestId('flow.nav.library').click();
     await page.getByTestId('flow.library.governance').click();
-    await expect(page.getByTestId('flow.governanceHost')).toBeVisible();
-    notes.push('Library hosts the governance viewers.');
+    await expect(page.getByTestId('flow.governance.overview')).toBeVisible();
+    await expect(page.getByTestId('flow.governance.boundary')).toContainText('grants no approval');
+    notes.push('Library opens the project Governance overview from backend truth.');
 
     const bodyText = await page.locator('body').innerText();
     expect(bodyText).not.toMatch(/\bfake\b/i);
