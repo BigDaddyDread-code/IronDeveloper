@@ -310,6 +310,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_project_collaboration.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_versioned_collaboration_writes.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_work_item_identity.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_user_mutation_attribution.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -572,6 +573,14 @@ public abstract class ApiTestBase
             IF OBJECT_ID('governance.TR_DogfoodReceipt_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_DogfoodReceipt_BlockUpdateDelete ON governance.DogfoodReceipt;
             IF OBJECT_ID('governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete', 'TR') IS NOT NULL ENABLE TRIGGER governance.TR_ThoughtLedgerGovernanceEventReference_BlockUpdateDelete ON governance.ThoughtLedgerGovernanceEventReference;
             IF OBJECT_ID('governance.ToolRequest', 'U') IS NOT NULL DELETE FROM governance.ToolRequest;
+            IF OBJECT_ID('dbo.UserMutationAttribution', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_UserMutationAttribution_BlockUpdateDelete', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_UserMutationAttribution_BlockUpdateDelete ON dbo.UserMutationAttribution;
+                DELETE FROM dbo.UserMutationAttribution;
+                IF OBJECT_ID('dbo.TR_UserMutationAttribution_BlockUpdateDelete', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_UserMutationAttribution_BlockUpdateDelete ON dbo.UserMutationAttribution;
+            END;
             IF OBJECT_ID('dbo.ChatMessageFeedback', 'U') IS NOT NULL DELETE FROM dbo.ChatMessageFeedback;
             IF OBJECT_ID('dbo.ChatTurnClarifications', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnClarifications;
             IF OBJECT_ID('dbo.ChatTurnGovernance', 'U') IS NOT NULL DELETE FROM dbo.ChatTurnGovernance;

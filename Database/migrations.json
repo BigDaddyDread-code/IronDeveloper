@@ -164,6 +164,11 @@
                            "id":  "2026-07-v25-work-item-identity",
                            "path":  "Database/migrate_work_item_identity.sql",
                            "description":  "Creates durable Work Item identity and versioned contract tables while preserving ticket-backed route compatibility."
+                       },
+                       {
+                           "id":  "2026-07-cln-12-user-mutation-attribution",
+                           "path":  "Database/migrate_user_mutation_attribution.sql",
+                           "description":  "Creates the append-only attribution ledger for authenticated user mutations, including actor, scope, trace, timestamp, and source client."
                        }
                    ]
 }

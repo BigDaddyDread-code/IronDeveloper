@@ -346,6 +346,32 @@ public sealed class SqlAuditLedgerReadService : IAuditLedgerReadService
             LEFT JOIN dbo.Users actorUser ON actorUser.Id = pm.RemovedByUserId
             LEFT JOIN dbo.Users targetUser ON targetUser.Id = pm.UserId
             WHERE pm.RemovedUtc IS NOT NULL
+
+            UNION ALL
+
+            SELECT
+                CONCAT(N'user-mutation:', CONVERT(nvarchar(30), mutation.Id)) AS LedgerId,
+                mutation.TimestampUtc AS TimeUtc,
+                mutation.TenantId,
+                TRY_CONVERT(int, mutation.ProjectId) AS ProjectId,
+                p.Name AS ProjectName,
+                NULL AS WorkItemId,
+                NULL AS WorkItemTitle,
+                N'UserMutation' AS Source,
+                CONVERT(nvarchar(30), mutation.ActorUserId) AS ActorId,
+                COALESCE(actorUser.DisplayName, CONVERT(nvarchar(30), mutation.ActorUserId)) AS ActorDisplayName,
+                CONCAT(mutation.Method, N' ', mutation.Route) AS Action,
+                mutation.Phase AS Outcome,
+                CONCAT(mutation.SourceSurface, N' via ', mutation.SourceClient, N' returned ', CONVERT(nvarchar(10), mutation.StatusCode), N'.') AS Summary,
+                mutation.CorrelationId,
+                NULL AS EvidenceHref,
+                NULL AS EvidenceLabel
+            FROM dbo.UserMutationAttribution mutation
+            INNER JOIN dbo.Projects p
+                ON p.Id = TRY_CONVERT(int, mutation.ProjectId)
+                AND p.TenantId = mutation.TenantId
+            LEFT JOIN dbo.Users actorUser ON actorUser.Id = mutation.ActorUserId
+            WHERE mutation.Phase <> N'Attempted'
         )
         SELECT TOP (@Take)
             l.LedgerId,
