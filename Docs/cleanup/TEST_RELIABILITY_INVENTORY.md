@@ -72,8 +72,8 @@ Counts are discovery evidence from `dotnet test --list-tests` and `npx playwrigh
 | `approval-package-review.spec.ts` | 40 | UX component / Playwright mock | Governance UI | None | Mock package evidence | No known failure; unowned | Critical review non-authority |
 | `batch-run.spec.ts` | 2 | Playwright mock | Legacy batch UI | None | Mock batch APIs | No known failure; unowned | Low compatibility surface |
 | `board-ux.spec.ts` | 4 | Playwright mock | Board | `frontend-behavior-ci` | Mock board/readiness | Stable | High backend-truth projection |
-| `chat-conversation-first.spec.ts` | 13 | Playwright mock | Workshop | `frontend-behavior-ci` | Deferred mock completion | One missed transient `chat.sending` assertion on PR #825; rerun passed | High conversation workflow |
-| `chat-session-navigation.spec.ts` | 18 | Playwright mock | Workshop | `frontend-behavior-ci` | Mock channels/sessions/unread | One unread badge clear timeout on PR #825; rerun passed | High collaboration state |
+| `chat-conversation-first.spec.ts` | 13 | Playwright mock | Workshop | `frontend-behavior-ci` | Explicitly gated mock completion | CLN-09 replaced a fixed delay with request/release synchronization; 10 repeated parallel passes | High conversation workflow |
+| `chat-session-navigation.spec.ts` | 18 | Playwright mock | Workshop | `frontend-behavior-ci` | Explicitly gated channels/sessions/unread | CLN-09 holds the read response until pre-response state is asserted; 10 repeated parallel passes | High collaboration state |
 | `chat-ticket-draft-review.spec.ts` | 5 | Playwright mock | Workshop | `frontend-behavior-ci` | Mock draft/session | Stable | High discussion-to-work boundary |
 | `chat-visual-smoke.spec.ts` | 2 | UX component / Playwright mock | Workshop | Manual visual command | Mock session | No known failure; not CI-owned | Medium visual layout |
 | `dogfood-receipt-viewer.spec.ts` | 45 | Dogfood / Playwright mock | Dogfood UI | None | Mock receipts | No known failure; unowned | Medium evidence presentation |
@@ -90,7 +90,7 @@ Counts are discovery evidence from `dotnet test --list-tests` and `npx playwrigh
 | `patch-package-viewer.spec.ts` | 41 | UX component / Playwright mock | Apply UI | None | Mock package | No known failure; unowned | Critical package review |
 | `policy-satisfaction-panel.spec.ts` | 25 | UX component / Playwright mock | Governance UI | None | Mock policy records | No known failure; unowned | Critical policy-evidence boundary |
 | `product-identity.spec.ts` | 2 | Playwright mock | Product shell | `frontend-behavior-ci` | Static product state | Stable | Medium product truth language |
-| `project-entry.spec.ts` | 11 | Playwright mock | Entry/project chooser | `frontend-behavior-ci` | Mock projects/readiness | One missing chooser timeout on PR #828; local 11/11 and rerun passed | Critical entry journey |
+| `project-entry.spec.ts` | 11 | Playwright mock | Entry/project chooser | `frontend-behavior-ci` | Explicitly gated project-list response | CLN-09 synchronizes on an observed request and durable chooser render; 10 repeated parallel passes | Critical entry journey |
 | `project-routing.spec.ts` | 9 | Playwright mock | Product routing | `frontend-behavior-ci` | Mock session/project | Stable | Critical canonical route behavior |
 | `project-setup.spec.ts` | 12 | Playwright mock | Provisioning | `frontend-behavior-ci` | Mock readiness/actions | Stable | High readiness truth |
 | `release-readiness-evidence-panel.spec.ts` | 34 | UX component / Playwright mock | Release UI | None | Mock release evidence | No known failure; unowned | Critical evidence-not-approval |
@@ -111,13 +111,13 @@ Counts are discovery evidence from `dotnet test --list-tests` and `npx playwrigh
 
 | Finding | Severity | Evidence | Owner | Next slice |
 | --- | --- | --- | --- | --- |
-| `TEST-REL-01` 589 Playwright cases have no GitHub execution lane | P2 | 747 discovered minus 158 bounded cases | Test platform and product client | CLN-09 assigns critical authority files or records deliberate retirement scope. |
-| `TEST-REL-02` integration ownership is filter-based, not exhaustive | P2 | 14,748 discovered cases; CI map owns named/category subsets | Test platform | CLN-09 adds executable inventory checks before broad lane expansion. |
-| `TEST-REL-03` three current-product tests have one observed timing failure each | P2 | PR #825 sending/unread; PR #828 project chooser; unchanged reruns passed | Product client | CLN-09 removes transient-state and asynchronous-render races without adding retries. |
+| `TEST-REL-01` 589 Playwright cases have no GitHub execution lane | P2 | 747 discovered minus 158 bounded cases | Test platform and product client | Dedicated lane-ownership follow-up; do not mislabel all historical tests as current-product proof. |
+| `TEST-REL-02` integration ownership is filter-based, not exhaustive | P2 | 14,748 discovered cases; CI map owns named/category subsets | Test platform | Add an executable inventory guard before any broad lane expansion. |
+| `TEST-REL-03` three current-product tests had one observed timing failure each | Closed by CLN-09 | PR #825 sending/unread; PR #828 project chooser; CLN-09 exact-case stress pack passed 30/30 with four workers | Product client | Fixed with explicit mock request gates; no retry, timeout increase, skip, or assertion removal. |
 | `TEST-REL-04` live model and LocalTest proof are manual | P2 accepted boundary | Credentials/real DB/visible journey cannot be safely mocked as equivalent | Dogfood, release, operations | Preserve explicit manual ownership; CLN-10 stabilizes seeds and CLN-42 qualifies clean clone. |
 | `TEST-REL-05` test seed truth is spread across scripts, fixtures, and tests | P2 | LocalTest credentials/projects and SQL smoke identities have multiple owners | Test platform/data | CLN-10 creates the canonical test-data and seed contract. |
 
-No P0/P1 reliability finding is open at CLN-08. No retry, timeout increase, skip, or test deletion is authorized by this inventory.
+No P0/P1 reliability finding is open after CLN-09. No retry, timeout increase, skip, or test deletion is authorized by this inventory.
 
 ## Review Line
 

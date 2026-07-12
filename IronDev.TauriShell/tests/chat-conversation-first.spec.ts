@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createDeferred } from './helpers/deferred';
 
 test('empty Workshop is conversation-first with useful starters and no backstage diagnostics', async ({ page }) => {
   await mockChatWorkspace(page);
@@ -59,16 +60,23 @@ test('a historical user message reads as conversation, not a framed inspection s
 });
 
 test('sending keeps the compact composer attached to the active conversation', async ({ page }) => {
-  await mockChatWorkspace(page, { completionDelayMs: 900 });
+  const completion = createDeferred();
+  const state = await mockChatWorkspace(page, { completionGate: completion.promise });
   await page.goto('/projects/7/workshop');
 
   await page.getByTestId('chat.composer.input').fill('Review the ticket flow.');
   await page.getByTestId('chat.command.send').click();
 
-  await expect(page.getByTestId('chat.sending')).toContainText('Sending');
-  await expect(page.getByTestId('chat.command.send')).toContainText('Sending');
-  await expect(page.getByTestId('chat.command.send')).toBeDisabled();
-  await expect(page.getByTestId('chat.contextPanel')).toHaveCount(0);
+  await expect.poll(() => state.completionRequests).toBe(1);
+  try {
+    await expect(page.getByTestId('chat.sending')).toContainText('Sending');
+    await expect(page.getByTestId('chat.command.send')).toContainText('Sending');
+    await expect(page.getByTestId('chat.command.send')).toBeDisabled();
+    await expect(page.getByTestId('chat.contextPanel')).toHaveCount(0);
+  } finally {
+    completion.resolve();
+  }
+  await expect(page.getByTestId('chat.message.assistant')).toContainText('Catalog sorting is handled by CatalogService.');
 });
 
 test('an answered conversation reveals sources only when the user asks', async ({ page }) => {
@@ -306,7 +314,7 @@ test.describe('narrow Workshop', () => {
 
 interface ChatMockOptions {
   history?: Array<Record<string, unknown>>;
-  completionDelayMs?: number;
+  completionGate?: Promise<void>;
   completionStatus?: number;
   completionResponseOverrides?: Record<string, unknown>;
   includeBaDraft?: boolean;
@@ -316,6 +324,7 @@ interface ChatMockOptions {
 }
 
 interface ChatMockState {
+  completionRequests: number;
   lastCompletionMode: string | null;
   lastUserMessageDocumentVersionIds: number[] | null;
   lastCompletionSourceMessageId: number | null;
@@ -324,6 +333,7 @@ interface ChatMockState {
 
 async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Promise<ChatMockState> {
   const state: ChatMockState = {
+    completionRequests: 0,
     lastCompletionMode: null,
     lastUserMessageDocumentVersionIds: null,
     lastCompletionSourceMessageId: null,
@@ -449,13 +459,12 @@ async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Pro
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(messageId) });
   });
   await page.route('**/irondev-api/api/projects/7/chat/complete', async (route) => {
+    state.completionRequests += 1;
     const body = route.request().postDataJSON() as { mode?: string; sourceMessageId?: number | null };
     state.lastCompletionMode = body.mode ?? null;
     state.lastCompletionSourceMessageId = body.sourceMessageId ?? null;
     const attachedSources = (history.find((item) => item.id === body.sourceMessageId)?.documentSources as Array<Record<string, unknown>> | undefined) ?? [];
-    if (options.completionDelayMs) {
-      await new Promise((resolve) => setTimeout(resolve, options.completionDelayMs));
-    }
+    await options.completionGate;
     if (options.completionStatus && options.completionStatus >= 400) {
       return route.fulfill({
         status: options.completionStatus,

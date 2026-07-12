@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **621 files** after CLN-08. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **622 files** after CLN-09. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -22,12 +22,12 @@ This inventory classifies every tracked Markdown document under `Docs/`: **621 f
 | --- | ---: |
 | `Canonical` | 45 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 397 |
+| `HistoricalReceipt` | 398 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **621** |
+| **Total** | **622** |
 
 ## Inventory
 
@@ -654,6 +654,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **621 f
 | `Docs/receipts/CLN_07_DOCUMENTATION_CONTRACT_CHECKS.md` | CLN-07 Documentation Contract Checks Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/TEST_RELIABILITY_INVENTORY.md` | Test Reliability Inventory | Testing | `Canonical` | 2026-07-13 executable test survey | `-` | Keep aligned with CI lanes, suites, and quarantine records | Test platform |
 | `Docs/receipts/CLN_08_TEST_RELIABILITY_INVENTORY.md` | CLN-08 Test Reliability Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/receipts/CLN_09_BRITTLE_TEST_CLEANUP.md` | CLN-09 Brittle Test Cleanup Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
