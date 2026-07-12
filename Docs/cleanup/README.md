@@ -9,5 +9,6 @@ This directory owns active cleanup inventories and remediation maps. Start with:
 - [GitHub CI Failure Inventory](GITHUB_CI_FAILURE_INVENTORY.md)
 - [Documentation Structure](DOCUMENTATION_STRUCTURE.md)
 - [Terminology Deprecation Map](TERMINOLOGY_DEPRECATION_MAP.md)
+- [Test Reliability Inventory](TEST_RELIABILITY_INVENTORY.md)
 
 Cleanup documents may classify and schedule behavior changes. They do not themselves grant runtime authority.

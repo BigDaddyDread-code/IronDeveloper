@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **619 files** after CLN-07. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **621 files** after CLN-08. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **619 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 44 |
+| `Canonical` | 45 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 396 |
+| `HistoricalReceipt` | 397 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **619** |
+| **Total** | **621** |
 
 ## Inventory
 
@@ -652,6 +652,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **619 f
 | `Docs/receipts/CLN_06_TERMINOLOGY_DEPRECATION.md` | CLN-06 Terminology Deprecation Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/testing/DOCUMENTATION_CONTRACT_CHECKS.md` | Documentation Contract Checks | Testing | `Canonical` | 2026-07-13 executable contract review | `-` | Keep aligned with the CI script and workflow | Test platform |
 | `Docs/receipts/CLN_07_DOCUMENTATION_CONTRACT_CHECKS.md` | CLN-07 Documentation Contract Checks Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/TEST_RELIABILITY_INVENTORY.md` | Test Reliability Inventory | Testing | `Canonical` | 2026-07-13 executable test survey | `-` | Keep aligned with CI lanes, suites, and quarantine records | Test platform |
+| `Docs/receipts/CLN_08_TEST_RELIABILITY_INVENTORY.md` | CLN-08 Test Reliability Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
