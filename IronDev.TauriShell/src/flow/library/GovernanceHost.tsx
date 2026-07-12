@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { routeForId } from '../../app/routes';
 import { governanceViewers, viewerForPath } from './governanceRoutes';
+import { GovernanceOverview } from './GovernanceOverview';
 
 // Hosts the 17 read-only governance viewers inside the Library surface at their
 // original URLs, so deep links and existing tests keep working. Pathname is real
 // React state (synced with history/popstate) — the old shell read window.location
 // during render, which React could not track.
-export function GovernanceHost() {
+interface GovernanceHostProps {
+  projectId: number;
+  preserveCompatibilityPath?: boolean;
+}
+
+export function GovernanceHost({ projectId, preserveCompatibilityPath = false }: GovernanceHostProps) {
   const [pathname, setPathname] = useState(() => window.location.pathname);
 
   useEffect(() => {
@@ -23,6 +29,10 @@ export function GovernanceHost() {
   const active = viewerForPath(pathname);
   const ActiveViewer = active.component;
   const governanceRoute = routeForId('governance');
+
+  if (!preserveCompatibilityPath) {
+    return <GovernanceOverview projectId={projectId} />;
+  }
 
   return (
     <div data-testid="flow.governanceHost">

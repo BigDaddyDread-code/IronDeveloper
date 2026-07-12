@@ -83,7 +83,9 @@ export function LibraryScreen({
       ) : null}
       {section === 'tools' ? <ToolsScreen projectId={projectId} toolId={toolId} /> : null}
       {section === 'members' ? <MembersScreen projectId={projectId} /> : null}
-      {section === 'governance' ? <GovernanceHost /> : null}
+      {section === 'governance' ? (
+        <GovernanceHost projectId={projectId} preserveCompatibilityPath={preserveGovernancePath} />
+      ) : null}
       {section === 'provisioning' ? (
         <ProvisioningSection onBackToProjects={onBackToProjects} onOpenBoard={onOpenBoard} />
       ) : null}

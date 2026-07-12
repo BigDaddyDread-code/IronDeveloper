@@ -33,6 +33,11 @@ export interface EnvironmentInfo {
 
 export type ProjectTicket = components['schemas']['ProjectTicket'] & { revision?: number };
 export type ProjectSummary = components['schemas']['Project'];
+export type ProjectGovernanceOverview = components['schemas']['ProjectGovernanceOverview'];
+export type ProjectGovernanceAttentionItem = components['schemas']['ProjectGovernanceAttentionItem'];
+export type ProjectGovernanceControl = components['schemas']['ProjectGovernanceControl'];
+export type ProjectGovernanceException = components['schemas']['ProjectGovernanceException'];
+export type ProjectGovernanceDecision = components['schemas']['ProjectGovernanceDecision'];
 export type ProjectBoardReadModel = components['schemas']['ProjectBoardReadModel'];
 export type ProjectBoardItemReadModel = components['schemas']['ProjectBoardItemReadModel'];
 export type ProjectWorkItemReadModel = components['schemas']['ProjectWorkItemReadModel'];
