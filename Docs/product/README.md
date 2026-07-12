@@ -9,6 +9,7 @@ This folder contains product-facing contracts for the IronDev desktop experience
 - [V2 Non-Author Qualification](V2_NON_AUTHOR_QUALIFICATION.md) - final human desktop qualification checklist and evidence template.
 - [IronDev Product and UX Specification v2.5](IRONDEV_PRODUCT_UX_SPEC_V25.md) - Workshop, durable Work Items, configurable agents, AI connections, reset/recovery, and run configuration snapshots.
 - [IronDev v2.5 Governance UX Specification](IRONDEV_V25_GOVERNANCE_UX_SPEC.md) - project control centre, backend-owned posture, attention, exceptions, decisions, technical evidence, and legacy viewer disposition.
+- [IronDev v2.5 Governance Acceptance](IRONDEV_V25_GOVERNANCE_ACCEPTANCE.md) - delivered slices, acceptance evidence, live LocalTest result, and known limits.
 - [V25-00 Work Item Contract Map](V25_00_WORK_ITEM_CONTRACT_MAP.md) - current-to-target ownership, migration, compatibility, and authority contract before durable Work Item schema work.
 - [IronDev Product and UX Specification v2](IRONDEV_PRODUCT_UX_SPEC_V2.md) - master information architecture, entry journey, Board, Chat, Work Item, Library, Documents, Tools, multi-user behavior, states, accessibility, and developer handoff.
 - [Multi-User Chat and Collaboration](IRONDEV_MULTI_USER_CHAT_SPEC.md) - channels, direct IronDev sessions, source inspection, mentions, shared drafts, concurrency, and artifact handoff.
