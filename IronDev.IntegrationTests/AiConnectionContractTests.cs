@@ -5,6 +5,7 @@ using IronDev.Core.AiConnections;
 using IronDev.Infrastructure.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests;
@@ -186,6 +187,34 @@ public sealed class AiConnectionContractTests
             Assert.AreEqual("MissingCredential", outcome.Status);
             Assert.AreEqual(0, handler.CallCount);
             Assert.IsNotNull(outcome.Connection?.LastFailedTestUtc);
+        }
+        finally { temp.Delete(recursive: true); }
+    }
+
+    [TestMethod]
+    public void ConnectionTest_TypedHttpClientRegistrationResolvesTheProductionConstructor()
+    {
+        var temp = Directory.CreateTempSubdirectory("irondev-ai-test-di-");
+        try
+        {
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Ai:Provider"] = "fake",
+                ["Ai:Model"] = "deterministic-test",
+                ["AiConnections:CredentialStorePath"] = Path.Combine(temp.FullName, "credentials"),
+                ["AiConnections:HealthStorePath"] = Path.Combine(temp.FullName, "health")
+            }).Build();
+            var services = new ServiceCollection();
+            services.AddSingleton<IConfiguration>(configuration);
+            services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(temp.FullName, "keys")));
+            services.AddScoped<IAiConnectionCredentialStore, FileSystemAiConnectionCredentialStore>();
+            services.AddScoped<IAiConnectionTestHealthStore, FileSystemAiConnectionTestHealthStore>();
+            services.AddScoped<IAiConnectionCatalogService, AiConnectionCatalogService>();
+            services.AddHttpClient<IAiConnectionTestService, AiConnectionTestService>();
+
+            using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+            using var scope = provider.CreateScope();
+            Assert.IsInstanceOfType<AiConnectionTestService>(scope.ServiceProvider.GetRequiredService<IAiConnectionTestService>());
         }
         finally { temp.Delete(recursive: true); }
     }

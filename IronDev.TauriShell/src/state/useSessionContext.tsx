@@ -61,7 +61,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setApiStatus(createInitialStatus(config));
     setEnvironmentInfo(null);
-  }, [config.apiBaseUrl, config.fallbackProjectId, config.selectedProjectId, config.selectedTenantId, config.token]);
+  }, [config.apiBaseUrl, config.token]);
 
   useEffect(() => {
     if (environmentInfo?.isTestEnvironment) {
@@ -127,6 +127,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setIsConnectionBusy(false);
     }
   }, [client]);
+
+  useEffect(() => {
+    let active = true;
+    if (!config.token) return () => { active = false; };
+
+    void client.getEnvironment()
+      .then((info) => { if (active) setEnvironmentInfo(info); })
+      .catch(() => { if (active) setEnvironmentInfo(null); });
+
+    return () => { active = false; };
+  }, [client, config.token]);
 
   const signIn = useCallback(
     async (request: LoginRequest) => {
