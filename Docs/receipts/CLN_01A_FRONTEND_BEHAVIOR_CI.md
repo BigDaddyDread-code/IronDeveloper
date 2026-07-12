@@ -41,6 +41,8 @@ The bounded candidate selected 158 tests across 18 current-product files. The fi
 
 Classification: `TestExpectationDrift`.
 
+The first GitHub execution then exposed a separate `FlakyOrTiming` fixture in the Tools retry test. It made backend availability depend on an exact number of requests, so success depended on incidental duplicate fetches. The mock now remains unavailable until the test explicitly changes backend state; Retry must then perform a further request and restore backend truth.
+
 Runtime behavior changed: **No**.
 
 ## Lane Contract
