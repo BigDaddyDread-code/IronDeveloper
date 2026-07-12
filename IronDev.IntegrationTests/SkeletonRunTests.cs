@@ -955,6 +955,7 @@ public sealed class SkeletonRunTests
         var saved = await harness.Profiles.SaveDraftAsync(SkeletonAgentRole.Builder, profileScope, new SkeletonAgentProfileDraftWriteRequest
         {
             ExpectedRevision = draft.Revision,
+            AiConnectionId = "project-builder",
             Provider = "ollama",
             Model = "llama3",
             TimeoutSeconds = 30,
@@ -974,6 +975,8 @@ public sealed class SkeletonRunTests
         var builder = report!.AgentConfigurations.Single(snapshot => snapshot.Role == "Builder");
         Assert.AreEqual(1L, builder.ProfileVersion);
         Assert.AreEqual("Project", builder.ProfileScopeLayer);
+        Assert.AreEqual("project-builder", builder.ConnectionId);
+        Assert.AreEqual("project-builder", builder.ControlledEndpointIdentity);
         Assert.AreEqual("ollama", builder.Provider);
         Assert.AreEqual("llama3", builder.Model);
     }

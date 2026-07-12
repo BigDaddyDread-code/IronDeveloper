@@ -1764,6 +1764,7 @@ export interface SkeletonAgentProfile {
   displayName: string;
   builtInDefaultName: string;
   builtInDefaultVersion: string;
+  aiConnectionId: string;
   provider: string;
   model: string;
   baseUrl: string;
@@ -1802,6 +1803,7 @@ export interface EffectiveSkeletonAgentProfile {
 }
 
 export interface SkeletonAgentProfileUpdate {
+  aiConnectionId: string;
   provider: string;
   model: string;
   timeoutSeconds: number;

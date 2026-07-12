@@ -18,6 +18,7 @@ test('agents panel edits a model and voice as a versioned draft', async ({ page 
   await expect(page.getByTestId('flow.settings.agent.analyst.defaultVersion')).toContainText('IronDev Agent Defaults 2.5.0');
   await expect(page.getByTestId('flow.settings.agent.analyst.boundary')).toContainText('cannot approve');
   await expect(page.getByTestId('flow.settings.agent.analyst.boundary')).toContainText('apply source');
+  await expect(page.getByTestId('flow.settings.agent.builder.connection')).toHaveValue('deployment-default');
   await expect(page.getByTestId('flow.settings.agent.tester')).toBeVisible();
   await expect(page.getByTestId('flow.settings.agent.critic')).toBeVisible();
 
@@ -78,6 +79,7 @@ test('agents panel shows effective profile provenance', async ({ page }) => {
   await page.getByTestId('flow.settings.section.agents').click();
 
   await expect(page.getByTestId('flow.settings.agent.builder.effective.summary')).toContainText('openai / gpt-4o / 60s');
+  await expect(page.getByTestId('flow.settings.agent.builder.effective.connectionSource')).toContainText('DeploymentDefault');
   await expect(page.getByTestId('flow.settings.agent.builder.effective.providerSource')).toContainText('DeploymentDefault');
   await expect(page.getByTestId('flow.settings.agent.builder.effective.skillSource')).toContainText('BuiltInDefault');
   await expect(page.getByTestId('flow.settings.agent.builder.effective.hash')).toContainText('sha256:');
@@ -182,6 +184,7 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
     displayName: roleName(role),
     builtInDefaultName: role === 'Orchestrator' || role === 0 ? '' : 'IronDev Agent Defaults',
     builtInDefaultVersion: role === 'Orchestrator' || role === 0 ? '' : 'IronDev Agent Defaults 2.5.0',
+    aiConnectionId: role === 'Orchestrator' || role === 0 ? '' : 'deployment-default',
     provider: options.numericRoles ? 'OpenAI' : 'openai',
     model: 'gpt-4o',
     baseUrl: '',
@@ -207,6 +210,7 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
       effectiveSkill: '',
       effectivePersonality: '',
       fieldSources: [
+        { field: 'aiConnectionId', sourceLayer, sourceLabel: isOrchestrator ? sourceLabel : 'deployment-default', inherited: true, detail: '' },
         { field: 'provider', sourceLayer, sourceLabel: isOrchestrator ? sourceLabel : `${sourceLabel}:Provider`, inherited: true, detail: '' },
         { field: 'model', sourceLayer, sourceLabel: isOrchestrator ? sourceLabel : `${sourceLabel}:Model`, inherited: true, detail: '' },
         { field: 'timeoutSeconds', sourceLayer, sourceLabel: isOrchestrator ? sourceLabel : `${sourceLabel}:TimeoutSeconds`, inherited: true, detail: '' },
@@ -252,6 +256,7 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
           revision: state.revision,
           basePublishedVersion: state.publishedVersion,
           values: {
+            aiConnectionId: current.aiConnectionId,
             provider: current.provider,
             model: current.model,
             timeoutSeconds: current.timeoutSeconds,
@@ -317,12 +322,12 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
       contentType: 'application/json',
       body: JSON.stringify([
         {
-          version: { version: 2, role, values: { provider: 'openai', model: 'gpt-4o', timeoutSeconds: 60, skill: 'Current skill', personality: 'Current voice' }, reason: 'Current profile', actorUserId: 8, publishedAtUtc: '2026-07-12T00:04:00Z' },
+          version: { version: 2, role, values: { aiConnectionId: 'deployment-default', provider: 'openai', model: 'gpt-4o', timeoutSeconds: 60, skill: 'Current skill', personality: 'Current voice' }, reason: 'Current profile', actorUserId: 8, publishedAtUtc: '2026-07-12T00:04:00Z' },
           runUsage: [{ runId: 'run-usage-2', projectId: 7, workItemId: 42, capturedAtUtc: '2026-07-12T00:05:00Z' }],
           usageBoundary: boundary
         },
         {
-          version: { version: 1, role, values: { provider: 'ollama', model: 'llama3', timeoutSeconds: 30, skill: 'Known skill', personality: 'Known voice' }, reason: 'Known working profile', actorUserId: 7, publishedAtUtc: '2026-07-12T00:03:00Z' },
+          version: { version: 1, role, values: { aiConnectionId: 'deployment-default', provider: 'ollama', model: 'llama3', timeoutSeconds: 30, skill: 'Known skill', personality: 'Known voice' }, reason: 'Known working profile', actorUserId: 7, publishedAtUtc: '2026-07-12T00:03:00Z' },
           runUsage: [],
           usageBoundary: boundary
         }
@@ -405,10 +410,20 @@ async function mockWorkspace(page: Page) {
   await page.route('**/irondev-api/api/projects/7/select', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
-  await page.route('**/irondev-api/api/tenants/3/users', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
-  });
   await page.route('**/irondev-api/api/v1/ai-connections', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{
+        id: 'deployment-default', tenantId: 3, displayName: 'Deployment default', providerKind: 'openai',
+        controlledEndpointId: 'deployment-default-openai', controlledEndpoint: 'https://api.openai.com',
+        credentialConfigured: true, credentialStatus: 'Configured', availableModels: ['gpt-4o'], enabled: true,
+        tenantAvailable: true, projectAvailable: true, createdByUserId: 0, updatedByUserId: 7,
+        version: 'IronDev AI Connection Contract 2.5.0', boundary: 'Non-secret metadata.'
+      }])
+    });
+  });
+  await page.route('**/irondev-api/api/tenants/3/users', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
   });
   await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {

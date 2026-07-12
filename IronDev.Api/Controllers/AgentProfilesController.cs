@@ -1,5 +1,6 @@
 using IronDev.Api.Auth;
 using IronDev.Core.Agents;
+using IronDev.Core.AiConnections;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
@@ -32,17 +33,20 @@ public sealed class AgentProfilesController : ControllerBase
     private readonly IUserService _userService;
     private readonly IRunEventStore _runEvents;
     private readonly IProjectMembershipService _projectMemberships;
+    private readonly IAiConnectionCatalogService _connections;
 
     public AgentProfilesController(
         ISkeletonAgentProfileService profiles,
         IUserService userService,
         IRunEventStore runEvents,
-        IProjectMembershipService projectMemberships)
+        IProjectMembershipService projectMemberships,
+        IAiConnectionCatalogService connections)
     {
         _profiles = profiles;
         _userService = userService;
         _runEvents = runEvents;
         _projectMemberships = projectMemberships;
+        _connections = connections;
     }
 
     [HttpGet]
@@ -120,6 +124,8 @@ public sealed class AgentProfilesController : ControllerBase
         var profileScope = await ResolveScopeAsync(projectId, scope, ct);
         if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
             return Forbid();
+        if (!await ConnectionAvailableAsync(profileScope.TenantId, request.AiConnectionId, ct))
+            return BadRequest(new { code = "AiConnectionUnavailable", error = "The selected AI connection is not enabled and available to this tenant/project." });
 
         var outcome = await _profiles.SaveDraftAsync(parsed, profileScope, request, ct);
         return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
@@ -137,6 +143,10 @@ public sealed class AgentProfilesController : ControllerBase
         var profileScope = await ResolveScopeAsync(projectId, scope, ct);
         if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
             return Forbid();
+
+        var draft = await _profiles.GetDraftAsync(parsed, profileScope, ct);
+        if (!await ConnectionAvailableAsync(profileScope.TenantId, draft.Values.AiConnectionId, ct))
+            return BadRequest(new { code = "AiConnectionUnavailable", error = "The draft's AI connection is no longer available." });
 
         var outcome = await _profiles.TestDraftAsync(parsed, profileScope, ct);
         return outcome.Succeeded ? Ok(outcome) : BadRequest(outcome);
@@ -156,6 +166,10 @@ public sealed class AgentProfilesController : ControllerBase
         var profileScope = await ResolveScopeAsync(projectId, scope, ct);
         if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
             return Forbid();
+
+        var draft = await _profiles.GetDraftAsync(parsed, profileScope, ct);
+        if (!await ConnectionAvailableAsync(profileScope.TenantId, draft.Values.AiConnectionId, ct))
+            return BadRequest(new { code = "AiConnectionUnavailable", error = "The draft's AI connection is no longer available." });
 
         var outcome = await _profiles.PublishDraftAsync(parsed, profileScope, request, ctx.UserId, ct);
         return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
@@ -261,6 +275,14 @@ public sealed class AgentProfilesController : ControllerBase
         var ctx = CurrentUser();
         var members = await _projectMemberships.GetMembersAsync(scope.TenantId, scope.ProjectId.Value, ctx.UserId, cancellationToken);
         return members.Any(member => member.UserId == ctx.UserId && member.ProjectRole == ProjectMemberRoles.Owner);
+    }
+
+    private async Task<bool> ConnectionAvailableAsync(int tenantId, string connectionId, CancellationToken cancellationToken)
+    {
+        var connections = await _connections.ListAsync(tenantId, CurrentUser().UserId, cancellationToken);
+        return connections.Any(connection =>
+            string.Equals(connection.Id, connectionId, StringComparison.OrdinalIgnoreCase) &&
+            connection.Enabled && connection.TenantAvailable && connection.ProjectAvailable);
     }
 
     private async Task<Dictionary<long, IReadOnlyList<SkeletonAgentProfileRunUsage>>> ReadUsageAsync(

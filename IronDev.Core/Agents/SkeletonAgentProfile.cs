@@ -159,6 +159,8 @@ public sealed record SkeletonAgentProfile
 
     public string BuiltInDefaultVersion { get; init; } = string.Empty;
 
+    public string AiConnectionId { get; init; } = "deployment-default";
+
     /// <summary>Provider key: "openai" | "localopenai" | "ollama" | "custom" | "fake". Falls back to the global Ai:Provider when blank.</summary>
     public string Provider { get; init; } = string.Empty;
 
@@ -193,6 +195,7 @@ public sealed record SkeletonAgentProfile
 /// </summary>
 public sealed record SkeletonAgentProfileUpdate
 {
+    public string AiConnectionId { get; init; } = "deployment-default";
     public string Provider { get; init; } = string.Empty;
     public string Model { get; init; } = string.Empty;
     public int TimeoutSeconds { get; init; }
@@ -239,6 +242,7 @@ public sealed record SkeletonAgentProfileDraft
 public sealed record SkeletonAgentProfileDraftWriteRequest
 {
     public required long ExpectedRevision { get; init; }
+    public string AiConnectionId { get; init; } = "deployment-default";
     public string Provider { get; init; } = string.Empty;
     public string Model { get; init; } = string.Empty;
     public int TimeoutSeconds { get; init; }
@@ -247,6 +251,7 @@ public sealed record SkeletonAgentProfileDraftWriteRequest
 
     public SkeletonAgentProfileUpdate ToUpdate() => new()
     {
+        AiConnectionId = AiConnectionId,
         Provider = Provider,
         Model = Model,
         TimeoutSeconds = TimeoutSeconds,
