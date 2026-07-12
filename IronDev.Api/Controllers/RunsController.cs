@@ -1,5 +1,7 @@
 using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
+using IronDev.Api.Middleware;
+using IronDev.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -24,6 +26,7 @@ public sealed class RunsController : ControllerBase
     }
 
     [HttpGet("{runId}")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Run, "runId")]
     public async Task<ActionResult<RunStatusDto>> GetRun(string runId, CancellationToken ct)
     {
         var run = await _runs.GetAsync(runId, ct);
@@ -38,6 +41,7 @@ public sealed class RunsController : ControllerBase
     }
 
     [HttpGet("{runId}/report")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Run, "runId")]
     public async Task<ActionResult<RunReportDto>> GetRunReport(string runId, CancellationToken ct)
     {
         var report = await _reports.GetRunAsync(runId, ct);
@@ -52,6 +56,7 @@ public sealed class RunsController : ControllerBase
     }
 
     [HttpGet("{runId}/events")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Run, "runId")]
     [Produces("text/event-stream")]
     public async Task GetRunEvents(string runId, CancellationToken ct)
     {

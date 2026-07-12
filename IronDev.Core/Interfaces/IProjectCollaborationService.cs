@@ -11,6 +11,27 @@ public interface IProjectMembershipService
     Task<ProjectMembershipMutationStatus> RemoveMemberAsync(int tenantId, int projectId, int userId, int actorUserId, CancellationToken cancellationToken = default);
 }
 
+public enum ProjectArtifactKind
+{
+    Document,
+    DocumentVersion,
+    Ticket,
+    MemoryDocument,
+    ImplementationPlan,
+    Run,
+    RunReport
+}
+
+public interface IProjectArtifactAccessService
+{
+    Task<bool> HasAccessAsync(
+        int tenantId,
+        int userId,
+        ProjectArtifactKind artifactKind,
+        string artifactId,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IProjectWorkItemCollaborationService
 {
     Task<ProjectWorkItemCollaborationSnapshot?> GetAsync(int tenantId, int projectId, long workItemId, CancellationToken cancellationToken = default);

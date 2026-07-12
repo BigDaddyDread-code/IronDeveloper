@@ -167,6 +167,7 @@ builder.Services.AddScoped<IProjectChatDocumentSourceService, ProjectChatDocumen
 builder.Services.AddScoped<IProjectToolCatalogueService, ProjectToolCatalogueService>();
 builder.Services.AddScoped<IProjectMemberDirectoryService, ProjectMemberDirectoryService>();
 builder.Services.AddScoped<IProjectMembershipService, ProjectMembershipService>();
+builder.Services.AddScoped<IProjectArtifactAccessService, ProjectArtifactAccessService>();
 builder.Services.AddScoped<IProjectWorkItemCollaborationService, ProjectWorkItemCollaborationService>();
 builder.Services.AddScoped<IProjectChannelMembershipService, ProjectChannelMembershipService>();
 builder.Services.AddScoped<IProjectChannelChatService, ProjectChannelChatService>();
@@ -418,6 +419,7 @@ app.UseRateLimiter();
 app.UseAuthorization();
 app.UseMiddleware<UserMutationAttributionMiddleware>();
 app.UseMiddleware<TenantTokenScopeMiddleware>();
+app.UseMiddleware<ProjectArtifactAccessMiddleware>();
 app.UseMiddleware<ProjectMembershipMiddleware>();
 
 // Health check endpoint (anonymous)

@@ -31,6 +31,9 @@ public sealed class ProjectCollaborationContractTests
         StringAssert.Contains(middleware, "HasAccessAsync");
         StringAssert.Contains(middleware, "StatusCodes.Status404NotFound");
         StringAssert.Contains(middleware, "you no longer have access");
+
+        var service = File.ReadAllText(RepoFile("IronDev.Infrastructure", "Services", "ProjectCollaborationService.cs"));
+        StringAssert.Contains(service, "INNER JOIN dbo.Projects p ON p.Id=pm.ProjectId AND p.TenantId=pm.TenantId");
     }
 
     private static string RepoFile(params string[] parts)

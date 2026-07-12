@@ -2,6 +2,8 @@ using System.Data;
 using Dapper;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.RunReports;
+using IronDev.Core.Runs;
 using IronDev.Data;
 
 namespace IronDev.Infrastructure.Services;
@@ -17,6 +19,7 @@ public sealed class ProjectMembershipService : IProjectMembershipService
         const string sql = """
             SELECT COUNT(1)
             FROM dbo.ProjectMembers pm
+            INNER JOIN dbo.Projects p ON p.Id=pm.ProjectId AND p.TenantId=pm.TenantId
             INNER JOIN dbo.TenantUsers tu ON tu.TenantId=pm.TenantId AND tu.UserId=pm.UserId
             INNER JOIN dbo.Users u ON u.Id=pm.UserId AND u.IsActive=1
             WHERE pm.TenantId = @TenantId AND pm.ProjectId = @ProjectId AND pm.UserId = @UserId AND pm.Status = N'Active';
@@ -29,6 +32,7 @@ public sealed class ProjectMembershipService : IProjectMembershipService
     {
         const string sql = """
             SELECT pm.ProjectId FROM dbo.ProjectMembers pm
+            INNER JOIN dbo.Projects p ON p.Id=pm.ProjectId AND p.TenantId=pm.TenantId
             INNER JOIN dbo.TenantUsers tu ON tu.TenantId=pm.TenantId AND tu.UserId=pm.UserId
             INNER JOIN dbo.Users u ON u.Id=pm.UserId AND u.IsActive=1
             WHERE pm.TenantId = @TenantId AND pm.UserId = @UserId AND pm.Status = N'Active';
@@ -130,6 +134,138 @@ public sealed class ProjectMembershipService : IProjectMembershipService
         public string Email { get; init; } = string.Empty;
         public string ProjectRole { get; init; } = string.Empty;
         public DateTimeOffset AddedUtc { get; init; }
+    }
+}
+
+public sealed class ProjectArtifactAccessService : IProjectArtifactAccessService
+{
+    private readonly IDbConnectionFactory _connections;
+    private readonly IRunReportService _runReports;
+    private readonly IRunStore _runs;
+
+    public ProjectArtifactAccessService(
+        IDbConnectionFactory connections,
+        IRunReportService runReports,
+        IRunStore runs)
+    {
+        _connections = connections;
+        _runReports = runReports;
+        _runs = runs;
+    }
+
+    public async Task<bool> HasAccessAsync(
+        int tenantId,
+        int userId,
+        ProjectArtifactKind artifactKind,
+        string artifactId,
+        CancellationToken cancellationToken = default)
+    {
+        if (artifactKind == ProjectArtifactKind.RunReport)
+        {
+            var report = await _runReports.GetRunAsync(artifactId, cancellationToken).ConfigureAwait(false);
+            if (report is null || string.IsNullOrWhiteSpace(report.Project))
+                return false;
+
+            return await HasProjectNameAccessAsync(
+                tenantId,
+                userId,
+                report.Project,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (artifactKind == ProjectArtifactKind.Run)
+        {
+            var run = await _runs.GetAsync(artifactId, cancellationToken).ConfigureAwait(false);
+            return run?.ProjectId is int projectId && await HasProjectIdAccessAsync(
+                tenantId,
+                userId,
+                projectId,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var artifactJoin = artifactKind switch
+        {
+            ProjectArtifactKind.Document =>
+                "INNER JOIN dbo.ProjectDocuments a ON a.ProjectId=p.Id AND a.TenantId=p.TenantId AND a.Id=@ArtifactId",
+            ProjectArtifactKind.DocumentVersion =>
+                "INNER JOIN dbo.ProjectDocuments d ON d.ProjectId=p.Id AND d.TenantId=p.TenantId INNER JOIN dbo.ProjectDocumentVersions a ON a.DocumentId=d.Id AND a.Id=@ArtifactId",
+            ProjectArtifactKind.Ticket =>
+                "INNER JOIN dbo.ProjectTickets a ON a.ProjectId=p.Id AND a.TenantId=p.TenantId AND a.Id=@ArtifactId AND a.IsDeleted=0",
+            ProjectArtifactKind.MemoryDocument =>
+                "INNER JOIN dbo.ProjectContextDocuments a ON a.ProjectId=p.Id AND a.TenantId=p.TenantId AND a.Id=@ArtifactId",
+            ProjectArtifactKind.ImplementationPlan =>
+                "INNER JOIN dbo.ProjectImplementationPlans a ON a.ProjectId=p.Id AND a.TenantId=p.TenantId AND a.Id=@ArtifactId",
+            _ => throw new ArgumentOutOfRangeException(nameof(artifactKind), artifactKind, null)
+        };
+
+        var sql = $"""
+            SELECT COUNT(1)
+            FROM dbo.Projects p
+            {artifactJoin}
+            INNER JOIN dbo.ProjectMembers pm ON pm.ProjectId=p.Id AND pm.TenantId=p.TenantId
+            INNER JOIN dbo.TenantUsers tu ON tu.TenantId=pm.TenantId AND tu.UserId=pm.UserId
+            INNER JOIN dbo.Users u ON u.Id=pm.UserId AND u.IsActive=1
+            WHERE p.TenantId=@TenantId
+              AND pm.UserId=@UserId
+              AND pm.Status=N'Active';
+            """;
+
+        using var connection = _connections.CreateConnection();
+        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            sql,
+            new { TenantId = tenantId, UserId = userId, ArtifactId = artifactId },
+            cancellationToken: cancellationToken)) > 0;
+    }
+
+    private async Task<bool> HasProjectNameAccessAsync(
+        int tenantId,
+        int userId,
+        string projectName,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT CASE
+                WHEN COUNT(DISTINCT p.Id)=1
+                 AND MAX(CASE WHEN pm.UserId=@UserId AND pm.Status=N'Active' AND u.IsActive=1 AND tu.UserId IS NOT NULL THEN 1 ELSE 0 END)=1
+                THEN 1 ELSE 0 END
+            FROM dbo.Projects p
+            LEFT JOIN dbo.ProjectMembers pm ON pm.ProjectId=p.Id AND pm.TenantId=p.TenantId AND pm.UserId=@UserId
+            LEFT JOIN dbo.TenantUsers tu ON tu.TenantId=pm.TenantId AND tu.UserId=pm.UserId
+            LEFT JOIN dbo.Users u ON u.Id=pm.UserId
+            WHERE p.TenantId=@TenantId
+              AND p.Name=@ProjectName;
+            """;
+
+        using var connection = _connections.CreateConnection();
+        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            sql,
+            new { TenantId = tenantId, UserId = userId, ProjectName = projectName },
+            cancellationToken: cancellationToken)) > 0;
+    }
+
+    private async Task<bool> HasProjectIdAccessAsync(
+        int tenantId,
+        int userId,
+        int projectId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT COUNT(1)
+            FROM dbo.Projects p
+            INNER JOIN dbo.ProjectMembers pm ON pm.ProjectId=p.Id AND pm.TenantId=p.TenantId
+            INNER JOIN dbo.TenantUsers tu ON tu.TenantId=pm.TenantId AND tu.UserId=pm.UserId
+            INNER JOIN dbo.Users u ON u.Id=pm.UserId AND u.IsActive=1
+            WHERE p.TenantId=@TenantId
+              AND p.Id=@ProjectId
+              AND pm.UserId=@UserId
+              AND pm.Status=N'Active';
+            """;
+
+        using var connection = _connections.CreateConnection();
+        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            sql,
+            new { TenantId = tenantId, UserId = userId, ProjectId = projectId },
+            cancellationToken: cancellationToken)) > 0;
     }
 }
 

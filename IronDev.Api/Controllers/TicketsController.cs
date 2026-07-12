@@ -1,4 +1,5 @@
 using IronDev.Core.Builder;
+using IronDev.Api.Middleware;
 using IronDev.Core.Auth;
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
@@ -84,6 +85,7 @@ public sealed class TicketsController : ControllerBase
 
     [HttpGet("api/tickets/{ticketId:long}")]
     [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Ticket, "ticketId")]
     public async Task<ActionResult<ProjectTicket>> GetTicket(long ticketId, CancellationToken ct, int? projectId = null)
     {
         var ticket = await _tickets.GetTicketByIdAsync(ticketId, ct);
@@ -198,6 +200,7 @@ public sealed class TicketsController : ControllerBase
     }
 
     [HttpDelete("api/tickets/{ticketId:long}")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Ticket, "ticketId")]
     public async Task<IActionResult> ArchiveTicket(long ticketId, CancellationToken ct)
     {
         var ok = await _tickets.ArchiveTicketAsync(ticketId, ct);
@@ -748,6 +751,7 @@ public sealed class TicketsController : ControllerBase
     }
 
     [HttpPost("api/tickets/{ticketId:long}/proposal")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Ticket, "ticketId")]
     public Task<BuilderProposal> GenerateProposal(long ticketId, CancellationToken ct) =>
         _proposals.GenerateProposalAsync(ticketId, ct);
 
@@ -769,6 +773,7 @@ public sealed class TicketsController : ControllerBase
         });
 
     [HttpPost("api/tickets/{ticketId:long}/apply-and-build")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Ticket, "ticketId")]
     public Task<TicketBuildResult> ApplyAndBuild(TicketBuildApproval approval, CancellationToken ct) =>
         _orchestrator.ApplyAndBuildAsync(approval, ct);
 
