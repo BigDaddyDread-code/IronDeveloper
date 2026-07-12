@@ -1,5 +1,7 @@
 # IronDev CLI, Test Agent, Retrieval, And Self-Improvement Loop
 
+> **Status: Parking lot.** This discussion is not a current architecture decision or active implementation plan. Use [Canonical Architecture Index](architecture/CANONICAL_ARCHITECTURE_INDEX.md) and [Current Product Capabilities](product/CURRENT_PRODUCT_CAPABILITIES.md) for current truth.
+
 ## Status
 
 Discussion document. Needs further review before promotion to architecture decisions.

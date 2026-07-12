@@ -1,5 +1,7 @@
 # IronDev Knowledge Compiler Semantic Memory Design
 
+> **Status: Superseded as current architecture.** Retained as design history. Use [ADR-003](ADR/ADR-003-memory-candidate-proposal-promotion-boundary.md) and the future CLN-23 memory reality audit for current boundaries. The “next major branch” instruction below is not active.
+
 ## Purpose
 
 This document captures the next major IronDev leap after Alpha 0.1:

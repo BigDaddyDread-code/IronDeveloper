@@ -1,5 +1,7 @@
 # IronDev LangGraph-Style Workflow Design
 
+> **Status: Superseded as current architecture.** Retained as design history. Use [Canonical Architecture Index](architecture/CANONICAL_ARCHITECTURE_INDEX.md), [Current Product Capabilities](product/CURRENT_PRODUCT_CAPABILITIES.md), and the SQL-backed workflow contracts for current truth. The proposed “next” workflow-engine direction below is not an active implementation plan.
+
 ## Purpose
 
 This document captures the proposed **LangGraph-style state machine direction** for IronDev so it can be tracked, refined, and eventually turned into implementation tickets.
