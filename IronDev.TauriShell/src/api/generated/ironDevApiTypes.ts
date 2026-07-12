@@ -13176,6 +13176,16 @@ export interface components {
             content: string | null;
             sha256: string | null;
         };
+        GovernedRefusalEnvelope: {
+            allowed?: boolean;
+            reasonCode: string | null;
+            message: string | null;
+            blockedReasons?: string[] | null;
+            missingEvidence?: string[] | null;
+            nextSafeActions?: string[] | null;
+            forbiddenActions?: string[] | null;
+            correlationId: string | null;
+        };
         GovernedReleaseGateApiBoundary: {
             releaseReadinessGateRan?: boolean;
             decisionRecordStored?: boolean;
@@ -13230,6 +13240,7 @@ export interface components {
             errors?: components["schemas"]["GovernedReleaseGateApiError"][] | null;
             warnings?: string[] | null;
             boundary?: components["schemas"]["GovernedReleaseGateApiBoundary"];
+            refusal?: components["schemas"]["GovernedRefusalEnvelope"];
         };
         GovernedReleaseGateApiError: {
             code?: string | null;
@@ -13291,6 +13302,7 @@ export interface components {
             errors?: components["schemas"]["GovernedWorkflowContinuationApiError"][] | null;
             warnings?: string[] | null;
             boundary?: components["schemas"]["GovernedWorkflowContinuationApiBoundary"];
+            refusal?: components["schemas"]["GovernedRefusalEnvelope"];
         };
         GovernedWorkflowContinuationApiError: {
             code?: string | null;

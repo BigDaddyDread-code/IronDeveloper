@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Collections;
 using System.Reflection;
 using System.Text.Json;
+using IronDev.Core.Governance;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -50,15 +51,13 @@ public sealed class RouteBodyScopeBindingFilter : IAsyncActionFilter
                     depth: 0,
                     out var bodyValue))
                 {
-                    context.Result = new ObjectResult(new RouteBodyScopeMismatchResponse
-                    {
-                        ReasonCode = scope.ReasonCode,
-                        Message = $"Body {scope.BodyName} must be omitted or match route {scope.RouteName}.",
-                        BlockedReasons = [$"Route {scope.RouteName} is authoritative for this write."],
-                        CorrelationId = context.HttpContext.TraceIdentifier,
-                        RouteValue = routeValue,
-                        BodyValue = bodyValue
-                    })
+                    context.Result = new ObjectResult(GovernedRefusal.Create(
+                        scope.ReasonCode,
+                        $"Body {scope.BodyName} must be omitted or match route {scope.RouteName}.",
+                        context.HttpContext.TraceIdentifier,
+                        blockedReasons: [$"Route {scope.RouteName} is authoritative for this write."],
+                        nextSafeActions: [$"Remove body {scope.BodyName} or set it to the route value."],
+                        forbiddenActions: ["Dispatch the write with conflicting scope."]))
                     {
                         StatusCode = StatusCodes.Status400BadRequest
                     };
@@ -222,15 +221,4 @@ public sealed class RouteBodyScopeBindingFilter : IAsyncActionFilter
     }
 
     private sealed record ScopeRoute(string RouteName, string BodyName, string ReasonCode);
-}
-
-public sealed record RouteBodyScopeMismatchResponse
-{
-    public bool Allowed { get; init; }
-    public required string ReasonCode { get; init; }
-    public required string Message { get; init; }
-    public IReadOnlyList<string> BlockedReasons { get; init; } = [];
-    public required string CorrelationId { get; init; }
-    public required string RouteValue { get; init; }
-    public required string BodyValue { get; init; }
 }

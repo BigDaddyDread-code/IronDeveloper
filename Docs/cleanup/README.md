@@ -13,5 +13,6 @@ This directory owns active cleanup inventories and remediation maps. Start with:
 - [LocalTest Test Data And Seed Contract](../testing/LOCALTEST_SEED_CONTRACT.md)
 - [Route And Body Scope Binding Audit](ROUTE_BODY_SCOPE_BINDING_AUDIT.md)
 - [Actor Attribution Audit](ACTOR_ATTRIBUTION_AUDIT.md)
+- [Canonical Governed Refusal Envelope](CANONICAL_REFUSAL_ENVELOPE.md)
 
 Cleanup documents may classify and schedule behavior changes. They do not themselves grant runtime authority.
