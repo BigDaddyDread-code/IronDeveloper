@@ -516,6 +516,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         var global = _configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
         var builtIn = SkeletonAgentBuiltInDefaults.For(role);
         var isDeterministic = role == SkeletonAgentRole.Orchestrator;
+        var state = await ReadStateAsync(role, cancellationToken).ConfigureAwait(false);
 
         var provider = isDeterministic
             ? string.Empty
@@ -577,6 +578,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
             BuiltInDefaultVersion = builtIn.Version,
             TenantProfileVersion = null,
             ProjectProfileVersion = null,
+            PublishedVersion = state.CurrentVersion > 0 ? state.CurrentVersion : null,
             EffectiveHash = EffectiveHash(role, provider, model, timeout, skill, personality, fieldSources, builtIn.Version),
             Boundary = SkeletonAgentRoles.CodeOwnedBoundary(role)
         };

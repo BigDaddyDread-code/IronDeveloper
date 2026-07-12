@@ -259,6 +259,7 @@ public sealed class SkeletonAgentConfigTests
             Assert.AreEqual(42, published.PublishedVersion?.ActorUserId);
             Assert.AreEqual("ollama", (await service.GetAsync(SkeletonAgentRole.Builder)).Provider);
             Assert.AreEqual(1, (await service.ListHistoryAsync(SkeletonAgentRole.Builder)).Count);
+            Assert.AreEqual(1L, (await service.ListEffectiveAsync(tenantId: 1)).Single(profile => profile.Role == SkeletonAgentRole.Builder).PublishedVersion);
         }
         finally { TryDelete(root); }
     }

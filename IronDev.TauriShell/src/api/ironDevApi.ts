@@ -17,7 +17,7 @@ import type {
   SkeletonAgentProfileDraftTestOutcome,
   SkeletonAgentProfileDraftWriteRequest,
   SkeletonAgentProfileOutcome,
-  SkeletonAgentProfilePublishedVersion,
+  SkeletonAgentProfileHistoryView,
   SkeletonAgentProfilePublishRequest,
   SkeletonAgentProfileResetRequest,
   SkeletonAgentProfileRestoreRequest,
@@ -1257,8 +1257,9 @@ class IronDevApiClient {
     });
   }
 
-  async listAgentProfileHistory(role: string, signal?: AbortSignal): Promise<SkeletonAgentProfilePublishedVersion[]> {
-    return this.request<SkeletonAgentProfilePublishedVersion[]>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/history`, {
+  async listAgentProfileHistory(role: string, projectId?: number | null, signal?: AbortSignal): Promise<SkeletonAgentProfileHistoryView[]> {
+    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return this.request<SkeletonAgentProfileHistoryView[]>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/history${query}`, {
       method: 'GET',
       signal
     });

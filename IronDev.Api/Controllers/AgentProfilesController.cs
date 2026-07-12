@@ -1,6 +1,7 @@
 using IronDev.Api.Auth;
 using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
+using IronDev.Core.RunReports;
 using IronDev.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,11 +29,19 @@ public sealed class AgentProfilesController : ControllerBase
 {
     private readonly ISkeletonAgentProfileService _profiles;
     private readonly IUserService _userService;
+    private readonly IRunEventStore _runEvents;
+    private readonly IProjectMembershipService _projectMemberships;
 
-    public AgentProfilesController(ISkeletonAgentProfileService profiles, IUserService userService)
+    public AgentProfilesController(
+        ISkeletonAgentProfileService profiles,
+        IUserService userService,
+        IRunEventStore runEvents,
+        IProjectMembershipService projectMemberships)
     {
         _profiles = profiles;
         _userService = userService;
+        _runEvents = runEvents;
+        _projectMemberships = projectMemberships;
     }
 
     [HttpGet]
@@ -68,11 +77,29 @@ public sealed class AgentProfilesController : ControllerBase
     }
 
     [HttpGet("{role}/history")]
-    public async Task<ActionResult<IReadOnlyList<SkeletonAgentProfilePublishedVersion>>> History(string role, CancellationToken ct)
+    public async Task<ActionResult<IReadOnlyList<SkeletonAgentProfileHistoryView>>> History(
+        string role,
+        [FromQuery] int? projectId,
+        CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
             return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
-        return Ok(await _profiles.ListHistoryAsync(parsed, ct));
+
+        var ctx = CurrentUser();
+        if (ctx.TenantId is null || ctx.UserId <= 0)
+            return Forbid();
+        if (projectId is > 0 && !await _projectMemberships.HasAccessAsync(ctx.TenantId.Value, projectId.Value, ctx.UserId, ct))
+            return Forbid();
+
+        var history = await _profiles.ListHistoryAsync(parsed, ct);
+        var usage = projectId is > 0
+            ? await ReadUsageAsync(parsed, projectId.Value, ct)
+            : new Dictionary<long, IReadOnlyList<SkeletonAgentProfileRunUsage>>();
+        return Ok(history.Select(version => new SkeletonAgentProfileHistoryView
+        {
+            Version = version,
+            RunUsage = usage.GetValueOrDefault(version.Version, [])
+        }).ToArray());
     }
 
     [HttpPut("{role}/draft")]
@@ -184,6 +211,40 @@ public sealed class AgentProfilesController : ControllerBase
         var callerRole = await _userService.GetTenantRoleAsync(ctx.UserId, ctx.TenantId.Value, ct);
         return TenantUserRoles.CanAdministerUsers(callerRole);
     }
+
+    private async Task<Dictionary<long, IReadOnlyList<SkeletonAgentProfileRunUsage>>> ReadUsageAsync(
+        SkeletonAgentRole role,
+        int projectId,
+        CancellationToken cancellationToken)
+    {
+        var usage = new Dictionary<long, List<SkeletonAgentProfileRunUsage>>();
+        foreach (var runId in await _runEvents.GetRecentRunIdsAsync(50, cancellationToken))
+        {
+            var snapshot = (await _runEvents.GetEventsAsync(runId, cancellationToken))
+                .FirstOrDefault(runEvent =>
+                    runEvent.EventType == "AgentConfigurationSnapshotted" &&
+                    string.Equals(Payload(runEvent, "role"), role.ToString(), StringComparison.OrdinalIgnoreCase) &&
+                    int.TryParse(Payload(runEvent, "projectId"), out var capturedProjectId) && capturedProjectId == projectId &&
+                    long.TryParse(Payload(runEvent, "profileVersion"), out _));
+            if (snapshot is null || !long.TryParse(Payload(snapshot, "profileVersion"), out var version))
+                continue;
+
+            if (!usage.TryGetValue(version, out var items))
+                usage[version] = items = [];
+            items.Add(new SkeletonAgentProfileRunUsage
+            {
+                RunId = runId,
+                ProjectId = projectId,
+                WorkItemId = long.TryParse(Payload(snapshot, "workItemId"), out var workItemId) ? workItemId : 0,
+                CapturedAtUtc = DateTimeOffset.TryParse(Payload(snapshot, "createdUtc"), out var capturedAt) ? capturedAt : snapshot.TimestampUtc
+            });
+        }
+
+        return usage.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<SkeletonAgentProfileRunUsage>)pair.Value);
+    }
+
+    private static string Payload(RunEventDto runEvent, string key) =>
+        runEvent.Payload.TryGetValue(key, out var value) ? value : string.Empty;
 
     private static bool TryParseRole(string role, out SkeletonAgentRole parsed) =>
         Enum.TryParse(role, ignoreCase: true, out parsed) && Enum.IsDefined(parsed);

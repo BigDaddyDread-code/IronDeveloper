@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { EffectiveSkeletonAgentProfile, SkeletonAgentProfile, SkeletonAgentProfileDraft, SkeletonAgentProfilePublishedVersion } from '../../api/types';
+import type { EffectiveSkeletonAgentProfile, SkeletonAgentProfile, SkeletonAgentProfileDraft, SkeletonAgentProfileHistoryView, SkeletonAgentProfileUpdate } from '../../api/types';
 import { useSessionContext } from '../../state/useSessionContext';
 
 // AG-5 — per-agent configuration: the model each agent runs on and its skill +
@@ -28,7 +28,8 @@ export function AgentsPanel() {
   const [draftState, setDraftState] = useState<Record<string, SkeletonAgentProfileDraft>>({});
   const [publishReasons, setPublishReasons] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<Record<string, string>>({});
-  const [histories, setHistories] = useState<Record<string, SkeletonAgentProfilePublishedVersion[]>>({});
+  const [histories, setHistories] = useState<Record<string, SkeletonAgentProfileHistoryView[]>>({});
+  const [comparisonVersions, setComparisonVersions] = useState<Record<string, number[]>>({});
   const [resetFields, setResetFields] = useState<Record<string, string>>({});
   const [recoveryReasons, setRecoveryReasons] = useState<Record<string, string>>({});
 
@@ -41,7 +42,7 @@ export function AgentsPanel() {
       ]);
       const editable = result.filter((profile) => !DETERMINISTIC_ROLES.includes(profile.role));
       const persistedDrafts = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.getAgentProfileDraft(profile.role)] as const));
-      const publishedHistory = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.listAgentProfileHistory(profile.role)] as const));
+      const publishedHistory = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.listAgentProfileHistory(profile.role, session.config.selectedProjectId)] as const));
       setProfiles(result);
       setEffectiveProfiles(Object.fromEntries(effective.map((profile) => [profile.role, profile])));
       setDraftState(Object.fromEntries(persistedDrafts));
@@ -180,6 +181,16 @@ export function AgentsPanel() {
       setSavingRole(null);
     }
   }, [draftState, load, recoveryReasons, savingRole, session.client]);
+
+  const toggleComparison = (role: string, version: number) => {
+    setComparisonVersions((previous) => {
+      const selected = previous[role] ?? [];
+      const next = selected.includes(version)
+        ? selected.filter((item) => item !== version)
+        : [...selected.slice(-1), version];
+      return { ...previous, [role]: next };
+    });
+  };
 
   if (state === 'loading') {
     return <p className="fl-empty">Loading agents…</p>;
@@ -346,21 +357,14 @@ export function AgentsPanel() {
                   data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.resetAgent`}
                 >Reset agent</button>
               </div>
-              {histories[profile.role]?.length ? (
-                <div style={{ marginTop: 10 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.history`}>
-                  {histories[profile.role].map((version) => (
-                    <div key={version.version} style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '5px 0' }}>
-                      <span className="fl-empty">v{version.version} · {version.reason} · user {version.actorUserId}</span>
-                      <button
-                        className="fl-btn"
-                        disabled={savingRole !== null || !(recoveryReasons[profile.role]?.trim())}
-                        onClick={() => void restoreProfile(profile.role, version.version)}
-                        data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.restore.${version.version}`}
-                      >Restore</button>
-                    </div>
-                  ))}
-                </div>
-              ) : <p className="fl-empty">No published profile versions yet.</p>}
+              <ProfileHistory
+                role={profile.role}
+                history={histories[profile.role] ?? []}
+                selectedVersions={comparisonVersions[profile.role] ?? []}
+                onToggleComparison={(version) => toggleComparison(profile.role, version)}
+                restoreDisabled={savingRole !== null || !(recoveryReasons[profile.role]?.trim())}
+                onRestore={(version) => void restoreProfile(profile.role, version)}
+              />
             </div>
             </>
             )}
@@ -369,6 +373,109 @@ export function AgentsPanel() {
       })}
     </div>
   );
+}
+
+function ProfileHistory({
+  role,
+  history,
+  selectedVersions,
+  onToggleComparison,
+  restoreDisabled,
+  onRestore
+}: {
+  role: string;
+  history: SkeletonAgentProfileHistoryView[];
+  selectedVersions: number[];
+  onToggleComparison: (version: number) => void;
+  restoreDisabled: boolean;
+  onRestore: (version: number) => void;
+}) {
+  const roleKey = role.toLowerCase();
+  const selected = selectedVersions
+    .map((version) => history.find((item) => item.version.version === version))
+    .filter((item): item is SkeletonAgentProfileHistoryView => item !== undefined);
+
+  if (history.length === 0) {
+    return <p className="fl-empty">No published profile versions yet.</p>;
+  }
+
+  return (
+    <div style={{ marginTop: 10 }} data-testid={`flow.settings.agent.${roleKey}.history`}>
+      <p className="fl-plabel">Version history</p>
+      {history.map((item) => {
+        const version = item.version;
+        return (
+          <details key={version.version} style={{ borderTop: '1px solid var(--fl-line)', padding: '8px 0' }}>
+            <summary style={{ cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={selectedVersions.includes(version.version)}
+                onChange={() => onToggleComparison(version.version)}
+                onClick={(event) => event.stopPropagation()}
+                aria-label={`Compare version ${version.version}`}
+                data-testid={`flow.settings.agent.${roleKey}.compare.${version.version}`}
+              />{' '}
+              <strong>v{version.version}</strong> - {version.reason}
+            </summary>
+            <dl className="fl-kv" style={{ margin: '8px 0' }}>
+              <dt>Actor</dt><dd style={{ margin: 0 }}>User {version.actorUserId}</dd>
+              <dt>Published</dt><dd style={{ margin: 0 }}>{new Date(version.publishedAtUtc).toLocaleString()}</dd>
+              <dt>Configuration</dt><dd style={{ margin: 0 }}>{formatProfileValues(version.values)}</dd>
+              <dt>Usage</dt>
+              <dd style={{ margin: 0 }} data-testid={`flow.settings.agent.${roleKey}.usage.${version.version}`}>
+                {item.runUsage.length > 0
+                  ? item.runUsage.map((usage) => `${usage.runId} (work item ${usage.workItemId})`).join(', ')
+                  : 'No linked run was observed in the bounded usage window.'}
+              </dd>
+            </dl>
+            <p className="fl-empty" style={{ marginTop: 0 }}>{item.usageBoundary}</p>
+            <button
+              className="fl-btn"
+              disabled={restoreDisabled}
+              onClick={() => onRestore(version.version)}
+              data-testid={`flow.settings.agent.${roleKey}.restore.${version.version}`}
+            >Restore version</button>
+          </details>
+        );
+      })}
+      {selected.length === 2 ? (
+        <ProfileComparison roleKey={roleKey} from={selected[0].version} to={selected[1].version} />
+      ) : null}
+    </div>
+  );
+}
+
+function ProfileComparison({
+  roleKey,
+  from,
+  to
+}: {
+  roleKey: string;
+  from: SkeletonAgentProfileHistoryView['version'];
+  to: SkeletonAgentProfileHistoryView['version'];
+}) {
+  const fields: Array<keyof SkeletonAgentProfileUpdate> = ['provider', 'model', 'timeoutSeconds', 'skill', 'personality'];
+  return (
+    <div data-testid={`flow.settings.agent.${roleKey}.comparison`} style={{ marginTop: 12 }}>
+      <p className="fl-plabel">Compare v{from.version} to v{to.version}</p>
+      <table className="fl-table" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <thead><tr><th>Field</th><th>v{from.version}</th><th>v{to.version}</th></tr></thead>
+        <tbody>
+          {fields.map((field) => (
+            <tr key={field}>
+              <td>{field}</td>
+              <td style={{ wordBreak: 'break-word' }}>{String(from.values[field] ?? '')}</td>
+              <td style={{ wordBreak: 'break-word' }}>{String(to.values[field] ?? '')}{from.values[field] !== to.values[field] ? ' (changed)' : ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function formatProfileValues(values: SkeletonAgentProfileUpdate): string {
+  return `${values.provider} / ${values.model} / ${values.timeoutSeconds}s`;
 }
 
 function EffectiveProfileSummary({ role, effective }: { role: string; effective?: EffectiveSkeletonAgentProfile }) {

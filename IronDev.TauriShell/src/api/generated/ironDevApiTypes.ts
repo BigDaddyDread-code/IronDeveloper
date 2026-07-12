@@ -391,7 +391,9 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    projectId?: number;
+                };
                 header?: never;
                 path: {
                     role: string;
@@ -406,9 +408,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain": components["schemas"]["SkeletonAgentProfilePublishedVersion"][];
-                        "application/json": components["schemas"]["SkeletonAgentProfilePublishedVersion"][];
-                        "text/json": components["schemas"]["SkeletonAgentProfilePublishedVersion"][];
+                        "text/plain": components["schemas"]["SkeletonAgentProfileHistoryView"][];
+                        "application/json": components["schemas"]["SkeletonAgentProfileHistoryView"][];
+                        "text/json": components["schemas"]["SkeletonAgentProfileHistoryView"][];
                     };
                 };
             };
@@ -12456,6 +12458,8 @@ export interface components {
             builtInDefaultVersion?: string | null;
             tenantProfileVersion?: string | null;
             projectProfileVersion?: string | null;
+            /** Format: int64 */
+            publishedVersion?: number | null;
             effectiveHash: string | null;
             boundary?: string | null;
         };
@@ -15269,6 +15273,11 @@ export interface components {
             inherited: boolean;
             detail?: string | null;
         };
+        SkeletonAgentProfileHistoryView: {
+            version: components["schemas"]["SkeletonAgentProfilePublishedVersion"];
+            runUsage?: components["schemas"]["SkeletonAgentProfileRunUsage"][] | null;
+            usageBoundary?: string | null;
+        };
         SkeletonAgentProfileOutcome: {
             succeeded: boolean;
             failureReason?: string | null;
@@ -15301,6 +15310,15 @@ export interface components {
             /** Format: int64 */
             expectedRevision: number;
             reason?: string | null;
+        };
+        SkeletonAgentProfileRunUsage: {
+            runId: string | null;
+            /** Format: int32 */
+            projectId: number;
+            /** Format: int64 */
+            workItemId: number;
+            /** Format: date-time */
+            capturedAtUtc: string;
         };
         SkeletonAgentProfileUpdate: {
             provider?: string | null;
@@ -15591,6 +15609,8 @@ export interface components {
             workItemId: number;
             runId: string | null;
             role: string | null;
+            /** Format: int64 */
+            profileVersion?: number | null;
             connectionId?: string | null;
             provider?: string | null;
             controlledEndpointIdentity?: string | null;

@@ -506,6 +506,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -516,7 +524,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SkeletonAgentProfilePublishedVersion"
+                    "$ref": "#/components/schemas/SkeletonAgentProfileHistoryView"
                   }
                 }
               },
@@ -524,7 +532,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SkeletonAgentProfilePublishedVersion"
+                    "$ref": "#/components/schemas/SkeletonAgentProfileHistoryView"
                   }
                 }
               },
@@ -532,7 +540,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SkeletonAgentProfilePublishedVersion"
+                    "$ref": "#/components/schemas/SkeletonAgentProfileHistoryView"
                   }
                 }
               }
@@ -19902,6 +19910,11 @@
             "type": "string",
             "nullable": true
           },
+          "publishedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
           "effectiveHash": {
             "type": "string",
             "nullable": true
@@ -30223,6 +30236,29 @@
         },
         "additionalProperties": false
       },
+      "SkeletonAgentProfileHistoryView": {
+        "required": [
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/SkeletonAgentProfilePublishedVersion"
+          },
+          "runUsage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkeletonAgentProfileRunUsage"
+            },
+            "nullable": true
+          },
+          "usageBoundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SkeletonAgentProfileOutcome": {
         "required": [
           "succeeded"
@@ -30333,6 +30369,34 @@
           "reason": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkeletonAgentProfileRunUsage": {
+        "required": [
+          "capturedAtUtc",
+          "projectId",
+          "runId",
+          "workItemId"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "capturedAtUtc": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -31468,6 +31532,11 @@
           },
           "role": {
             "type": "string",
+            "nullable": true
+          },
+          "profileVersion": {
+            "type": "integer",
+            "format": "int64",
             "nullable": true
           },
           "connectionId": {
