@@ -66,6 +66,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
             DisplayName = SkeletonAgentRoles.DisplayName(role),
             BuiltInDefaultName = builtIn.Name,
             BuiltInDefaultVersion = builtIn.Version,
+            AiConnectionId = Coalesce(settings?.AiConnectionId, "deployment-default"),
             Provider = Coalesce(settings?.Provider, global.Provider),
             Model = Coalesce(settings?.Model, global.Model),
             // BaseUrl is always the deployment's global value — never taken from
@@ -339,7 +340,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
             if (scope is not null && request.Scope.Equals(SkeletonAgentProfileResetScopes.Field, StringComparison.OrdinalIgnoreCase))
             {
                 if (!await RemoveScopedFieldAsync(role, scope, request.Field, cancellationToken).ConfigureAwait(false))
-                    return Refused("ResetFieldInvalid", "Reset field must be provider, model, timeoutSeconds, skill, or personality.", state.Revision, state.Draft);
+                    return Refused("ResetFieldInvalid", "Reset field must be aiConnectionId, provider, model, timeoutSeconds, skill, or personality.", state.Revision, state.Draft);
                 var inherited = ToUpdate((await ListEffectiveAsync(scope.TenantId, scope.ProjectId, cancellationToken).ConfigureAwait(false)).Single(profile => profile.Role == role));
                 return await PublishStateOnlyAsync(role, scope, inherited, request.Reason, actorUserId, state, cancellationToken).ConfigureAwait(false);
             }
@@ -361,6 +362,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
                 var current = ToUpdate(await GetAsync(role, cancellationToken).ConfigureAwait(false));
                 replacement = request.Field.Trim().ToLowerInvariant() switch
                 {
+                    "aiconnectionid" => current with { AiConnectionId = defaults.AiConnectionId },
                     "provider" => current with { Provider = defaults.Provider },
                     "model" => current with { Model = defaults.Model },
                     "timeoutseconds" => current with { TimeoutSeconds = defaults.TimeoutSeconds },
@@ -369,7 +371,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
                     _ => null!
                 };
                 if (replacement is null)
-                    return Refused("ResetFieldInvalid", "Reset field must be provider, model, timeoutSeconds, skill, or personality.", state.Revision, state.Draft);
+                    return Refused("ResetFieldInvalid", "Reset field must be aiConnectionId, provider, model, timeoutSeconds, skill, or personality.", state.Revision, state.Draft);
             }
             else if (request.Scope.Equals(SkeletonAgentProfileResetScopes.Agent, StringComparison.OrdinalIgnoreCase) ||
                      request.Scope.Equals(SkeletonAgentProfileResetScopes.BuiltIn, StringComparison.OrdinalIgnoreCase))
@@ -489,6 +491,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         Directory.CreateDirectory(dir);
         var settings = new AgentSettingsFile
         {
+            AiConnectionId = update.AiConnectionId?.Trim() ?? "deployment-default",
             Provider = update.Provider?.Trim() ?? string.Empty,
             Model = update.Model?.Trim() ?? string.Empty,
             BaseUrl = string.Empty,
@@ -504,6 +507,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         var issues = new List<SkeletonAgentProfileValidationIssue>();
         var leakedField = new Dictionary<string, string?>
         {
+            ["aiConnectionId"] = update.AiConnectionId,
             ["provider"] = update.Provider,
             ["model"] = update.Model,
             ["skill"] = update.Skill,
@@ -511,6 +515,9 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         }.FirstOrDefault(item => !string.IsNullOrEmpty(item.Value) && SecretMarkers.Any(marker => item.Value.Contains(marker, StringComparison.OrdinalIgnoreCase)));
         if (!string.IsNullOrEmpty(leakedField.Key))
             issues.Add(Issue("SecretLikeContent", leakedField.Key, "This update looks like it contains a secret. Profiles configure voice and model only; store credentials in AI Connections, never in an agent profile."));
+
+        if (string.IsNullOrWhiteSpace(update.AiConnectionId))
+            issues.Add(Issue("AiConnectionRequired", "aiConnectionId", "AI connection is required."));
 
         var provider = update.Provider?.Trim().ToLowerInvariant() ?? string.Empty;
         var fakeAllowed = string.Equals(_configuration["AgentProfiles:AllowFakeProvider"], "true", StringComparison.OrdinalIgnoreCase);
@@ -530,6 +537,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
 
     private static SkeletonAgentProfileUpdate ToUpdate(SkeletonAgentProfile profile) => new()
     {
+        AiConnectionId = profile.AiConnectionId,
         Provider = profile.Provider,
         Model = profile.Model,
         TimeoutSeconds = profile.TimeoutSeconds,
@@ -539,6 +547,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
 
     private static SkeletonAgentProfileUpdate ToUpdate(EffectiveSkeletonAgentProfile profile) => new()
     {
+        AiConnectionId = profile.AiConnectionId,
         Provider = profile.Provider,
         Model = profile.Model,
         TimeoutSeconds = profile.TimeoutSeconds,
@@ -566,6 +575,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         var builtIn = SkeletonAgentBuiltInDefaults.For(role);
         return new SkeletonAgentProfileUpdate
         {
+            AiConnectionId = "deployment-default",
             Provider = global.Provider?.Trim() ?? string.Empty,
             Model = global.Model?.Trim() ?? string.Empty,
             TimeoutSeconds = global.TimeoutSeconds,
@@ -660,18 +670,19 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
                 File.Delete(textPath);
             return true;
         }
-        if (normalized is not ("provider" or "model" or "timeoutseconds"))
+        if (normalized is not ("aiconnectionid" or "provider" or "model" or "timeoutseconds"))
             return false;
 
         var settingsPath = Path.Combine(directory, "agent.json");
         var settings = await ReadSettingsAsync(settingsPath, cancellationToken).ConfigureAwait(false) ?? new AgentSettingsFile();
         settings = normalized switch
         {
+            "aiconnectionid" => settings with { AiConnectionId = string.Empty },
             "provider" => settings with { Provider = string.Empty },
             "model" => settings with { Model = string.Empty },
             _ => settings with { TimeoutSeconds = null }
         };
-        if (string.IsNullOrWhiteSpace(settings.Provider) && string.IsNullOrWhiteSpace(settings.Model) && settings.TimeoutSeconds is not > 0)
+        if (string.IsNullOrWhiteSpace(settings.AiConnectionId) && string.IsNullOrWhiteSpace(settings.Provider) && string.IsNullOrWhiteSpace(settings.Model) && settings.TimeoutSeconds is not > 0)
         {
             if (File.Exists(settingsPath))
                 File.Delete(settingsPath);
@@ -710,6 +721,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
             DisplayName = effective.DisplayName,
             BuiltInDefaultName = SkeletonAgentBuiltInDefaults.Name,
             BuiltInDefaultVersion = effective.BuiltInDefaultVersion,
+            AiConnectionId = effective.AiConnectionId,
             Provider = effective.Provider,
             Model = effective.Model,
             TimeoutSeconds = effective.TimeoutSeconds,
@@ -749,6 +761,9 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         var provider = isDeterministic
             ? string.Empty
             : Coalesce(projectSettings?.Provider, Coalesce(tenantSettings?.Provider, Coalesce(legacySettings?.Provider, global.Provider)));
+        var aiConnectionId = isDeterministic
+            ? string.Empty
+            : Coalesce(projectSettings?.AiConnectionId, Coalesce(tenantSettings?.AiConnectionId, Coalesce(legacySettings?.AiConnectionId, "deployment-default")));
         var model = isDeterministic
             ? string.Empty
             : Coalesce(projectSettings?.Model, Coalesce(tenantSettings?.Model, Coalesce(legacySettings?.Model, global.Model)));
@@ -780,6 +795,11 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         {
             var sources = new List<SkeletonAgentProfileFieldSource>
             {
+                Source(
+                    "aiConnectionId",
+                    string.IsNullOrWhiteSpace(legacySettings?.AiConnectionId) ? "DeploymentDefault" : "RoleOverride",
+                    string.IsNullOrWhiteSpace(legacySettings?.AiConnectionId) ? "deployment-default" : $"{ProfileRelativePath(role)}/agent.json",
+                    inherited: string.IsNullOrWhiteSpace(legacySettings?.AiConnectionId)),
                 Source(
                     "provider",
                     string.IsNullOrWhiteSpace(legacySettings?.Provider) ? "DeploymentDefault" : "RoleOverride",
@@ -819,7 +839,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         {
             Role = role,
             DisplayName = SkeletonAgentRoles.DisplayName(role),
-            AiConnectionId = isDeterministic ? string.Empty : "deployment-default",
+            AiConnectionId = aiConnectionId,
             Provider = provider,
             Model = model,
             TimeoutSeconds = timeout,
@@ -835,7 +855,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
             PublishedScopeLayer = projectState.CurrentVersion > 0 ? "Project"
                 : tenantState.CurrentVersion > 0 ? "Tenant"
                 : legacyState.CurrentVersion > 0 ? "LegacyRole" : string.Empty,
-            EffectiveHash = EffectiveHash(role, provider, model, timeout, skill, personality, fieldSources, builtIn.Version),
+            EffectiveHash = EffectiveHash(role, aiConnectionId, provider, model, timeout, skill, personality, fieldSources, builtIn.Version),
             Boundary = SkeletonAgentRoles.CodeOwnedBoundary(role)
         };
     }
@@ -848,6 +868,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         string layer)
     {
         var version = state.CurrentVersion > 0 ? state.CurrentVersion.ToString() : null;
+        ReplaceSource(sources, "aiConnectionId", !string.IsNullOrWhiteSpace(settings?.AiConnectionId), layer, Path.Combine(directory, "agent.json"), version);
         ReplaceSource(sources, "provider", !string.IsNullOrWhiteSpace(settings?.Provider), layer, Path.Combine(directory, "agent.json"), version);
         ReplaceSource(sources, "model", !string.IsNullOrWhiteSpace(settings?.Model), layer, Path.Combine(directory, "agent.json"), version);
         ReplaceSource(sources, "timeoutSeconds", settings?.TimeoutSeconds is > 0, layer, Path.Combine(directory, "agent.json"), version);
@@ -918,6 +939,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
 
     private static string EffectiveHash(
         SkeletonAgentRole role,
+        string aiConnectionId,
         string provider,
         string model,
         int timeoutSeconds,
@@ -929,6 +951,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         var payload = JsonSerializer.Serialize(new
         {
             role,
+            aiConnectionId,
             provider,
             model,
             timeoutSeconds,
@@ -951,6 +974,7 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
 
     private sealed record AgentSettingsFile
     {
+        public string AiConnectionId { get; init; } = string.Empty;
         public string Provider { get; init; } = string.Empty;
         public string Model { get; init; } = string.Empty;
         public string BaseUrl { get; init; } = string.Empty;

@@ -15234,6 +15234,7 @@ export interface components {
             displayName?: string | null;
             builtInDefaultName?: string | null;
             builtInDefaultVersion?: string | null;
+            aiConnectionId?: string | null;
             provider?: string | null;
             model?: string | null;
             baseUrl?: string | null;
@@ -15278,6 +15279,7 @@ export interface components {
         SkeletonAgentProfileDraftWriteRequest: {
             /** Format: int64 */
             expectedRevision: number;
+            aiConnectionId?: string | null;
             provider?: string | null;
             model?: string | null;
             /** Format: int32 */
@@ -15346,6 +15348,7 @@ export interface components {
             capturedAtUtc: string;
         };
         SkeletonAgentProfileUpdate: {
+            aiConnectionId?: string | null;
             provider?: string | null;
             model?: string | null;
             /** Format: int32 */

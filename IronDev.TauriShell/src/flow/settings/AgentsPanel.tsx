@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { EffectiveSkeletonAgentProfile, SkeletonAgentProfile, SkeletonAgentProfileDraft, SkeletonAgentProfileHistoryView, SkeletonAgentProfileUpdate } from '../../api/types';
+import type { AiConnectionMetadata, EffectiveSkeletonAgentProfile, SkeletonAgentProfile, SkeletonAgentProfileDraft, SkeletonAgentProfileHistoryView, SkeletonAgentProfileUpdate } from '../../api/types';
 import { useSessionContext } from '../../state/useSessionContext';
 
 // AG-5 — per-agent configuration: the model each agent runs on and its skill +
@@ -20,6 +20,7 @@ export function AgentsPanel() {
   const session = useSessionContext();
   const [profileScope, setProfileScope] = useState<'project' | 'tenant'>('project');
   const [profiles, setProfiles] = useState<SkeletonAgentProfile[]>([]);
+  const [connections, setConnections] = useState<AiConnectionMetadata[]>([]);
   const [effectiveProfiles, setEffectiveProfiles] = useState<Record<string, EffectiveSkeletonAgentProfile>>({});
   const [drafts, setDrafts] = useState<Record<string, SkeletonAgentProfile>>({});
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -37,14 +38,16 @@ export function AgentsPanel() {
   const load = useCallback(async () => {
     setState('loading');
     try {
-      const [result, effective] = await Promise.all([
+      const [result, effective, availableConnections] = await Promise.all([
         session.client.listAgentProfiles(),
-        session.client.listEffectiveAgentProfiles(session.config.selectedProjectId)
+        session.client.listEffectiveAgentProfiles(session.config.selectedProjectId),
+        session.client.listAiConnections()
       ]);
       const editable = result.filter((profile) => !DETERMINISTIC_ROLES.includes(profile.role));
       const persistedDrafts = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.getAgentProfileDraft(profile.role, session.config.selectedProjectId, profileScope)] as const));
       const publishedHistory = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.listAgentProfileHistory(profile.role, session.config.selectedProjectId, profileScope)] as const));
       setProfiles(result);
+      setConnections(availableConnections.filter((connection) => connection.enabled && connection.tenantAvailable && connection.projectAvailable));
       setEffectiveProfiles(Object.fromEntries(effective.map((profile) => [profile.role, profile])));
       setDraftState(Object.fromEntries(persistedDrafts));
       setHistories(Object.fromEntries(publishedHistory));
@@ -76,6 +79,7 @@ export function AgentsPanel() {
       try {
         const outcome = await session.client.saveAgentProfileDraft(role, {
           expectedRevision: draftState[role]?.revision ?? 0,
+          aiConnectionId: draft.aiConnectionId,
           provider: draft.provider,
           model: draft.model,
           timeoutSeconds: draft.timeoutSeconds,
@@ -230,6 +234,7 @@ export function AgentsPanel() {
         const isDeterministic = DETERMINISTIC_ROLES.includes(profile.role);
         const displayName = profile.displayName || displayAgentRole(profile.role);
         const effective = effectiveProfiles[profile.role];
+        const connectionAvailable = connections.some((connection) => connection.id === draft.aiConnectionId);
         return (
           <div className="fl-panel-box" key={profile.role} style={{ marginTop: 10 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}`}>
             <p className="fl-plabel" style={{ marginTop: 0 }}>
@@ -245,6 +250,20 @@ export function AgentsPanel() {
               </>
             ) : (
             <>
+            <p className="fl-plabel" style={{ marginTop: 10 }}>AI connection</p>
+            <select
+              className="fl-select"
+              value={draft.aiConnectionId}
+              onChange={(event) => patch(profile.role, { aiConnectionId: event.target.value })}
+              data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.connection`}
+            >
+              {!connectionAvailable ? (
+                <option value={draft.aiConnectionId} disabled>{draft.aiConnectionId || 'No connection'} (unavailable)</option>
+              ) : null}
+              {connections.map((connection) => (
+                <option key={connection.id} value={connection.id}>{connection.displayName}</option>
+              ))}
+            </select>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <select
                 className="fl-select"
@@ -297,7 +316,7 @@ export function AgentsPanel() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
               <button
                 className="fl-btn fl-pri"
-                disabled={savingRole !== null}
+                disabled={savingRole !== null || !connectionAvailable}
                 onClick={() => void save(profile.role)}
                 data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.save`}
               >
@@ -305,7 +324,7 @@ export function AgentsPanel() {
               </button>
               <button
                 className="fl-btn"
-                disabled={savingRole !== null || !draftState[profile.role]}
+                disabled={savingRole !== null || !connectionAvailable || !draftState[profile.role]}
                 onClick={() => void testDraft(profile.role)}
                 data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.test`}
               >
@@ -323,7 +342,7 @@ export function AgentsPanel() {
               />
               <button
                 className="fl-btn fl-pri"
-                disabled={savingRole !== null || !draftState[profile.role]?.isValid || !(publishReasons[profile.role]?.trim())}
+                disabled={savingRole !== null || !connectionAvailable || !draftState[profile.role]?.isValid || !(publishReasons[profile.role]?.trim())}
                 onClick={() => void publishDraft(profile.role)}
                 data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.publish`}
               >
@@ -346,6 +365,7 @@ export function AgentsPanel() {
                   onChange={(event) => setResetFields((previous) => ({ ...previous, [profile.role]: event.target.value }))}
                   data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.resetField`}
                 >
+                  <option value="aiConnectionId">AI connection</option>
                   <option value="provider">Provider</option>
                   <option value="model">Model</option>
                   <option value="timeoutSeconds">Timeout</option>
@@ -469,7 +489,7 @@ function ProfileComparison({
   from: SkeletonAgentProfileHistoryView['version'];
   to: SkeletonAgentProfileHistoryView['version'];
 }) {
-  const fields: Array<keyof SkeletonAgentProfileUpdate> = ['provider', 'model', 'timeoutSeconds', 'skill', 'personality'];
+  const fields: Array<keyof SkeletonAgentProfileUpdate> = ['aiConnectionId', 'provider', 'model', 'timeoutSeconds', 'skill', 'personality'];
   return (
     <div data-testid={`flow.settings.agent.${roleKey}.comparison`} style={{ marginTop: 12 }}>
       <p className="fl-plabel">Compare v{from.version} to v{to.version}</p>
@@ -490,7 +510,7 @@ function ProfileComparison({
 }
 
 function formatProfileValues(values: SkeletonAgentProfileUpdate): string {
-  return `${values.provider} / ${values.model} / ${values.timeoutSeconds}s`;
+  return `${values.aiConnectionId} / ${values.provider} / ${values.model} / ${values.timeoutSeconds}s`;
 }
 
 function EffectiveProfileSummary({ role, effective }: { role: string; effective?: EffectiveSkeletonAgentProfile }) {
@@ -500,6 +520,7 @@ function EffectiveProfileSummary({ role, effective }: { role: string; effective?
 
   const roleKey = role.toLowerCase();
   const providerSource = fieldSource(effective, 'provider');
+  const connectionSource = fieldSource(effective, 'aiConnectionId');
   const modelSource = fieldSource(effective, 'model');
   const skillSource = fieldSource(effective, 'effectiveSkill');
   const personalitySource = fieldSource(effective, 'effectivePersonality');
@@ -515,6 +536,10 @@ function EffectiveProfileSummary({ role, effective }: { role: string; effective?
         {providerLabel} / {modelLabel} / {effective.timeoutSeconds}s
       </p>
       <dl className="fl-kv" style={{ marginTop: 8 }}>
+        <dt>Connection source</dt>
+        <dd style={{ margin: 0 }} data-testid={`flow.settings.agent.${roleKey}.effective.connectionSource`}>
+          {formatSource(connectionSource)}
+        </dd>
         <dt>Provider source</dt>
         <dd style={{ margin: 0 }} data-testid={`flow.settings.agent.${roleKey}.effective.providerSource`}>
           {formatSource(providerSource)}

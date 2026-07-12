@@ -30121,6 +30121,10 @@
             "type": "string",
             "nullable": true
           },
+          "aiConnectionId": {
+            "type": "string",
+            "nullable": true
+          },
           "provider": {
             "type": "string",
             "nullable": true
@@ -30278,6 +30282,10 @@
           "expectedRevision": {
             "type": "integer",
             "format": "int64"
+          },
+          "aiConnectionId": {
+            "type": "string",
+            "nullable": true
           },
           "provider": {
             "type": "string",
@@ -30519,6 +30527,10 @@
       "SkeletonAgentProfileUpdate": {
         "type": "object",
         "properties": {
+          "aiConnectionId": {
+            "type": "string",
+            "nullable": true
+          },
           "provider": {
             "type": "string",
             "nullable": true

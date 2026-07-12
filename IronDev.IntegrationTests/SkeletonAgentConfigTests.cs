@@ -186,9 +186,9 @@ public sealed class SkeletonAgentConfigTests
     {
         var updateProps = typeof(SkeletonAgentProfileUpdate).GetProperties().Select(p => p.Name).ToArray();
         CollectionAssert.AreEquivalent(
-            new[] { "Provider", "Model", "TimeoutSeconds", "Skill", "Personality" },
+            new[] { "AiConnectionId", "Provider", "Model", "TimeoutSeconds", "Skill", "Personality" },
             updateProps,
-            "The write surface is voice and model only — no BaseUrl (outbound endpoint is deployment config, not user-editable).");
+            "The write surface is controlled connection identity, voice, and model only — no BaseUrl or credential material.");
 
         foreach (var forbidden in new[] { "Capability", "Approval", "Authority", "Key", "Secret", "Token", "Grant", "Gate", "BaseUrl", "Url" })
         {
@@ -415,6 +415,7 @@ public sealed class SkeletonAgentConfigTests
             var tenantSaved = await service.SaveDraftAsync(SkeletonAgentRole.Builder, tenantScope, new SkeletonAgentProfileDraftWriteRequest
             {
                 ExpectedRevision = tenantDraft.Revision,
+                AiConnectionId = "tenant-connection",
                 Provider = "ollama",
                 Model = "tenant-model",
                 TimeoutSeconds = 40,
@@ -433,6 +434,7 @@ public sealed class SkeletonAgentConfigTests
             var projectSaved = await service.SaveDraftAsync(SkeletonAgentRole.Builder, projectScope, new SkeletonAgentProfileDraftWriteRequest
             {
                 ExpectedRevision = projectDraft.Revision,
+                AiConnectionId = "project-connection",
                 Provider = "openai",
                 Model = "project-model",
                 TimeoutSeconds = 25,
@@ -447,9 +449,12 @@ public sealed class SkeletonAgentConfigTests
 
             var projectEffective = (await service.ListEffectiveAsync(11, 101)).Single(profile => profile.Role == SkeletonAgentRole.Builder);
             Assert.AreEqual("project-model", projectEffective.Model);
+            Assert.AreEqual("project-connection", projectEffective.AiConnectionId);
+            Assert.AreEqual("ProjectOverride", projectEffective.FieldSources.Single(source => source.Field == "aiConnectionId").SourceLayer);
             Assert.AreEqual("ProjectOverride", projectEffective.FieldSources.Single(source => source.Field == "model").SourceLayer);
             var otherProject = (await service.ListEffectiveAsync(11, 202)).Single(profile => profile.Role == SkeletonAgentRole.Builder);
             Assert.AreEqual("tenant-model", otherProject.Model);
+            Assert.AreEqual("tenant-connection", otherProject.AiConnectionId);
             Assert.AreEqual("TenantDefault", otherProject.FieldSources.Single(source => source.Field == "model").SourceLayer);
 
             var fieldReset = await service.ResetAsync(SkeletonAgentRole.Builder, projectScope, new SkeletonAgentProfileResetRequest
@@ -473,6 +478,7 @@ public sealed class SkeletonAgentConfigTests
             var afterProjectReset = (await service.ListEffectiveAsync(11, 101)).Single(profile => profile.Role == SkeletonAgentRole.Builder);
             Assert.AreEqual("tenant-model", afterProjectReset.Model);
             Assert.AreEqual("ollama", afterProjectReset.Provider);
+            Assert.AreEqual("tenant-connection", afterProjectReset.AiConnectionId);
             Assert.IsTrue(afterProjectReset.FieldSources.All(source => source.SourceLayer != "ProjectOverride"));
             Assert.HasCount(3, await service.ListHistoryAsync(SkeletonAgentRole.Builder, projectScope));
         }
