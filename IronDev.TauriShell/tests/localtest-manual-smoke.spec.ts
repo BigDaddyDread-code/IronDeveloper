@@ -75,6 +75,18 @@ test.describe('LocalTest manual flow-shell smoke', () => {
     await expect(page.getByTestId('flow.governance.overview')).toBeVisible();
     notes.push('Technical evidence is progressively disclosed and returns to the project overview.');
 
+    await page.getByTestId('flow.library.nav.audit').click();
+    await expect(page).toHaveURL('/projects/1/library/audit');
+    await expect(page.getByTestId('flow.audit.rows')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('flow.audit.export.open').click();
+    await expect(page.getByTestId('flow.audit.export.download')).toBeDisabled();
+    await page.getByTestId('flow.audit.export.generate').click();
+    await expect(page.getByTestId('flow.audit.export.result')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('flow.audit.export.result').locator('code')).toHaveText(/^[a-f0-9]{64}$/);
+    await expect(page.getByTestId('flow.audit.export.dialog')).toContainText(/grant authority/i);
+    await expect(page.getByTestId('flow.audit.export.download')).toBeEnabled();
+    notes.push('Audit generated a bounded backend JSON package with a 64-character item hash and no authority claim.');
+
     const bodyText = await page.locator('body').innerText();
     expect(bodyText).not.toMatch(/\bfake\b/i);
 

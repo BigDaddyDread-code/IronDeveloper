@@ -20,7 +20,7 @@ This file closes the repository-side V2 feature scope without pretending the fin
 | Shared-write integrity | Passed | Work Item collaboration and channel membership refuse stale writes with reload-and-compare recovery. |
 | Apply recovery | Passed with explicit boundary | Interrupted/failed apply states are classified with safe resume/retry/abandon/manual-review actions. Rollback execution remains outside V2. |
 | Two-user authority routing | Passed | Reviewer/approver eligibility, self-approval refusal, solo exception display, and acting-human attribution are backend-governed. |
-| Unified audit ledger | Passed | Library Audit exposes read-only actor/action/outcome/correlation/evidence rows and filters. It grants no authority. |
+| Unified audit ledger | Passed | Library Audit exposes read-only actor/action/outcome/correlation/evidence rows, filters, safe event detail, and a bounded backend-produced JSON export with integrity metadata. It grants no authority. |
 | Non-author Tauri qualification | Pending human gate | Must be performed by a person who did not build the slice, in the Tauri desktop app, using only supported product instructions. |
 | Production shared-host service | Excluded | V2 is a local/technical pilot, not a production hosted service. |
 | Commit, push, pull request, merge, release, deploy from product | Excluded | Source apply receipts do not imply source-control or release authority. |
@@ -29,7 +29,7 @@ This file closes the repository-side V2 feature scope without pretending the fin
 
 - Production identity, hosting, backup, monitoring, SLO, and security-operations contracts are not implemented.
 - General external tool connection setup and mutating tool invocation are not implemented.
-- Audit export, analytics, and reporting are not implemented.
+- Bounded Audit JSON export is supported. Audit analytics and reporting are not implemented.
 - Realtime presence and live typing are not implemented.
 - Secure provider credential setup is not implemented.
 - Settings remain functionally split but not redesigned.

@@ -11,6 +11,7 @@ This folder contains product-facing contracts for the IronDev desktop experience
 - [IronDev v2.5 Governance UX Specification](IRONDEV_V25_GOVERNANCE_UX_SPEC.md) - project control centre, backend-owned posture, attention, exceptions, decisions, technical evidence, and legacy viewer disposition.
 - [IronDev v2.5 Governance Acceptance](IRONDEV_V25_GOVERNANCE_ACCEPTANCE.md) - delivered slices, acceptance evidence, live LocalTest result, and known limits.
 - [Audit Export and Evidence Detail](IRONDEV_AUDIT_EXPORT_SPEC.md) - bounded backend-produced JSON export, row inspection, safe evidence navigation, and read-only authority boundaries.
+- [Audit Export Acceptance](IRONDEV_AUDIT_EXPORT_ACCEPTANCE.md) - delivered contract, automated and live LocalTest evidence, authority boundary, and known exclusions.
 - [V25-00 Work Item Contract Map](V25_00_WORK_ITEM_CONTRACT_MAP.md) - current-to-target ownership, migration, compatibility, and authority contract before durable Work Item schema work.
 - [IronDev Product and UX Specification v2](IRONDEV_PRODUCT_UX_SPEC_V2.md) - master information architecture, entry journey, Board, Chat, Work Item, Library, Documents, Tools, multi-user behavior, states, accessibility, and developer handoff.
 - [Multi-User Chat and Collaboration](IRONDEV_MULTI_USER_CHAT_SPEC.md) - channels, direct IronDev sessions, source inspection, mentions, shared drafts, concurrency, and artifact handoff.
