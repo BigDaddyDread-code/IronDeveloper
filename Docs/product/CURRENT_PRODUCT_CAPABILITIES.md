@@ -1,8 +1,8 @@
 # Current Product Capabilities
 
 **Status:** Current product truth  
-**Verified against:** `main` after API-CONTRACT-1  
-**Last reviewed:** 11 July 2026
+**Verified against:** `main` after AUDIT-DETAIL-1
+**Last reviewed:** 12 July 2026
 
 This matrix describes the capability a user can reach through the current API and React/Tauri product. It is not a roadmap and does not infer support from planned designs or historical receipts.
 
@@ -32,7 +32,7 @@ This matrix describes the capability a user can reach through the current API an
 | Board | Supported | Readiness header, one priority action, attention items, stage columns, and run queue. | Dedicated backend Board read model for richer waiting, assignment, and run summaries. |
 | Chat | Supported | Direct IronDev sessions, project channels, persisted messages, explicit attributed `@IronDev` turns, person mentions, in-product notifications, durable unread markers, effective notification level, source/document context, reply context, and ticket-draft handoff. | Realtime presence and complete concurrency handling. |
 | Work Item | Supported | Shape, Ticket, Build, Review, and Done stages consume a dedicated backend projection for lifecycle, gate, contract, collaboration, assignment, waiting-on actor, failed-apply recovery, execution proof, and evidence truth. | Realtime collaboration presence and durable Work Item aggregate are deferred. |
-| Library | Supported | Explorer, Documents, Tools, Members, Governance, Project setup, Audit, and Settings are live. | Audit export and analytics are not implemented. |
+| Library | Supported | Explorer, Documents, Tools, Members, Governance, Project setup, Audit, and Settings are live. Audit provides bounded JSON export and safe event inspection. | Audit analytics and reporting are not implemented. |
 
 ## Governed work
 
@@ -63,7 +63,7 @@ This matrix describes the capability a user can reach through the current API an
 | Project-specific membership | Supported | Project member directory, project roles, access removal, and membership-admin refusals are backend-owned. Project membership controls visibility and collaboration administration only. |
 | Invite/pending/accept membership lifecycle | Not implemented | Direct user administration does not imply invitations exist. |
 | Shared project channels | Supported | Messages, membership, mentions, unread markers, effective notification levels, and the in-product notification inbox are durable; realtime presence is not claimed. |
-| Unified audit ledger | Supported | Read-only project traceability spans run events, approvals, work item activity, chat, documents, versions, and membership changes with actor, outcome, correlation ID, filters, and evidence links. It does not approve, continue, apply, export, or grant authority. |
+| Unified audit ledger | Supported | Read-only project traceability spans run events, approvals, work item activity, chat, documents, versions, and membership changes with actor, outcome, correlation ID, filters, safe evidence links, bounded JSON export, and an ordered-item SHA-256. It does not approve, continue, apply, replay, or grant authority. |
 
 ## Hosting posture
 
@@ -89,6 +89,7 @@ This matrix describes the capability a user can reach through the current API an
 /projects/{projectId}/work-items/{workItemId|new}
 /projects/{projectId}/library
 /projects/{projectId}/library/{documents|tools|members|governance|provisioning|audit|settings}
+/projects/{projectId}/library/audit/events/{ledgerId}
 ```
 
 Compatibility URLs may redirect into this project-scoped model. They are not a second information architecture.
