@@ -27,6 +27,7 @@ using IronDev.Core.Operations;
 using IronDev.Core.Workflow;
 using IronDev.Core.WorkItems;
 using IronDev.Infrastructure.AgentRunAudit;
+using IronDev.Infrastructure.Audit;
 using IronDev.Data;
 using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.DependencyInjection;
@@ -324,6 +325,7 @@ builder.Services.AddScoped<IApprovalGateDogfoodCorrelationReportService, Approva
 builder.Services.AddScoped<IAgentRunHealthSummaryService, AgentRunHealthSummaryService>();
 builder.Services.AddScoped<IBackendOperationalHealthService, BackendOperationalHealthService>();
 builder.Services.AddScoped<IAuditLedgerReadService, SqlAuditLedgerReadService>();
+builder.Services.AddScoped<IUserMutationAttributionStore, SqlUserMutationAttributionStore>();
 builder.Services.AddScoped<IProjectAuditExportService, ProjectAuditExportService>();
 builder.Services.AddSingleton<IGovernedOperationStatusReadRepository, GovernedOperationStatusReadRepository>();
 builder.Services.AddSingleton<IEvidenceMetadataReadRepository, EvidenceMetadataReadRepository>();
@@ -415,6 +417,7 @@ app.UseAuthentication();
 app.UseMiddleware<ProjectMembershipMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
+app.UseMiddleware<UserMutationAttributionMiddleware>();
 
 // Health check endpoint (anonymous)
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))

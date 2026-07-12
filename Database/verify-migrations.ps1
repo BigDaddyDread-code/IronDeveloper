@@ -368,6 +368,8 @@ try {
             ,@{ Name = "MemoryProposalEvidenceReference evidence type check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposalEvidenceReference') AND name = N'CK_MemoryProposalEvidenceReference_EvidenceType_Allowed'" }
             ,@{ Name = "MemoryProposalWorkflowReference target check constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.MemoryProposalWorkflowReference') AND name = N'CK_MemoryProposalWorkflowReference_Target'" }
             ,@{ Name = "dbo.ProjectDocuments table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectDocuments', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "dbo.UserMutationAttribution table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.UserMutationAttribution', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "UserMutationAttribution append-only trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.TR_UserMutationAttribution_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "dbo.ProjectDocumentVersions table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectDocumentVersions', N'U') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "dbo.ProjectDocumentLinks table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectDocumentLinks', N'U') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "ChatMessages ReplyToMessageId column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ChatMessages', N'ReplyToMessageId') IS NULL THEN 0 ELSE 1 END" }

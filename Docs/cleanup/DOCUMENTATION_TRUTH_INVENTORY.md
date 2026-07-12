@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **626 files** after CLN-11. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **628 files** after CLN-12. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **626 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 47 |
+| `Canonical` | 48 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 400 |
+| `HistoricalReceipt` | 401 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **626** |
+| **Total** | **628** |
 
 ## Inventory
 
@@ -106,6 +106,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **626 f
 | `Docs/cleanup/DOCUMENTATION_TRUTH_INVENTORY.md` | Documentation Truth Inventory | Cleanup | `Canonical` | 2026-07-12 to 2026-07-13 cleanup review | `-` | Keep current; update with its owning contract | Cleanup programme |
 | `Docs/cleanup/GITHUB_CI_FAILURE_INVENTORY.md` | GitHub CI Failure Inventory | Cleanup | `Canonical` | Authority retained; code not reverified by CLN-04 | `-` | Keep current; update with its owning contract | Cleanup programme |
 | `Docs/cleanup/ROUTE_BODY_SCOPE_BINDING_AUDIT.md` | Route And Body Scope Binding Audit | Cleanup | `Canonical` | 2026-07-13 controller write-route sweep and global filter proof | `-` | Keep aligned with API write routes and scope filter reason codes | API and governance |
+| `Docs/cleanup/ACTOR_ATTRIBUTION_AUDIT.md` | Actor Attribution Audit | Cleanup | `Canonical` | 2026-07-13 middleware, durable ledger, and audit projection proof | `-` | Keep aligned with authenticated write attribution | API and audit |
 | `Docs/cli/CLI_COMMAND_INVENTORY.md` | CLI Command Inventory | API and clients | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | API and clients |
 | `Docs/cli/IRONDEV_CLI_CONTRACT.md` | IronDev CLI Contract (PR-2) | API and clients | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | API and clients |
 | `Docs/cli/WORKSPACE_COMMAND_BOUNDARY_INVENTORY.md` | Workspace Command Boundary Inventory | Apply and workspaces | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Governed apply |
@@ -659,6 +660,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **626 f
 | `Docs/receipts/CLN_09_BRITTLE_TEST_CLEANUP.md` | CLN-09 Brittle Test Cleanup Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_10_TEST_DATA_SEED_CONTRACT.md` | CLN-10 Test Data And Seed Contract Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_11_ROUTE_BODY_SCOPE_BINDING.md` | CLN-11 Route And Body Scope Binding Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/receipts/CLN_12_ACTOR_ATTRIBUTION.md` | CLN-12 Actor Attribution Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

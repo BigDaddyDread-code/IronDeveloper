@@ -45,6 +45,7 @@ This inventory records backend SQL artifacts before the Backend Contract Freeze 
 | `dbo.ProjectFiles` | `local_dev_setup.sql`, `migrate_code_indexing.sql`, `rebuild_db.sql` | Code indexing | Code index service/tests | Indexed file metadata | Active | No | Unchanged |
 | `dbo.CodeIndexEntries` | `local_dev_setup.sql`, `migrate_code_indexing.sql`, `update_schema_v1_indexing.sql`, `rebuild_db.sql` | Code indexing | Code index service/tests | Code symbol lookup rows | Active | No | Unchanged |
 | `dbo.ProjectDocuments` | `migrate_project_documents.sql` | Project docs | Project document tests/services | Document metadata | Active | No | Unchanged |
+| `dbo.UserMutationAttribution` | `migrate_user_mutation_attribution.sql` | Audit | Mutation attribution middleware and audit ledger | Append-only user mutation attribution | Active | CLN-12 | Additive |
 | `dbo.ProjectDocumentVersions` | `migrate_project_documents.sql` | Project docs | Project document tests/services | Document version history | Active | No | Unchanged |
 | `dbo.ProjectDocumentLinks` | `migrate_project_documents.sql` | Project docs | Project document tests/services | Document link evidence | Active | No | Unchanged |
 | `dbo.ProjectProfiles` | `migrate_project_profiles.sql` | Project profile | Profile/readiness services/tests | Project profile settings | Active | No | Unchanged |

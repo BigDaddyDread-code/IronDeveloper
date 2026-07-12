@@ -69,7 +69,8 @@ public sealed class ApiTestBaseCatalogGuardContractTests
                      "migrate_project_profiles.sql",
                      "migrate_code_indexing.sql",
                      "migrate_projects_indexing_fields.sql",
-                     "migrate_agent_run_audit_envelope.sql"
+                     "migrate_agent_run_audit_envelope.sql",
+                     "migrate_user_mutation_attribution.sql"
                  })
         {
             var sql = File.ReadAllText(Path.Combine(RepositoryRoot(), "Database", file));
