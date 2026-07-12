@@ -5,6 +5,7 @@ This folder contains product-facing contracts for the IronDev desktop experience
 ## Current specifications
 
 - [Current Product Capabilities](CURRENT_PRODUCT_CAPABILITIES.md) - maintained supported, partial, and not-implemented truth for the running product.
+- [Cleanup and Product Completion Map](IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md) - cleanup-era status, canonical owners, product surfaces, defects, compatibility, and next proof for every major area.
 - [V2 Acceptance Status](V2_ACCEPTANCE_STATUS.md) - release-candidate scope, acceptance status, limitations, and V2.5 deferrals.
 - [V2 Non-Author Qualification](V2_NON_AUTHOR_QUALIFICATION.md) - final human desktop qualification checklist and evidence template.
 - [IronDev Product and UX Specification v2.5](IRONDEV_PRODUCT_UX_SPEC_V25.md) - Workshop, durable Work Items, configurable agents, AI connections, reset/recovery, and run configuration snapshots.
