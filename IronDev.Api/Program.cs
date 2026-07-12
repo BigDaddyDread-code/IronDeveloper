@@ -221,6 +221,7 @@ builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();
 builder.Services.AddScoped<ITicketSkeletonRunService, TicketSkeletonRunService>();
 builder.Services.AddScoped<ISkeletonAgentProfileService, SkeletonAgentProfileService>();
+builder.Services.AddScoped<IAgentConfigurationPackService, AgentConfigurationPackService>();
 builder.Services.AddScoped<IAiConnectionCredentialStore, FileSystemAiConnectionCredentialStore>();
 builder.Services.AddScoped<IAiConnectionCredentialService, AiConnectionCredentialService>();
 builder.Services.AddScoped<IAiConnectionTestHealthStore, FileSystemAiConnectionTestHealthStore>();

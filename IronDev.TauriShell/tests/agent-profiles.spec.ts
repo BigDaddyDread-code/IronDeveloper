@@ -163,6 +163,77 @@ test('settings advanced shows honest product and runtime identity', async ({ pag
   await expect(page.getByText('IronDev 0.5.0 (development)')).toBeVisible();
 });
 
+test('configuration pack import previews differences and creates drafts without publishing', async ({ page }) => {
+  await mockWorkspace(page);
+  let importBody: Record<string, unknown> | null = null;
+  let publishCalled = false;
+  const pack = {
+    format: 'irondev-agent-configuration-pack',
+    formatVersion: 1,
+    packId: 'portable-pack-1',
+    exportedAtUtc: '2026-07-12T03:00:00Z',
+    sourceScope: 'Tenant',
+    sourceTenantId: 9,
+    sourceProjectId: null,
+    profiles: [{
+      role: 1,
+      values: { aiConnectionId: 'source-openai', provider: 'openai', model: 'gpt-5', timeoutSeconds: 45, skill: 'Build carefully.', personality: 'Direct.' },
+      logicalConnectionName: 'OpenAI shared',
+      builtInDefaultVersion: 'IronDev Agent Defaults 2.5.0',
+      sourcePublishedVersion: 3
+    }],
+    boundary: 'non-secret draft only'
+  };
+  const preview = {
+    succeeded: true,
+    code: '',
+    failureReason: '',
+    targetScope: 'Project',
+    targetProjectId: 1,
+    differences: [{ role: 1, field: 'model', currentValue: 'gpt-4o', importedValue: 'gpt-5', changed: true }],
+    expectedRevisions: { Builder: 7 },
+    draftOnly: true,
+    sourceProvenance: 'Pack portable-pack-1 exported from Tenant scope.',
+    boundary: 'non-secret draft only'
+  };
+
+  await page.route('**/api/v1/agent-profiles/**', async (route) => {
+    const url = route.request().url();
+    if (url.includes('/draft/publish')) publishCalled = true;
+    if (url.includes('/configuration-pack/preview')) return route.fulfill({ status: 200, json: preview });
+    if (url.includes('/configuration-pack/import')) {
+      importBody = route.request().postDataJSON() as Record<string, unknown>;
+      return route.fulfill({ status: 200, json: {
+        succeeded: true,
+        code: '',
+        failureReason: '',
+        createdDrafts: [{ role: 1, revision: 8, basePublishedVersion: 3, values: pack.profiles[0].values, isValid: true, validationIssues: [], updatedAtUtc: '2026-07-12T03:01:00Z' }],
+        published: false,
+        preview,
+        boundary: 'non-secret draft only'
+      } });
+    }
+    return route.fulfill({ status: 404, json: { error: 'not mocked' } });
+  });
+
+  await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
+  await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.advanced').click();
+  await page.getByTestId('flow.settings.configurationPack.file').setInputFiles({
+    name: 'portable-pack.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(pack))
+  });
+
+  await expect(page.getByTestId('flow.settings.configurationPack.preview')).toContainText('gpt-4o');
+  await expect(page.getByTestId('flow.settings.configurationPack.preview')).toContainText('gpt-5');
+  await page.getByTestId('flow.settings.configurationPack.createDrafts').click();
+  await expect(page.getByTestId('flow.settings.configurationPack.success')).toContainText('Nothing was published');
+  expect(importBody).toMatchObject({ expectedRevisions: { Builder: 7 } });
+  expect(publishCalled).toBe(false);
+});
+
 interface AgentState {
   lastUpdate: { role: string; body: Record<string, unknown>; url: string };
   revision: number;

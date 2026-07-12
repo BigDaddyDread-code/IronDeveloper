@@ -217,6 +217,182 @@
         }
       }
     },
+    "/api/v1/agent-profiles/configuration-pack": {
+      "get": {
+        "tags": [
+          "AgentProfiles"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigurationPack"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigurationPack"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigurationPack"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-profiles/configuration-pack/preview": {
+      "post": {
+        "tags": [
+          "AgentProfiles"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentConfigurationPackPreviewRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentConfigurationPackPreviewRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentConfigurationPackPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigurationPackPreview"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigurationPackPreview"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigurationPackPreview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-profiles/configuration-pack/import": {
+      "post": {
+        "tags": [
+          "AgentProfiles"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentConfigurationPackImportRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentConfigurationPackImportRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentConfigurationPackImportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigurationPackImportOutcome"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigurationPackImportOutcome"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigurationPackImportOutcome"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/agent-profiles": {
       "get": {
         "tags": [
@@ -15297,6 +15473,248 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "AgentConfigurationPack": {
+        "required": [
+          "exportedAtUtc",
+          "packId",
+          "sourceScope",
+          "sourceTenantId"
+        ],
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "nullable": true
+          },
+          "formatVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "packId": {
+            "type": "string",
+            "nullable": true
+          },
+          "exportedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sourceScope": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceTenantId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourceProjectId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentConfigurationPackEntry"
+            },
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentConfigurationPackDifference": {
+        "required": [
+          "changed",
+          "currentValue",
+          "field",
+          "importedValue",
+          "role"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/SkeletonAgentRole"
+          },
+          "field": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "importedValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentConfigurationPackEntry": {
+        "required": [
+          "builtInDefaultVersion",
+          "logicalConnectionName",
+          "role",
+          "sourcePublishedVersion",
+          "values"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/SkeletonAgentRole"
+          },
+          "values": {
+            "$ref": "#/components/schemas/SkeletonAgentProfileUpdate"
+          },
+          "logicalConnectionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "builtInDefaultVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourcePublishedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentConfigurationPackImportOutcome": {
+        "required": [
+          "preview",
+          "published",
+          "succeeded"
+        ],
+        "type": "object",
+        "properties": {
+          "succeeded": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdDrafts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkeletonAgentProfileDraft"
+            },
+            "nullable": true
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/AgentConfigurationPackPreview"
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentConfigurationPackImportRequest": {
+        "required": [
+          "pack"
+        ],
+        "type": "object",
+        "properties": {
+          "pack": {
+            "$ref": "#/components/schemas/AgentConfigurationPack"
+          },
+          "expectedRevisions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentConfigurationPackPreview": {
+        "required": [
+          "draftOnly",
+          "succeeded",
+          "targetScope"
+        ],
+        "type": "object",
+        "properties": {
+          "succeeded": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetScope": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetProjectId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "differences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentConfigurationPackDifference"
+            },
+            "nullable": true
+          },
+          "expectedRevisions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "draftOnly": {
+            "type": "boolean"
+          },
+          "sourceProvenance": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentConfigurationPackPreviewRequest": {
+        "required": [
+          "pack"
+        ],
+        "type": "object",
+        "properties": {
+          "pack": {
+            "$ref": "#/components/schemas/AgentConfigurationPack"
+          }
+        },
+        "additionalProperties": false
       },
       "AgentDefinitionSnapshotDto": {
         "required": [

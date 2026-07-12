@@ -6,6 +6,9 @@ import type {
   AiConnectionCredentialWriteRequest,
   AiConnectionMetadata,
   AiConnectionTestOutcome,
+  AgentConfigurationPack,
+  AgentConfigurationPackImportOutcome,
+  AgentConfigurationPackPreview,
   ApiConnectionStatus,
   ApiStatus,
   AuditLedgerQuery,
@@ -1191,6 +1194,44 @@ class IronDevApiClient {
         signal
       }
     );
+  }
+
+  async exportAgentConfigurationPack(
+    projectId?: number | null,
+    scope: 'project' | 'tenant' = 'project',
+    signal?: AbortSignal
+  ): Promise<AgentConfigurationPack> {
+    const query = agentProfileScopeQuery(projectId, scope);
+    return this.request<AgentConfigurationPack>(`/api/v1/agent-profiles/configuration-pack${query}`, { method: 'GET', signal });
+  }
+
+  async previewAgentConfigurationPack(
+    pack: AgentConfigurationPack,
+    projectId?: number | null,
+    scope: 'project' | 'tenant' = 'project',
+    signal?: AbortSignal
+  ): Promise<AgentConfigurationPackPreview> {
+    const query = agentProfileScopeQuery(projectId, scope);
+    return this.request<AgentConfigurationPackPreview>(`/api/v1/agent-profiles/configuration-pack/preview${query}`, {
+      method: 'POST',
+      body: { pack },
+      signal
+    });
+  }
+
+  async importAgentConfigurationPack(
+    pack: AgentConfigurationPack,
+    expectedRevisions: Record<string, number>,
+    projectId?: number | null,
+    scope: 'project' | 'tenant' = 'project',
+    signal?: AbortSignal
+  ): Promise<AgentConfigurationPackImportOutcome> {
+    const query = agentProfileScopeQuery(projectId, scope);
+    return this.request<AgentConfigurationPackImportOutcome>(`/api/v1/agent-profiles/configuration-pack/import${query}`, {
+      method: 'POST',
+      body: { pack, expectedRevisions },
+      signal
+    });
   }
 
   async testAiConnection(connectionId: string, signal?: AbortSignal): Promise<AiConnectionTestOutcome> {

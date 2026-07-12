@@ -170,6 +170,138 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-profiles/configuration-pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                    scope?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentConfigurationPack"];
+                        "application/json": components["schemas"]["AgentConfigurationPack"];
+                        "text/json": components["schemas"]["AgentConfigurationPack"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-profiles/configuration-pack/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                    scope?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AgentConfigurationPackPreviewRequest"];
+                    "text/json": components["schemas"]["AgentConfigurationPackPreviewRequest"];
+                    "application/*+json": components["schemas"]["AgentConfigurationPackPreviewRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentConfigurationPackPreview"];
+                        "application/json": components["schemas"]["AgentConfigurationPackPreview"];
+                        "text/json": components["schemas"]["AgentConfigurationPackPreview"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-profiles/configuration-pack/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    projectId?: number;
+                    scope?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AgentConfigurationPackImportRequest"];
+                    "text/json": components["schemas"]["AgentConfigurationPackImportRequest"];
+                    "application/*+json": components["schemas"]["AgentConfigurationPackImportRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AgentConfigurationPackImportOutcome"];
+                        "application/json": components["schemas"]["AgentConfigurationPackImportOutcome"];
+                        "text/json": components["schemas"]["AgentConfigurationPackImportOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent-profiles": {
         parameters: {
             query?: never;
@@ -11285,6 +11417,69 @@ export interface components {
          * @enum {integer}
          */
         AgentCapabilityUseOutcome: 1 | 2 | 3 | 4;
+        AgentConfigurationPack: {
+            format?: string | null;
+            /** Format: int32 */
+            formatVersion?: number;
+            packId: string | null;
+            /** Format: date-time */
+            exportedAtUtc: string;
+            sourceScope: string | null;
+            /** Format: int32 */
+            sourceTenantId: number;
+            /** Format: int32 */
+            sourceProjectId?: number | null;
+            profiles?: components["schemas"]["AgentConfigurationPackEntry"][] | null;
+            boundary?: string | null;
+        };
+        AgentConfigurationPackDifference: {
+            role: components["schemas"]["SkeletonAgentRole"];
+            field: string | null;
+            currentValue: string | null;
+            importedValue: string | null;
+            changed: boolean;
+        };
+        AgentConfigurationPackEntry: {
+            role: components["schemas"]["SkeletonAgentRole"];
+            values: components["schemas"]["SkeletonAgentProfileUpdate"];
+            logicalConnectionName: string | null;
+            builtInDefaultVersion: string | null;
+            /** Format: int64 */
+            sourcePublishedVersion: number;
+        };
+        AgentConfigurationPackImportOutcome: {
+            succeeded: boolean;
+            code?: string | null;
+            failureReason?: string | null;
+            createdDrafts?: components["schemas"]["SkeletonAgentProfileDraft"][] | null;
+            published: boolean;
+            preview: components["schemas"]["AgentConfigurationPackPreview"];
+            boundary?: string | null;
+        };
+        AgentConfigurationPackImportRequest: {
+            pack: components["schemas"]["AgentConfigurationPack"];
+            expectedRevisions?: {
+                [key: string]: number;
+            } | null;
+        };
+        AgentConfigurationPackPreview: {
+            succeeded: boolean;
+            code?: string | null;
+            failureReason?: string | null;
+            targetScope: string | null;
+            /** Format: int32 */
+            targetProjectId?: number | null;
+            differences?: components["schemas"]["AgentConfigurationPackDifference"][] | null;
+            expectedRevisions?: {
+                [key: string]: number;
+            } | null;
+            draftOnly: boolean;
+            sourceProvenance?: string | null;
+            boundary?: string | null;
+        };
+        AgentConfigurationPackPreviewRequest: {
+            pack: components["schemas"]["AgentConfigurationPack"];
+        };
         AgentDefinitionSnapshotDto: {
             agentId: string | null;
             name: string | null;
