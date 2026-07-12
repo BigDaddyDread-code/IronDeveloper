@@ -1,5 +1,7 @@
 # Codex Goal Pack
 
+> **Status: Parking lot.** This historical goal pack is not an active implementation plan. Current cleanup work is governed by [Cleanup and Product Completion Plan](product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md).
+
 ## Purpose
 
 Codex needs explicit goals when driving IronDev through the Test Agent and CLI. The goal pack prevents broad, unfocused "improve IronDev" work and keeps each loop measurable.
