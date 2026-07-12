@@ -226,7 +226,7 @@ function Test-LocalTestAuthenticationContract {
         $login = Invoke-JsonRequest `
             -Method "POST" `
             -Uri "$BaseUrl/api/auth/login" `
-            -Body @{ email = $seedContract.credentials.email; password = $seedContract.credentials.password } `
+            -Body $seedContract.credentials `
             -TimeoutSeconds $TimeoutSeconds
 
         if ($null -eq $login -or [string]::IsNullOrWhiteSpace($login.token)) {
