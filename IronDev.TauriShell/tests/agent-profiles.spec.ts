@@ -108,12 +108,20 @@ test('agents panel resets fields and restores immutable published versions', asy
   await page.getByTestId('flow.settings.section.agents').click();
 
   await expect(page.getByTestId('flow.settings.agent.builder.history')).toContainText('v1');
+  await expect(page.getByTestId('flow.settings.agent.builder.history')).toContainText('Known working profile');
+  await page.getByTestId('flow.settings.agent.builder.compare.1').check();
+  await page.getByTestId('flow.settings.agent.builder.compare.2').check();
+  await expect(page.getByTestId('flow.settings.agent.builder.comparison')).toContainText('Compare v1 to v2');
+  await expect(page.getByTestId('flow.settings.agent.builder.comparison')).toContainText('changed');
+  await page.getByTestId('flow.settings.agent.builder.history').getByText('v2 - Current profile', { exact: false }).click();
+  await expect(page.getByTestId('flow.settings.agent.builder.usage.2')).toContainText('run-usage-2');
   await page.getByTestId('flow.settings.agent.builder.recoveryReason').fill('Return to the known baseline');
   await page.getByTestId('flow.settings.agent.builder.resetField').selectOption('skill');
   await page.getByTestId('flow.settings.agent.builder.resetFieldAction').click();
   await expect(page.getByTestId('flow.settings.agent.builder.notice')).toContainText('Reset published');
 
   await page.getByTestId('flow.settings.agent.builder.recoveryReason').fill('Restore the prior working version');
+  await page.getByTestId('flow.settings.agent.builder.history').getByText('v1 - Known working profile', { exact: false }).click();
   await page.getByTestId('flow.settings.agent.builder.restore.1').click();
   await expect(page.getByTestId('flow.settings.agent.builder.notice')).toContainText('restored as new version');
 });
@@ -191,6 +199,7 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
       builtInDefaultVersion: isOrchestrator ? '' : 'IronDev Agent Defaults 2.5.0',
       tenantProfileVersion: null,
       projectProfileVersion: null,
+      publishedVersion: isOrchestrator ? null : 2,
       effectiveHash: `sha256:test-effective-${String(role).toLowerCase()}`,
       boundary: 'An agent profile configures voice and model, never authority.'
     };
@@ -283,9 +292,25 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ succeeded: true, code: '', failureReason: '', currentRevision: state.revision, publishedVersion: { version: state.publishedVersion, role, values: {}, reason: 'test', actorUserId: 7, publishedAtUtc: '2026-07-12T00:03:00Z' }, profile: profile(role) }) });
   });
 
-  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/history$/i, async (route) => {
+  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/history(?:\?.*)?$/i, async (route) => {
     const role = route.request().url().split('/agent-profiles/')[1].split('/')[0];
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ version: 1, role, values: {}, reason: 'Known working profile', actorUserId: 7, publishedAtUtc: '2026-07-12T00:03:00Z' }]) });
+    const boundary = 'Usage is reconstructed from durable configuration snapshots in recent project runs.';
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          version: { version: 2, role, values: { provider: 'openai', model: 'gpt-4o', timeoutSeconds: 60, skill: 'Current skill', personality: 'Current voice' }, reason: 'Current profile', actorUserId: 8, publishedAtUtc: '2026-07-12T00:04:00Z' },
+          runUsage: [{ runId: 'run-usage-2', projectId: 7, workItemId: 42, capturedAtUtc: '2026-07-12T00:05:00Z' }],
+          usageBoundary: boundary
+        },
+        {
+          version: { version: 1, role, values: { provider: 'ollama', model: 'llama3', timeoutSeconds: 30, skill: 'Known skill', personality: 'Known voice' }, reason: 'Known working profile', actorUserId: 7, publishedAtUtc: '2026-07-12T00:03:00Z' },
+          runUsage: [],
+          usageBoundary: boundary
+        }
+      ])
+    });
   });
 
   await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/reset$/i, async (route) => {

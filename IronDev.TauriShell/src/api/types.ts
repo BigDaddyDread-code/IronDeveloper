@@ -1492,6 +1492,7 @@ export interface SkeletonRunAgentConfigurationSnapshot {
     workItemId: number;
     runId: string;
     role: string;
+    profileVersion?: number | null;
     connectionId: string;
     provider: string;
     controlledEndpointIdentity: string;
@@ -1793,6 +1794,7 @@ export interface EffectiveSkeletonAgentProfile {
   builtInDefaultVersion: string;
   tenantProfileVersion?: string | null;
   projectProfileVersion?: string | null;
+  publishedVersion?: number | null;
   effectiveHash: string;
   boundary: string;
 }
@@ -1843,6 +1845,19 @@ export interface SkeletonAgentProfilePublishedVersion {
   reason: string;
   actorUserId: number;
   publishedAtUtc: string;
+}
+
+export interface SkeletonAgentProfileRunUsage {
+  runId: string;
+  projectId: number;
+  workItemId: number;
+  capturedAtUtc: string;
+}
+
+export interface SkeletonAgentProfileHistoryView {
+  version: SkeletonAgentProfilePublishedVersion;
+  runUsage: SkeletonAgentProfileRunUsage[];
+  usageBoundary: string;
 }
 
 export interface SkeletonAgentProfileDraftOutcome {

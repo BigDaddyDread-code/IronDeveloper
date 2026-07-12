@@ -947,6 +947,36 @@ public sealed class SkeletonRunTests
     }
 
     [TestMethod]
+    public async Task RunConfigurationSnapshot_LinksTheExactPublishedProfileVersion()
+    {
+        var harness = SkeletonHarness.Create();
+        var draft = await harness.Profiles.GetDraftAsync(SkeletonAgentRole.Builder);
+        var saved = await harness.Profiles.SaveDraftAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfileDraftWriteRequest
+        {
+            ExpectedRevision = draft.Revision,
+            Provider = "ollama",
+            Model = "llama3",
+            TimeoutSeconds = 30,
+            Skill = "Use the confirmed contract.",
+            Personality = "Direct."
+        });
+        var published = await harness.Profiles.PublishDraftAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfilePublishRequest
+        {
+            ExpectedRevision = saved.CurrentRevision,
+            Reason = "Use the local Builder profile."
+        }, actorUserId: 7);
+        Assert.AreEqual(1L, published.PublishedVersion?.Version);
+
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run!.RunId);
+
+        var builder = report!.AgentConfigurations.Single(snapshot => snapshot.Role == "Builder");
+        Assert.AreEqual(1L, builder.ProfileVersion);
+        Assert.AreEqual("ollama", builder.Provider);
+        Assert.AreEqual("llama3", builder.Model);
+    }
+
+    [TestMethod]
     public async Task GetRunReport_IsReadOnly_PublishesNothingAndAltersNothing()
     {
         var harness = SkeletonHarness.Create();

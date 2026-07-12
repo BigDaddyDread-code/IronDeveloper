@@ -271,6 +271,23 @@ public sealed record SkeletonAgentProfilePublishedVersion
     public required DateTimeOffset PublishedAtUtc { get; init; }
 }
 
+public sealed record SkeletonAgentProfileRunUsage
+{
+    public required string RunId { get; init; }
+    public required int ProjectId { get; init; }
+    public required long WorkItemId { get; init; }
+    public required DateTimeOffset CapturedAtUtc { get; init; }
+}
+
+public sealed record SkeletonAgentProfileHistoryView
+{
+    public required SkeletonAgentProfilePublishedVersion Version { get; init; }
+    public IReadOnlyList<SkeletonAgentProfileRunUsage> RunUsage { get; init; } = [];
+    public string UsageBoundary { get; init; } =
+        "Usage is reconstructed from durable configuration snapshots in the 50 most recent project runs. " +
+        "Runs created before profile-version linkage are not attributed by guesswork.";
+}
+
 public sealed record SkeletonAgentProfileDraftOutcome
 {
     public required bool Succeeded { get; init; }
@@ -340,6 +357,7 @@ public sealed record EffectiveSkeletonAgentProfile
     public string BuiltInDefaultVersion { get; init; } = string.Empty;
     public string? TenantProfileVersion { get; init; }
     public string? ProjectProfileVersion { get; init; }
+    public long? PublishedVersion { get; init; }
     public required string EffectiveHash { get; init; }
     public string Boundary { get; init; } = SkeletonAgentProfile.BoundaryText;
 }
