@@ -281,21 +281,25 @@ The target routes are project-scoped unless noted.
 | `/projects/connect` | Connect a local repository |
 | `/projects/:projectId/setup` | Project setup and readiness |
 | `/projects/:projectId/board` | Shared pipeline and run queue |
-| `/projects/:projectId/chat` | Chat landing and recent channels/sessions |
-| `/projects/:projectId/chat/channels/:channelId` | Shared or members-only project channel |
-| `/projects/:projectId/chat/sessions/:sessionId` | Direct IronDev session |
+| `/projects/:projectId/workshop` | Workshop landing and recent channels/sessions |
+| `/projects/:projectId/workshop/channels/:channelId` | Shared or members-only project channel |
+| `/projects/:projectId/workshop/sessions/:sessionId` | Direct IronDev session |
 | `/projects/:projectId/work-items/:workItemId` | Governed Work Item |
 | `/projects/:projectId/library` | Library home |
 | `/projects/:projectId/library/documents` | Document list |
 | `/projects/:projectId/library/documents/upload` | Upload document |
 | `/projects/:projectId/library/documents/:documentId` | Document detail and versions |
 | `/projects/:projectId/library/tools` | Project tool catalogue |
-| `/projects/:projectId/library/tools/add` | Add or request a tool connection |
 | `/projects/:projectId/library/tools/:toolId` | Tool detail, scope, health, and usage |
 | `/projects/:projectId/library/members` | Project-visible member directory and collaboration settings |
-| `/library/administration/users` | Tenant user administration for eligible users |
+| `/projects/:projectId/library/governance` | Project Governance control centre |
+| `/projects/:projectId/library/provisioning` | Provisioning state and remedies |
+| `/projects/:projectId/library/audit` | Project audit ledger and evidence export |
+| `/projects/:projectId/library/settings` | Project settings, agents, and AI connections |
 
 Compatibility redirects may preserve current routes, but new navigation uses the target structure. A route must not claim success merely because a component rendered.
+
+A dedicated add-tool connection route and tenant user-administration route are not implemented. Current documentation must describe those capabilities as unavailable rather than linking a path that renders as some other resource.
 
 ### 6.4 Route outcome semantics
 
