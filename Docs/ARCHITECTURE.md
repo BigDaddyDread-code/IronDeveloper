@@ -1,5 +1,7 @@
 # IronDev Architecture
 
+> **Architecture authority:** Use the [Canonical Architecture Index](architecture/CANONICAL_ARCHITECTURE_INDEX.md) to resolve current authority by domain and to distinguish canonical contracts from supporting, historical, superseded, and parking-lot documents.
+
 ## Overview
 
 IronDev is structured as a multi-tenant client-server system.
