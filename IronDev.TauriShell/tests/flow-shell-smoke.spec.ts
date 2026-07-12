@@ -199,6 +199,40 @@ test('audit library route renders read-only ledger rows and filters', async ({ p
   expect(auditRequests.some((url) => new URL(url).searchParams.get('actor') === 'Alice')).toBeTruthy();
 });
 
+test('audit export previews applied filters before enabling JSON download', async ({ page }) => {
+  await mockSelectedProject(page);
+  await page.route('**/irondev-api/api/v1/audit/ledger**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(auditLedgerResponse()) });
+  });
+  const exportRequests: string[] = [];
+  await page.route('**/irondev-api/api/projects/7/audit/export**', async (route) => {
+    exportRequests.push(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        schemaVersion: '1', projectId: 7, projectName: 'IronDeveloper', generatedUtc: '2026-07-12T05:00:00Z',
+        filters: { actor: 'Alice', take: 250 }, returnedCount: 2, take: 250, truncated: false,
+        itemsSha256: 'a'.repeat(64), items: [], warnings: [],
+        boundary: { readOnly: true, grantsAuthority: false, boundaryStatement: 'Read-only export. It grants no authority.' }
+      })
+    });
+  });
+  await page.goto('/projects/7/library/audit');
+
+  await page.getByTestId('flow.audit.filter.actor').fill('Alice');
+  await page.getByTestId('flow.audit.filter.apply').click();
+  await page.getByTestId('flow.audit.export.open').click();
+  await expect(page.getByTestId('flow.audit.export.dialog')).toContainText('Alice');
+  await expect(page.getByTestId('flow.audit.export.download')).toBeDisabled();
+  await page.getByTestId('flow.audit.export.generate').click();
+  await expect(page.getByTestId('flow.audit.export.result')).toContainText('2');
+  await expect(page.getByTestId('flow.audit.export.result')).toContainText('a'.repeat(64));
+  await expect(page.getByTestId('flow.audit.export.download')).toBeEnabled();
+  expect(new URL(exportRequests[0]).searchParams.get('actor')).toBe('Alice');
+  expect(new URL(exportRequests[0]).searchParams.get('take')).toBe('250');
+});
+
 async function mockHealthyApi(page: import('@playwright/test').Page) {
   await page.route('**/irondev-api/health', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) });

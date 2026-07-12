@@ -384,6 +384,126 @@
   font-size: 12px;
 }
 
+.fl-audit-heading__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fl-audit-export-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(20 24 28 / 42%);
+}
+
+.fl-audit-export {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--fl-line2);
+  border-radius: 8px;
+  background: var(--fl-panel);
+  box-shadow: 0 18px 50px rgb(20 24 28 / 20%);
+}
+
+.fl-audit-export > header,
+.fl-audit-export > footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fl-audit-export h3 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.fl-audit-export__scope,
+.fl-audit-export__result {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fl-audit-export__scope div,
+.fl-audit-export__result div,
+.fl-audit-export__result p {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--fl-line);
+  border-radius: 6px;
+  background: var(--fl-ground);
+}
+
+.fl-audit-export__scope dt,
+.fl-audit-export__result span {
+  color: var(--fl-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fl-audit-export__scope dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.fl-audit-export__result p {
+  grid-column: 1 / -1;
+}
+
+.fl-audit-export__result code {
+  color: var(--fl-ink2);
+  font-family: var(--fl-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.fl-audit-export__boundary {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--fl-line);
+  color: var(--fl-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .fl-audit-heading,
+  .fl-audit-export > header,
+  .fl-audit-export > footer {
+    flex-direction: column;
+  }
+
+  .fl-audit-heading__actions,
+  .fl-audit-export > footer .fl-btn {
+    width: 100%;
+  }
+
+  .fl-audit-export__scope,
+  .fl-audit-export__result {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fl-audit-export__result p {
+    grid-column: auto;
+  }
+}
+
 .fl-documents,
 .fl-document-detail,
 .fl-document-upload {
