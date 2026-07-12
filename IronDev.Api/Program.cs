@@ -414,10 +414,11 @@ app.UseHttpsRedirection();
 app.UseRouting();
 app.UseCors(CorsPolicyName);
 app.UseAuthentication();
-app.UseMiddleware<ProjectMembershipMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.UseMiddleware<UserMutationAttributionMiddleware>();
+app.UseMiddleware<TenantTokenScopeMiddleware>();
+app.UseMiddleware<ProjectMembershipMiddleware>();
 
 // Health check endpoint (anonymous)
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))

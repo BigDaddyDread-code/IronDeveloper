@@ -2,6 +2,7 @@ using IronDev.Data.Models;
 using IronDev.Api.Auth;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Auth;
+using IronDev.Core.Governance;
 using IronDev.Core.Models;
 using IronDev.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -49,6 +50,18 @@ public sealed class ProjectsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Project>> Create(Project project, CancellationToken ct)
     {
+        if (project.TenantId > 0 && project.TenantId != _tenant.TenantId)
+        {
+            return BadRequest(GovernedRefusal.Create(
+                "selected_tenant_body_scope_mismatch",
+                "Project tenantId must be omitted or match the selected tenant.",
+                HttpContext.TraceIdentifier,
+                blockedReasons: ["The selected tenant is authoritative for project creation."],
+                nextSafeActions: ["Remove tenantId from the request or select the intended accessible tenant first."],
+                forbiddenActions: ["Create a project in another tenant through body data."]));
+        }
+
+        project.TenantId = _tenant.TenantId;
         var id = await _projects.CreateProjectAsync(project, ct);
         var user = CurrentUser();
         var membership = await _memberships.SetMemberAsync(_tenant.TenantId, id, user.UserId, user.UserId, ProjectMemberRoles.Owner, ct);
