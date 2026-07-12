@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$ApiBaseUrl = "http://localhost:5000",
-    [int]$ProjectId = 1,
+    [int]$ProjectId = 0,
     [int]$UiPort = 5173,
     [switch]$Reset,
     [switch]$FreshSession,

@@ -115,7 +115,7 @@ Counts are discovery evidence from `dotnet test --list-tests` and `npx playwrigh
 | `TEST-REL-02` integration ownership is filter-based, not exhaustive | P2 | 14,748 discovered cases; CI map owns named/category subsets | Test platform | Add an executable inventory guard before any broad lane expansion. |
 | `TEST-REL-03` three current-product tests had one observed timing failure each | Closed by CLN-09 | PR #825 sending/unread; PR #828 project chooser; CLN-09 exact-case stress pack passed 30/30 with four workers | Product client | Fixed with explicit mock request gates; no retry, timeout increase, skip, or assertion removal. |
 | `TEST-REL-04` live model and LocalTest proof are manual | P2 accepted boundary | Credentials/real DB/visible journey cannot be safely mocked as equivalent | Dogfood, release, operations | Preserve explicit manual ownership; CLN-10 stabilizes seeds and CLN-42 qualifies clean clone. |
-| `TEST-REL-05` test seed truth is spread across scripts, fixtures, and tests | P2 | LocalTest credentials/projects and SQL smoke identities have multiple owners | Test platform/data | CLN-10 creates the canonical test-data and seed contract. |
+| `TEST-REL-05` test seed truth was spread across scripts, fixtures, and tests | Closed by CLN-10 | Machine-readable manifest is consumed by reset/start/smoke; post-reset SQL verifies every contracted identity | Test platform/data | Maintain `Docs/testing/LOCALTEST_SEED_CONTRACT.md` and the JSON manifest together. |
 
 No P0/P1 reliability finding is open after CLN-09. No retry, timeout increase, skip, or test deletion is authorized by this inventory.
 

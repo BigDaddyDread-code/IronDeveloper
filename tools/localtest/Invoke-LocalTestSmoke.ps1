@@ -10,6 +10,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+. (Join-Path $PSScriptRoot "localtest-seed-contract.ps1")
+$seedContract = Get-LocalTestSeedContract
 $shellRoot = Join-Path $repoRoot "IronDev.TauriShell"
 $reportRoot = Join-Path $PSScriptRoot "reports"
 $jsonReportPath = Join-Path $reportRoot "latest-localtest-report.json"
@@ -214,7 +216,7 @@ function Test-LocalTestAuthenticationContract {
         $login = Invoke-JsonRequest `
             -Method "POST" `
             -Uri "$BaseUrl/api/auth/login" `
-            -Body @{ email = "bob@irondev.local"; password = "change-me-local-only" } `
+            -Body @{ email = $seedContract.credentials.email; password = $seedContract.credentials.password } `
             -TimeoutSeconds $TimeoutSeconds
 
         if ($null -eq $login -or [string]::IsNullOrWhiteSpace($login.token)) {
@@ -275,14 +277,20 @@ function Get-SeedCounts {
         return [ordered]@{ available = $false; reason = "sqlcmd not found" }
     }
 
+    $baselineProject = $seedContract.projects | Where-Object key -eq "baseline" | Select-Object -First 1
+    $documentIds = @($seedContract.knownArtifacts | Where-Object { $_.kind -eq "ProjectDocument" -and $_.projectId -eq $baselineProject.id } | ForEach-Object { $_.id }) -join ","
+    $ticketIds = @($seedContract.seededTickets | Where-Object projectId -eq $baselineProject.id | ForEach-Object { $_.id }) -join ","
+    $runIds = @($seedContract.seededRuns | ForEach-Object { "N'$(ConvertTo-LocalTestSqlLiteral $_.runId)'" }) -join ","
+    $projectName = ConvertTo-LocalTestSqlLiteral $baselineProject.name
+
     $query = @"
 SET NOCOUNT ON;
 SELECT
-  (SELECT COUNT(*) FROM dbo.Projects WHERE Name = 'IronDev Local Test Project') AS Projects,
-  (SELECT COUNT(*) FROM dbo.ProjectDocuments WHERE Title IN ('Workspace Manual Test Notes','Code Standards Draft','Testing Companion Direction')) AS Documents,
-  (SELECT COUNT(*) FROM dbo.ProjectTickets WHERE Title IN ('Add Governed Tool Architecture','Wire Start Sandbox Run','Improve Ticket Workspace UI')) AS Tickets,
-  (SELECT COUNT(*) FROM dbo.RunEvents WHERE RunId = 'localtest-run-ticket-3002') AS RunEvents,
-  (SELECT COUNT(*) FROM dbo.Runs WHERE ProjectId = 1 AND TicketId IS NOT NULL AND IsDisposable = 1) AS DisposableRuns,
+  (SELECT COUNT(*) FROM dbo.Projects WHERE Id = $($baselineProject.id) AND Name = N'$projectName') AS Projects,
+  (SELECT COUNT(*) FROM dbo.ProjectDocuments WHERE Id IN ($documentIds)) AS Documents,
+  (SELECT COUNT(*) FROM dbo.ProjectTickets WHERE Id IN ($ticketIds)) AS Tickets,
+  (SELECT COUNT(*) FROM dbo.RunEvents WHERE RunId IN ($runIds)) AS RunEvents,
+  (SELECT COUNT(*) FROM dbo.Runs WHERE ProjectId = $($baselineProject.id) AND TicketId IS NOT NULL AND IsDisposable = 1) AS DisposableRuns,
   (SELECT COUNT(*) FROM dbo.RunEvents WHERE EventType IN ('DisposableCommandCompleted','DisposableCommandFailed')) AS DisposableCommandEvents,
   (SELECT COUNT(*) FROM dbo.RunEvents WHERE EventType = 'DisposableWorkspaceCreated') AS DisposableWorkspaceEvents;
 "@

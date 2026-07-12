@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **622 files** after CLN-09. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **624 files** after CLN-10. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **622 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 45 |
+| `Canonical` | 46 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 398 |
+| `HistoricalReceipt` | 399 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **622** |
+| **Total** | **624** |
 
 ## Inventory
 
@@ -620,6 +620,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **622 f
 | `Docs/testing/API_CONTRACT_2_GENERATED_REQUESTS.md` | API-CONTRACT-2 Generated Request Consumption | Testing | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Test platform |
 | `Docs/testing/INTEGRATION_TEST_CATEGORIES.md` | Integration Test Categories | Testing | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Test platform |
 | `Docs/testing/LOCAL_MANUAL_TEST_PLAN.md` | IronDev LocalTest Manual Test Plan | Testing | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Test platform |
+| `Docs/testing/LOCALTEST_SEED_CONTRACT.md` | LocalTest Test Data And Seed Contract | Testing | `Canonical` | 2026-07-13 manifest, scripts, SQL seed, and boundary tests | `-` | Keep aligned with the machine-readable LocalTest seed manifest | Test platform |
 | `Docs/testing/PLATFORM_BASELINE_1.md` | PLATFORM-BASELINE-1 Clean Validation | Testing | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Test platform |
 | `Docs/testing/SLOW_TEST_QUARANTINE_REGISTER.md` | Slow Test / Quarantine Register | Testing | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Test platform |
 | `Docs/THOUGHT_LEDGER_132.md` | ThoughtLedger 132 | Agents | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Agent platform |
@@ -655,6 +656,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **622 f
 | `Docs/cleanup/TEST_RELIABILITY_INVENTORY.md` | Test Reliability Inventory | Testing | `Canonical` | 2026-07-13 executable test survey | `-` | Keep aligned with CI lanes, suites, and quarantine records | Test platform |
 | `Docs/receipts/CLN_08_TEST_RELIABILITY_INVENTORY.md` | CLN-08 Test Reliability Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_09_BRITTLE_TEST_CLEANUP.md` | CLN-09 Brittle Test Cleanup Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/receipts/CLN_10_TEST_DATA_SEED_CONTRACT.md` | CLN-10 Test Data And Seed Contract Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

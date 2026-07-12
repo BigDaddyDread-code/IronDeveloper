@@ -2,6 +2,8 @@
 
 This plan verifies the Tauri cockpit against isolated LocalTest data. It must not touch the normal development database or real project rows.
 
+Stable identities and reset boundaries are owned by the [LocalTest Test Data And Seed Contract](LOCALTEST_SEED_CONTRACT.md). Do not duplicate or improvise fixture IDs in manual evidence.
+
 ## Reset And Launch
 
 1. Reset the isolated database and seed repeatable data:
@@ -48,22 +50,22 @@ This plan verifies the Tauri cockpit against isolated LocalTest data. It must no
 - Open the Tickets workspace.
 - Confirm these seeded tickets are visible:
   - `Add Governed Tool Architecture`
-  - `Wire Start Disposable Run`
+  - `Wire Start Sandbox Run`
   - `Improve Ticket Workspace UI`
 - Select `Add Governed Tool Architecture`.
 - Confirm Execution Evidence shows an honest empty state with no linked run.
 - Confirm Review Latest Run is disabled when no real linked run exists.
 - Confirm Start Disposable Run is enabled only when the selected ticket/project/session are valid and readiness is not explicitly blocked.
-- Select `Wire Start Disposable Run`.
+- Select `Wire Start Sandbox Run`.
 - Confirm Execution Evidence shows linked run `localtest-run-ticket-3002`.
 - Click Review Latest Run.
 - Confirm the in-ticket run review panel opens without losing the selected ticket.
 - Confirm the run review shows run status, run ID, ticket title, disposable run marker, output summary, and events/evidence state.
 - Open Documents if the current shell exposes the workspace or API-backed list.
 - Confirm these seeded documents are visible through the API/UI:
-  - `Alpha UI Manual Test Notes`
+  - `Workspace Manual Test Notes`
   - `Code Standards Draft`
-  - `Test Agent Direction`
+  - `Testing Companion Direction`
 - Confirm unfinished or unavailable actions show honest disabled reasons or backend errors.
 - Confirm no fake green success state appears for actions that did not actually run.
 - Confirm the normal development database was not modified.
@@ -80,7 +82,7 @@ Invoke-RestMethod http://localhost:5000/health
 
 ## Safety Rules
 
-- The LocalTest database name must contain `Test`.
-- The LocalTest workspace and logs roots must contain `Test`.
+- The LocalTest database must exactly match the production-disabled seed contract and its explicit `_Test` boundary.
+- The LocalTest workspace and logs roots must exactly match the production-disabled seed contract.
 - Real repository writes must remain disabled in LocalTest.
 - Missing backend functionality must be disabled or return an honest error. Do not fake successful execution.
