@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/` at CLN-04: **603 files**. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **615 files** after CLN-05. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/` at CLN-0
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 31 |
+| `Canonical` | 42 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 393 |
+| `HistoricalReceipt` | 394 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **603** |
+| **Total** | **615** |
 
 ## Inventory
 
@@ -636,6 +636,18 @@ This inventory classifies every tracked Markdown document under `Docs/` at CLN-0
 | `Docs/ux/ux-start-entry-sequence.md` | UX-START â€” The Session Front Door and Project Cockpit | Product and UX | `ArchiveCandidate` | Historical context; not current | `Docs/product/IRONDEV_PRODUCT_UX_SPEC_V2.md` | Move only in CLN-05 when references can be updated safely | Product and client |
 | `Docs/weaviate-local-setup.md` | Weaviate Local Setup | Memory | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Memory |
 | `Docs/WORKFLOW_ENGINE_DESIGN.md` | IronDev LangGraph-Style Workflow Design | Engineering and operations | `Superseded` | Not current | `Docs/architecture/CANONICAL_ARCHITECTURE_INDEX.md` | Retain replacement banner; archive only when links are safe | Engineering |
+| `Docs/README.md` | IronDev Documentation | Cleanup | `Canonical` | 2026-07-13 structure review | `-` | Keep current; update with documentation structure | Cleanup programme |
+| `Docs/archive/README.md` | Documentation Archive | Cleanup | `Canonical` | 2026-07-13 structure review | `-` | Keep current; update with documentation structure | Cleanup programme |
+| `Docs/architecture/README.md` | Architecture Documentation | Architecture | `Canonical` | 2026-07-13 structure review | `-` | Keep current; update with architecture ownership | Architecture |
+| `Docs/api/README.md` | API Documentation | API and clients | `Canonical` | 2026-07-13 structure review | `-` | Keep current; update with API ownership | API and clients |
+| `Docs/cleanup/README.md` | Cleanup Programme Documentation | Cleanup | `Canonical` | 2026-07-13 structure review | `-` | Keep current; update with cleanup programme | Cleanup programme |
+| `Docs/cleanup/DOCUMENTATION_STRUCTURE.md` | Documentation Structure | Cleanup | `Canonical` | 2026-07-13 structure review | `-` | Keep current; enforce move gates | Cleanup programme |
+| `Docs/dogfood/README.md` | Dogfood Documentation | Dogfood | `Canonical` | 2026-07-13 structure review | `-` | Keep current; update with dogfood ownership | Dogfood |
+| `Docs/memory/README.md` | Memory Documentation | Memory | `Canonical` | 2026-07-13 structure review | `-` | Keep current; add CLN-23 reality audit when delivered | Memory |
+| `Docs/operations/README.md` | Operations Documentation | Engineering and operations | `Canonical` | 2026-07-13 structure review | `-` | Keep current; update with operations ownership | Engineering |
+| `Docs/receipts/README.md` | Receipts | Evidence | `Canonical` | 2026-07-13 structure review | `-` | Keep current; preserve receipt immutability rules | Evidence and audit |
+| `Docs/testing/README.md` | Testing Documentation | Testing | `Canonical` | 2026-07-13 structure review | `-` | Keep current; update with test-platform ownership | Test platform |
+| `Docs/receipts/CLN_05_DOCUMENTATION_STRUCTURE.md` | CLN-05 Documentation Structure Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
