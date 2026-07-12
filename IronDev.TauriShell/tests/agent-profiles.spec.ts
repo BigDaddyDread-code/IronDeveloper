@@ -11,6 +11,7 @@ test('agents panel edits a model and voice as a versioned draft', async ({ page 
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.agents').click();
 
   await expect(page.getByTestId('flow.settings.agents')).toBeVisible();
   await expect(page.getByTestId('flow.settings.agent.analyst')).toContainText('Workshop guide');
@@ -38,6 +39,7 @@ test('the orchestrator card is honest — deterministic, no model to configure',
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.agents').click();
 
   await expect(page.getByTestId('flow.settings.agent.orchestrator')).toBeVisible();
   // It states what it is...
@@ -56,6 +58,7 @@ test('agents panel shows effective profile provenance', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.agents').click();
 
   await expect(page.getByTestId('flow.settings.agent.builder.effective.summary')).toContainText('openai / gpt-4o / 60s');
   await expect(page.getByTestId('flow.settings.agent.builder.effective.providerSource')).toContainText('DeploymentDefault');
@@ -72,6 +75,7 @@ test('agents panel accepts numeric backend role values from LocalTest', async ({
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.agents').click();
 
   await expect(page.getByTestId('flow.settings.agent.analyst')).toContainText('Workshop guide');
   await expect(page.getByTestId('flow.settings.agent.orchestrator')).toBeVisible();
@@ -86,6 +90,7 @@ test('a secret in a profile is refused and shown honestly', async ({ page }) => 
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.agents').click();
 
   await page.getByTestId('flow.settings.agent.builder.personality').fill('use sk-secret');
   await page.getByTestId('flow.settings.agent.builder.save').click();
@@ -100,6 +105,7 @@ test('agents panel resets fields and restores immutable published versions', asy
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.agents').click();
 
   await expect(page.getByTestId('flow.settings.agent.builder.history')).toContainText('v1');
   await page.getByTestId('flow.settings.agent.builder.recoveryReason').fill('Return to the known baseline');
@@ -119,6 +125,7 @@ test('settings advanced shows honest product and runtime identity', async ({ pag
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.advanced').click();
 
   await expect(page.getByTestId('flow.settings.about')).toContainText('IronDev');
   await expect(page.getByTestId('flow.settings.about')).toContainText('0.5.0');

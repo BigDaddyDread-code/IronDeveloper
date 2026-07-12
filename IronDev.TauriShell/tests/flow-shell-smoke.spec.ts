@@ -122,9 +122,16 @@ test('settings labels membership handoff and the local policy draft honestly', a
 
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
-  await expect(page.getByTestId('flow.settings.banner')).toContainText('Tenant membership and roles now live under Library > Members');
-  await expect(page.getByTestId('flow.settings.banner')).toContainText('approval policy below is still a local draft');
+  await expect(page.getByTestId('flow.settings.hub')).toBeVisible();
+  await expect(page.getByRole('tab')).toHaveCount(6);
+  await expect(page.getByTestId('flow.settings.panel.project')).toContainText('IronDeveloper');
+  await expect(page.getByTestId('flow.settings.agents')).toHaveCount(0);
+  await page.getByTestId('flow.settings.section.safety').click();
+  await expect(page.getByTestId('flow.settings.banner')).toContainText('Tenant membership and roles live under Library > Members');
+  await expect(page.getByTestId('flow.settings.banner')).toContainText('approval policy below remains a local draft');
   await expect(page.getByTestId('flow.settings.savePolicy')).toBeVisible();
+  await page.getByTestId('flow.settings.section.runtime').click();
+  await expect(page.getByTestId('flow.settings.runtime')).toContainText('LocalTest');
 });
 
 test('library members lists backend-owned project membership', async ({ page }) => {

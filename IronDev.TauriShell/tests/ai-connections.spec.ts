@@ -33,6 +33,7 @@ test('settings shows tenant AI connection metadata without credential material',
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.aiConnections').click();
 
   await expect(page.getByTestId('flow.settings.aiConnections')).toBeVisible();
   await expect(page.getByTestId('flow.settings.aiConnections.count')).toContainText('1 available');
@@ -79,6 +80,7 @@ test('settings stores and revokes AI credentials without rendering the secret', 
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.aiConnections').click();
 
   await page.getByTestId('flow.settings.aiConnections.connection.0.credentialInput').fill(secret);
   await page.getByTestId('flow.settings.aiConnections.connection.0.reason').fill('manual local test');
@@ -104,6 +106,7 @@ test('settings shows an honest empty state when no AI connections are returned',
   await page.goto('/');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.aiConnections').click();
 
   await expect(page.getByTestId('flow.settings.aiConnections.count')).toContainText('None configured');
   await expect(page.getByTestId('flow.settings.aiConnections.empty')).toContainText('No AI connection metadata');
