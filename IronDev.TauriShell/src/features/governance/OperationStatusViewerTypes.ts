@@ -15,7 +15,7 @@ export interface OperationStatusViewerSection {
 }
 
 export const operationStatusViewerBoundaryWarnings = [
-  'The first frontend is a window, not a cockpit.',
+  'This Technical Evidence view is a window into backend state.',
   'UI is not authority.',
   'Display is not execution.',
   'Next safe action is guidance, not a button.',

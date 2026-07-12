@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 // Live LocalTest smoke for the flow shell: sign in with seeded credentials, see the
 // seeded tickets on the board, open one as a work item with real build readiness, and
-// confirm settings lists the seeded tenant membership. The old cockpit's disposable-run
+// confirm settings lists the seeded tenant membership. Legacy disposable-run
 // and run-review coverage returns when the Build and Review stages land on the spine.
 
 test.describe('LocalTest manual flow-shell smoke', () => {

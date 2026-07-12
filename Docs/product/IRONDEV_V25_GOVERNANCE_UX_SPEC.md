@@ -586,13 +586,13 @@ Add control details, exception details, source explanations, remedy navigation, 
 
 GOV-CLEAN-1 — legacy viewer containment
 
-Remove the 17-viewer strip, preserve direct links, group technical viewers, route trace investigation toward Audit, and move Work Item-owned evidence to the Work Item.
+Remove the 17-viewer strip, preserve direct links, group Technical Evidence, route trace investigation toward Audit, and move Work Item-owned evidence to the Work Item.
 
 21. Acceptance criteria
 
 The specification is complete when:
 
-Governance opens as a project overview rather than a viewer catalogue.
+Governance opens as a project control centre rather than a record-type catalogue.
 A user understands protections, attention, abnormal state, and next destination without knowing an internal ID.
 Overall posture is backend-owned.
 Every effective control identifies its source.
