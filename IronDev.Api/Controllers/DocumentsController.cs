@@ -1,4 +1,5 @@
 using IronDev.Core.Interfaces;
+using IronDev.Api.Middleware;
 using IronDev.Data.Models;
 using IronDev.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -113,6 +114,7 @@ public sealed class DocumentsController : ControllerBase
 
     [HttpGet("api/documents/{documentId:long}")]
     [HttpGet("api/projects/{projectId:int}/documents/{documentId:long}")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Document, "documentId")]
     public async Task<ActionResult<ProjectDocument>> GetDocument(long documentId, CancellationToken ct, int? projectId = null)
     {
         var document = await _documents.GetDocumentAsync(documentId, ct);
@@ -137,10 +139,12 @@ public sealed class DocumentsController : ControllerBase
         Ok(new { projectId, documentId, status = "not_implemented" });
 
     [HttpPost("api/documents/{documentId:long}/versions")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Document, "documentId")]
     public Task<ProjectDocumentVersion> AddVersion(AddProjectDocumentVersionRequest request, CancellationToken ct) =>
         _documents.AddVersionAsync(request, ct);
 
     [HttpGet("api/documents/{documentId:long}/versions/current")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Document, "documentId")]
     public Task<ProjectDocumentVersion?> GetCurrentVersion(long documentId, CancellationToken ct) =>
         _documents.GetCurrentVersionAsync(documentId, ct);
 
@@ -155,10 +159,12 @@ public sealed class DocumentsController : ControllerBase
     }
 
     [HttpGet("api/document-versions/{versionId:long}")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.DocumentVersion, "versionId")]
     public Task<ProjectDocumentVersion?> GetVersion(long versionId, CancellationToken ct) =>
         _documents.GetVersionAsync(versionId, ct);
 
     [HttpGet("api/documents/{documentId:long}/versions")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Document, "documentId")]
     public Task<IReadOnlyList<ProjectDocumentVersion>> GetVersions(long documentId, CancellationToken ct) =>
         _documents.GetVersionHistoryAsync(documentId, ct);
 
@@ -172,6 +178,7 @@ public sealed class DocumentsController : ControllerBase
     }
 
     [HttpPost("api/document-versions/{versionId:long}/links")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.DocumentVersion, "versionId")]
     public async Task<IActionResult> LinkVersion(LinkProjectDocumentVersionRequest request, CancellationToken ct)
     {
         await _documents.LinkVersionAsync(request, ct);
@@ -179,10 +186,12 @@ public sealed class DocumentsController : ControllerBase
     }
 
     [HttpGet("api/document-versions/{versionId:long}/links")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.DocumentVersion, "versionId")]
     public Task<IReadOnlyList<ProjectDocumentLink>> GetLinks(long versionId, CancellationToken ct) =>
         _documents.GetLinksForVersionAsync(versionId, ct);
 
     [HttpDelete("api/documents/{documentId:long}")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Document, "documentId")]
     public async Task<IActionResult> ArchiveDocument(long documentId, CancellationToken ct)
     {
         await _documents.ArchiveDocumentAsync(documentId, ct);

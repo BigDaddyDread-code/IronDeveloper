@@ -1,4 +1,6 @@
 using IronDev.Core.KnowledgeCompiler;
+using IronDev.Api.Middleware;
+using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Services;
@@ -127,6 +129,7 @@ public sealed class MemoryController : ControllerBase
     }
 
     [HttpGet("api/memory/documents/{documentId:long}")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.MemoryDocument, "documentId")]
     public Task<ProjectContextDocument?> GetDocument(long documentId, CancellationToken ct) =>
         _memory.GetContextDocumentByIdAsync(documentId, ct);
 
@@ -135,6 +138,7 @@ public sealed class MemoryController : ControllerBase
         _memory.SaveContextDocumentAsync(document, ct);
 
     [HttpDelete("api/memory/documents/{documentId:long}")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.MemoryDocument, "documentId")]
     public async Task<IActionResult> ArchiveDocument(long documentId, CancellationToken ct)
     {
         var ok = await _memory.ArchiveContextDocumentAsync(documentId, ct);
@@ -146,10 +150,12 @@ public sealed class MemoryController : ControllerBase
         _memory.GetRecentPlansAsync(projectId, take, ct);
 
     [HttpGet("api/memory/plans/{planId:long}")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.ImplementationPlan, "planId")]
     public Task<ProjectImplementationPlan?> GetPlan(long planId, CancellationToken ct) =>
         _memory.GetPlanByIdAsync(planId, ct);
 
     [HttpGet("api/tickets/{ticketId:long}/implementation-plan")]
+    [RequireProjectArtifactAccess(ProjectArtifactKind.Ticket, "ticketId")]
     public Task<ProjectImplementationPlan?> GetPlanByTicket(long ticketId, CancellationToken ct) =>
         _memory.GetPlanByTicketIdAsync(ticketId, ct);
 

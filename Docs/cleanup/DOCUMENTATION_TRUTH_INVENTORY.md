@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **634 files** after CLN-15. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **636 files** after CLN-16. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **634 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 51 |
+| `Canonical` | 52 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 404 |
+| `HistoricalReceipt` | 405 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **634** |
+| **Total** | **636** |
 
 ## Inventory
 
@@ -667,6 +667,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **634 f
 | `Docs/receipts/CLN_13_CANONICAL_REFUSAL_ENVELOPE.md` | CLN-13 Canonical Governed Refusal Envelope Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_14_GENERATED_CONTRACT_DETERMINISM.md` | CLN-14 Generated Contract Determinism Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_15_AUTHENTICATION_TENANT_TOKEN_CONTRACT.md` | CLN-15 Authentication And Tenant Token Contract Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/PROJECT_ACCESS_SWEEP.md` | Project Access Sweep | Cleanup | `Canonical` | 2026-07-13 project access review | `-` | Keep aligned with membership and artifact guards | Security and API |
+| `Docs/receipts/CLN_16_PROJECT_ACCESS_SWEEP.md` | CLN-16 Project Access Sweep Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
