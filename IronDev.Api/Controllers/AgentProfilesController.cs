@@ -59,6 +59,65 @@ public sealed class AgentProfilesController : ControllerBase
         return Ok(await _profiles.GetAsync(parsed, ct));
     }
 
+    [HttpGet("{role}/draft")]
+    public async Task<ActionResult<SkeletonAgentProfileDraft>> GetDraft(string role, CancellationToken ct)
+    {
+        if (!TryParseRole(role, out var parsed))
+            return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
+        return Ok(await _profiles.GetDraftAsync(parsed, ct));
+    }
+
+    [HttpGet("{role}/history")]
+    public async Task<ActionResult<IReadOnlyList<SkeletonAgentProfilePublishedVersion>>> History(string role, CancellationToken ct)
+    {
+        if (!TryParseRole(role, out var parsed))
+            return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
+        return Ok(await _profiles.ListHistoryAsync(parsed, ct));
+    }
+
+    [HttpPut("{role}/draft")]
+    public async Task<ActionResult<SkeletonAgentProfileDraftOutcome>> SaveDraft(
+        string role,
+        [FromBody] SkeletonAgentProfileDraftWriteRequest request,
+        CancellationToken ct)
+    {
+        if (!TryParseRole(role, out var parsed))
+            return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
+        if (!await CanAdministerAsync(ct))
+            return Forbid();
+
+        var outcome = await _profiles.SaveDraftAsync(parsed, request, ct);
+        return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
+    }
+
+    [HttpPost("{role}/draft/test")]
+    public async Task<ActionResult<SkeletonAgentProfileDraftTestOutcome>> TestDraft(string role, CancellationToken ct)
+    {
+        if (!TryParseRole(role, out var parsed))
+            return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
+        if (!await CanAdministerAsync(ct))
+            return Forbid();
+
+        var outcome = await _profiles.TestDraftAsync(parsed, ct);
+        return outcome.Succeeded ? Ok(outcome) : BadRequest(outcome);
+    }
+
+    [HttpPost("{role}/draft/publish")]
+    public async Task<ActionResult<SkeletonAgentProfileDraftOutcome>> PublishDraft(
+        string role,
+        [FromBody] SkeletonAgentProfilePublishRequest request,
+        CancellationToken ct)
+    {
+        if (!TryParseRole(role, out var parsed))
+            return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
+        var ctx = CurrentUser();
+        if (!await CanAdministerAsync(ct))
+            return Forbid();
+
+        var outcome = await _profiles.PublishDraftAsync(parsed, request, ctx.UserId, ct);
+        return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
+    }
+
     [HttpPut("{role}")]
     public async Task<ActionResult<SkeletonAgentProfileOutcome>> Update(
         string role,
@@ -70,7 +129,7 @@ public sealed class AgentProfilesController : ControllerBase
 
         // Writing an agent's model/voice is an administering action — gate it the
         // same way tenant user administration is gated (Owner or TenantAdmin).
-        var ctx = new CurrentUserContext(HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
+        var ctx = CurrentUser();
         if (ctx.TenantId is null || ctx.UserId <= 0)
             return Forbid();
         var callerRole = await _userService.GetTenantRoleAsync(ctx.UserId, ctx.TenantId.Value, ct);
@@ -79,6 +138,18 @@ public sealed class AgentProfilesController : ControllerBase
 
         var outcome = await _profiles.UpdateAsync(parsed, update, ct);
         return outcome.Succeeded ? Ok(outcome) : BadRequest(outcome);
+    }
+
+    private CurrentUserContext CurrentUser() =>
+        new(HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
+
+    private async Task<bool> CanAdministerAsync(CancellationToken ct)
+    {
+        var ctx = CurrentUser();
+        if (ctx.TenantId is null || ctx.UserId <= 0)
+            return false;
+        var callerRole = await _userService.GetTenantRoleAsync(ctx.UserId, ctx.TenantId.Value, ct);
+        return TenantUserRoles.CanAdministerUsers(callerRole);
     }
 
     private static bool TryParseRole(string role, out SkeletonAgentRole parsed) =>

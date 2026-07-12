@@ -398,6 +398,246 @@
         }
       }
     },
+    "/api/v1/agent-profiles/{role}/draft": {
+      "get": {
+        "tags": [
+          "AgentProfiles"
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraft"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraft"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraft"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "AgentProfiles"
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonAgentProfileDraftWriteRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonAgentProfileDraftWriteRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonAgentProfileDraftWriteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraftOutcome"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraftOutcome"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraftOutcome"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-profiles/{role}/history": {
+      "get": {
+        "tags": [
+          "AgentProfiles"
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SkeletonAgentProfilePublishedVersion"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SkeletonAgentProfilePublishedVersion"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SkeletonAgentProfilePublishedVersion"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-profiles/{role}/draft/test": {
+      "post": {
+        "tags": [
+          "AgentProfiles"
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraftTestOutcome"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraftTestOutcome"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraftTestOutcome"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-profiles/{role}/draft/publish": {
+      "post": {
+        "tags": [
+          "AgentProfiles"
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonAgentProfilePublishRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonAgentProfilePublishRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonAgentProfilePublishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraftOutcome"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraftOutcome"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkeletonAgentProfileDraftOutcome"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/agent-runs": {
       "get": {
         "tags": [
@@ -29673,6 +29913,156 @@
         },
         "additionalProperties": false
       },
+      "SkeletonAgentProfileDraft": {
+        "required": [
+          "basePublishedVersion",
+          "isValid",
+          "revision",
+          "role",
+          "updatedAtUtc",
+          "values"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/SkeletonAgentRole"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "basePublishedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "values": {
+            "$ref": "#/components/schemas/SkeletonAgentProfileUpdate"
+          },
+          "isValid": {
+            "type": "boolean"
+          },
+          "validationIssues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkeletonAgentProfileValidationIssue"
+            },
+            "nullable": true
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkeletonAgentProfileDraftOutcome": {
+        "required": [
+          "currentRevision",
+          "succeeded"
+        ],
+        "type": "object",
+        "properties": {
+          "succeeded": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/SkeletonAgentProfileDraft"
+          },
+          "publishedVersion": {
+            "$ref": "#/components/schemas/SkeletonAgentProfilePublishedVersion"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/SkeletonAgentProfile"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkeletonAgentProfileDraftTestOutcome": {
+        "required": [
+          "executedAtUtc",
+          "status",
+          "succeeded"
+        ],
+        "type": "object",
+        "properties": {
+          "succeeded": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "validationIssues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkeletonAgentProfileValidationIssue"
+            },
+            "nullable": true
+          },
+          "executedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkeletonAgentProfileDraftWriteRequest": {
+        "required": [
+          "expectedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skill": {
+            "type": "string",
+            "nullable": true
+          },
+          "personality": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SkeletonAgentProfileFieldSource": {
         "required": [
           "field",
@@ -29727,6 +30117,59 @@
         },
         "additionalProperties": false
       },
+      "SkeletonAgentProfilePublishRequest": {
+        "required": [
+          "expectedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkeletonAgentProfilePublishedVersion": {
+        "required": [
+          "actorUserId",
+          "publishedAtUtc",
+          "reason",
+          "role",
+          "values",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SkeletonAgentRole"
+          },
+          "values": {
+            "$ref": "#/components/schemas/SkeletonAgentProfileUpdate"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorUserId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "publishedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "SkeletonAgentProfileUpdate": {
         "type": "object",
         "properties": {
@@ -29747,6 +30190,29 @@
             "nullable": true
           },
           "personality": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkeletonAgentProfileValidationIssue": {
+        "required": [
+          "code",
+          "field",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "field": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
             "type": "string",
             "nullable": true
           }

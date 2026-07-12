@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { EffectiveSkeletonAgentProfile, SkeletonAgentProfile } from '../../api/types';
+import type { EffectiveSkeletonAgentProfile, SkeletonAgentProfile, SkeletonAgentProfileDraft } from '../../api/types';
 import { useSessionContext } from '../../state/useSessionContext';
 
 // AG-5 — per-agent configuration: the model each agent runs on and its skill +
@@ -25,6 +25,9 @@ export function AgentsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [savingRole, setSavingRole] = useState<string | null>(null);
   const [savedRole, setSavedRole] = useState<string | null>(null);
+  const [draftState, setDraftState] = useState<Record<string, SkeletonAgentProfileDraft>>({});
+  const [publishReasons, setPublishReasons] = useState<Record<string, string>>({});
+  const [notice, setNotice] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setState('loading');
@@ -33,9 +36,15 @@ export function AgentsPanel() {
         session.client.listAgentProfiles(),
         session.client.listEffectiveAgentProfiles(session.config.selectedProjectId)
       ]);
+      const editable = result.filter((profile) => !DETERMINISTIC_ROLES.includes(profile.role));
+      const persistedDrafts = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.getAgentProfileDraft(profile.role)] as const));
       setProfiles(result);
       setEffectiveProfiles(Object.fromEntries(effective.map((profile) => [profile.role, profile])));
-      setDrafts(Object.fromEntries(result.map((p) => [p.role, p])));
+      setDraftState(Object.fromEntries(persistedDrafts));
+      setDrafts(Object.fromEntries(result.map((profile) => {
+        const persisted = persistedDrafts.find(([role]) => role === profile.role)?.[1];
+        return [profile.role, persisted ? { ...profile, ...persisted.values } : profile];
+      })));
       setState('ready');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load agent profiles.');
@@ -58,7 +67,8 @@ export function AgentsPanel() {
       setSavedRole(null);
       setError(null);
       try {
-        const outcome = await session.client.updateAgentProfile(role, {
+        const outcome = await session.client.saveAgentProfileDraft(role, {
+          expectedRevision: draftState[role]?.revision ?? 0,
           provider: draft.provider,
           model: draft.model,
           timeoutSeconds: draft.timeoutSeconds,
@@ -69,7 +79,11 @@ export function AgentsPanel() {
           setError(outcome.failureReason);
           return;
         }
+        if (outcome.draft) {
+          setDraftState((previous) => ({ ...previous, [role]: outcome.draft! }));
+        }
         setSavedRole(role);
+        setNotice((previous) => ({ ...previous, [role]: outcome.draft?.isValid ? 'Draft saved and valid.' : 'Draft saved with validation issues.' }));
       } catch (e) {
         // A refused update (e.g. secret detected) returns 400 with the outcome.
         const body = e instanceof IronDevApiError ? (e.body as { failureReason?: string } | undefined) : undefined;
@@ -78,8 +92,47 @@ export function AgentsPanel() {
         setSavingRole(null);
       }
     },
-    [drafts, savingRole, session.client]
+    [draftState, drafts, savingRole, session.client]
   );
+
+  const testDraft = useCallback(async (role: string) => {
+    if (savingRole) return;
+    setSavingRole(role);
+    setError(null);
+    try {
+      const outcome = await session.client.testAgentProfileDraft(role);
+      setNotice((previous) => ({ ...previous, [role]: outcome.summary || outcome.status }));
+    } catch (e) {
+      const body = e instanceof IronDevApiError ? (e.body as { failureReason?: string } | undefined) : undefined;
+      setError(body?.failureReason ?? (e instanceof Error ? e.message : 'Draft test failed.'));
+    } finally {
+      setSavingRole(null);
+    }
+  }, [savingRole, session.client]);
+
+  const publishDraft = useCallback(async (role: string) => {
+    if (savingRole) return;
+    setSavingRole(role);
+    setError(null);
+    try {
+      const outcome = await session.client.publishAgentProfileDraft(role, {
+        expectedRevision: draftState[role]?.revision ?? 0,
+        reason: publishReasons[role]?.trim() ?? ''
+      });
+      if (!outcome.succeeded) {
+        setError(outcome.failureReason);
+        return;
+      }
+      setNotice((previous) => ({ ...previous, [role]: `Published version ${outcome.publishedVersion?.version ?? ''}.` }));
+      setPublishReasons((previous) => ({ ...previous, [role]: '' }));
+      await load();
+    } catch (e) {
+      const body = e instanceof IronDevApiError ? (e.body as { failureReason?: string } | undefined) : undefined;
+      setError(body?.failureReason ?? (e instanceof Error ? e.message : 'Publish failed.'));
+    } finally {
+      setSavingRole(null);
+    }
+  }, [draftState, load, publishReasons, savingRole, session.client]);
 
   if (state === 'loading') {
     return <p className="fl-empty">Loading agents…</p>;
@@ -175,10 +228,41 @@ export function AgentsPanel() {
                 onClick={() => void save(profile.role)}
                 data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.save`}
               >
-                {savingRole === profile.role ? 'Saving…' : 'Save'}
+                {savingRole === profile.role ? 'Working…' : 'Save draft'}
               </button>
-              {savedRole === profile.role ? <span style={{ fontSize: 12.5, color: 'var(--fl-acc-ink)' }}>Saved.</span> : null}
+              <button
+                className="fl-btn"
+                disabled={savingRole !== null || !draftState[profile.role]}
+                onClick={() => void testDraft(profile.role)}
+                data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.test`}
+              >
+                Test draft
+              </button>
+              {savedRole === profile.role ? <span style={{ fontSize: 12.5, color: 'var(--fl-acc-ink)' }}>Draft saved.</span> : null}
             </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+              <input
+                style={{ flex: '1 1 260px' }}
+                value={publishReasons[profile.role] ?? ''}
+                onChange={(event) => setPublishReasons((previous) => ({ ...previous, [profile.role]: event.target.value }))}
+                placeholder="Reason for publishing this version"
+                data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.publishReason`}
+              />
+              <button
+                className="fl-btn fl-pri"
+                disabled={savingRole !== null || !draftState[profile.role]?.isValid || !(publishReasons[profile.role]?.trim())}
+                onClick={() => void publishDraft(profile.role)}
+                data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.publish`}
+              >
+                Publish
+              </button>
+            </div>
+            {draftState[profile.role]?.validationIssues.length ? (
+              <ul className="fl-empty" data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.validation`}>
+                {draftState[profile.role].validationIssues.map((issue) => <li key={`${issue.field}-${issue.code}`}>{issue.field}: {issue.message}</li>)}
+              </ul>
+            ) : null}
+            {notice[profile.role] ? <p className="fl-empty" data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.notice`}>{notice[profile.role]}</p> : null}
             </>
             )}
           </div>

@@ -218,6 +218,81 @@ public sealed record SkeletonAgentProfileOutcome
     public SkeletonAgentProfile? Profile { get; init; }
 }
 
+public sealed record SkeletonAgentProfileValidationIssue
+{
+    public required string Code { get; init; }
+    public required string Field { get; init; }
+    public required string Message { get; init; }
+}
+
+public sealed record SkeletonAgentProfileDraft
+{
+    public required SkeletonAgentRole Role { get; init; }
+    public required long Revision { get; init; }
+    public required long BasePublishedVersion { get; init; }
+    public required SkeletonAgentProfileUpdate Values { get; init; }
+    public required bool IsValid { get; init; }
+    public IReadOnlyList<SkeletonAgentProfileValidationIssue> ValidationIssues { get; init; } = [];
+    public required DateTimeOffset UpdatedAtUtc { get; init; }
+}
+
+public sealed record SkeletonAgentProfileDraftWriteRequest
+{
+    public required long ExpectedRevision { get; init; }
+    public string Provider { get; init; } = string.Empty;
+    public string Model { get; init; } = string.Empty;
+    public int TimeoutSeconds { get; init; }
+    public string Skill { get; init; } = string.Empty;
+    public string Personality { get; init; } = string.Empty;
+
+    public SkeletonAgentProfileUpdate ToUpdate() => new()
+    {
+        Provider = Provider,
+        Model = Model,
+        TimeoutSeconds = TimeoutSeconds,
+        Skill = Skill,
+        Personality = Personality
+    };
+}
+
+public sealed record SkeletonAgentProfilePublishRequest
+{
+    public required long ExpectedRevision { get; init; }
+    public string Reason { get; init; } = string.Empty;
+}
+
+public sealed record SkeletonAgentProfilePublishedVersion
+{
+    public required long Version { get; init; }
+    public required SkeletonAgentRole Role { get; init; }
+    public required SkeletonAgentProfileUpdate Values { get; init; }
+    public required string Reason { get; init; }
+    public required int ActorUserId { get; init; }
+    public required DateTimeOffset PublishedAtUtc { get; init; }
+}
+
+public sealed record SkeletonAgentProfileDraftOutcome
+{
+    public required bool Succeeded { get; init; }
+    public string Code { get; init; } = string.Empty;
+    public string FailureReason { get; init; } = string.Empty;
+    public required long CurrentRevision { get; init; }
+    public SkeletonAgentProfileDraft? Draft { get; init; }
+    public SkeletonAgentProfilePublishedVersion? PublishedVersion { get; init; }
+    public SkeletonAgentProfile? Profile { get; init; }
+}
+
+public sealed record SkeletonAgentProfileDraftTestOutcome
+{
+    public required bool Succeeded { get; init; }
+    public required string Status { get; init; }
+    public string FailureReason { get; init; } = string.Empty;
+    public IReadOnlyList<SkeletonAgentProfileValidationIssue> ValidationIssues { get; init; } = [];
+    public required DateTimeOffset ExecutedAtUtc { get; init; }
+    public string Summary { get; init; } = string.Empty;
+    public string Boundary { get; init; } = SkeletonAgentProfile.BoundaryText;
+}
+
 public sealed record SkeletonAgentProfileFieldSource
 {
     public required string Field { get; init; }
@@ -261,4 +336,9 @@ public interface ISkeletonAgentProfileService
         int? projectId = null,
         CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileOutcome> UpdateAsync(SkeletonAgentRole role, SkeletonAgentProfileUpdate update, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraft> GetDraftAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftOutcome> SaveDraftAsync(SkeletonAgentRole role, SkeletonAgentProfileDraftWriteRequest request, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftTestOutcome> TestDraftAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftOutcome> PublishDraftAsync(SkeletonAgentRole role, SkeletonAgentProfilePublishRequest request, int actorUserId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SkeletonAgentProfilePublishedVersion>> ListHistoryAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
 }

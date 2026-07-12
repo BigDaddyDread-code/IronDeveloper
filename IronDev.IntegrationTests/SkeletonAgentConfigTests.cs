@@ -227,6 +227,94 @@ public sealed class SkeletonAgentConfigTests
             "Profile writes are rate-limited like other sensitive admin surfaces.");
     }
 
+    [TestMethod]
+    public async Task Draft_SaveDoesNotChangeRuntimeUntilReasonedPublish()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var initial = await service.GetDraftAsync(SkeletonAgentRole.Builder);
+            var saved = await service.SaveDraftAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfileDraftWriteRequest
+            {
+                ExpectedRevision = initial.Revision,
+                Provider = "ollama",
+                Model = "llama3",
+                TimeoutSeconds = 45,
+                Skill = "Prefer narrow changes.",
+                Personality = "Direct."
+            });
+
+            Assert.IsTrue(saved.Succeeded);
+            Assert.AreEqual("openai", (await service.GetAsync(SkeletonAgentRole.Builder)).Provider,
+                "A saved draft must not alter the profile used by running agents.");
+
+            var published = await service.PublishDraftAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfilePublishRequest
+            {
+                ExpectedRevision = saved.CurrentRevision,
+                Reason = "Use the local model for this project."
+            }, actorUserId: 42);
+
+            Assert.IsTrue(published.Succeeded);
+            Assert.AreEqual(1L, published.PublishedVersion?.Version);
+            Assert.AreEqual(42, published.PublishedVersion?.ActorUserId);
+            Assert.AreEqual("ollama", (await service.GetAsync(SkeletonAgentRole.Builder)).Provider);
+            Assert.AreEqual(1, (await service.ListHistoryAsync(SkeletonAgentRole.Builder)).Count);
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task Draft_StaleRevisionAndInvalidPublishAreRefused()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var saved = await service.SaveDraftAsync(SkeletonAgentRole.Tester, new SkeletonAgentProfileDraftWriteRequest
+            {
+                ExpectedRevision = 0,
+                Provider = "openai",
+                Model = string.Empty,
+                TimeoutSeconds = 60
+            });
+            Assert.IsTrue(saved.Succeeded, "Invalid values may be retained as a visible draft.");
+            Assert.IsFalse(saved.Draft?.IsValid);
+
+            var stale = await service.SaveDraftAsync(SkeletonAgentRole.Tester, new SkeletonAgentProfileDraftWriteRequest
+            {
+                ExpectedRevision = 0,
+                Provider = "openai",
+                Model = "gpt-4o",
+                TimeoutSeconds = 60
+            });
+            Assert.IsFalse(stale.Succeeded);
+            Assert.AreEqual("StaleWrite", stale.Code);
+
+            var publish = await service.PublishDraftAsync(SkeletonAgentRole.Tester, new SkeletonAgentProfilePublishRequest
+            {
+                ExpectedRevision = saved.CurrentRevision,
+                Reason = "Try invalid draft"
+            }, actorUserId: 42);
+            Assert.IsFalse(publish.Succeeded);
+            Assert.AreEqual("ValidationFailed", publish.Code);
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task Draft_TestIsBoundedAndDoesNotSendAProviderRequest()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var outcome = await service.TestDraftAsync(SkeletonAgentRole.Critic);
+            Assert.IsTrue(outcome.Succeeded);
+            Assert.AreEqual("Passed", outcome.Status);
+            StringAssert.Contains(outcome.Summary, "No provider request was sent");
+            StringAssert.Contains(outcome.Boundary, "cannot share agent memory");
+        }
+        finally { TryDelete(root); }
+    }
+
     // ── AG-2: resolver + prompt composition ───────────────────────────────────
 
     [TestMethod]
