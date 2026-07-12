@@ -1,0 +1,54 @@
+name: frontend-behavior-ci
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-behavior-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-behavior-ci:
+    name: Current-product frontend behavior
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.16.0'
+          cache: npm
+          cache-dependency-path: IronDev.TauriShell/package-lock.json
+
+      - name: Pin npm
+        shell: pwsh
+        run: npm install --global npm@11.13.0
+
+      - name: Frontend behavior lane
+        shell: pwsh
+        run: ./Scripts/ci/run-frontend-behavior-ci.ps1
+
+      - name: Verify frontend behavior evidence artifacts are sanitized
+        if: always()
+        id: artifact-safety
+        shell: pwsh
+        run: ./Scripts/ci/test-ci-evidence-artifact-safety.ps1 -ArtifactDirectory artifacts/ci/frontend-behavior
+
+      - name: Upload frontend behavior evidence
+        if: ${{ always() && steps.artifact-safety.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-behavior-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/frontend-behavior
+          retention-days: 14
+          if-no-files-found: error

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockProjectBoard } from './helpers/mockBoard';
+import { workItemProjection } from './helpers/mockWorkItem';
 
 const READY_READINESS = {
   projectId: 7,
@@ -307,6 +308,18 @@ async function mockCommonApi(page: Page, options: MockOptions) {
     for (const ticket of ticketsByProject[projectId] ?? []) {
       await page.route(`**/irondev-api/api/projects/${projectId}/tickets/${ticket.id}`, (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticket) })
+      );
+      await page.route(`**/irondev-api/api/projects/${projectId}/work-items/${ticket.id}`, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(workItemProjection({
+            projectId,
+            workItemId: Number(ticket.id),
+            title: String(ticket.title),
+            ticket
+          }))
+        })
       );
     }
     await page.route(`**/irondev-api/api/projects/${projectId}/provisioning/readiness`, (route) => {

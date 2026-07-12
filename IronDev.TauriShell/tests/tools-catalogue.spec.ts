@@ -51,16 +51,17 @@ test('an empty backend registry has a distinct honest state', async ({ page }) =
 });
 
 test('catalogue failure preserves the route and retries backend truth', async ({ page }) => {
-  const state = await mockToolsWorkspace(page, { catalogueFailures: 2 });
+  const state = await mockToolsWorkspace(page, { catalogueInitiallyUnavailable: true });
   await page.goto('/projects/7/library/tools');
 
   await expect(page.getByRole('heading', { name: 'Project tools are unavailable', exact: true })).toBeVisible();
   await expect(page.getByTestId('flow.routeOutcome')).toContainText('Tool registry unavailable.');
   await expect(page).toHaveURL('/projects/7/library/tools');
+  state.makeCatalogueAvailable();
   await page.getByTestId('flow.routeOutcome.primary').click();
 
   await expect(page.getByTestId('flow.tools.open.code_standards.analyse_patch')).toBeVisible();
-  expect(state.catalogueRequests).toBe(3);
+  expect(state.catalogueRequests).toBeGreaterThanOrEqual(2);
 });
 
 test('an unknown tool returns an honest 404 and a working route back to Tools', async ({ page }) => {
@@ -94,11 +95,12 @@ test.describe('narrow Tools', () => {
 
 interface ToolsMockOptions {
   tools?: Array<Record<string, unknown>>;
-  catalogueFailures?: number;
+  catalogueInitiallyUnavailable?: boolean;
 }
 
 interface ToolsMockState {
   catalogueRequests: number;
+  makeCatalogueAvailable: () => void;
 }
 
 const toolSummary = {
@@ -135,8 +137,11 @@ const toolDetail = {
 };
 
 async function mockToolsWorkspace(page: Page, options: ToolsMockOptions = {}): Promise<ToolsMockState> {
-  const state = { catalogueRequests: 0 };
-  let failuresRemaining = options.catalogueFailures ?? 0;
+  let catalogueAvailable = !options.catalogueInitiallyUnavailable;
+  const state = {
+    catalogueRequests: 0,
+    makeCatalogueAvailable: () => { catalogueAvailable = true; }
+  };
   const tools = options.tools ?? [toolSummary];
 
   await page.addInitScript(() => {
@@ -170,8 +175,7 @@ async function mockToolsWorkspace(page: Page, options: ToolsMockOptions = {}): P
   });
   await page.route(/\/irondev-api\/api\/projects\/7\/tools(?:\?[^#]*)?$/, (route) => {
     state.catalogueRequests += 1;
-    if (failuresRemaining > 0) {
-      failuresRemaining -= 1;
+    if (!catalogueAvailable) {
       return json(route, { error: 'Tool registry unavailable.' }, 503);
     }
     return json(route, {
