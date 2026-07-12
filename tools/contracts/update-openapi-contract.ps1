@@ -1,6 +1,7 @@
 param(
     [int]$Port = 5017,
-    [switch]$Check
+    [switch]$Check,
+    [switch]$VerifyDeterminism
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,6 +63,27 @@ function Wait-ForSwagger {
     throw "Timed out waiting for contract-source Swagger at $apiBaseUrl."
 }
 
+function Invoke-ContractGeneration {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    Push-Location $frontendRoot
+    try {
+        $previousApiBaseUrl = $env:IRONDEV_API_BASE_URL
+        $env:IRONDEV_API_BASE_URL = $apiBaseUrl
+        try {
+            Invoke-Native -Name $Name -Command {
+                npm run api:generate
+            }
+        }
+        finally {
+            $env:IRONDEV_API_BASE_URL = $previousApiBaseUrl
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
 if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) {
     throw "Port $Port is already in use. Refusing to stop or reuse an unrelated process."
 }
@@ -93,21 +115,21 @@ try {
 
     Wait-ForSwagger
 
-    Push-Location $frontendRoot
-    try {
-        $previousApiBaseUrl = $env:IRONDEV_API_BASE_URL
-        $env:IRONDEV_API_BASE_URL = $apiBaseUrl
-        try {
-            Invoke-Native -Name "Regenerate OpenAPI and TypeScript contracts" -Command {
-                npm run api:generate
-            }
+    Invoke-ContractGeneration -Name "Regenerate OpenAPI and TypeScript contracts"
+
+    $firstOpenApiHash = (Get-FileHash -LiteralPath $openApiSnapshot -Algorithm SHA256).Hash
+    $firstTypesHash = (Get-FileHash -LiteralPath $generatedTypes -Algorithm SHA256).Hash
+
+    if ($VerifyDeterminism) {
+        Invoke-ContractGeneration -Name "Regenerate OpenAPI and TypeScript contracts again"
+        $secondOpenApiHash = (Get-FileHash -LiteralPath $openApiSnapshot -Algorithm SHA256).Hash
+        $secondTypesHash = (Get-FileHash -LiteralPath $generatedTypes -Algorithm SHA256).Hash
+
+        if ($firstOpenApiHash -ne $secondOpenApiHash -or $firstTypesHash -ne $secondTypesHash) {
+            throw "Generated API contracts are nondeterministic. OpenAPI: $firstOpenApiHash / $secondOpenApiHash; TypeScript: $firstTypesHash / $secondTypesHash."
         }
-        finally {
-            $env:IRONDEV_API_BASE_URL = $previousApiBaseUrl
-        }
-    }
-    finally {
-        Pop-Location
+
+        Write-Host "Determinism verified: two OpenAPI and TypeScript generations produced identical SHA-256 hashes."
     }
 
     $afterOpenApiHash = (Get-FileHash -LiteralPath $openApiSnapshot -Algorithm SHA256).Hash

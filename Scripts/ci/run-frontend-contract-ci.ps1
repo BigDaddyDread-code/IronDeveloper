@@ -121,7 +121,7 @@ try {
         -Name "Live OpenAPI regeneration and dirty-tree check" `
         -OutputPath $script:OpenApiDriftSummary `
         -Command {
-            & (Join-Path $script:RepoRoot "tools\contracts\update-openapi-contract.ps1") -Check
+            & (Join-Path $script:RepoRoot "tools\contracts\update-openapi-contract.ps1") -Check -VerifyDeterminism
             git -C $script:RepoRoot diff --exit-code -- `
                 IronDev.TauriShell/openapi/irondev-api.openapi.json `
                 IronDev.TauriShell/src/api/generated/ironDevApiTypes.ts
