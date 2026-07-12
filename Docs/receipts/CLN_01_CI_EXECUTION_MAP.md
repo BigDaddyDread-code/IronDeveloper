@@ -58,6 +58,8 @@ npx playwright test --list
 
 Result: 747 tests discovered in 41 files.
 
+An unfiltered local run exceeded ten minutes and was terminated without a result. No pass claim is made from that run; it establishes that the first GitHub lane must use an explicit current-product file inventory rather than an arbitrary timeout increase.
+
 Repository inspection confirmed no workflow invokes `playwright`, `vite build`, or a broad unfiltered `IronDev.IntegrationTests` test command.
 
 ## Next Cleanup Slices

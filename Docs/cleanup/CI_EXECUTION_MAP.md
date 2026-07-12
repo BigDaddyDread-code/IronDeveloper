@@ -158,7 +158,9 @@ Classification: `MissingCiLane`.
 
 `npx playwright test --list` currently discovers 747 tests in 41 files. No GitHub workflow installs Chromium or invokes Playwright. These tests include current Board, Workshop, Work Item, Library, Audit, settings, authority-firewall, refusal, empty, failure, and responsive-state contracts.
 
-Required follow-up: create a bounded frontend behavior lane. Live LocalTest remains a separate manual/operational proof and must not be replaced with mocks.
+A local unfiltered run was terminated after exceeding ten minutes. That result is timing evidence, not a pass or failure count, and rules out adding all 747 tests to an existing lane with an arbitrary larger timeout.
+
+Required follow-up: create a bounded current-product frontend behavior lane with an explicit file inventory. CLN-08 must assign the remaining historical/component suites. Live LocalTest remains a separate manual/operational proof and must not be replaced with mocks.
 
 ### GAP-CI-02: Integration-project ownership is filter-based, not exhaustive
 
