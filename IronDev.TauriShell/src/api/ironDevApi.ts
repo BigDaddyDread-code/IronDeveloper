@@ -69,6 +69,8 @@ import type {
   LoginResponse,
   PlannedSurfaceEnvelope,
   ProjectBoardReadModel,
+  ProjectAuditExport,
+  ProjectAuditExportFilters,
   ProjectGovernanceOverview,
   ProjectWorkItemReadModel,
   ProjectProvisioningReadinessUi,
@@ -910,6 +912,18 @@ class IronDevApiClient {
   async searchAuditLedger(query: AuditLedgerQuery, signal?: AbortSignal): Promise<AuditLedgerResponse> {
     const queryString = toQueryString(query);
     return this.request<AuditLedgerResponse>(`/api/v1/audit/ledger${queryString}`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async exportProjectAudit(
+    projectId: number,
+    filters: ProjectAuditExportFilters,
+    signal?: AbortSignal
+  ): Promise<ProjectAuditExport> {
+    const queryString = toQueryString(filters);
+    return this.request<ProjectAuditExport>(`/api/projects/${projectId}/audit/export${queryString}`, {
       method: 'GET',
       signal
     });

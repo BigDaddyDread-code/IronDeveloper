@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
-import type { AuditLedgerItem, AuditLedgerResponse } from '../../api/types';
+import type { AuditLedgerItem, AuditLedgerResponse, ProjectAuditExport } from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useSessionContext } from '../../state/useSessionContext';
 
@@ -9,6 +9,7 @@ interface AuditSectionProps {
 }
 
 type AuditLedgerLoadState = 'loading' | 'ready' | 'empty' | 'unavailable';
+type AuditExportState = 'idle' | 'generating' | 'ready' | 'error';
 
 interface AuditFilters {
   actor: string;
@@ -34,6 +35,10 @@ export function AuditSection({ projectId }: AuditSectionProps) {
   const [loadState, setLoadState] = useState<AuditLedgerLoadState>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportState, setExportState] = useState<AuditExportState>('idle');
+  const [exportPackage, setExportPackage] = useState<ProjectAuditExport | null>(null);
+  const [exportError, setExportError] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -67,7 +72,43 @@ export function AuditSection({ projectId }: AuditSectionProps) {
 
   const applyFilters = (event: FormEvent) => {
     event.preventDefault();
+    invalidateExport();
     setAppliedFilters(filters);
+  };
+
+  const updateFilter = (field: keyof AuditFilters, value: string) => {
+    setFilters((current) => ({ ...current, [field]: value }));
+    invalidateExport();
+  };
+
+  const invalidateExport = () => {
+    setExportPackage(null);
+    setExportError('');
+    setExportState('idle');
+  };
+
+  const generateExport = async () => {
+    setExportState('generating');
+    setExportError('');
+    setExportPackage(null);
+    try {
+      setExportPackage(await session.client.exportProjectAudit(projectId, exportFilters(appliedFilters)));
+      setExportState('ready');
+    } catch (error) {
+      setExportState('error');
+      setExportError(describeError(error, 'The audit export could not be generated.'));
+    }
+  };
+
+  const downloadExport = () => {
+    if (!exportPackage) return;
+    const blob = new Blob([`${JSON.stringify(exportPackage, null, 2)}\n`], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = exportFileName(projectId, exportPackage.generatedUtc);
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loadState === 'loading') {
@@ -77,7 +118,7 @@ export function AuditSection({ projectId }: AuditSectionProps) {
   if (loadState === 'unavailable') {
     return (
       <section className="fl-audit" data-testid="flow.library.auditLedger">
-        <AuditHeader ledger={ledger} />
+        <AuditHeader ledger={ledger} onExport={() => setExportOpen(true)} />
         <div className="fl-error" role="alert" data-testid="flow.audit.error">
           {errorMessage}
         </div>
@@ -90,14 +131,14 @@ export function AuditSection({ projectId }: AuditSectionProps) {
 
   return (
     <section className="fl-audit" data-testid="flow.library.auditLedger" aria-labelledby="audit-heading">
-      <AuditHeader ledger={ledger} />
+      <AuditHeader ledger={ledger} onExport={() => setExportOpen(true)} />
 
       <form className="fl-audit-filters" onSubmit={applyFilters} aria-label="Audit ledger filters">
         <label className="fl-field">
           Actor
           <input
             value={filters.actor}
-            onChange={(event) => setFilters((current) => ({ ...current, actor: event.target.value }))}
+            onChange={(event) => updateFilter('actor', event.target.value)}
             data-testid="flow.audit.filter.actor"
           />
         </label>
@@ -105,7 +146,7 @@ export function AuditSection({ projectId }: AuditSectionProps) {
           Event
           <input
             value={filters.event}
-            onChange={(event) => setFilters((current) => ({ ...current, event: event.target.value }))}
+            onChange={(event) => updateFilter('event', event.target.value)}
             data-testid="flow.audit.filter.event"
           />
         </label>
@@ -114,7 +155,7 @@ export function AuditSection({ projectId }: AuditSectionProps) {
           <input
             inputMode="numeric"
             value={filters.workItemId}
-            onChange={(event) => setFilters((current) => ({ ...current, workItemId: event.target.value }))}
+            onChange={(event) => updateFilter('workItemId', event.target.value)}
             data-testid="flow.audit.filter.workItem"
           />
         </label>
@@ -123,7 +164,7 @@ export function AuditSection({ projectId }: AuditSectionProps) {
           <input
             type="datetime-local"
             value={filters.fromUtc}
-            onChange={(event) => setFilters((current) => ({ ...current, fromUtc: event.target.value }))}
+            onChange={(event) => updateFilter('fromUtc', event.target.value)}
             data-testid="flow.audit.filter.from"
           />
         </label>
@@ -132,7 +173,7 @@ export function AuditSection({ projectId }: AuditSectionProps) {
           <input
             type="datetime-local"
             value={filters.toUtc}
-            onChange={(event) => setFilters((current) => ({ ...current, toUtc: event.target.value }))}
+            onChange={(event) => updateFilter('toUtc', event.target.value)}
             data-testid="flow.audit.filter.to"
           />
         </label>
@@ -157,11 +198,59 @@ export function AuditSection({ projectId }: AuditSectionProps) {
       ) : (
         <AuditRows items={ledger?.items ?? []} />
       )}
+
+      {exportOpen ? (
+        <div className="fl-audit-export-backdrop">
+          <section className="fl-audit-export" role="dialog" aria-modal="true" aria-labelledby="audit-export-heading" data-testid="flow.audit.export.dialog">
+            <header>
+              <div>
+                <p className="fl-plabel">Read-only JSON package</p>
+                <h3 id="audit-export-heading">Export current audit view</h3>
+              </div>
+              <button className="fl-btn" type="button" onClick={() => setExportOpen(false)}>Close</button>
+            </header>
+
+            <dl className="fl-audit-export__scope">
+              <div><dt>Actor</dt><dd>{appliedFilters.actor || 'Any actor'}</dd></div>
+              <div><dt>Event</dt><dd>{appliedFilters.event || 'Any event'}</dd></div>
+              <div><dt>Work Item</dt><dd>{appliedFilters.workItemId ? `WI-${appliedFilters.workItemId}` : 'Any Work Item'}</dd></div>
+              <div><dt>Date range</dt><dd>{formatDateRange(appliedFilters)}</dd></div>
+              <div><dt>Maximum rows</dt><dd>250</dd></div>
+            </dl>
+
+            {exportState === 'error' ? <div className="fl-error" role="alert">{exportError}</div> : null}
+            {exportPackage ? (
+              <div className="fl-audit-export__result" role="status" data-testid="flow.audit.export.result">
+                <div><span>Rows</span><strong>{exportPackage.returnedCount ?? 0}</strong></div>
+                <div><span>Truncated</span><strong>{exportPackage.truncated ? 'Yes' : 'No'}</strong></div>
+                <div><span>Schema</span><strong>{exportPackage.schemaVersion ?? 'Unknown'}</strong></div>
+                <div><span>Generated</span><strong>{formatTime(exportPackage.generatedUtc)}</strong></div>
+                <p><span>Items SHA-256</span><code>{exportPackage.itemsSha256 ?? 'Unavailable'}</code></p>
+              </div>
+            ) : (
+              <p className="fl-muted">Generate the backend package to confirm row count, truncation, schema, and item hash before downloading.</p>
+            )}
+
+            <p className="fl-audit-export__boundary">
+              {exportPackage?.boundary?.boundaryStatement ?? 'The export is bounded, non-secret, and read-only. It grants no authority.'}
+            </p>
+
+            <footer>
+              <button className="fl-btn" type="button" onClick={() => void generateExport()} disabled={exportState === 'generating'} data-testid="flow.audit.export.generate">
+                {exportState === 'generating' ? 'Generating...' : exportPackage ? 'Regenerate export' : 'Generate export'}
+              </button>
+              <button className="fl-btn fl-pri" type="button" onClick={downloadExport} disabled={!exportPackage} data-testid="flow.audit.export.download">
+                Download JSON
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function AuditHeader({ ledger }: { ledger: AuditLedgerResponse | null }) {
+function AuditHeader({ ledger, onExport }: { ledger: AuditLedgerResponse | null; onExport: () => void }) {
   const statement = ledger?.boundary?.boundaryStatement;
   return (
     <header className="fl-audit-heading">
@@ -170,7 +259,10 @@ function AuditHeader({ ledger }: { ledger: AuditLedgerResponse | null }) {
         <h2 id="audit-heading">Project audit</h2>
         {statement ? <p>{statement}</p> : null}
       </div>
-      <StatusBadge status="ready">{ledger?.returnedCount ?? 0} rows</StatusBadge>
+      <div className="fl-audit-heading__actions">
+        <StatusBadge status="ready">{ledger?.returnedCount ?? 0} rows</StatusBadge>
+        <button className="fl-btn" type="button" onClick={onExport} data-testid="flow.audit.export.open">Export current view</button>
+      </div>
     </header>
   );
 }
@@ -243,6 +335,31 @@ function dateTimeOrUndefined(value: string) {
   if (!value) return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function exportFilters(filters: AuditFilters) {
+  return {
+    actor: textOrUndefined(filters.actor),
+    event: textOrUndefined(filters.event),
+    workItemId: numberOrUndefined(filters.workItemId),
+    fromUtc: dateTimeOrUndefined(filters.fromUtc),
+    toUtc: dateTimeOrUndefined(filters.toUtc),
+    take: 250
+  };
+}
+
+function formatDateRange(filters: AuditFilters) {
+  const from = dateTimeOrUndefined(filters.fromUtc);
+  const to = dateTimeOrUndefined(filters.toUtc);
+  if (!from && !to) return 'Any time';
+  return `${from ? formatTime(from) : 'Beginning'} to ${to ? formatTime(to) : 'Now'}`;
+}
+
+function exportFileName(projectId: number, generatedUtc: string | null | undefined) {
+  const parsed = generatedUtc ? new Date(generatedUtc) : new Date();
+  const safeDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  const stamp = safeDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z').replace('T', '-');
+  return `irondev-audit-project-${projectId}-${stamp}.json`;
 }
 
 function formatTime(value: string | null | undefined) {
