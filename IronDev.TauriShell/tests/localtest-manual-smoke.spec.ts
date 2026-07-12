@@ -50,14 +50,30 @@ test.describe('LocalTest manual flow-shell smoke', () => {
     await page.getByTestId('flow.nav.settings').click();
     await page.getByTestId('flow.settings.section.safety').click();
     await expect(page.getByTestId('flow.settings.banner')).toContainText('never mutation authority');
-    await expect(page.getByText('bob@irondev.local')).toBeVisible({ timeout: 15_000 });
-    notes.push('Settings lists the seeded tenant membership from the tenant users API.');
+    notes.push('Settings preserves the explicit no-mutation-authority boundary.');
 
     await page.getByTestId('flow.nav.library').click();
     await page.getByTestId('flow.library.governance').click();
     await expect(page.getByTestId('flow.governance.overview')).toBeVisible();
+    await expect(page.getByTestId('flow.governance.status')).toHaveText('Attention required');
+    await expect(page.getByTestId('flow.governance.primaryAction')).toHaveText('Review controlled apply');
+    await expect(page.getByTestId('flow.governance.attention')).toContainText('WI-3002');
+    await expect(page.getByTestId('flow.governance.controls')).toContainText('IronDev invariant');
+    await expect(page.getByTestId('flow.governance.controls')).toContainText('Tenant policy');
+    await expect(page.getByTestId('flow.governance.exceptions')).toContainText('Execution evidence is incomplete');
     await expect(page.getByTestId('flow.governance.boundary')).toContainText('grants no approval');
-    notes.push('Library opens the project Governance overview from backend truth.');
+    await expect(page.getByTestId('flow.governanceHost')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /approve|continue workflow|apply source|rollback/i })).toHaveCount(0);
+    notes.push('Governance reports backend posture, next action, sourced controls, and the evidence exception without mutation controls.');
+
+    await page.getByRole('button', { name: 'Technical evidence' }).click();
+    await expect(page).toHaveURL('/projects/1/library/governance/technical');
+    await expect(page.getByTestId('flow.governance.technical')).toContainText('Runs and operations');
+    await expect(page.getByTestId('flow.governance.technical')).toContainText('Approvals and policy');
+    await page.getByRole('button', { name: 'Back to overview' }).click();
+    await expect(page).toHaveURL('/projects/1/library/governance');
+    await expect(page.getByTestId('flow.governance.overview')).toBeVisible();
+    notes.push('Technical evidence is progressively disclosed and returns to the project overview.');
 
     const bodyText = await page.locator('body').innerText();
     expect(bodyText).not.toMatch(/\bfake\b/i);
