@@ -11,6 +11,8 @@ export type LibrarySection =
   | 'audit'
   | 'settings';
 
+export type GovernanceSection = 'overview' | 'controls' | 'exceptions' | 'decisions' | 'technical';
+
 export type ProductRouteKind =
   | 'root'
   | 'signIn'
@@ -220,6 +222,11 @@ export function libraryPath(projectId: number, section: LibrarySection): string 
   return section === 'explorer'
     ? projectPath(projectId, 'library')
     : `${projectPath(projectId, 'library')}/${section}`;
+}
+
+export function governancePath(projectId: number, section: GovernanceSection = 'overview'): string {
+  const root = libraryPath(projectId, 'governance');
+  return section === 'overview' ? root : `${root}/${section}`;
 }
 
 export function documentPath(projectId: number, documentId: number): string {

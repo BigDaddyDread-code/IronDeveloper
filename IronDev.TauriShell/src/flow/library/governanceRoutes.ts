@@ -28,6 +28,8 @@ export interface GovernanceViewerEntry {
   label: string;
   prefixes: string[];
   entryPath: string;
+  canonicalOwner: 'board' | 'workItem' | 'governance' | 'audit' | 'library' | 'release' | 'developerEvidence';
+  disposition: string;
   component: ComponentType<GovernanceViewerProps>;
 }
 
@@ -39,6 +41,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Operation status',
     prefixes: ['/operations/'],
     entryPath: '/operations/',
+    canonicalOwner: 'board',
+    disposition: 'Board or Work Item',
     component: OperationStatusViewerRoute
   },
   {
@@ -46,6 +50,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Action requests',
     prefixes: ['/governance/action-requests', '/action-requests'],
     entryPath: '/action-requests',
+    canonicalOwner: 'workItem',
+    disposition: 'Work Item current action',
     component: ControlledActionRequestRoute
   },
   {
@@ -53,6 +59,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Workflow runs and steps',
     prefixes: ['/workflows/runs'],
     entryPath: '/workflows/runs',
+    canonicalOwner: 'workItem',
+    disposition: 'Work Item execution evidence',
     component: WorkflowRunStepViewerRoute
   },
   {
@@ -60,6 +68,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Patch packages',
     prefixes: ['/governance/patch-packages', '/patch-packages'],
     entryPath: '/patch-packages',
+    canonicalOwner: 'workItem',
+    disposition: 'Work Item evidence',
     component: PatchPackageViewerRoute
   },
   {
@@ -67,6 +77,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Memory proposals',
     prefixes: ['/governance/memory-proposals'],
     entryPath: '/governance/memory-proposals',
+    canonicalOwner: 'library',
+    disposition: 'Library memory area or Governance control detail',
     component: MemoryProposalReviewRoute
   },
   {
@@ -74,6 +86,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Patch artifacts',
     prefixes: ['/governance/patch-artifacts'],
     entryPath: '/governance/patch-artifacts',
+    canonicalOwner: 'workItem',
+    disposition: 'Work Item evidence',
     component: PatchArtifactPanelRoute
   },
   {
@@ -81,6 +95,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Dogfood receipts',
     prefixes: ['/governance/dogfood-receipts'],
     entryPath: '/governance/dogfood-receipts',
+    canonicalOwner: 'developerEvidence',
+    disposition: 'Advanced developer evidence',
     component: DogfoodReceiptViewerRoute
   },
   {
@@ -88,6 +104,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Approval packages',
     prefixes: ['/governance/approval-packages'],
     entryPath: '/governance/approval-packages',
+    canonicalOwner: 'workItem',
+    disposition: 'Work Item review',
     component: ApprovalPackageReviewRoute
   },
   {
@@ -95,6 +113,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Accepted approvals',
     prefixes: ['/governance/accepted-approvals'],
     entryPath: '/governance/accepted-approvals',
+    canonicalOwner: 'governance',
+    disposition: 'Governance decision detail and Audit',
     component: AcceptedApprovalPanelRoute
   },
   {
@@ -102,6 +122,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Policy satisfaction',
     prefixes: ['/governance/policy-satisfaction'],
     entryPath: '/governance/policy-satisfaction',
+    canonicalOwner: 'governance',
+    disposition: 'Governance effective controls',
     component: PolicySatisfactionPanelRoute
   },
   {
@@ -109,6 +131,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Release readiness evidence',
     prefixes: ['/governance/release-readiness-evidence'],
     entryPath: '/governance/release-readiness-evidence',
+    canonicalOwner: 'release',
+    disposition: 'Future Release surface',
     component: ReleaseReadinessEvidencePanelRoute
   },
   {
@@ -116,6 +140,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Workflow continuation evidence',
     prefixes: ['/governance/workflow-continuation-evidence'],
     entryPath: '/governance/workflow-continuation-evidence',
+    canonicalOwner: 'workItem',
+    disposition: 'Work Item review or outcome',
     component: WorkflowContinuationEvidencePanelRoute
   },
   {
@@ -123,6 +149,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Rollback evidence',
     prefixes: ['/governance/rollback-evidence'],
     entryPath: '/governance/rollback-evidence',
+    canonicalOwner: 'workItem',
+    disposition: 'Work Item recovery',
     component: RollbackEvidencePanelRoute
   },
   {
@@ -130,6 +158,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Source apply reviews',
     prefixes: ['/governance/source-apply-reviews'],
     entryPath: '/governance/source-apply-reviews',
+    canonicalOwner: 'workItem',
+    disposition: 'Work Item apply',
     component: SourceApplyReviewPanelRoute
   },
   {
@@ -137,6 +167,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Source apply dry-run receipts',
     prefixes: ['/governance/source-apply-dry-run-receipts'],
     entryPath: '/governance/source-apply-dry-run-receipts',
+    canonicalOwner: 'workItem',
+    disposition: 'Work Item apply',
     component: SourceApplyDryRunReceiptPanelRoute
   },
   {
@@ -144,6 +176,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Tool gate decisions',
     prefixes: ['/governance/tool-gates'],
     entryPath: '/governance/tool-gates',
+    canonicalOwner: 'governance',
+    disposition: 'Governance controls or Work Item evidence',
     component: ToolGateDecisionRoute
   },
   {
@@ -151,6 +185,8 @@ export const governanceViewers: GovernanceViewerEntry[] = [
     label: 'Governance timeline',
     prefixes: ['/governance'],
     entryPath: '/governance/timeline',
+    canonicalOwner: 'audit',
+    disposition: 'Audit technical traces',
     component: GovernanceTimelineRoute
   }
 ];
