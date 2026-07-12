@@ -1268,6 +1268,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-connections/{connectionId}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    connectionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AiConnectionTestOutcome"];
+                        "application/json": components["schemas"]["AiConnectionTestOutcome"];
+                        "text/json": components["schemas"]["AiConnectionTestOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflow/apply-preview/{workflowRunId}/{workflowStepId}": {
         parameters: {
             query?: never;
@@ -11659,6 +11698,17 @@ export interface components {
             /** Format: date-time */
             updatedUtc?: string | null;
             version: string | null;
+            boundary: string | null;
+        };
+        AiConnectionTestOutcome: {
+            succeeded: boolean;
+            status: string | null;
+            failureReason?: string | null;
+            /** Format: int32 */
+            httpStatusCode?: number | null;
+            /** Format: date-time */
+            testedAtUtc: string;
+            connection?: components["schemas"]["AiConnectionMetadata"];
             boundary: string | null;
         };
         ApprovalSatisfactionEvaluation: {

@@ -13,32 +13,43 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
     private readonly IConfiguration _configuration;
     private readonly Func<string, string?> _environmentVariableReader;
     private readonly IAiConnectionCredentialStore? _credentialStore;
+    private readonly IAiConnectionTestHealthStore? _healthStore;
 
     public AiConnectionCatalogService(IConfiguration configuration)
-        : this(configuration, Environment.GetEnvironmentVariable, credentialStore: null)
+        : this(configuration, Environment.GetEnvironmentVariable, credentialStore: null, healthStore: null)
     {
     }
 
     public AiConnectionCatalogService(
         IConfiguration configuration,
         IAiConnectionCredentialStore credentialStore)
-        : this(configuration, Environment.GetEnvironmentVariable, credentialStore)
+        : this(configuration, Environment.GetEnvironmentVariable, credentialStore, healthStore: null)
+    {
+    }
+
+    public AiConnectionCatalogService(
+        IConfiguration configuration,
+        IAiConnectionCredentialStore credentialStore,
+        IAiConnectionTestHealthStore healthStore)
+        : this(configuration, Environment.GetEnvironmentVariable, credentialStore, healthStore)
     {
     }
 
     public AiConnectionCatalogService(IConfiguration configuration, Func<string, string?> environmentVariableReader)
-        : this(configuration, environmentVariableReader, credentialStore: null)
+        : this(configuration, environmentVariableReader, credentialStore: null, healthStore: null)
     {
     }
 
     public AiConnectionCatalogService(
         IConfiguration configuration,
         Func<string, string?> environmentVariableReader,
-        IAiConnectionCredentialStore? credentialStore)
+        IAiConnectionCredentialStore? credentialStore,
+        IAiConnectionTestHealthStore? healthStore = null)
     {
         _configuration = configuration;
         _environmentVariableReader = environmentVariableReader;
         _credentialStore = credentialStore;
+        _healthStore = healthStore;
     }
 
     public async Task<IReadOnlyList<AiConnectionMetadata>> ListAsync(
@@ -61,6 +72,9 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
             ? null
             : await _credentialStore.GetMetadataAsync(tenantId, connectionId, cancellationToken)
                 .ConfigureAwait(false);
+        var health = _healthStore is null
+            ? null
+            : await _healthStore.GetAsync(tenantId, connectionId, cancellationToken).ConfigureAwait(false);
         var deploymentCredentialConfigured = HasCredential();
         var credentialConfigured = storedCredential?.CredentialConfigured ?? deploymentCredentialConfigured;
         var credentialStatus = storedCredential?.CredentialStatus ?? CredentialStatus(provider, deploymentCredentialConfigured);
@@ -78,8 +92,8 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
                 ControlledEndpoint = endpoint,
                 CredentialConfigured = credentialConfigured,
                 CredentialStatus = credentialStatus,
-                LastSuccessfulTestUtc = null,
-                LastFailedTestUtc = null,
+                LastSuccessfulTestUtc = health?.LastSuccessfulTestUtc,
+                LastFailedTestUtc = health?.LastFailedTestUtc,
                 AvailableModels = string.IsNullOrWhiteSpace(model) ? [] : [model],
                 Enabled = enabled,
                 TenantAvailable = enabled,

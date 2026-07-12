@@ -223,7 +223,10 @@ builder.Services.AddScoped<ITicketSkeletonRunService, TicketSkeletonRunService>(
 builder.Services.AddScoped<ISkeletonAgentProfileService, SkeletonAgentProfileService>();
 builder.Services.AddScoped<IAiConnectionCredentialStore, FileSystemAiConnectionCredentialStore>();
 builder.Services.AddScoped<IAiConnectionCredentialService, AiConnectionCredentialService>();
+builder.Services.AddScoped<IAiConnectionTestHealthStore, FileSystemAiConnectionTestHealthStore>();
 builder.Services.AddScoped<IAiConnectionCatalogService, AiConnectionCatalogService>();
+builder.Services.AddHttpClient<IAiConnectionTestService, AiConnectionTestService>(client =>
+    client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddScoped<IAgentLlmResolver, AgentLlmResolver>();
 builder.Services.AddSingleton<ISkeletonAgentScratchpad, SkeletonAgentScratchpad>();
 builder.Services.AddScoped<ISkeletonTestAuthoringService, SkeletonTestAuthoringService>();

@@ -80,6 +80,14 @@ export function AiConnectionsPanel() {
                 }
                 return outcome.succeeded ? null : outcome.failureReason ?? 'Credential was not revoked.';
               }}
+              onTest={async () => {
+                const outcome = await session.client.testAiConnection(connection.id);
+                const updated = outcome.connection;
+                if (updated) {
+                  setConnections((current) => current.map((item) => item.id === updated.id ? updated : item));
+                }
+                return outcome.succeeded ? null : outcome.failureReason ?? 'Connection test failed.';
+              }}
             />
           ))}
         </div>
@@ -92,18 +100,20 @@ function ConnectionRow({
   connection,
   index,
   onConfigure,
-  onRevoke
+  onRevoke,
+  onTest
 }: {
   connection: AiConnectionMetadata;
   index: number;
   onConfigure: (credential: string, reason?: string | null) => Promise<string | null>;
   onRevoke: (reason?: string | null) => Promise<string | null>;
+  onTest: () => Promise<string | null>;
 }) {
   const availability = connection.enabled && connection.tenantAvailable && connection.projectAvailable;
   const models = connection.availableModels.length === 0 ? 'No models returned' : connection.availableModels.join(', ');
   const [credential, setCredential] = useState('');
   const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState<'configure' | 'revoke' | null>(null);
+  const [busy, setBusy] = useState<'configure' | 'revoke' | 'test' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,6 +166,25 @@ function ConnectionRow({
     }
   };
 
+  const testConnection = async () => {
+    if (busy) return;
+    setBusy('test');
+    setError(null);
+    setMessage(null);
+    try {
+      const failure = await onTest();
+      if (failure) {
+        setError(failure);
+        return;
+      }
+      setMessage('Connection test passed.');
+    } catch (e) {
+      setError(readMutationError(e, 'Connection test failed.'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <article
       data-testid={`flow.settings.aiConnections.connection.${index}`}
@@ -189,6 +218,10 @@ function ConnectionRow({
         <dd style={{ margin: 0 }} data-testid={`flow.settings.aiConnections.connection.${index}.revoked`}>{formatUtc(connection.credentialRevokedUtc)}</dd>
         <dt>Models</dt>
         <dd style={{ margin: 0 }} data-testid={`flow.settings.aiConnections.connection.${index}.models`}>{models}</dd>
+        <dt>Last successful test</dt>
+        <dd style={{ margin: 0 }} data-testid={`flow.settings.aiConnections.connection.${index}.lastSuccess`}>{formatUtc(connection.lastSuccessfulTestUtc)}</dd>
+        <dt>Last failed test</dt>
+        <dd style={{ margin: 0 }} data-testid={`flow.settings.aiConnections.connection.${index}.lastFailure`}>{formatUtc(connection.lastFailedTestUtc)}</dd>
       </dl>
 
       <div style={{ display: 'grid', gap: 8, marginTop: 10 }} data-testid={`flow.settings.aiConnections.connection.${index}.credentialActions`}>
@@ -222,6 +255,15 @@ function ConnectionRow({
             data-testid={`flow.settings.aiConnections.connection.${index}.saveCredential`}
           >
             {busy === 'configure' ? 'Saving...' : connection.credentialConfigured ? 'Replace credential' : 'Save credential'}
+          </button>
+          <button
+            className="fl-btn"
+            type="button"
+            disabled={busy !== null || !availability}
+            onClick={() => void testConnection()}
+            data-testid={`flow.settings.aiConnections.connection.${index}.test`}
+          >
+            {busy === 'test' ? 'Testing...' : 'Test connection'}
           </button>
           <button
             className="fl-btn"

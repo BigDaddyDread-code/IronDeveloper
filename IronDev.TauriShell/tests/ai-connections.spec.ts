@@ -112,6 +112,30 @@ test('settings shows an honest empty state when no AI connections are returned',
   await expect(page.getByTestId('flow.settings.aiConnections.empty')).toContainText('No AI connection metadata');
 });
 
+test('settings tests a controlled connection and renders durable health truth', async ({ page }) => {
+  await mockWorkspace(page, {
+    connections: [{
+      id: 'deployment-default', tenantId: 3, displayName: 'Deployment default', providerKind: 'openai',
+      controlledEndpointId: 'deployment-default-openai', controlledEndpoint: 'https://api.openai.com',
+      credentialConfigured: true, credentialStatus: 'Configured', lastSuccessfulTestUtc: null, lastFailedTestUtc: null,
+      availableModels: ['gpt-4o'], enabled: true, tenantAvailable: true, projectAvailable: true,
+      credentialRotatedUtc: null, credentialRevokedUtc: null, createdByUserId: 0, createdUtc: null,
+      updatedByUserId: 7, updatedUtc: null, version: 'IronDev AI Connection Contract 2.5.0',
+      boundary: 'Credential values are never returned.'
+    }]
+  });
+
+  await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
+  await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.aiConnections').click();
+  await page.getByTestId('flow.settings.aiConnections.connection.0.test').click();
+
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.0.message')).toContainText('passed');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.0.lastSuccess')).not.toHaveText('Never');
+  await expect(page.locator('body')).not.toContainText('configured-secret-value');
+});
+
 async function mockWorkspace(page: Page, options: { connections: unknown[] }) {
   let connections = options.connections as Array<Record<string, unknown>>;
 
@@ -204,6 +228,18 @@ async function mockWorkspace(page: Page, options: { connections: unknown[] }) {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ succeeded: true, connection: next, boundary: 'write-only' })
+      });
+      return;
+    }
+
+    if (route.request().method() === 'POST' && url.endsWith('/test')) {
+      const testedAtUtc = '2026-07-12T00:02:00Z';
+      const next = { ...current, lastSuccessfulTestUtc: testedAtUtc };
+      connections = [next];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ succeeded: true, status: 'Passed', testedAtUtc, connection: next, boundary: 'Non-secret test outcome.' })
       });
       return;
     }

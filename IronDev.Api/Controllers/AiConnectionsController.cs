@@ -21,15 +21,18 @@ public sealed class AiConnectionsController : ControllerBase
 {
     private readonly IAiConnectionCatalogService _connections;
     private readonly IAiConnectionCredentialService _credentials;
+    private readonly IAiConnectionTestService _tests;
     private readonly IUserService _userService;
 
     public AiConnectionsController(
         IAiConnectionCatalogService connections,
         IAiConnectionCredentialService credentials,
+        IAiConnectionTestService tests,
         IUserService userService)
     {
         _connections = connections;
         _credentials = credentials;
+        _tests = tests;
         _userService = userService;
     }
 
@@ -98,6 +101,22 @@ public sealed class AiConnectionsController : ControllerBase
             request,
             cancellationToken);
 
+        return outcome.Succeeded ? Ok(outcome) : BadRequest(outcome);
+    }
+
+    [HttpPost("{connectionId}/test")]
+    public async Task<ActionResult<AiConnectionTestOutcome>> TestConnection(
+        string connectionId,
+        CancellationToken cancellationToken)
+    {
+        var context = new CurrentUserContext(HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
+        if (context.TenantId is null || context.UserId <= 0)
+            return Forbid();
+        var callerRole = await _userService.GetTenantRoleAsync(context.UserId, context.TenantId.Value, cancellationToken);
+        if (!TenantUserRoles.CanAdministerUsers(callerRole))
+            return Forbid();
+
+        var outcome = await _tests.TestAsync(context.TenantId.Value, context.UserId, connectionId, cancellationToken);
         return outcome.Succeeded ? Ok(outcome) : BadRequest(outcome);
     }
 }

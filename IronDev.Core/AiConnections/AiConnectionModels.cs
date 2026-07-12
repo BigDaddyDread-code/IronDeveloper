@@ -37,6 +37,35 @@ public interface IAiConnectionCatalogService
     Task<IReadOnlyList<AiConnectionMetadata>> ListAsync(int tenantId, int userId, CancellationToken cancellationToken = default);
 }
 
+public sealed record AiConnectionTestHealth
+{
+    public DateTimeOffset? LastSuccessfulTestUtc { get; init; }
+    public DateTimeOffset? LastFailedTestUtc { get; init; }
+    public string LastStatus { get; init; } = "NotTested";
+}
+
+public interface IAiConnectionTestHealthStore
+{
+    Task<AiConnectionTestHealth?> GetAsync(int tenantId, string connectionId, CancellationToken cancellationToken = default);
+    Task RecordAsync(int tenantId, string connectionId, bool succeeded, DateTimeOffset testedAtUtc, CancellationToken cancellationToken = default);
+}
+
+public sealed record AiConnectionTestOutcome
+{
+    public required bool Succeeded { get; init; }
+    public required string Status { get; init; }
+    public string? FailureReason { get; init; }
+    public int? HttpStatusCode { get; init; }
+    public required DateTimeOffset TestedAtUtc { get; init; }
+    public AiConnectionMetadata? Connection { get; init; }
+    public required string Boundary { get; init; }
+}
+
+public interface IAiConnectionTestService
+{
+    Task<AiConnectionTestOutcome> TestAsync(int tenantId, int userId, string connectionId, CancellationToken cancellationToken = default);
+}
+
 public sealed record AiConnectionCredentialWriteRequest
 {
     public required string Credential { get; init; }
@@ -69,6 +98,12 @@ public sealed record AiConnectionCredentialStoredMetadata
 public interface IAiConnectionCredentialStore
 {
     Task<AiConnectionCredentialStoredMetadata?> GetMetadataAsync(
+        int tenantId,
+        string connectionId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Internal provider-use path only. Credential values must never enter an API response, log, or audit payload.</summary>
+    Task<string?> GetCredentialForUseAsync(
         int tenantId,
         string connectionId,
         CancellationToken cancellationToken = default);
