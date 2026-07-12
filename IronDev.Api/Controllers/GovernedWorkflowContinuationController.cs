@@ -27,7 +27,8 @@ public sealed class GovernedWorkflowContinuationController : ControllerBase
             return BadRequest(Envelope(
                 "rejected",
                 null,
-                [new GovernedWorkflowContinuationApiError("ProjectMismatch", "projectId", "Route projectId must match request projectId.")]));
+                [new GovernedWorkflowContinuationApiError("ProjectMismatch", "projectId", "Route projectId must match request projectId.")],
+                refused: true));
         }
 
         var result = await _service.ContinueAsync(request, cancellationToken).ConfigureAwait(false);
@@ -35,7 +36,8 @@ public sealed class GovernedWorkflowContinuationController : ControllerBase
             result.Status,
             SanitizeResult(result),
             result.Issues.Select(issue => new GovernedWorkflowContinuationApiError(issue.Code, issue.Field, issue.Message)).ToArray(),
-            result.Warnings);
+            result.Warnings,
+            refused: !result.Succeeded);
 
         if (result.Succeeded)
             return Ok(envelope);
@@ -46,15 +48,18 @@ public sealed class GovernedWorkflowContinuationController : ControllerBase
         return BadRequest(envelope);
     }
 
-    private static GovernedWorkflowContinuationApiEnvelope Envelope(
+    private GovernedWorkflowContinuationApiEnvelope Envelope(
         string status,
         GovernedWorkflowContinuationApiResult? data,
         IReadOnlyList<GovernedWorkflowContinuationApiError>? errors = null,
-        IReadOnlyList<string>? warnings = null) =>
-        new(
+        IReadOnlyList<string>? warnings = null,
+        bool refused = false)
+    {
+        var normalizedErrors = errors ?? [];
+        return new(
             status,
             data,
-            errors ?? [],
+            normalizedErrors,
             warnings ?? GovernedWorkflowContinuationBoundaryText.Warnings,
             new GovernedWorkflowContinuationApiBoundary(
                 WorkflowContinuationIsReleaseReadiness: false,
@@ -64,7 +69,23 @@ public sealed class GovernedWorkflowContinuationController : ControllerBase
                 WorkflowContinuationSatisfiesPolicy: false,
                 WorkflowContinuationCallsAgentsModelsToolsGitMemoryOrRetrieval: false,
                 HumanReviewRequiredForReleaseReadinessAndApproval: true,
-                Boundary: GovernedWorkflowContinuationBoundaryText.Boundary));
+                Boundary: GovernedWorkflowContinuationBoundaryText.Boundary))
+        {
+            Refusal = refused ? ContinuationRefusal(status, normalizedErrors) : null
+        };
+    }
+
+    private GovernedRefusalEnvelope ContinuationRefusal(
+        string status,
+        IReadOnlyList<GovernedWorkflowContinuationApiError> errors) =>
+        GovernedRefusal.Create(
+            errors.FirstOrDefault()?.Code ?? status,
+            errors.FirstOrDefault()?.Message ?? "Workflow continuation was refused.",
+            HttpContext.TraceIdentifier,
+            blockedReasons: errors.Select(error => error.Message),
+            missingEvidence: errors.Where(error => error.Code.Contains("Missing", StringComparison.OrdinalIgnoreCase)).Select(error => error.Message),
+            nextSafeActions: ["Resolve the blocked reasons, then submit a new continuation request."],
+            forbiddenActions: ["Continue workflow state", "Apply source changes", "Approve release"]);
 
     private static GovernedWorkflowContinuationApiResult SanitizeResult(GovernedWorkflowContinuationResult result) =>
         new(
@@ -126,7 +147,10 @@ public sealed record GovernedWorkflowContinuationApiEnvelope(
     GovernedWorkflowContinuationApiResult? Data,
     IReadOnlyList<GovernedWorkflowContinuationApiError> Errors,
     IReadOnlyList<string> Warnings,
-    GovernedWorkflowContinuationApiBoundary Boundary);
+    GovernedWorkflowContinuationApiBoundary Boundary)
+{
+    public GovernedRefusalEnvelope? Refusal { get; init; }
+}
 
 public sealed record GovernedWorkflowContinuationApiResult(
     string Status,

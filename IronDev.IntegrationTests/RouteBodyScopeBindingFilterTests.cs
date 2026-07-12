@@ -1,5 +1,6 @@
 using System.Text.Json;
 using IronDev.Api.Filters;
+using IronDev.Core.Governance;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
@@ -23,12 +24,12 @@ public sealed class RouteBodyScopeBindingFilterTests
         var result = context.Result as ObjectResult;
         Assert.IsNotNull(result);
         Assert.AreEqual(StatusCodes.Status400BadRequest, result.StatusCode);
-        var response = result.Value as RouteBodyScopeMismatchResponse;
+        var response = result.Value as GovernedRefusalEnvelope;
         Assert.IsNotNull(response);
         Assert.IsFalse(response.Allowed);
         Assert.AreEqual(RouteBodyScopeBindingFilter.ProjectMismatchReasonCode, response.ReasonCode);
-        Assert.AreEqual("7", response.RouteValue);
-        Assert.AreEqual("8", response.BodyValue);
+        Assert.IsNotEmpty(response.NextSafeActions);
+        Assert.IsNotEmpty(response.ForbiddenActions);
     }
 
     [TestMethod]
@@ -42,7 +43,7 @@ public sealed class RouteBodyScopeBindingFilterTests
         await ExecuteAsync(context, () => Assert.Fail("Mismatched tenant scope reached the action."));
 
         var result = context.Result as ObjectResult;
-        var response = result?.Value as RouteBodyScopeMismatchResponse;
+        var response = result?.Value as GovernedRefusalEnvelope;
         Assert.IsNotNull(response);
         Assert.AreEqual(RouteBodyScopeBindingFilter.TenantMismatchReasonCode, response.ReasonCode);
     }

@@ -77,7 +77,8 @@ public sealed class GovernedReleaseGateController : ControllerBase
                 GovernedReleaseGateStatuses.Rejected,
                 null,
                 [new GovernedReleaseGateApiError("RequestRequired", "request", "Governed release gate request is required.")],
-                releaseReadinessGateRan: false));
+                releaseReadinessGateRan: false,
+                refused: true));
         }
 
         if (request.ProjectId != projectId)
@@ -86,7 +87,8 @@ public sealed class GovernedReleaseGateController : ControllerBase
                 GovernedReleaseGateStatuses.Rejected,
                 null,
                 [new GovernedReleaseGateApiError("ProjectMismatch", "projectId", "Route projectId must match request projectId.")],
-                releaseReadinessGateRan: false));
+                releaseReadinessGateRan: false,
+                refused: true));
         }
 
         if (ContainsUnsafeRequestMaterial(request))
@@ -95,7 +97,8 @@ public sealed class GovernedReleaseGateController : ControllerBase
                 GovernedReleaseGateStatuses.Rejected,
                 null,
                 [new GovernedReleaseGateApiError("UnsafeRequestMaterialRejected", "request", "Governed release gate request contains unsafe private, raw, secret-like, authority, or execution material.")],
-                releaseReadinessGateRan: false));
+                releaseReadinessGateRan: false,
+                refused: true));
         }
 
         var result = await _service.EvaluateAsync(request, cancellationToken).ConfigureAwait(false);
@@ -105,7 +108,8 @@ public sealed class GovernedReleaseGateController : ControllerBase
             data,
             result.Issues.Select(issue => new GovernedReleaseGateApiError(issue.Code, issue.Field, issue.Message)).ToArray(),
             result.ReleaseReadinessGateRan,
-            result.Warnings);
+            result.Warnings,
+            refused: !result.Succeeded);
 
         if (result.Succeeded)
             return Ok(envelope);
@@ -122,16 +126,19 @@ public sealed class GovernedReleaseGateController : ControllerBase
         return UnsafeRequestMarkers.Any(marker => serialized.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static GovernedReleaseGateApiEnvelope Envelope(
+    private GovernedReleaseGateApiEnvelope Envelope(
         string status,
         GovernedReleaseGateApiResult? data,
         IReadOnlyList<GovernedReleaseGateApiError>? errors = null,
         bool releaseReadinessGateRan = false,
-        IReadOnlyList<string>? warnings = null) =>
-        new(
+        IReadOnlyList<string>? warnings = null,
+        bool refused = false)
+    {
+        var normalizedErrors = errors ?? [];
+        return new(
             status,
             data,
-            errors ?? [],
+            normalizedErrors,
             warnings ?? GovernedReleaseGateBoundaryText.Warnings,
             new GovernedReleaseGateApiBoundary(
                 ReleaseReadinessGateRan: releaseReadinessGateRan,
@@ -149,7 +156,23 @@ public sealed class GovernedReleaseGateController : ControllerBase
                 WorkflowContinued: false,
                 GitOperationExecuted: false,
                 HumanReviewRequired: true,
-                Boundary: GovernedReleaseGateBoundaryText.Boundary));
+                Boundary: GovernedReleaseGateBoundaryText.Boundary))
+        {
+            Refusal = refused ? ReleaseRefusal(status, normalizedErrors) : null
+        };
+    }
+
+    private GovernedRefusalEnvelope ReleaseRefusal(
+        string status,
+        IReadOnlyList<GovernedReleaseGateApiError> errors) =>
+        GovernedRefusal.Create(
+            errors.FirstOrDefault()?.Code ?? status,
+            errors.FirstOrDefault()?.Message ?? "Release readiness evaluation was refused.",
+            HttpContext.TraceIdentifier,
+            blockedReasons: errors.Select(error => error.Message),
+            missingEvidence: errors.Where(error => error.Code.Contains("Missing", StringComparison.OrdinalIgnoreCase)).Select(error => error.Message),
+            nextSafeActions: ["Resolve the blocked reasons and submit fresh release-readiness evidence."],
+            forbiddenActions: ["Approve release", "Approve deployment", "Approve merge", "Execute source apply"]);
 
     private static GovernedReleaseGateApiResult SanitizeResult(GovernedReleaseGateResult result) =>
         new(
@@ -217,7 +240,10 @@ public sealed record GovernedReleaseGateApiEnvelope(
     GovernedReleaseGateApiResult? Data,
     IReadOnlyList<GovernedReleaseGateApiError> Errors,
     IReadOnlyList<string> Warnings,
-    GovernedReleaseGateApiBoundary Boundary);
+    GovernedReleaseGateApiBoundary Boundary)
+{
+    public GovernedRefusalEnvelope? Refusal { get; init; }
+}
 
 public sealed record GovernedReleaseGateApiResult(
     Guid GovernedReleaseGateRequestId,
