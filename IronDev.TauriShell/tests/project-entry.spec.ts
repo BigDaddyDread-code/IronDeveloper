@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockProjectBoard } from './helpers/mockBoard';
+import { createDeferred } from './helpers/deferred';
 import { workItemProjection } from './helpers/mockWorkItem';
 
 const READY_READINESS = {
@@ -77,9 +78,12 @@ test('configured fallback does not auto-open a project', async ({ page }) => {
 });
 
 test('projects render as whole clickable tiles with the connect tile last', async ({ page }) => {
-  await mockProjectEntryApi(page, { signedIn: true });
+  const projects = createDeferred();
+  const state = await mockProjectEntryApi(page, { signedIn: true, projectListGate: projects.promise });
   await page.goto('/');
 
+  await expect.poll(() => state.projectListRequests).toBeGreaterThanOrEqual(1);
+  projects.resolve();
   const grid = page.getByTestId('flow.chooser.list');
   await expect(grid).toBeVisible();
   await expect(page.getByRole('button', { name: /^Open BookSeller\. Ready/ })).toBeVisible();
@@ -209,6 +213,7 @@ test('changing projects clears the active work item', async ({ page }) => {
 });
 
 async function mockProjectEntryApi(page: Page, options: MockOptions = {}) {
+  const state: MockState = { projectListRequests: 0 };
   if (options.signedIn) {
     await page.addInitScript(({ selectedProjectId, fallbackProjectId }) => {
       window.localStorage.setItem('irondev.token', 'tenant-token');
@@ -224,11 +229,12 @@ async function mockProjectEntryApi(page: Page, options: MockOptions = {}) {
     }, { selectedProjectId: options.selectedProjectId, fallbackProjectId: options.fallbackProjectId });
   }
 
-  await mockCommonApi(page, options);
+  await mockCommonApi(page, options, state);
   await mockCreateRoute(page, options);
+  return state;
 }
 
-async function mockCommonApi(page: Page, options: MockOptions) {
+async function mockCommonApi(page: Page, options: MockOptions, state: MockState) {
   const projects = options.projects ?? DEFAULT_PROJECTS;
   const ticketsByProject = options.ticketsByProject ?? {};
 
@@ -283,6 +289,8 @@ async function mockCommonApi(page: Page, options: MockOptions) {
       return;
     }
 
+    state.projectListRequests += 1;
+    await options.projectListGate;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(projects) });
   });
 
@@ -421,4 +429,9 @@ interface MockOptions {
   readinessFailures?: number[];
   selectionFailures?: number[];
   ticketsByProject?: Record<number, Array<Record<string, unknown>>>;
+  projectListGate?: Promise<void>;
+}
+
+interface MockState {
+  projectListRequests: number;
 }

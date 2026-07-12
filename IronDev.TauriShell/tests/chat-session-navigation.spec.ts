@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { ProjectChannelChatSummary } from '../src/api/types';
+import { createDeferred } from './helpers/deferred';
 
 test('recent backend sessions form the Workshop rail and the latest conversation opens', async ({ page }) => {
   await mockSessionWorkspace(page);
@@ -61,7 +62,8 @@ test('an unknown direct-session URL returns an honest conversation outcome', asy
 });
 
 test('shared-channel URLs open persisted human conversation and mark durable unread state', async ({ page }) => {
-  const state = await mockSessionWorkspace(page);
+  const markRead = createDeferred();
+  const state = await mockSessionWorkspace(page, { markReadGate: markRead.promise });
   await page.goto('/projects/7/workshop/channels/general');
 
   await expect(page.getByTestId('chat.channel.workspace')).toBeVisible();
@@ -71,6 +73,9 @@ test('shared-channel URLs open persisted human conversation and mark durable unr
   await expect(page.getByTestId('chat.channel.collaborationState')).toContainText('All notifications');
   await expect(page.getByTestId('chat.channel.collaborationState')).toContainText('Presence unavailable');
   await expect.poll(() => state.markReadRequests).toBe(1);
+  await expect(page.getByLabel('1 unread')).toBeVisible();
+  markRead.resolve();
+  await expect.poll(() => state.markReadResponses).toBe(1);
   await expect(page.getByLabel('1 unread')).toHaveCount(0);
   await expect(page.getByTestId('chat.workspace')).toHaveCount(0);
   if (process.env.IRONDEV_VISUAL_SMOKE === '1') {
@@ -282,6 +287,7 @@ interface SessionMockOptions {
   failMarkRead?: boolean;
   failAssistantCompletionOnce?: boolean;
   withNotification?: boolean;
+  markReadGate?: Promise<void>;
 }
 
 interface SessionMockState {
@@ -289,6 +295,7 @@ interface SessionMockState {
   sessionListRequests: number;
   channelMessageCount: number;
   markReadRequests: number;
+  markReadResponses: number;
   assistantCompletionRequests: number;
   markNotificationReadRequests: number;
 }
@@ -299,6 +306,7 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     sessionListRequests: 0,
     channelMessageCount: 1,
     markReadRequests: 0,
+    markReadResponses: 0,
     assistantCompletionRequests: 0,
     markNotificationReadRequests: 0
   };
@@ -491,11 +499,13 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     }) : json(route, { error: 'Channel not found or not visible to this user.' }, 404);
   });
 
-  await page.route(/\/irondev-api\/api\/projects\/7\/channels\/([^/]+)\/read$/, (route) => {
+  await page.route(/\/irondev-api\/api\/projects\/7\/channels\/([^/]+)\/read$/, async (route) => {
     state.markReadRequests += 1;
     if (options.failMarkRead) {
       return json(route, { error: 'Read marker store unavailable.' }, 503);
     }
+
+    await options.markReadGate;
 
     const slug = decodeURIComponent(route.request().url().match(/\/channels\/([^/]+)\/read$/)?.[1] ?? '');
     const channel = channels.find((item) => item.slug === slug);
@@ -503,6 +513,7 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     channel.unreadCount = 0;
     channel.lastReadMessageId = 7101;
     channel.lastReadUtc = '2026-07-10T08:01:00Z';
+    state.markReadResponses += 1;
     return json(route, {
       unreadCount: 0,
       lastReadMessageId: 7101,
