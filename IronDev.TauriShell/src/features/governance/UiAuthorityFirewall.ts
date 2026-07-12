@@ -251,7 +251,9 @@ export const governanceEvidenceUiFileAllowList = [
   'src/features/governance/WorkflowContinuationEvidencePanel.tsx',
   'src/features/governance/WorkflowContinuationEvidencePanelRoute.tsx',
   'src/features/governance/ReleaseReadinessEvidencePanel.tsx',
-  'src/features/governance/ReleaseReadinessEvidencePanelRoute.tsx'
+  'src/features/governance/ReleaseReadinessEvidencePanelRoute.tsx',
+  'src/flow/library/GovernanceHost.tsx',
+  'src/flow/library/GovernanceOverview.tsx'
 ] as const;
 
 export function normalizeAuthorityFirewallText(text: string | null | undefined): string {

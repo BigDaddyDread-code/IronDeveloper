@@ -161,6 +161,8 @@ test('governance deep link renders the timeline viewer inside the Library', asyn
 
   await expect(page.getByTestId('flow.shell')).toBeVisible();
   await expect(page.getByTestId('flow.governanceHost')).toBeVisible();
+  await expect(page.getByTestId('flow.governance.compatibilityNotice')).toContainText('Legacy evidence view');
+  await expect(page.locator('.fl-chips')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Governance Timeline' })).toBeVisible();
 });
 
