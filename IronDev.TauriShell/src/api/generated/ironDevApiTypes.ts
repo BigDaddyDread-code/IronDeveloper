@@ -314,6 +314,197 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-profiles/{role}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    role: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfileDraft"];
+                        "application/json": components["schemas"]["SkeletonAgentProfileDraft"];
+                        "text/json": components["schemas"]["SkeletonAgentProfileDraft"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    role: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SkeletonAgentProfileDraftWriteRequest"];
+                    "text/json": components["schemas"]["SkeletonAgentProfileDraftWriteRequest"];
+                    "application/*+json": components["schemas"]["SkeletonAgentProfileDraftWriteRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                        "application/json": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                        "text/json": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-profiles/{role}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    role: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfilePublishedVersion"][];
+                        "application/json": components["schemas"]["SkeletonAgentProfilePublishedVersion"][];
+                        "text/json": components["schemas"]["SkeletonAgentProfilePublishedVersion"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-profiles/{role}/draft/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    role: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfileDraftTestOutcome"];
+                        "application/json": components["schemas"]["SkeletonAgentProfileDraftTestOutcome"];
+                        "text/json": components["schemas"]["SkeletonAgentProfileDraftTestOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-profiles/{role}/draft/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    role: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SkeletonAgentProfilePublishRequest"];
+                    "text/json": components["schemas"]["SkeletonAgentProfilePublishRequest"];
+                    "application/*+json": components["schemas"]["SkeletonAgentProfilePublishRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                        "application/json": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                        "text/json": components["schemas"]["SkeletonAgentProfileDraftOutcome"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/agent-runs": {
         parameters: {
             query?: never;
@@ -14937,6 +15128,48 @@ export interface components {
             personality?: string | null;
             boundary?: string | null;
         };
+        SkeletonAgentProfileDraft: {
+            role: components["schemas"]["SkeletonAgentRole"];
+            /** Format: int64 */
+            revision: number;
+            /** Format: int64 */
+            basePublishedVersion: number;
+            values: components["schemas"]["SkeletonAgentProfileUpdate"];
+            isValid: boolean;
+            validationIssues?: components["schemas"]["SkeletonAgentProfileValidationIssue"][] | null;
+            /** Format: date-time */
+            updatedAtUtc: string;
+        };
+        SkeletonAgentProfileDraftOutcome: {
+            succeeded: boolean;
+            code?: string | null;
+            failureReason?: string | null;
+            /** Format: int64 */
+            currentRevision: number;
+            draft?: components["schemas"]["SkeletonAgentProfileDraft"];
+            publishedVersion?: components["schemas"]["SkeletonAgentProfilePublishedVersion"];
+            profile?: components["schemas"]["SkeletonAgentProfile"];
+        };
+        SkeletonAgentProfileDraftTestOutcome: {
+            succeeded: boolean;
+            status: string | null;
+            failureReason?: string | null;
+            validationIssues?: components["schemas"]["SkeletonAgentProfileValidationIssue"][] | null;
+            /** Format: date-time */
+            executedAtUtc: string;
+            summary?: string | null;
+            boundary?: string | null;
+        };
+        SkeletonAgentProfileDraftWriteRequest: {
+            /** Format: int64 */
+            expectedRevision: number;
+            provider?: string | null;
+            model?: string | null;
+            /** Format: int32 */
+            timeoutSeconds?: number;
+            skill?: string | null;
+            personality?: string | null;
+        };
         SkeletonAgentProfileFieldSource: {
             field: string | null;
             sourceLayer: string | null;
@@ -14950,6 +15183,22 @@ export interface components {
             failureReason?: string | null;
             profile?: components["schemas"]["SkeletonAgentProfile"];
         };
+        SkeletonAgentProfilePublishRequest: {
+            /** Format: int64 */
+            expectedRevision: number;
+            reason?: string | null;
+        };
+        SkeletonAgentProfilePublishedVersion: {
+            /** Format: int64 */
+            version: number;
+            role: components["schemas"]["SkeletonAgentRole"];
+            values: components["schemas"]["SkeletonAgentProfileUpdate"];
+            reason: string | null;
+            /** Format: int32 */
+            actorUserId: number;
+            /** Format: date-time */
+            publishedAtUtc: string;
+        };
         SkeletonAgentProfileUpdate: {
             provider?: string | null;
             model?: string | null;
@@ -14957,6 +15206,11 @@ export interface components {
             timeoutSeconds?: number;
             skill?: string | null;
             personality?: string | null;
+        };
+        SkeletonAgentProfileValidationIssue: {
+            code: string | null;
+            field: string | null;
+            message: string | null;
         };
         /**
          * Format: int32

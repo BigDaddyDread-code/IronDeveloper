@@ -1788,6 +1788,60 @@ export interface SkeletonAgentProfileOutcome {
   profile?: SkeletonAgentProfile | null;
 }
 
+export interface SkeletonAgentProfileValidationIssue {
+  code: string;
+  field: string;
+  message: string;
+}
+
+export interface SkeletonAgentProfileDraft {
+  role: string;
+  revision: number;
+  basePublishedVersion: number;
+  values: SkeletonAgentProfileUpdate;
+  isValid: boolean;
+  validationIssues: SkeletonAgentProfileValidationIssue[];
+  updatedAtUtc: string;
+}
+
+export interface SkeletonAgentProfileDraftWriteRequest extends SkeletonAgentProfileUpdate {
+  expectedRevision: number;
+}
+
+export interface SkeletonAgentProfilePublishRequest {
+  expectedRevision: number;
+  reason: string;
+}
+
+export interface SkeletonAgentProfilePublishedVersion {
+  version: number;
+  role: string;
+  values: SkeletonAgentProfileUpdate;
+  reason: string;
+  actorUserId: number;
+  publishedAtUtc: string;
+}
+
+export interface SkeletonAgentProfileDraftOutcome {
+  succeeded: boolean;
+  code: string;
+  failureReason: string;
+  currentRevision: number;
+  draft?: SkeletonAgentProfileDraft | null;
+  publishedVersion?: SkeletonAgentProfilePublishedVersion | null;
+  profile?: SkeletonAgentProfile | null;
+}
+
+export interface SkeletonAgentProfileDraftTestOutcome {
+  succeeded: boolean;
+  status: string;
+  failureReason: string;
+  validationIssues: SkeletonAgentProfileValidationIssue[];
+  executedAtUtc: string;
+  summary: string;
+  boundary: string;
+}
+
 export interface AiConnectionMetadata {
   id: string;
   tenantId: number;

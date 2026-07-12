@@ -12,7 +12,13 @@ import type {
   BuildReadinessResult,
   CreateAcceptedApprovalUiRequest,
   SkeletonAgentProfile,
+  SkeletonAgentProfileDraft,
+  SkeletonAgentProfileDraftOutcome,
+  SkeletonAgentProfileDraftTestOutcome,
+  SkeletonAgentProfileDraftWriteRequest,
   SkeletonAgentProfileOutcome,
+  SkeletonAgentProfilePublishedVersion,
+  SkeletonAgentProfilePublishRequest,
   SkeletonAgentProfileUpdate,
   SkeletonBatchMapOutcome,
   SkeletonBatchPlanOutcome,
@@ -1207,6 +1213,51 @@ class IronDevApiClient {
     return this.request<SkeletonAgentProfileOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}`, {
       method: 'PUT',
       body: update,
+      signal
+    });
+  }
+
+  async getAgentProfileDraft(role: string, signal?: AbortSignal): Promise<SkeletonAgentProfileDraft> {
+    return this.request<SkeletonAgentProfileDraft>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async saveAgentProfileDraft(
+    role: string,
+    request: SkeletonAgentProfileDraftWriteRequest,
+    signal?: AbortSignal
+  ): Promise<SkeletonAgentProfileDraftOutcome> {
+    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft`, {
+      method: 'PUT',
+      body: request,
+      signal
+    });
+  }
+
+  async testAgentProfileDraft(role: string, signal?: AbortSignal): Promise<SkeletonAgentProfileDraftTestOutcome> {
+    return this.request<SkeletonAgentProfileDraftTestOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft/test`, {
+      method: 'POST',
+      signal
+    });
+  }
+
+  async publishAgentProfileDraft(
+    role: string,
+    request: SkeletonAgentProfilePublishRequest,
+    signal?: AbortSignal
+  ): Promise<SkeletonAgentProfileDraftOutcome> {
+    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft/publish`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+  }
+
+  async listAgentProfileHistory(role: string, signal?: AbortSignal): Promise<SkeletonAgentProfilePublishedVersion[]> {
+    return this.request<SkeletonAgentProfilePublishedVersion[]>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/history`, {
+      method: 'GET',
       signal
     });
   }
