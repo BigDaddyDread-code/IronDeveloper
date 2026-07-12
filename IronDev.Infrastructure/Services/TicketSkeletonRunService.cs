@@ -187,6 +187,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // Authoring failure degrades explicitly; it is never a silent skip.
         var authoring = await _testAuthoring.AuthorTestsAsync(new SkeletonTestAuthoringRequest
         {
+            TenantId = project.TenantId,
             TicketId = ticketId,
             ProjectId = projectId,
             TicketTitle = ticket.Title ?? string.Empty,
@@ -842,6 +843,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         // matrix must be as honest as the original's.
         var authoring = await _testAuthoring.AuthorTestsAsync(new SkeletonTestAuthoringRequest
         {
+            TenantId = project.TenantId,
             TicketId = ticketId,
             ProjectId = projectId,
             TicketTitle = ticket.Title ?? string.Empty,

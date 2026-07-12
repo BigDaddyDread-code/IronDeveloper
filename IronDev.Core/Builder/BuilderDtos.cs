@@ -7,6 +7,7 @@ namespace IronDev.Core.Builder;
 
 public sealed class TicketBuildContext
 {
+    public int    TenantId     { get; set; }
     public int    ProjectId    { get; set; }
     public long   TicketId     { get; set; }
     public string ProjectName  { get; set; } = "";

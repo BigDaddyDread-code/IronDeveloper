@@ -128,6 +128,7 @@ public sealed class BuilderContextService : IBuilderContextService
         // ── 7. Assemble ───────────────────────────────────────────────────────
         var ctx = new TicketBuildContext
         {
+            TenantId     = project.TenantId,
             ProjectId    = projectId,
             TicketId     = ticketId,
             ProjectName  = project.Name,

@@ -44,9 +44,16 @@ public sealed class SkeletonTestAuthoringService : ISkeletonTestAuthoringService
             };
         }
 
-        var agent = await _llmResolver.ResolveAsync(SkeletonAgentRole.Tester, cancellationToken).ConfigureAwait(false);
-        var profile = await _profiles.GetAsync(SkeletonAgentRole.Tester, cancellationToken).ConfigureAwait(false);
-        var prompt = SkeletonAgentPromptComposer.Compose(profile, BuildPrompt(request));
+        var scoped = request.TenantId > 0 && request.ProjectId > 0;
+        var agent = scoped
+            ? await _llmResolver.ResolveAsync(SkeletonAgentRole.Tester, request.TenantId, request.ProjectId, cancellationToken).ConfigureAwait(false)
+            : await _llmResolver.ResolveAsync(SkeletonAgentRole.Tester, cancellationToken).ConfigureAwait(false);
+        var prompt = scoped
+            ? SkeletonAgentPromptComposer.Compose(
+                (await _profiles.ListEffectiveAsync(request.TenantId, request.ProjectId, cancellationToken).ConfigureAwait(false))
+                    .Single(item => item.Role == SkeletonAgentRole.Tester),
+                BuildPrompt(request))
+            : SkeletonAgentPromptComposer.Compose(await _profiles.GetAsync(SkeletonAgentRole.Tester, cancellationToken).ConfigureAwait(false), BuildPrompt(request));
 
         string response;
         try

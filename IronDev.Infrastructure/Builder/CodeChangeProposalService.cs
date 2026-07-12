@@ -53,9 +53,18 @@ public sealed class CodeChangeProposalService : ICodeChangeProposalService
     {
         // AG-6: the Builder runs the model its profile configures, with its voice
         // framing the code-owned prompt (which stays last and authoritative).
-        var profile = await _profiles.GetAsync(SkeletonAgentRole.Builder, cancellationToken).ConfigureAwait(false);
-        var agent = await _llmResolver.ResolveAsync(SkeletonAgentRole.Builder, cancellationToken).ConfigureAwait(false);
-        var prompt = SkeletonAgentPromptComposer.Compose(profile, BuildPrompt(context));
+        var scoped = context.TenantId > 0 && context.ProjectId > 0;
+        var profile = scoped
+            ? (await _profiles.ListEffectiveAsync(context.TenantId, context.ProjectId, cancellationToken).ConfigureAwait(false))
+                .Single(item => item.Role == SkeletonAgentRole.Builder)
+            : null;
+        var legacyProfile = scoped ? null : await _profiles.GetAsync(SkeletonAgentRole.Builder, cancellationToken).ConfigureAwait(false);
+        var agent = scoped
+            ? await _llmResolver.ResolveAsync(SkeletonAgentRole.Builder, context.TenantId, context.ProjectId, cancellationToken).ConfigureAwait(false)
+            : await _llmResolver.ResolveAsync(SkeletonAgentRole.Builder, cancellationToken).ConfigureAwait(false);
+        var prompt = profile is not null
+            ? SkeletonAgentPromptComposer.Compose(profile, BuildPrompt(context))
+            : SkeletonAgentPromptComposer.Compose(legacyProfile!, BuildPrompt(context));
 
         // ── Call LLM with tracing ─────────────────────────────────────────────
         var trace = new LlmTraceEntry
