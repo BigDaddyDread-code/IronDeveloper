@@ -1487,13 +1487,36 @@ export interface SkeletonRunRepairAttemptTrace {
   repairProposalEvidenceExistsOnDisk: boolean;
 }
 
-export interface SkeletonRunReport {
+export interface SkeletonRunAgentConfigurationSnapshot {
+    snapshotId: string;
+    workItemId: number;
+    runId: string;
+    role: string;
+    connectionId: string;
+    provider: string;
+    controlledEndpointIdentity: string;
+    model: string;
+    timeoutSeconds: number;
+    inputTokenLimit?: number | null;
+    outputTokenLimit?: number | null;
+    temperature?: number | null;
+    skillVersion: string;
+    skillHash: string;
+    personalityVersion: string;
+    personalityHash: string;
+    effectiveProfileHash: string;
+    createdUtc: string;
+    boundary: string;
+  }
+
+  export interface SkeletonRunReport {
   runId: string;
   projectId: number;
   ticketId: number;
   status: string;
-  summary: string;
-  timeline: SkeletonRunTimelineEntry[];
+    summary: string;
+    timeline: SkeletonRunTimelineEntry[];
+    agentConfigurations?: SkeletonRunAgentConfigurationSnapshot[];
   /**
    * The FINAL/CURRENT proposal — the one the gate, critic package, and approval
    * hash bind to. After a successful bounded repair this is the repaired

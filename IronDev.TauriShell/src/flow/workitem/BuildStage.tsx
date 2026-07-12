@@ -49,6 +49,41 @@ export function BuildStage({ run, report, onRefreshReport }: BuildStageProps) {
             gateProposal={report.proposal}
           />
 
+          {(report.agentConfigurations?.length ?? 0) > 0 ? (
+            <section data-testid="flow.build.agentConfigurations" style={{ marginTop: 14 }}>
+              <p className="fl-plabel">Run configuration</p>
+              <p style={{ fontSize: 12.5, color: 'var(--fl-ink2)', marginTop: -3 }}>
+                Immutable, non-secret profiles captured before model work began. These records grant no authority.
+              </p>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="fl-table" style={{ minWidth: 720 }}>
+                  <thead>
+                    <tr>
+                      <th>Role</th>
+                      <th>Provider and model</th>
+                      <th>Connection</th>
+                      <th>Timeout</th>
+                      <th>Profile fingerprint</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.agentConfigurations!.map((snapshot) => (
+                      <tr key={snapshot.snapshotId} data-testid={`flow.build.agentConfiguration.${snapshot.role}`}>
+                        <td><strong>{snapshot.role}</strong></td>
+                        <td>{snapshot.provider}/{snapshot.model}</td>
+                        <td>{snapshot.controlledEndpointIdentity || snapshot.connectionId}</td>
+                        <td>{snapshot.timeoutSeconds}s</td>
+                        <td title={snapshot.effectiveProfileHash} style={{ fontFamily: 'monospace' }}>
+                          {snapshot.effectiveProfileHash.slice(0, 15)}...
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
           {report.testAuthoring ? (
             <p style={{ fontSize: 13, color: 'var(--fl-ink2)' }} data-testid="flow.build.testAuthoring">
               {report.testAuthoring.authored

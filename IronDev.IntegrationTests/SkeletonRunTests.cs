@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using IronDev.Core.Agents;
 using IronDev.Core.Builder;
 using IronDev.Core.Governance;
 using IronDev.Core.Interfaces;
@@ -894,6 +895,58 @@ public sealed class SkeletonRunTests
     }
 
     [TestMethod]
+    public async Task StartRun_CapturesImmutableNonSecretAgentConfigurationsBeforeModelWork()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+
+        var report = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run!.RunId);
+        Assert.IsNotNull(report);
+        Assert.HasCount(4, report.AgentConfigurations,
+            "Analyst, Builder, Tester, and Critic are model-driven; the deterministic Orchestrator is not snapshotted.");
+        CollectionAssert.AreEquivalent(
+            new[] { "Analyst", "Builder", "Tester", "Critic" },
+            report.AgentConfigurations.Select(snapshot => snapshot.Role).ToArray());
+        Assert.IsTrue(report.AgentConfigurations.All(snapshot => snapshot.RunId == run.RunId && snapshot.WorkItemId == TicketId));
+        Assert.IsTrue(report.AgentConfigurations.All(snapshot => snapshot.Provider == "fake" && snapshot.Model == "deterministic-test"));
+        Assert.IsTrue(report.AgentConfigurations.All(snapshot => snapshot.SkillHash.StartsWith("sha256:", StringComparison.Ordinal)));
+        Assert.IsTrue(report.AgentConfigurations.All(snapshot => snapshot.PersonalityHash.StartsWith("sha256:", StringComparison.Ordinal)));
+        Assert.IsTrue(report.AgentConfigurations.All(snapshot => snapshot.EffectiveProfileHash.StartsWith("sha256:", StringComparison.Ordinal)));
+        Assert.IsTrue(report.AgentConfigurations.All(snapshot => snapshot.Boundary.Contains("never contains credentials", StringComparison.Ordinal)));
+
+        var runEvents = await harness.Events.GetEventsAsync(run.RunId);
+        var firstModelEvent = runEvents.First(runEvent => runEvent.EventType is "ProposalGenerated" or "TestsAuthored");
+        Assert.IsTrue(report.AgentConfigurations.All(snapshot => snapshot.CreatedUtc <= firstModelEvent.TimestampUtc),
+            "Every effective profile must be frozen before model-driven evidence is produced.");
+        var serialized = System.Text.Json.JsonSerializer.Serialize(report.AgentConfigurations);
+        foreach (var forbidden in new[] { "api_key", "bearer ", "password", "secretReference" })
+            Assert.IsFalse(serialized.Contains(forbidden, StringComparison.OrdinalIgnoreCase), $"Snapshot disclosed forbidden material: {forbidden}");
+    }
+
+    [TestMethod]
+    public async Task RunConfigurationSnapshot_DoesNotChangeWhenTheLiveProfileChanges()
+    {
+        var harness = SkeletonHarness.Create();
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var before = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run!.RunId);
+        var builderBefore = before!.AgentConfigurations.Single(snapshot => snapshot.Role == "Builder");
+
+        var update = await harness.Profiles.UpdateAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfileUpdate
+        {
+            Provider = "ollama",
+            Model = "changed-after-run",
+            TimeoutSeconds = 20,
+            Skill = "Changed later",
+            Personality = "Changed later"
+        });
+        Assert.IsTrue(update.Succeeded);
+
+        var after = await harness.Service.GetRunReportAsync(ProjectId, TicketId, run.RunId);
+        Assert.AreEqual(builderBefore, after!.AgentConfigurations.Single(snapshot => snapshot.Role == "Builder"),
+            "Historical run provenance must never be reconstructed from current Settings.");
+    }
+
+    [TestMethod]
     public async Task GetRunReport_IsReadOnly_PublishesNothingAndAltersNothing()
     {
         var harness = SkeletonHarness.Create();
@@ -1384,6 +1437,7 @@ public sealed class SkeletonRunTests
         public required InMemoryRunEventStore Events { get; init; }
         public required InMemoryAcceptedApprovalStore Approvals { get; init; }
         public required SkeletonMutationLeaseService Leases { get; init; }
+        public required SkeletonAgentProfileService Profiles { get; init; }
         public required string EvidenceRoot { get; init; }
 
         public static SkeletonHarness Create(
@@ -1409,6 +1463,11 @@ public sealed class SkeletonRunTests
             {
                 ["DisposableBuild:EvidenceRoot"] = evidenceRoot,
                 ["DisposableBuild:WorkspaceRoot"] = Path.Combine(Path.GetTempPath(), "irondev-skel-ws-" + Guid.NewGuid().ToString("N")),
+                ["AgentProfiles:Root"] = Path.Combine(Path.GetTempPath(), "irondev-skel-profiles-" + Guid.NewGuid().ToString("N")),
+                ["Ai:Provider"] = "fake",
+                ["Ai:Model"] = "deterministic-test",
+                ["Ai:TimeoutSeconds"] = "60",
+                ["AgentProfiles:AllowFakeProvider"] = "true",
                 ["SkeletonApply:Enabled"] = applyEnabled ? "true" : null,
                 ["MutationLease:TimeoutMinutes"] = leaseTimeoutMinutes?.ToString(),
                 ["SkeletonAuthority:AllowSoloApproval"] = allowSoloApproval ? "true" : null
@@ -1416,6 +1475,7 @@ public sealed class SkeletonRunTests
 
             var approvals = new InMemoryAcceptedApprovalStore();
             var leases = new SkeletonMutationLeaseService(configuration);
+            var profiles = new SkeletonAgentProfileService(configuration);
             var service = new TicketSkeletonRunService(
                 new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ticketProjectId ?? ProjectId, Title = "Add book sorting", AcceptanceCriteria = acceptanceCriteria }),
                 new StubProjectService(new Project { Id = ProjectId, TenantId = 1, Name = "BookSeller", LocalPath = resolvedPath }),
@@ -1434,6 +1494,7 @@ public sealed class SkeletonRunTests
                 new StubTestAuthoringService(testAuthoringBehavior ?? (() => new SkeletonTestAuthoringResult { Succeeded = true, Tests = [] })),
                 leases,
                 new StubProjectMembershipService(members ?? DefaultMembers()),
+                profiles,
                 configuration);
 
             return new SkeletonHarness
@@ -1444,6 +1505,7 @@ public sealed class SkeletonRunTests
                 Events = events,
                 Approvals = approvals,
                 Leases = leases,
+                Profiles = profiles,
                 EvidenceRoot = evidenceRoot
             };
         }

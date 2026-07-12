@@ -1,4 +1,6 @@
+using System.Text;
 using System.Text.Json;
+using IronDev.Core.Agents;
 using IronDev.Core.Builder;
 using IronDev.Core.Governance;
 using IronDev.Core.Interfaces;
@@ -47,6 +49,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private readonly ISkeletonTestAuthoringService _testAuthoring;
     private readonly ISkeletonMutationLeaseService _mutationLeases;
     private readonly IProjectMembershipService _projectMemberships;
+    private readonly ISkeletonAgentProfileService _agentProfiles;
     private readonly SkeletonRunDriftDetector _driftDetector;
     private readonly IConfiguration _configuration;
 
@@ -63,6 +66,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         ISkeletonTestAuthoringService testAuthoring,
         ISkeletonMutationLeaseService mutationLeases,
         IProjectMembershipService projectMemberships,
+        ISkeletonAgentProfileService agentProfiles,
         IConfiguration configuration)
     {
         _tickets = tickets;
@@ -77,6 +81,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _testAuthoring = testAuthoring;
         _mutationLeases = mutationLeases;
         _projectMemberships = projectMemberships;
+        _agentProfiles = agentProfiles;
         _driftDetector = new SkeletonRunDriftDetector(events);
         _configuration = configuration;
     }
@@ -104,6 +109,19 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             ["status"] = RunLifecycleState.Created.ToString(),
             ["currentNode"] = "SkeletonRun"
         }, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await CaptureAgentConfigurationSnapshotsAsync(run.RunId, project.TenantId, projectId, ticketId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return await BlockAsync(run.RunId, projectId, ticketId,
+                "AgentConfigurationSnapshotFailed",
+                exception.Message,
+                "Resolve agent configuration and start a new run. No model-driven work was started.",
+                cancellationToken).ConfigureAwait(false);
+        }
 
         if (string.IsNullOrWhiteSpace(project.LocalPath) || !Directory.Exists(project.LocalPath))
         {
@@ -1631,6 +1649,32 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         var gaps = new List<string>();
         var evidenceRoot = ResolveEvidenceRoot();
 
+        var agentConfigurations = events
+            .Where(runEvent => runEvent.EventType == "AgentConfigurationSnapshotted")
+            .Select(runEvent => new SkeletonRunAgentConfigurationSnapshot
+            {
+                SnapshotId = Payload(runEvent, "snapshotId"),
+                WorkItemId = long.TryParse(Payload(runEvent, "workItemId"), out var workItemId) ? workItemId : ticketId,
+                RunId = runId,
+                Role = Payload(runEvent, "role"),
+                ConnectionId = Payload(runEvent, "connectionId"),
+                Provider = Payload(runEvent, "provider"),
+                ControlledEndpointIdentity = Payload(runEvent, "controlledEndpointIdentity"),
+                Model = Payload(runEvent, "model"),
+                TimeoutSeconds = int.TryParse(Payload(runEvent, "timeoutSeconds"), out var timeout) ? timeout : 0,
+                InputTokenLimit = int.TryParse(Payload(runEvent, "inputTokenLimit"), out var inputLimit) ? inputLimit : null,
+                OutputTokenLimit = int.TryParse(Payload(runEvent, "outputTokenLimit"), out var outputLimit) ? outputLimit : null,
+                Temperature = double.TryParse(Payload(runEvent, "temperature"), out var temperature) ? temperature : null,
+                SkillVersion = Payload(runEvent, "skillVersion"),
+                SkillHash = Payload(runEvent, "skillHash"),
+                PersonalityVersion = Payload(runEvent, "personalityVersion"),
+                PersonalityHash = Payload(runEvent, "personalityHash"),
+                EffectiveProfileHash = Payload(runEvent, "effectiveProfileHash"),
+                CreatedUtc = DateTimeOffset.TryParse(Payload(runEvent, "createdUtc"), out var createdUtc) ? createdUtc : runEvent.TimestampUtc,
+                Boundary = Payload(runEvent, "boundary")
+            })
+            .ToArray();
+
         // Proposal link. `Proposal` is the FINAL/CURRENT proposal — the one the gate,
         // critic package, and approval hash bind to. When bounded repair or a
         // human-directed revision replaced the initial proposal, the original is
@@ -1985,6 +2029,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                     Message = runEvent.Message
                 })
                 .ToList(),
+            AgentConfigurations = agentConfigurations,
             Proposal = proposalTrace,
             InitialProposal = initialProposalTrace,
             TestAuthoring = testAuthoringTrace,
@@ -2033,6 +2078,62 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         events.Any(runEvent =>
             string.Equals(runEvent.EventType, "SkeletonCriticReviewRecorded", StringComparison.Ordinal) &&
             string.Equals(Payload(runEvent, "packageSha256"), packageHash, StringComparison.Ordinal));
+
+    private async Task CaptureAgentConfigurationSnapshotsAsync(
+        string runId,
+        int tenantId,
+        int projectId,
+        long ticketId,
+        CancellationToken cancellationToken)
+    {
+        var profiles = await _agentProfiles.ListEffectiveAsync(tenantId, projectId, cancellationToken).ConfigureAwait(false);
+        foreach (var profile in profiles.Where(item => item.Role != SkeletonAgentRole.Orchestrator))
+        {
+            var createdUtc = DateTimeOffset.UtcNow;
+            var connectionId = profile.AiConnectionId?.Trim() ?? string.Empty;
+            await PublishAsync(runId, "AgentConfigurationSnapshotted",
+                $"Immutable non-secret {SkeletonAgentRoles.DisplayName(profile.Role)} configuration captured for this run.",
+                projectId, ticketId, new Dictionary<string, string>
+                {
+                    ["snapshotId"] = Guid.NewGuid().ToString("N"),
+                    ["workItemId"] = ticketId.ToString(),
+                    ["role"] = profile.Role.ToString(),
+                    ["connectionId"] = connectionId,
+                    ["provider"] = profile.Provider,
+                    ["controlledEndpointIdentity"] = string.IsNullOrWhiteSpace(connectionId) ? "not-configured" : connectionId,
+                    ["model"] = profile.Model,
+                    ["timeoutSeconds"] = profile.TimeoutSeconds.ToString(),
+                    ["inputTokenLimit"] = string.Empty,
+                    ["outputTokenLimit"] = string.Empty,
+                    ["temperature"] = string.Empty,
+                    ["skillVersion"] = ProfileFieldVersion(profile, "effectiveSkill"),
+                    ["skillHash"] = TextHash(profile.EffectiveSkill),
+                    ["personalityVersion"] = ProfileFieldVersion(profile, "effectivePersonality"),
+                    ["personalityHash"] = TextHash(profile.EffectivePersonality),
+                    ["effectiveProfileHash"] = profile.EffectiveHash,
+                    ["createdUtc"] = createdUtc.ToString("O"),
+                    ["boundary"] = SkeletonRunAgentConfigurationSnapshot.BoundaryText,
+                    ["currentNode"] = "SkeletonRun"
+                }, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static string ProfileFieldVersion(EffectiveSkeletonAgentProfile profile, string field)
+    {
+        var source = profile.FieldSources.FirstOrDefault(item => string.Equals(item.Field, field, StringComparison.Ordinal));
+        if (!string.IsNullOrWhiteSpace(source?.Version))
+            return source.Version;
+        if (!string.IsNullOrWhiteSpace(profile.ProjectProfileVersion))
+            return profile.ProjectProfileVersion;
+        if (!string.IsNullOrWhiteSpace(profile.TenantProfileVersion))
+            return profile.TenantProfileVersion;
+        return string.Equals(source?.SourceLayer, "RoleOverride", StringComparison.Ordinal)
+            ? "unversioned-role-override"
+            : profile.BuiltInDefaultVersion;
+    }
+
+    private static string TextHash(string value) =>
+        "sha256:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(value ?? string.Empty))).ToLowerInvariant();
 
     private async Task<TicketBuildRunDto> BlockAsync(
         string runId,

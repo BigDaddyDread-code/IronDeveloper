@@ -15585,6 +15585,33 @@ export interface components {
             findingIds?: string[] | null;
             reason?: string | null;
         };
+        SkeletonRunAgentConfigurationSnapshot: {
+            snapshotId: string | null;
+            /** Format: int64 */
+            workItemId: number;
+            runId: string | null;
+            role: string | null;
+            connectionId?: string | null;
+            provider?: string | null;
+            controlledEndpointIdentity?: string | null;
+            model?: string | null;
+            /** Format: int32 */
+            timeoutSeconds?: number;
+            /** Format: int32 */
+            inputTokenLimit?: number | null;
+            /** Format: int32 */
+            outputTokenLimit?: number | null;
+            /** Format: double */
+            temperature?: number | null;
+            skillVersion?: string | null;
+            skillHash?: string | null;
+            personalityVersion?: string | null;
+            personalityHash?: string | null;
+            effectiveProfileHash?: string | null;
+            /** Format: date-time */
+            createdUtc: string;
+            boundary?: string | null;
+        };
         SkeletonRunApplyAttemptTrace: {
             attemptId?: string | null;
             /** Format: int32 */
@@ -15699,6 +15726,7 @@ export interface components {
             status?: string | null;
             summary?: string | null;
             timeline?: components["schemas"]["SkeletonRunTimelineEntry"][] | null;
+            agentConfigurations?: components["schemas"]["SkeletonRunAgentConfigurationSnapshot"][] | null;
             proposal?: components["schemas"]["SkeletonRunProposalTrace"];
             initialProposal?: components["schemas"]["SkeletonRunProposalTrace"];
             testAuthoring?: components["schemas"]["SkeletonRunTestAuthoringTrace"];
