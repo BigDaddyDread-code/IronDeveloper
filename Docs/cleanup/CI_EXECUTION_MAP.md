@@ -1,14 +1,14 @@
 # IronDev CI Execution Map
 
 **Status:** Canonical executable CI map
-**Verified against:** `main` at `a1341123`
+**Verified against:** CLN-01A branch after `main` at `17a75a77`
 **Last verified:** 12 July 2026
 
 This map describes commands GitHub Actions actually executes. Workflow names, test discovery, category listing, local scripts, and manual evidence do not count as execution unless a runner invokes them.
 
 ## Shared Contract
 
-All six pull-request workflows:
+All seven pull-request workflows:
 
 - run from checked-out repository content;
 - pin .NET SDK `10.0.301`;
@@ -30,6 +30,7 @@ No workflow is triggered by a push to `main`. Every workflow supports `workflow_
 | `sql-integration-ci` | Ubuntu + SQL Server 2022 | `main` | `run-sql-integration-ci.ps1` | Connectivity smoke and seven SQL governance-store suites | Yes | `artifacts/ci/sql-integration` |
 | `full-sql-integration-ci` | Ubuntu + SQL Server 2022 | `main`, legacy governance/CI branches | `run-full-sql-integration-ci.ps1` | Clean migration/API baseline plus named SQL, release, demo, repair, revision, category, catalog, and secret-scan proofs | Yes | `artifacts/ci/full-sql-integration` |
 | `frontend-contract-ci` | Windows | `main` | `run-frontend-contract-ci.ps1` | TypeScript type-check and two OpenAPI/generated-client drift checks | No | `artifacts/ci/frontend-contract` |
+| `frontend-behavior-ci` | Windows | `main` | `run-frontend-behavior-ci.ps1` | Production Vite build and 158 current-product Playwright tests in 18 explicit files | No | `artifacts/ci/frontend-behavior` |
 
 ## Lane Detail
 
@@ -138,13 +139,28 @@ The first OpenAPI check compares a temporary generated TypeScript client with th
 
 This workflow does not run Vite production build, Playwright, or live LocalTest.
 
+### `frontend-behavior-ci`
+
+The workflow pins Node `24.16.0` and npm `11.13.0`, installs locked dependencies and Chromium, runs `npm run build`, then lists and executes 18 explicitly owned current-product Playwright files with four workers.
+
+The lane fails when:
+
+- production bundling fails;
+- no tests are selected;
+- selected and executed counts differ;
+- any selected test fails;
+- required JUnit evidence is absent;
+- the evidence artifact safety scan fails.
+
+The explicit inventory covers entry, routing, setup, Board, Workshop, Work Item, Documents, Tools, Members, Governance, Audit through the flow-shell contract, agent profiles, AI connections, and product identity. It does not claim ownership of the remaining historical/component Playwright files.
+
 ## Retry and Quarantine Truth
 
 | Behavior | Current truth |
 | --- | --- |
 | Automatic workflow retry | None. |
 | Test retry | SQL connectivity probes only, to allow the service to become reachable. |
-| Playwright retry | Not applicable in GitHub Actions because Playwright is not executed. |
+| Playwright retry | None. The bounded frontend behavior lane uses four workers and no retry. |
 | `LongRunning` category | Listed in full SQL selection evidence; not executed as a complete category. |
 | `RequiresRealDatabase` category | Listed in full SQL selection evidence; not executed as a complete category. |
 | Quarantine contract | `SlowQuarantineCategoryContractTests` executes and validates category discipline. |
@@ -152,15 +168,15 @@ This workflow does not run Vite production build, Playwright, or live LocalTest.
 
 ## Coverage Gaps
 
-### GAP-CI-01: Frontend behavior has no GitHub execution lane
+### GAP-CI-01: Frontend behavior has no GitHub execution lane - resolved by CLN-01A
 
-Classification: `MissingCiLane`.
+Classification: `MissingCiLane`, resolved for the current-product suite.
 
 `npx playwright test --list` currently discovers 747 tests in 41 files. No GitHub workflow installs Chromium or invokes Playwright. These tests include current Board, Workshop, Work Item, Library, Audit, settings, authority-firewall, refusal, empty, failure, and responsive-state contracts.
 
 A local unfiltered run was terminated after exceeding ten minutes. That result is timing evidence, not a pass or failure count, and rules out adding all 747 tests to an existing lane with an arbitrary larger timeout.
 
-Required follow-up: create a bounded current-product frontend behavior lane with an explicit file inventory. CLN-08 must assign the remaining historical/component suites. Live LocalTest remains a separate manual/operational proof and must not be replaced with mocks.
+Resolution: `frontend-behavior-ci` executes 158 tests in 18 explicit current-product files and the production Vite build. CLN-08 must assign the remaining historical/component suites. Live LocalTest remains a separate manual/operational proof and is not replaced with mocks.
 
 ### GAP-CI-02: Integration-project ownership is filter-based, not exhaustive
 
@@ -170,11 +186,11 @@ No workflow executes all of `IronDev.IntegrationTests` without a filter. Tests o
 
 Required follow-up: CLN-08 must inventory every integration suite against an owning lane, then create narrow lane additions for load-bearing uncovered suites. This map does not call unexecuted tests green.
 
-### GAP-CI-03: Frontend production bundling is not a CI command
+### GAP-CI-03: Frontend production bundling is not a CI command - resolved by CLN-01A
 
-Classification: `MissingCiLane`.
+Classification: `MissingCiLane`, resolved.
 
-`vite build` is not executed. TypeScript success alone does not prove production bundling. Add production build to the bounded frontend follow-up.
+`frontend-behavior-ci` executes `npm run build` before browser tests. TypeScript and OpenAPI drift remain independently owned by `frontend-contract-ci`.
 
 ### GAP-CI-04: Live LocalTest and Tauri desktop remain human-operated
 
@@ -191,7 +207,8 @@ The live LocalTest Playwright smoke and non-author Tauri walk require a supporte
 | Governance/static/API/CLI boundary groups | `governance-boundary-ci` | CLN-08 verifies exact suite completeness. |
 | Bounded SQL stores | `sql-integration-ci` | None from CLN-01. |
 | Migration and named release/database proofs | `full-sql-integration-ci` | CLN-08 resolves unowned category members. |
-| TypeScript/OpenAPI contract | `frontend-contract-ci` | Add build and bounded Playwright execution. |
+| TypeScript/OpenAPI contract | `frontend-contract-ci` | None from CLN-01A. |
+| Current-product frontend behavior and bundle | `frontend-behavior-ci` | CLN-08 assigns remaining historical/component files. |
 | Live LocalTest | Manual test contract | Preserve as real-stack evidence. |
 | Tauri desktop | Non-author qualification | Preserve as human release gate. |
 
