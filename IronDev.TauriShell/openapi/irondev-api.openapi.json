@@ -7862,8 +7862,25 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannedSurfaceEnvelope"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannedSurfaceEnvelope"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannedSurfaceEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -7885,8 +7902,25 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannedSurfaceEnvelope"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannedSurfaceEnvelope"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannedSurfaceEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -24536,6 +24570,43 @@
             "items": {
               "$ref": "#/components/schemas/FilePatchValidation"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannedSurfaceEnvelope": {
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "surface": {
+            "type": "string",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "plannedSlice": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
             "nullable": true
           }
         },

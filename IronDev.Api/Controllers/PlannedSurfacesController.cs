@@ -21,6 +21,7 @@ public sealed class PlannedSurfacesController : ControllerBase
 
     /// <summary>Invite flow (full-ux-map section 8.3 step 2). Direct user creation exists; invite is gated on TEAM-0.</summary>
     [HttpPost("api/tenants/{tenantId:int}/users/invite")]
+    [ProducesResponseType(typeof(PlannedSurfaceEnvelope), StatusCodes.Status501NotImplemented)]
     public IActionResult InviteTenantUser(int tenantId) => Planned(
         surface: "Tenant user invite",
         plannedSlice: "TEAM-0 (tenant-scope proof + role/visibility matrix)",
@@ -29,6 +30,7 @@ public sealed class PlannedSurfacesController : ControllerBase
 
     /// <summary>Human-intervention dial from the superseded UX map. The settings control is a labeled local draft until AUTH-0.</summary>
     [HttpGet("api/projects/{projectId:int}/authority/intervention-dial")]
+    [ProducesResponseType(typeof(PlannedSurfaceEnvelope), StatusCodes.Status501NotImplemented)]
     public IActionResult GetInterventionDial(int projectId) => Planned(
         surface: "Human-intervention dial",
         plannedSlice: "AUTH-0 (approval profile contract)",

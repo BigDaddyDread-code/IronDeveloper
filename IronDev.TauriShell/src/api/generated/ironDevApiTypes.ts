@@ -5658,12 +5658,16 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK */
-                200: {
+                /** @description Not Implemented */
+                501: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["PlannedSurfaceEnvelope"];
+                        "application/json": components["schemas"]["PlannedSurfaceEnvelope"];
+                        "text/json": components["schemas"]["PlannedSurfaceEnvelope"];
+                    };
                 };
             };
         };
@@ -5691,12 +5695,16 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK */
-                200: {
+                /** @description Not Implemented */
+                501: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["PlannedSurfaceEnvelope"];
+                        "application/json": components["schemas"]["PlannedSurfaceEnvelope"];
+                        "text/json": components["schemas"]["PlannedSurfaceEnvelope"];
+                    };
                 };
             };
         };
@@ -13824,6 +13832,16 @@ export interface components {
             allValid?: boolean;
             summary?: string | null;
             fileResults?: components["schemas"]["FilePatchValidation"][] | null;
+        };
+        PlannedSurfaceEnvelope: {
+            allowed?: boolean;
+            reason?: string | null;
+            surface?: string | null;
+            detail?: string | null;
+            plannedSlice?: string | null;
+            nextSafeAction?: string | null;
+            boundary?: string | null;
+            correlationId?: string | null;
         };
         PolicyRequirement: {
             /** Format: uuid */
