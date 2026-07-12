@@ -1,4 +1,4 @@
-import { libraryPath, navigateProductPath, type LibrarySection } from '../navigation/productRoutes';
+import { libraryPath, navigateProductPath, type GovernanceSection, type LibrarySection } from '../navigation/productRoutes';
 import { GovernanceHost } from './GovernanceHost';
 import { AuditSection } from './AuditSection';
 import { ProvisioningSection } from './PlannedSections';
@@ -11,6 +11,7 @@ import { MembersScreen } from './MembersScreen';
 interface LibraryScreenProps {
   projectId: number;
   section: LibrarySection;
+  governanceSection?: GovernanceSection | null;
   documentId?: number | null;
   documentVersionId?: number | null;
   documentAction?: 'upload' | null;
@@ -34,6 +35,7 @@ const sections: Array<{ id: LibrarySection; label: string }> = [
 export function LibraryScreen({
   projectId,
   section,
+  governanceSection = null,
   documentId = null,
   documentVersionId = null,
   documentAction = null,
@@ -84,7 +86,11 @@ export function LibraryScreen({
       {section === 'tools' ? <ToolsScreen projectId={projectId} toolId={toolId} /> : null}
       {section === 'members' ? <MembersScreen projectId={projectId} /> : null}
       {section === 'governance' ? (
-        <GovernanceHost projectId={projectId} preserveCompatibilityPath={preserveGovernancePath} />
+        <GovernanceHost
+          projectId={projectId}
+          section={governanceSection ?? 'overview'}
+          preserveCompatibilityPath={preserveGovernancePath}
+        />
       ) : null}
       {section === 'provisioning' ? (
         <ProvisioningSection onBackToProjects={onBackToProjects} onOpenBoard={onOpenBoard} />

@@ -22,6 +22,15 @@ test('canonical project governance routes resolve to the Governance library surf
     expect(route.kind).toBe('library');
     expect(route.projectId).toBe(42);
     expect(route.librarySection).toBe('governance');
+    expect(route.governanceSection).toBe(section);
     expect(route.compatibility).toBe(false);
   }
+});
+
+test('unknown project Governance subsections do not silently become technical evidence', () => {
+  const route = parseProductRoute('/projects/42/library/governance/internal-record-name');
+
+  expect(route.kind).toBe('notFound');
+  expect(route.librarySection).toBeNull();
+  expect(route.governanceSection).toBeNull();
 });

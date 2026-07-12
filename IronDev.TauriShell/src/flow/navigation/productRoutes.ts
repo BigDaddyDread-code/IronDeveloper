@@ -35,6 +35,7 @@ export interface ProductRoute {
   chatChannelId: string | null;
   workItemId: number | 'new' | null;
   librarySection: LibrarySection | null;
+  governanceSection: GovernanceSection | null;
   libraryDocumentId: number | null;
   libraryDocumentVersionId: number | null;
   libraryDocumentAction: 'upload' | null;
@@ -57,6 +58,7 @@ function route(
     chatChannelId: options.chatChannelId ?? null,
     workItemId: options.workItemId ?? null,
     librarySection: options.librarySection ?? null,
+    governanceSection: options.governanceSection ?? null,
     libraryDocumentId: options.libraryDocumentId ?? null,
     libraryDocumentVersionId: options.libraryDocumentVersionId ?? null,
     libraryDocumentAction: options.libraryDocumentAction ?? null,
@@ -162,11 +164,14 @@ export function parseProductRoute(pathname: string): ProductRoute {
     });
   }
 
-  const libraryGovernanceMatch = normalized.match(/^\/projects\/(\d+)\/library\/governance(?:\/.*)?$/);
+  const libraryGovernanceMatch = normalized.match(
+    /^\/projects\/(\d+)\/library\/governance(?:\/(controls|exceptions|decisions|technical))?$/
+  );
   if (libraryGovernanceMatch) {
     return route(normalized, 'library', {
       projectId: Number(libraryGovernanceMatch[1]),
-      librarySection: 'governance'
+      librarySection: 'governance',
+      governanceSection: (libraryGovernanceMatch[2] as GovernanceSection | undefined) ?? 'overview'
     });
   }
 

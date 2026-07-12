@@ -558,6 +558,7 @@ export function FlowShell() {
           <LibraryScreen
             projectId={activeProjectId}
             section={currentRoute.librarySection ?? 'settings'}
+            governanceSection={currentRoute.governanceSection}
             documentId={currentRoute.libraryDocumentId}
             documentVersionId={currentRoute.libraryDocumentVersionId}
             documentAction={currentRoute.libraryDocumentAction}

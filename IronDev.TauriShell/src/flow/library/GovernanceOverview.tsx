@@ -10,11 +10,12 @@ import type {
 import { StatusBadge } from '../../components/StatusBadge';
 import { useSessionContext } from '../../state/useSessionContext';
 import { RouteOutcomeScreen } from '../components/RouteOutcomeScreen';
-import { navigateProductPath } from '../navigation/productRoutes';
+import { governancePath, navigateProductPath, type GovernanceSection } from '../navigation/productRoutes';
+import { governanceViewers } from './governanceRoutes';
 
 type LoadState = 'loading' | 'ready' | 'notFound' | 'unavailable';
 
-export function GovernanceOverview({ projectId }: { projectId: number }) {
+export function GovernanceOverview({ projectId, section = 'overview' }: { projectId: number; section?: GovernanceSection }) {
   const session = useSessionContext();
   const [model, setModel] = useState<ProjectGovernanceOverviewModel | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('loading');
@@ -70,10 +71,10 @@ export function GovernanceOverview({ projectId }: { projectId: number }) {
     );
   }
 
-  return <GovernanceOverviewContent model={model} />;
+  return <GovernanceOverviewContent model={model} section={section} />;
 }
 
-function GovernanceOverviewContent({ model }: { model: ProjectGovernanceOverviewModel }) {
+function GovernanceOverviewContent({ model, section }: { model: ProjectGovernanceOverviewModel; section: GovernanceSection }) {
   const attention = model.attentionItems ?? [];
   const controls = model.controls ?? [];
   const exceptions = model.exceptions ?? [];
@@ -83,6 +84,7 @@ function GovernanceOverviewContent({ model }: { model: ProjectGovernanceOverview
   const primaryTarget = safeProductRoute(model.primaryAction.targetRoute);
   const auditTarget = safeProductRoute(model.navigation.audit);
   const settingsTarget = safeProductRoute(model.navigation.settings);
+  const projectId = model.projectId ?? 0;
 
   return (
     <main className="fl-governance" data-testid="flow.governance.overview">
@@ -114,6 +116,32 @@ function GovernanceOverviewContent({ model }: { model: ProjectGovernanceOverview
         </div>
       </header>
 
+      <nav className="fl-governance__subnav" aria-label="Governance views">
+        {governanceSections.map((candidate) => {
+          const target = governanceSectionTarget(model, candidate.id, projectId);
+          return (
+            <button
+              key={candidate.id}
+              type="button"
+              className={section === candidate.id ? 'fl-on' : ''}
+              aria-current={section === candidate.id ? 'page' : undefined}
+              onClick={() => navigateProductPath(target)}
+            >
+              {candidate.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {section !== 'overview' ? (
+        <div className="fl-governance__detail-heading">
+          <button type="button" className="fl-governance__text-action" onClick={() => navigateProductPath(governanceSectionTarget(model, 'overview', projectId))}>
+            Back to overview
+          </button>
+          <p>{detailDescription(section)}</p>
+        </div>
+      ) : null}
+
       {sectionIssues.length > 0 ? (
         <section className="fl-governance__section-issues" aria-labelledby="governance-section-issues" role="status">
           <h3 id="governance-section-issues">Some governance evidence is unavailable</h3>
@@ -121,7 +149,7 @@ function GovernanceOverviewContent({ model }: { model: ProjectGovernanceOverview
         </section>
       ) : null}
 
-      <GovernanceSection
+      {section === 'overview' ? <GovernanceSection
         title="Needs attention"
         count={attention.length}
         actionLabel="View exceptions"
@@ -135,9 +163,9 @@ function GovernanceOverviewContent({ model }: { model: ProjectGovernanceOverview
             {attention.map((item) => <AttentionCard key={`${item.workItemId}-${item.kind}`} item={item} />)}
           </div>
         )}
-      </GovernanceSection>
+      </GovernanceSection> : null}
 
-      <GovernanceSection
+      {section === 'overview' || section === 'controls' ? <GovernanceSection
         title="Effective controls"
         count={controls.length}
         actionLabel="View all controls"
@@ -165,9 +193,9 @@ function GovernanceOverviewContent({ model }: { model: ProjectGovernanceOverview
             </section>
           ))}
         </div>
-      </GovernanceSection>
+      </GovernanceSection> : null}
 
-      <div className="fl-governance__lower-grid">
+      {section === 'overview' ? <div className="fl-governance__lower-grid">
         <GovernanceSection
           title="Exceptions and degraded states"
           count={exceptions.length}
@@ -191,10 +219,88 @@ function GovernanceOverviewContent({ model }: { model: ProjectGovernanceOverview
             <div className="fl-governance__compact-list">{decisions.slice(0, 5).map((item) => <DecisionRow key={item.id ?? `${item.kind}-${item.workItemId}`} item={item} />)}</div>
           )}
         </GovernanceSection>
-      </div>
+      </div> : null}
+
+      {section === 'exceptions' ? (
+        <GovernanceSection
+          title="Exceptions and degraded states"
+          count={exceptions.length}
+          actionLabel="View audit"
+          actionTarget={auditTarget}
+          testId="flow.governance.exceptions.detail"
+        >
+          {exceptions.length === 0 ? <EmptySection>No active governance exceptions are recorded.</EmptySection> : (
+            <div className="fl-governance__detail-list">{exceptions.map((item) => <ExceptionRow key={item.id ?? `${item.category}-${item.workItemId}`} item={item} />)}</div>
+          )}
+        </GovernanceSection>
+      ) : null}
+
+      {section === 'decisions' ? (
+        <GovernanceSection
+          title="Consequential decisions"
+          count={decisions.length}
+          actionLabel="View full audit"
+          actionTarget={auditTarget}
+          testId="flow.governance.decisions.detail"
+        >
+          {decisions.length === 0 ? <EmptySection>No consequential decisions were returned.</EmptySection> : (
+            <div className="fl-governance__detail-list">{decisions.map((item) => <DecisionRow key={item.id ?? `${item.kind}-${item.workItemId}`} item={item} />)}</div>
+          )}
+        </GovernanceSection>
+      ) : null}
+
+      {section === 'technical' ? <TechnicalEvidence /> : null}
 
       <p className="fl-governance__boundary" data-testid="flow.governance.boundary">{text(model.boundary, 'Governance is read-only.')}</p>
     </main>
+  );
+}
+
+const governanceSections: Array<{ id: GovernanceSection; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'controls', label: 'Controls' },
+  { id: 'exceptions', label: 'Exceptions' },
+  { id: 'decisions', label: 'Decisions' },
+  { id: 'technical', label: 'Technical evidence' }
+];
+
+const technicalViewerGroups: Array<{ label: string; viewerIds: string[] }> = [
+  { label: 'Traces', viewerIds: ['timeline'] },
+  { label: 'Runs and operations', viewerIds: ['operations', 'workflow-runs'] },
+  { label: 'Packages and artifacts', viewerIds: ['patch-packages', 'patch-artifacts', 'dogfood-receipts'] },
+  { label: 'Approvals and policy', viewerIds: ['approval-packages', 'accepted-approvals', 'policy-satisfaction', 'release-readiness-evidence', 'workflow-continuation-evidence'] },
+  { label: 'Apply and recovery', viewerIds: ['source-apply-reviews', 'source-apply-dry-run-receipts', 'rollback-evidence'] },
+  { label: 'Tools and memory', viewerIds: ['tool-gates', 'memory-proposals'] }
+];
+
+function TechnicalEvidence() {
+  return (
+    <section className="fl-governance__section" data-testid="flow.governance.technical">
+      <header><div><h3>Technical evidence</h3><span>Read-only</span></div></header>
+      <p className="fl-governance__technical-intro">
+        Open preserved evidence viewers when an investigation needs run IDs, traces, packages, receipts, or policy records.
+        These links observe existing evidence and perform no governed action.
+      </p>
+      <div className="fl-governance__technical-groups">
+        {technicalViewerGroups.map((group) => (
+          <section key={group.label}>
+            <h4>{group.label}</h4>
+            <div>
+              {group.viewerIds.map((id) => {
+                const viewer = governanceViewers.find((candidate) => candidate.id === id);
+                if (!viewer) return null;
+                return (
+                  <button key={viewer.id} type="button" onClick={() => navigateProductPath(viewer.entryPath)}>
+                    <strong>{viewer.label}</strong>
+                    <span>{viewer.disposition}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -272,6 +378,21 @@ function groupControls(controls: ProjectGovernanceControl[]) {
     groups.set(group, [...(groups.get(group) ?? []), control]);
   }
   return [...groups.entries()];
+}
+
+function governanceSectionTarget(model: ProjectGovernanceOverviewModel, section: GovernanceSection, projectId: number) {
+  const backendTarget = section === 'overview'
+    ? model.navigation.overview
+    : model.navigation[section];
+  return safeProductRoute(backendTarget) ?? governancePath(projectId, section);
+}
+
+function detailDescription(section: GovernanceSection) {
+  if (section === 'controls') return 'Effective values and their authoritative policy or invariant source.';
+  if (section === 'exceptions') return 'Material deviations, degraded controls, and recovery states requiring inspection.';
+  if (section === 'decisions') return 'A concise project view of material decisions; Audit owns the complete record.';
+  if (section === 'technical') return 'Progressive access to read-only technical evidence and compatibility viewers.';
+  return '';
 }
 
 function safeProductRoute(value: string | null | undefined): string | null {
