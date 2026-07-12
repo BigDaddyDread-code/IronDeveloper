@@ -422,12 +422,13 @@ public sealed class SkeletonRunTests
             .ToArray();
 
         // Same discipline as the critic's memory-blindness: independence is enforced
-        // by the contract, not by convention. A new field that could carry the
-        // proposal must trip this and force a conscious decision.
+        // by the contract, not by convention. Tenant and project scope are part of
+        // the requirement surface; a field that could carry the proposal must trip
+        // this and force a conscious decision.
         CollectionAssert.AreEquivalent(
-            new[] { "TicketId", "ProjectId", "TicketTitle", "AcceptanceCriteria", "Problem" },
+            new[] { "TenantId", "TicketId", "ProjectId", "TicketTitle", "AcceptanceCriteria", "Problem" },
             propertyNames,
-            "The Tester's input is the requirement surface only.");
+            "The Tester's input is scoped requirement data only.");
 
         foreach (var forbidden in new[] { "Proposal", "Diff", "Change", "Content", "File", "Patch" })
         {
