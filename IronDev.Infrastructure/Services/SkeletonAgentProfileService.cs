@@ -108,6 +108,9 @@ public sealed class SkeletonAgentProfileService : ISkeletonAgentProfileService
         return profiles;
     }
 
+    public IReadOnlyList<SkeletonAgentProfileValidationIssue> ValidateUpdate(SkeletonAgentProfileUpdate update) =>
+        Validate(update);
+
     public async Task<SkeletonAgentProfileOutcome> UpdateAsync(
         SkeletonAgentRole role,
         SkeletonAgentProfileUpdate update,

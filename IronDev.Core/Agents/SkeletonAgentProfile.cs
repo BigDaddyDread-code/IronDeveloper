@@ -392,6 +392,7 @@ public interface ISkeletonAgentProfileService
         int tenantId,
         int? projectId = null,
         CancellationToken cancellationToken = default);
+    IReadOnlyList<SkeletonAgentProfileValidationIssue> ValidateUpdate(SkeletonAgentProfileUpdate update);
     Task<SkeletonAgentProfileOutcome> UpdateAsync(SkeletonAgentRole role, SkeletonAgentProfileUpdate update, CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileDraft> GetDraftAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileDraft> GetDraftAsync(SkeletonAgentRole role, SkeletonAgentProfileScope scope, CancellationToken cancellationToken = default);

@@ -34,19 +34,65 @@ public sealed class AgentProfilesController : ControllerBase
     private readonly IRunEventStore _runEvents;
     private readonly IProjectMembershipService _projectMemberships;
     private readonly IAiConnectionCatalogService _connections;
+    private readonly IAgentConfigurationPackService _configurationPacks;
 
     public AgentProfilesController(
         ISkeletonAgentProfileService profiles,
         IUserService userService,
         IRunEventStore runEvents,
         IProjectMembershipService projectMemberships,
-        IAiConnectionCatalogService connections)
+        IAiConnectionCatalogService connections,
+        IAgentConfigurationPackService configurationPacks)
     {
         _profiles = profiles;
         _userService = userService;
         _runEvents = runEvents;
         _projectMemberships = projectMemberships;
         _connections = connections;
+        _configurationPacks = configurationPacks;
+    }
+
+    [HttpGet("configuration-pack")]
+    public async Task<ActionResult<AgentConfigurationPack>> ExportConfigurationPack(
+        [FromQuery] int? projectId,
+        [FromQuery] string? scope,
+        CancellationToken ct)
+    {
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        if (profileScope is null)
+            return Forbid();
+        var ctx = CurrentUser();
+        return Ok(await _configurationPacks.ExportAsync(profileScope.TenantId, ctx.UserId, profileScope, ct));
+    }
+
+    [HttpPost("configuration-pack/preview")]
+    public async Task<ActionResult<AgentConfigurationPackPreview>> PreviewConfigurationPack(
+        [FromQuery] int? projectId,
+        [FromQuery] string? scope,
+        [FromBody] AgentConfigurationPackPreviewRequest request,
+        CancellationToken ct)
+    {
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
+            return Forbid();
+        var ctx = CurrentUser();
+        var preview = await _configurationPacks.PreviewAsync(profileScope.TenantId, ctx.UserId, profileScope, request.Pack, ct);
+        return preview.Succeeded ? Ok(preview) : BadRequest(preview);
+    }
+
+    [HttpPost("configuration-pack/import")]
+    public async Task<ActionResult<AgentConfigurationPackImportOutcome>> ImportConfigurationPack(
+        [FromQuery] int? projectId,
+        [FromQuery] string? scope,
+        [FromBody] AgentConfigurationPackImportRequest request,
+        CancellationToken ct)
+    {
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
+            return Forbid();
+        var ctx = CurrentUser();
+        var outcome = await _configurationPacks.ImportAsync(profileScope.TenantId, ctx.UserId, profileScope, request, ct);
+        return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
     }
 
     [HttpGet]

@@ -1942,6 +1942,57 @@ export interface AiConnectionCredentialMutationOutcome {
   boundary: string;
 }
 
+export interface AgentConfigurationPackEntry {
+  role: string | number;
+  values: SkeletonAgentProfileUpdate;
+  logicalConnectionName: string;
+  builtInDefaultVersion: string;
+  sourcePublishedVersion: number;
+}
+
+export interface AgentConfigurationPack {
+  format: string;
+  formatVersion: number;
+  packId: string;
+  exportedAtUtc: string;
+  sourceScope: string;
+  sourceTenantId: number;
+  sourceProjectId?: number | null;
+  profiles: AgentConfigurationPackEntry[];
+  boundary: string;
+}
+
+export interface AgentConfigurationPackDifference {
+  role: string | number;
+  field: string;
+  currentValue: string;
+  importedValue: string;
+  changed: boolean;
+}
+
+export interface AgentConfigurationPackPreview {
+  succeeded: boolean;
+  code: string;
+  failureReason: string;
+  targetScope: string;
+  targetProjectId?: number | null;
+  differences: AgentConfigurationPackDifference[];
+  expectedRevisions: Record<string, number>;
+  draftOnly: boolean;
+  sourceProvenance: string;
+  boundary: string;
+}
+
+export interface AgentConfigurationPackImportOutcome {
+  succeeded: boolean;
+  code: string;
+  failureReason: string;
+  createdDrafts: SkeletonAgentProfileDraft[];
+  published: boolean;
+  preview: AgentConfigurationPackPreview;
+  boundary: string;
+}
+
 export interface AiConnectionTestOutcome {
   succeeded: boolean;
   status: string;
