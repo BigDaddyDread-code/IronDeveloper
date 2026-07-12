@@ -323,7 +323,10 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    projectId?: number;
+                    scope?: string;
+                };
                 header?: never;
                 path: {
                     role: string;
@@ -347,7 +350,10 @@ export interface paths {
         };
         put: {
             parameters: {
-                query?: never;
+                query?: {
+                    projectId?: number;
+                    scope?: string;
+                };
                 header?: never;
                 path: {
                     role: string;
@@ -393,6 +399,7 @@ export interface paths {
             parameters: {
                 query?: {
                     projectId?: number;
+                    scope?: string;
                 };
                 header?: never;
                 path: {
@@ -434,7 +441,10 @@ export interface paths {
         put?: never;
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    projectId?: number;
+                    scope?: string;
+                };
                 header?: never;
                 path: {
                     role: string;
@@ -473,7 +483,10 @@ export interface paths {
         put?: never;
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    projectId?: number;
+                    scope?: string;
+                };
                 header?: never;
                 path: {
                     role: string;
@@ -518,7 +531,10 @@ export interface paths {
         put?: never;
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    projectId?: number;
+                    scope?: string;
+                };
                 header?: never;
                 path: {
                     role: string;
@@ -563,7 +579,10 @@ export interface paths {
         put?: never;
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    projectId?: number;
+                    scope?: string;
+                };
                 header?: never;
                 path: {
                     role: string;
@@ -12460,6 +12479,7 @@ export interface components {
             projectProfileVersion?: string | null;
             /** Format: int64 */
             publishedVersion?: number | null;
+            publishedScopeLayer?: string | null;
             effectiveHash: string | null;
             boundary?: string | null;
         };
@@ -15298,6 +15318,11 @@ export interface components {
             actorUserId: number;
             /** Format: date-time */
             publishedAtUtc: string;
+            scopeLayer?: string | null;
+            /** Format: int32 */
+            tenantId?: number | null;
+            /** Format: int32 */
+            projectId?: number | null;
         };
         SkeletonAgentProfileResetRequest: {
             /** Format: int64 */
@@ -15611,6 +15636,7 @@ export interface components {
             role: string | null;
             /** Format: int64 */
             profileVersion?: number | null;
+            profileScopeLayer?: string | null;
             connectionId?: string | null;
             provider?: string | null;
             controlledEndpointIdentity?: string | null;

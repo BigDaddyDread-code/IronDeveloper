@@ -1219,8 +1219,9 @@ class IronDevApiClient {
     });
   }
 
-  async getAgentProfileDraft(role: string, signal?: AbortSignal): Promise<SkeletonAgentProfileDraft> {
-    return this.request<SkeletonAgentProfileDraft>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft`, {
+  async getAgentProfileDraft(role: string, projectId?: number | null, scope: 'project' | 'tenant' = 'project', signal?: AbortSignal): Promise<SkeletonAgentProfileDraft> {
+    const query = agentProfileScopeQuery(projectId, scope);
+    return this.request<SkeletonAgentProfileDraft>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft${query}`, {
       method: 'GET',
       signal
     });
@@ -1229,17 +1230,21 @@ class IronDevApiClient {
   async saveAgentProfileDraft(
     role: string,
     request: SkeletonAgentProfileDraftWriteRequest,
+    projectId?: number | null,
+    scope: 'project' | 'tenant' = 'project',
     signal?: AbortSignal
   ): Promise<SkeletonAgentProfileDraftOutcome> {
-    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft`, {
+    const query = agentProfileScopeQuery(projectId, scope);
+    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft${query}`, {
       method: 'PUT',
       body: request,
       signal
     });
   }
 
-  async testAgentProfileDraft(role: string, signal?: AbortSignal): Promise<SkeletonAgentProfileDraftTestOutcome> {
-    return this.request<SkeletonAgentProfileDraftTestOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft/test`, {
+  async testAgentProfileDraft(role: string, projectId?: number | null, scope: 'project' | 'tenant' = 'project', signal?: AbortSignal): Promise<SkeletonAgentProfileDraftTestOutcome> {
+    const query = agentProfileScopeQuery(projectId, scope);
+    return this.request<SkeletonAgentProfileDraftTestOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft/test${query}`, {
       method: 'POST',
       signal
     });
@@ -1248,17 +1253,20 @@ class IronDevApiClient {
   async publishAgentProfileDraft(
     role: string,
     request: SkeletonAgentProfilePublishRequest,
+    projectId?: number | null,
+    scope: 'project' | 'tenant' = 'project',
     signal?: AbortSignal
   ): Promise<SkeletonAgentProfileDraftOutcome> {
-    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft/publish`, {
+    const query = agentProfileScopeQuery(projectId, scope);
+    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/draft/publish${query}`, {
       method: 'POST',
       body: request,
       signal
     });
   }
 
-  async listAgentProfileHistory(role: string, projectId?: number | null, signal?: AbortSignal): Promise<SkeletonAgentProfileHistoryView[]> {
-    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+  async listAgentProfileHistory(role: string, projectId?: number | null, scope: 'project' | 'tenant' = 'project', signal?: AbortSignal): Promise<SkeletonAgentProfileHistoryView[]> {
+    const query = agentProfileScopeQuery(projectId, scope);
     return this.request<SkeletonAgentProfileHistoryView[]>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/history${query}`, {
       method: 'GET',
       signal
@@ -1268,9 +1276,12 @@ class IronDevApiClient {
   async resetAgentProfile(
     role: string,
     request: SkeletonAgentProfileResetRequest,
+    projectId?: number | null,
+    scope: 'project' | 'tenant' = 'project',
     signal?: AbortSignal
   ): Promise<SkeletonAgentProfileDraftOutcome> {
-    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/reset`, {
+    const query = agentProfileScopeQuery(projectId, scope);
+    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/reset${query}`, {
       method: 'POST',
       body: request,
       signal
@@ -1281,9 +1292,12 @@ class IronDevApiClient {
     role: string,
     version: number,
     request: SkeletonAgentProfileRestoreRequest,
+    projectId?: number | null,
+    scope: 'project' | 'tenant' = 'project',
     signal?: AbortSignal
   ): Promise<SkeletonAgentProfileDraftOutcome> {
-    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/history/${encodeURIComponent(version)}/restore`, {
+    const query = agentProfileScopeQuery(projectId, scope);
+    return this.request<SkeletonAgentProfileDraftOutcome>(`/api/v1/agent-profiles/${encodeURIComponent(role)}/history/${encodeURIComponent(version)}/restore${query}`, {
       method: 'POST',
       body: request,
       signal
@@ -1493,6 +1507,12 @@ type RawSkeletonAgentProfile = Omit<SkeletonAgentProfile, 'role' | 'provider'> &
   role: string | number;
   provider: string | null;
 };
+
+function agentProfileScopeQuery(projectId: number | null | undefined, scope: 'project' | 'tenant'): string {
+  const params = new URLSearchParams({ scope });
+  if (projectId) params.set('projectId', String(projectId));
+  return `?${params.toString()}`;
+}
 
 type RawEffectiveSkeletonAgentProfile = Omit<EffectiveSkeletonAgentProfile, 'role' | 'provider'> & {
   role: string | number;

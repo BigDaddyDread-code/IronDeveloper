@@ -411,6 +411,21 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -445,6 +460,21 @@
             "name": "role",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -514,6 +544,13 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -562,6 +599,21 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -598,6 +650,21 @@
             "name": "role",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -656,6 +723,21 @@
             "name": "role",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -725,6 +807,21 @@
             "schema": {
               "type": "integer",
               "format": "int64"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -19915,6 +20012,10 @@
             "format": "int64",
             "nullable": true
           },
+          "publishedScopeLayer": {
+            "type": "string",
+            "nullable": true
+          },
           "effectiveHash": {
             "type": "string",
             "nullable": true
@@ -30327,6 +30428,20 @@
           "publishedAtUtc": {
             "type": "string",
             "format": "date-time"
+          },
+          "scopeLayer": {
+            "type": "string",
+            "nullable": true
+          },
+          "tenantId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -31537,6 +31652,10 @@
           "profileVersion": {
             "type": "integer",
             "format": "int64",
+            "nullable": true
+          },
+          "profileScopeLayer": {
+            "type": "string",
             "nullable": true
           },
           "connectionId": {

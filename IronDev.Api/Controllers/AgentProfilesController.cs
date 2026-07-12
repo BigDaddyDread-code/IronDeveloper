@@ -1,6 +1,7 @@
 using IronDev.Api.Auth;
 using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -69,31 +70,35 @@ public sealed class AgentProfilesController : ControllerBase
     }
 
     [HttpGet("{role}/draft")]
-    public async Task<ActionResult<SkeletonAgentProfileDraft>> GetDraft(string role, CancellationToken ct)
+    public async Task<ActionResult<SkeletonAgentProfileDraft>> GetDraft(
+        string role,
+        [FromQuery] int? projectId,
+        [FromQuery] string? scope,
+        CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
             return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
-        return Ok(await _profiles.GetDraftAsync(parsed, ct));
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        return profileScope is null ? Forbid() : Ok(await _profiles.GetDraftAsync(parsed, profileScope, ct));
     }
 
     [HttpGet("{role}/history")]
     public async Task<ActionResult<IReadOnlyList<SkeletonAgentProfileHistoryView>>> History(
         string role,
         [FromQuery] int? projectId,
+        [FromQuery] string? scope,
         CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
             return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
 
-        var ctx = CurrentUser();
-        if (ctx.TenantId is null || ctx.UserId <= 0)
-            return Forbid();
-        if (projectId is > 0 && !await _projectMemberships.HasAccessAsync(ctx.TenantId.Value, projectId.Value, ctx.UserId, ct))
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        if (profileScope is null)
             return Forbid();
 
-        var history = await _profiles.ListHistoryAsync(parsed, ct);
+        var history = await _profiles.ListHistoryAsync(parsed, profileScope, ct);
         var usage = projectId is > 0
-            ? await ReadUsageAsync(parsed, projectId.Value, ct)
+            ? await ReadUsageAsync(parsed, profileScope.Layer, projectId.Value, ct)
             : new Dictionary<long, IReadOnlyList<SkeletonAgentProfileRunUsage>>();
         return Ok(history.Select(version => new SkeletonAgentProfileHistoryView
         {
@@ -105,59 +110,73 @@ public sealed class AgentProfilesController : ControllerBase
     [HttpPut("{role}/draft")]
     public async Task<ActionResult<SkeletonAgentProfileDraftOutcome>> SaveDraft(
         string role,
+        [FromQuery] int? projectId,
+        [FromQuery] string? scope,
         [FromBody] SkeletonAgentProfileDraftWriteRequest request,
         CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
             return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
-        if (!await CanAdministerAsync(ct))
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
             return Forbid();
 
-        var outcome = await _profiles.SaveDraftAsync(parsed, request, ct);
+        var outcome = await _profiles.SaveDraftAsync(parsed, profileScope, request, ct);
         return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
     }
 
     [HttpPost("{role}/draft/test")]
-    public async Task<ActionResult<SkeletonAgentProfileDraftTestOutcome>> TestDraft(string role, CancellationToken ct)
+    public async Task<ActionResult<SkeletonAgentProfileDraftTestOutcome>> TestDraft(
+        string role,
+        [FromQuery] int? projectId,
+        [FromQuery] string? scope,
+        CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
             return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
-        if (!await CanAdministerAsync(ct))
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
             return Forbid();
 
-        var outcome = await _profiles.TestDraftAsync(parsed, ct);
+        var outcome = await _profiles.TestDraftAsync(parsed, profileScope, ct);
         return outcome.Succeeded ? Ok(outcome) : BadRequest(outcome);
     }
 
     [HttpPost("{role}/draft/publish")]
     public async Task<ActionResult<SkeletonAgentProfileDraftOutcome>> PublishDraft(
         string role,
+        [FromQuery] int? projectId,
+        [FromQuery] string? scope,
         [FromBody] SkeletonAgentProfilePublishRequest request,
         CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
             return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
         var ctx = CurrentUser();
-        if (!await CanAdministerAsync(ct))
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
             return Forbid();
 
-        var outcome = await _profiles.PublishDraftAsync(parsed, request, ctx.UserId, ct);
+        var outcome = await _profiles.PublishDraftAsync(parsed, profileScope, request, ctx.UserId, ct);
         return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
     }
 
     [HttpPost("{role}/reset")]
     public async Task<ActionResult<SkeletonAgentProfileDraftOutcome>> Reset(
         string role,
+        [FromQuery] int? projectId,
+        [FromQuery] string? scope,
         [FromBody] SkeletonAgentProfileResetRequest request,
         CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
             return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
         var ctx = CurrentUser();
-        if (!await CanAdministerAsync(ct))
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
             return Forbid();
 
-        var outcome = await _profiles.ResetAsync(parsed, request, ctx.UserId, ct);
+        var outcome = await _profiles.ResetAsync(parsed, profileScope, request, ctx.UserId, ct);
         return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
     }
 
@@ -165,16 +184,19 @@ public sealed class AgentProfilesController : ControllerBase
     public async Task<ActionResult<SkeletonAgentProfileDraftOutcome>> Restore(
         string role,
         long version,
+        [FromQuery] int? projectId,
+        [FromQuery] string? scope,
         [FromBody] SkeletonAgentProfileRestoreRequest request,
         CancellationToken ct)
     {
         if (!TryParseRole(role, out var parsed))
             return BadRequest(new { error = "Unknown agent role. Roles: analyst, builder, tester, critic, orchestrator." });
         var ctx = CurrentUser();
-        if (!await CanAdministerAsync(ct))
+        var profileScope = await ResolveScopeAsync(projectId, scope, ct);
+        if (profileScope is null || !await CanAdministerScopeAsync(profileScope, ct))
             return Forbid();
 
-        var outcome = await _profiles.RestoreAsync(parsed, version, request, ctx.UserId, ct);
+        var outcome = await _profiles.RestoreAsync(parsed, profileScope, version, request, ctx.UserId, ct);
         return outcome.Succeeded ? Ok(outcome) : Conflict(outcome);
     }
 
@@ -196,8 +218,11 @@ public sealed class AgentProfilesController : ControllerBase
         if (!TenantUserRoles.CanAdministerUsers(callerRole))
             return Forbid();
 
-        var outcome = await _profiles.UpdateAsync(parsed, update, ct);
-        return outcome.Succeeded ? Ok(outcome) : BadRequest(outcome);
+        return Conflict(new
+        {
+            code = "LegacyWriteDisabled",
+            error = "Immediate global profile writes are disabled. Save and publish a tenant default or project override through the versioned draft endpoints."
+        });
     }
 
     private CurrentUserContext CurrentUser() =>
@@ -212,8 +237,35 @@ public sealed class AgentProfilesController : ControllerBase
         return TenantUserRoles.CanAdministerUsers(callerRole);
     }
 
+    private async Task<SkeletonAgentProfileScope?> ResolveScopeAsync(int? projectId, string? requestedScope, CancellationToken cancellationToken)
+    {
+        var ctx = CurrentUser();
+        if (ctx.TenantId is null || ctx.UserId <= 0)
+            return null;
+        var layer = string.IsNullOrWhiteSpace(requestedScope)
+            ? projectId is > 0 ? "project" : "tenant"
+            : requestedScope.Trim().ToLowerInvariant();
+        if (layer == "tenant")
+            return new SkeletonAgentProfileScope { TenantId = ctx.TenantId.Value };
+        if (layer != "project" || projectId is not > 0)
+            return null;
+        return await _projectMemberships.HasAccessAsync(ctx.TenantId.Value, projectId.Value, ctx.UserId, cancellationToken)
+            ? new SkeletonAgentProfileScope { TenantId = ctx.TenantId.Value, ProjectId = projectId.Value }
+            : null;
+    }
+
+    private async Task<bool> CanAdministerScopeAsync(SkeletonAgentProfileScope scope, CancellationToken cancellationToken)
+    {
+        if (scope.ProjectId is not > 0)
+            return await CanAdministerAsync(cancellationToken);
+        var ctx = CurrentUser();
+        var members = await _projectMemberships.GetMembersAsync(scope.TenantId, scope.ProjectId.Value, ctx.UserId, cancellationToken);
+        return members.Any(member => member.UserId == ctx.UserId && member.ProjectRole == ProjectMemberRoles.Owner);
+    }
+
     private async Task<Dictionary<long, IReadOnlyList<SkeletonAgentProfileRunUsage>>> ReadUsageAsync(
         SkeletonAgentRole role,
+        string scopeLayer,
         int projectId,
         CancellationToken cancellationToken)
     {
@@ -224,6 +276,7 @@ public sealed class AgentProfilesController : ControllerBase
                 .FirstOrDefault(runEvent =>
                     runEvent.EventType == "AgentConfigurationSnapshotted" &&
                     string.Equals(Payload(runEvent, "role"), role.ToString(), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(Payload(runEvent, "profileScopeLayer"), scopeLayer, StringComparison.OrdinalIgnoreCase) &&
                     int.TryParse(Payload(runEvent, "projectId"), out var capturedProjectId) && capturedProjectId == projectId &&
                     long.TryParse(Payload(runEvent, "profileVersion"), out _));
             if (snapshot is null || !long.TryParse(Payload(snapshot, "profileVersion"), out var version))

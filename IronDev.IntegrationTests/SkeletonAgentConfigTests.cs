@@ -225,6 +225,8 @@ public sealed class SkeletonAgentConfigTests
             "A non-administering caller must be refused (403), not allowed to write.");
         StringAssert.Contains(source, "SensitiveApiPolicy",
             "Profile writes are rate-limited like other sensitive admin surfaces.");
+        StringAssert.Contains(source, "LegacyWriteDisabled",
+            "The compatibility PUT must never mutate the legacy global profile shared beneath tenant scopes.");
     }
 
     [TestMethod]
@@ -398,6 +400,113 @@ public sealed class SkeletonAgentConfigTests
             Assert.AreEqual("ollama", restored.Profile?.Provider);
             Assert.AreEqual("llama3", restored.Profile?.Model);
             Assert.AreEqual(3, (await service.ListHistoryAsync(SkeletonAgentRole.Tester)).Count);
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task ScopedProfiles_ResolveProjectOverTenantAndResetBackToInheritedProvenance()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var tenantScope = new SkeletonAgentProfileScope { TenantId = 11 };
+            var tenantDraft = await service.GetDraftAsync(SkeletonAgentRole.Builder, tenantScope);
+            var tenantSaved = await service.SaveDraftAsync(SkeletonAgentRole.Builder, tenantScope, new SkeletonAgentProfileDraftWriteRequest
+            {
+                ExpectedRevision = tenantDraft.Revision,
+                Provider = "ollama",
+                Model = "tenant-model",
+                TimeoutSeconds = 40,
+                Skill = "Tenant skill",
+                Personality = "Tenant voice"
+            });
+            await service.PublishDraftAsync(SkeletonAgentRole.Builder, tenantScope, new SkeletonAgentProfilePublishRequest
+            {
+                ExpectedRevision = tenantSaved.CurrentRevision,
+                Reason = "Tenant default"
+            }, actorUserId: 7);
+
+            var projectScope = new SkeletonAgentProfileScope { TenantId = 11, ProjectId = 101 };
+            var projectDraft = await service.GetDraftAsync(SkeletonAgentRole.Builder, projectScope);
+            Assert.AreEqual("tenant-model", projectDraft.Values.Model, "A new project draft begins from the tenant-effective profile.");
+            var projectSaved = await service.SaveDraftAsync(SkeletonAgentRole.Builder, projectScope, new SkeletonAgentProfileDraftWriteRequest
+            {
+                ExpectedRevision = projectDraft.Revision,
+                Provider = "openai",
+                Model = "project-model",
+                TimeoutSeconds = 25,
+                Skill = "Project skill",
+                Personality = "Project voice"
+            });
+            var projectPublished = await service.PublishDraftAsync(SkeletonAgentRole.Builder, projectScope, new SkeletonAgentProfilePublishRequest
+            {
+                ExpectedRevision = projectSaved.CurrentRevision,
+                Reason = "Project override"
+            }, actorUserId: 8);
+
+            var projectEffective = (await service.ListEffectiveAsync(11, 101)).Single(profile => profile.Role == SkeletonAgentRole.Builder);
+            Assert.AreEqual("project-model", projectEffective.Model);
+            Assert.AreEqual("ProjectOverride", projectEffective.FieldSources.Single(source => source.Field == "model").SourceLayer);
+            var otherProject = (await service.ListEffectiveAsync(11, 202)).Single(profile => profile.Role == SkeletonAgentRole.Builder);
+            Assert.AreEqual("tenant-model", otherProject.Model);
+            Assert.AreEqual("TenantDefault", otherProject.FieldSources.Single(source => source.Field == "model").SourceLayer);
+
+            var fieldReset = await service.ResetAsync(SkeletonAgentRole.Builder, projectScope, new SkeletonAgentProfileResetRequest
+            {
+                ExpectedRevision = projectPublished.CurrentRevision,
+                Scope = SkeletonAgentProfileResetScopes.Field,
+                Field = "model",
+                Reason = "Inherit the tenant model"
+            }, actorUserId: 8);
+            var afterFieldReset = (await service.ListEffectiveAsync(11, 101)).Single(profile => profile.Role == SkeletonAgentRole.Builder);
+            Assert.AreEqual("tenant-model", afterFieldReset.Model);
+            Assert.AreEqual("openai", afterFieldReset.Provider, "Resetting one field must preserve the other project overrides.");
+            Assert.AreEqual("TenantDefault", afterFieldReset.FieldSources.Single(source => source.Field == "model").SourceLayer);
+
+            await service.ResetAsync(SkeletonAgentRole.Builder, projectScope, new SkeletonAgentProfileResetRequest
+            {
+                ExpectedRevision = fieldReset.CurrentRevision,
+                Scope = SkeletonAgentProfileResetScopes.Project,
+                Reason = "Remove the project override"
+            }, actorUserId: 8);
+            var afterProjectReset = (await service.ListEffectiveAsync(11, 101)).Single(profile => profile.Role == SkeletonAgentRole.Builder);
+            Assert.AreEqual("tenant-model", afterProjectReset.Model);
+            Assert.AreEqual("ollama", afterProjectReset.Provider);
+            Assert.IsTrue(afterProjectReset.FieldSources.All(source => source.SourceLayer != "ProjectOverride"));
+            Assert.HasCount(3, await service.ListHistoryAsync(SkeletonAgentRole.Builder, projectScope));
+        }
+        finally { TryDelete(root); }
+    }
+
+    [TestMethod]
+    public async Task ScopedProfiles_DoNotCrossTenantStorageBoundaries()
+    {
+        var (service, root) = Harness();
+        try
+        {
+            var tenantOne = new SkeletonAgentProfileScope { TenantId = 1 };
+            var draft = await service.GetDraftAsync(SkeletonAgentRole.Critic, tenantOne);
+            var saved = await service.SaveDraftAsync(SkeletonAgentRole.Critic, tenantOne, new SkeletonAgentProfileDraftWriteRequest
+            {
+                ExpectedRevision = draft.Revision,
+                Provider = "ollama",
+                Model = "tenant-one-only",
+                TimeoutSeconds = 30,
+                Skill = "Tenant one",
+                Personality = "Tenant one"
+            });
+            await service.PublishDraftAsync(SkeletonAgentRole.Critic, tenantOne, new SkeletonAgentProfilePublishRequest
+            {
+                ExpectedRevision = saved.CurrentRevision,
+                Reason = "Tenant one profile"
+            }, actorUserId: 7);
+
+            var tenantOneEffective = (await service.ListEffectiveAsync(1)).Single(profile => profile.Role == SkeletonAgentRole.Critic);
+            var tenantTwoEffective = (await service.ListEffectiveAsync(2)).Single(profile => profile.Role == SkeletonAgentRole.Critic);
+            Assert.AreEqual("tenant-one-only", tenantOneEffective.Model);
+            Assert.AreNotEqual("tenant-one-only", tenantTwoEffective.Model);
+            Assert.IsEmpty(await service.ListHistoryAsync(SkeletonAgentRole.Critic, new SkeletonAgentProfileScope { TenantId = 2 }));
         }
         finally { TryDelete(root); }
     }

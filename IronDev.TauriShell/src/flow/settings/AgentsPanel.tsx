@@ -18,6 +18,7 @@ const DETERMINISTIC_ROLES = ['Orchestrator'];
 
 export function AgentsPanel() {
   const session = useSessionContext();
+  const [profileScope, setProfileScope] = useState<'project' | 'tenant'>('project');
   const [profiles, setProfiles] = useState<SkeletonAgentProfile[]>([]);
   const [effectiveProfiles, setEffectiveProfiles] = useState<Record<string, EffectiveSkeletonAgentProfile>>({});
   const [drafts, setDrafts] = useState<Record<string, SkeletonAgentProfile>>({});
@@ -41,8 +42,8 @@ export function AgentsPanel() {
         session.client.listEffectiveAgentProfiles(session.config.selectedProjectId)
       ]);
       const editable = result.filter((profile) => !DETERMINISTIC_ROLES.includes(profile.role));
-      const persistedDrafts = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.getAgentProfileDraft(profile.role)] as const));
-      const publishedHistory = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.listAgentProfileHistory(profile.role, session.config.selectedProjectId)] as const));
+      const persistedDrafts = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.getAgentProfileDraft(profile.role, session.config.selectedProjectId, profileScope)] as const));
+      const publishedHistory = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.listAgentProfileHistory(profile.role, session.config.selectedProjectId, profileScope)] as const));
       setProfiles(result);
       setEffectiveProfiles(Object.fromEntries(effective.map((profile) => [profile.role, profile])));
       setDraftState(Object.fromEntries(persistedDrafts));
@@ -56,7 +57,7 @@ export function AgentsPanel() {
       setError(e instanceof Error ? e.message : 'Could not load agent profiles.');
       setState('error');
     }
-  }, [session.client, session.config.selectedProjectId]);
+  }, [profileScope, session.client, session.config.selectedProjectId]);
 
   useEffect(() => {
     void load();
@@ -80,7 +81,7 @@ export function AgentsPanel() {
           timeoutSeconds: draft.timeoutSeconds,
           skill: draft.skill,
           personality: draft.personality
-        });
+        }, session.config.selectedProjectId, profileScope);
         if (!outcome.succeeded) {
           setError(outcome.failureReason);
           return;
@@ -98,7 +99,7 @@ export function AgentsPanel() {
         setSavingRole(null);
       }
     },
-    [draftState, drafts, savingRole, session.client]
+    [draftState, drafts, profileScope, savingRole, session.client, session.config.selectedProjectId]
   );
 
   const testDraft = useCallback(async (role: string) => {
@@ -106,7 +107,7 @@ export function AgentsPanel() {
     setSavingRole(role);
     setError(null);
     try {
-      const outcome = await session.client.testAgentProfileDraft(role);
+      const outcome = await session.client.testAgentProfileDraft(role, session.config.selectedProjectId, profileScope);
       setNotice((previous) => ({ ...previous, [role]: outcome.summary || outcome.status }));
     } catch (e) {
       const body = e instanceof IronDevApiError ? (e.body as { failureReason?: string } | undefined) : undefined;
@@ -114,7 +115,7 @@ export function AgentsPanel() {
     } finally {
       setSavingRole(null);
     }
-  }, [savingRole, session.client]);
+  }, [profileScope, savingRole, session.client, session.config.selectedProjectId]);
 
   const publishDraft = useCallback(async (role: string) => {
     if (savingRole) return;
@@ -124,7 +125,7 @@ export function AgentsPanel() {
       const outcome = await session.client.publishAgentProfileDraft(role, {
         expectedRevision: draftState[role]?.revision ?? 0,
         reason: publishReasons[role]?.trim() ?? ''
-      });
+      }, session.config.selectedProjectId, profileScope);
       if (!outcome.succeeded) {
         setError(outcome.failureReason);
         return;
@@ -138,9 +139,9 @@ export function AgentsPanel() {
     } finally {
       setSavingRole(null);
     }
-  }, [draftState, load, publishReasons, savingRole, session.client]);
+  }, [draftState, load, profileScope, publishReasons, savingRole, session.client, session.config.selectedProjectId]);
 
-  const resetProfile = useCallback(async (role: string, scope: 'Field' | 'Agent') => {
+  const resetProfile = useCallback(async (role: string, scope: 'Field' | 'Project' | 'Tenant') => {
     if (savingRole) return;
     setSavingRole(role);
     setError(null);
@@ -150,7 +151,7 @@ export function AgentsPanel() {
         scope,
         field: scope === 'Field' ? (resetFields[role] || 'skill') : '',
         reason: recoveryReasons[role]?.trim() ?? ''
-      });
+      }, session.config.selectedProjectId, profileScope);
       setNotice((previous) => ({ ...previous, [role]: `Reset published as version ${outcome.publishedVersion?.version ?? ''}.` }));
       setRecoveryReasons((previous) => ({ ...previous, [role]: '' }));
       await load();
@@ -160,7 +161,7 @@ export function AgentsPanel() {
     } finally {
       setSavingRole(null);
     }
-  }, [draftState, load, recoveryReasons, resetFields, savingRole, session.client]);
+  }, [draftState, load, profileScope, recoveryReasons, resetFields, savingRole, session.client, session.config.selectedProjectId]);
 
   const restoreProfile = useCallback(async (role: string, version: number) => {
     if (savingRole) return;
@@ -170,7 +171,7 @@ export function AgentsPanel() {
       const outcome = await session.client.restoreAgentProfile(role, version, {
         expectedRevision: draftState[role]?.revision ?? 0,
         reason: recoveryReasons[role]?.trim() ?? ''
-      });
+      }, session.config.selectedProjectId, profileScope);
       setNotice((previous) => ({ ...previous, [role]: `Version ${version} restored as new version ${outcome.publishedVersion?.version ?? ''}.` }));
       setRecoveryReasons((previous) => ({ ...previous, [role]: '' }));
       await load();
@@ -180,7 +181,7 @@ export function AgentsPanel() {
     } finally {
       setSavingRole(null);
     }
-  }, [draftState, load, recoveryReasons, savingRole, session.client]);
+  }, [draftState, load, profileScope, recoveryReasons, savingRole, session.client, session.config.selectedProjectId]);
 
   const toggleComparison = (role: string, version: number) => {
     setComparisonVersions((previous) => {
@@ -202,6 +203,20 @@ export function AgentsPanel() {
   return (
     <div data-testid="flow.settings.agents">
       <p className="fl-plabel">Agents</p>
+      <div className="fl-segmented" role="group" aria-label="Profile scope" style={{ marginBottom: 10 }}>
+        <button
+          className={profileScope === 'project' ? 'active' : ''}
+          aria-pressed={profileScope === 'project'}
+          onClick={() => setProfileScope('project')}
+          data-testid="flow.settings.agents.scope.project"
+        >Project overrides</button>
+        <button
+          className={profileScope === 'tenant' ? 'active' : ''}
+          aria-pressed={profileScope === 'tenant'}
+          onClick={() => setProfileScope('tenant')}
+          data-testid="flow.settings.agents.scope.tenant"
+        >Tenant defaults</button>
+      </div>
       <p className="fl-empty" style={{ marginTop: 0 }}>
         Each agent can run a different model and carry its own skill and personality. A profile configures voice and model,
         never authority — and never a secret (keep API keys in your environment). The critic stays blind by contract no
@@ -353,9 +368,9 @@ export function AgentsPanel() {
                 <button
                   className="fl-btn"
                   disabled={savingRole !== null || !(recoveryReasons[profile.role]?.trim())}
-                  onClick={() => void resetProfile(profile.role, 'Agent')}
+                  onClick={() => void resetProfile(profile.role, profileScope === 'project' ? 'Project' : 'Tenant')}
                   data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.resetAgent`}
-                >Reset agent</button>
+                >{profileScope === 'project' ? 'Reset project override' : 'Reset tenant default'}</button>
               </div>
               <ProfileHistory
                 role={profile.role}
