@@ -69,6 +69,7 @@ import type {
   LoginResponse,
   PlannedSurfaceEnvelope,
   ProjectBoardReadModel,
+  ProjectGovernanceOverview,
   ProjectWorkItemReadModel,
   ProjectProvisioningReadinessUi,
   ProjectDocument,
@@ -385,6 +386,13 @@ class IronDevApiClient {
 
   async getProjectBoard(projectId: number, signal?: AbortSignal): Promise<ProjectBoardReadModel> {
     return this.request<ProjectBoardReadModel>(`/api/projects/${projectId}/board`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getProjectGovernanceOverview(projectId: number, signal?: AbortSignal): Promise<ProjectGovernanceOverview> {
+    return this.request<ProjectGovernanceOverview>(`/api/projects/${projectId}/governance/overview`, {
       method: 'GET',
       signal
     });

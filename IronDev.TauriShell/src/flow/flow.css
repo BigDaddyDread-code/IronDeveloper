@@ -3657,6 +3657,327 @@
   }
 }
 
+/* Governance control centre */
+.fl-governance {
+  min-width: 0;
+  display: grid;
+  gap: 24px;
+}
+
+.fl-governance__header {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 4px 0 24px;
+  border-bottom: 1px solid var(--fl-line);
+}
+
+.fl-governance__identity {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.fl-governance__title-row,
+.fl-governance__item-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.fl-governance__title-row h2,
+.fl-governance__section h3,
+.fl-governance__section h4,
+.fl-governance__section-issues h3 {
+  margin: 0;
+  letter-spacing: 0;
+  color: var(--fl-ink);
+}
+
+.fl-governance__title-row h2 {
+  font-size: 23px;
+  line-height: 1.2;
+}
+
+.fl-governance__summary,
+.fl-governance__generated,
+.fl-governance__section p,
+.fl-governance__section-issues ul,
+.fl-governance__boundary {
+  margin: 0;
+}
+
+.fl-governance__summary {
+  max-width: 760px;
+  color: var(--fl-ink);
+}
+
+.fl-governance__generated,
+.fl-governance__empty,
+.fl-governance__boundary {
+  color: var(--fl-muted);
+  font-size: 12px;
+}
+
+.fl-governance__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.fl-governance__section-issues {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-left: 3px solid var(--fl-gate);
+  background: var(--fl-gate-soft);
+}
+
+.fl-governance__section-issues h3 {
+  font-size: 15px;
+}
+
+.fl-governance__section-issues ul {
+  padding-left: 20px;
+  color: var(--fl-ink2);
+}
+
+.fl-governance__section {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.fl-governance__section > header {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--fl-line);
+}
+
+.fl-governance__section > header > div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.fl-governance__section > header h3 {
+  font-size: 16px;
+}
+
+.fl-governance__section > header span {
+  color: var(--fl-muted);
+  font-size: 12px;
+}
+
+.fl-governance__text-action {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--fl-blue);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fl-governance__text-action:hover {
+  text-decoration: underline;
+}
+
+.fl-governance__text-action:focus-visible {
+  outline: 2px solid var(--fl-blue);
+  outline-offset: 3px;
+}
+
+.fl-governance__attention-list,
+.fl-governance__compact-list {
+  display: grid;
+  gap: 10px;
+}
+
+.fl-governance__attention-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--fl-line);
+  border-left: 3px solid var(--fl-gate);
+  border-radius: 6px;
+  background: var(--fl-panel);
+}
+
+.fl-governance__attention-main {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.fl-governance__attention-card h4 {
+  font-size: 15px;
+}
+
+.fl-governance__attention-card p,
+.fl-governance__compact-list p {
+  color: var(--fl-ink2);
+  overflow-wrap: anywhere;
+}
+
+.fl-governance__item-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 6px 0 0;
+}
+
+.fl-governance__item-meta div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.fl-governance__item-meta dt {
+  color: var(--fl-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fl-governance__item-meta dd {
+  margin: 0;
+  color: var(--fl-ink);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.fl-governance__control-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 32px;
+}
+
+.fl-governance__control-group {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+}
+
+.fl-governance__control-group h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--fl-muted);
+}
+
+.fl-governance__control-group dl {
+  margin: 0;
+  display: grid;
+}
+
+.fl-governance__control-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(128px, 0.7fr) minmax(0, 1.3fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-top: 1px solid var(--fl-line);
+}
+
+.fl-governance__control-row dt,
+.fl-governance__control-row dd {
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.fl-governance__control-row dt span,
+.fl-governance__control-row dd strong {
+  color: var(--fl-ink);
+  overflow-wrap: anywhere;
+}
+
+.fl-governance__control-row dt small,
+.fl-governance__control-row dd span {
+  color: var(--fl-muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.fl-governance__lower-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+
+.fl-governance__compact-list article {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--fl-line);
+}
+
+.fl-governance__compact-list article:first-child {
+  padding-top: 0;
+}
+
+.fl-governance__compact-list footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--fl-muted);
+  font-size: 11px;
+}
+
+.fl-governance__boundary {
+  padding-top: 16px;
+  border-top: 1px solid var(--fl-line);
+}
+
+@media (max-width: 860px) {
+  .fl-governance__header,
+  .fl-governance__section > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fl-governance__actions {
+    justify-content: flex-start;
+  }
+
+  .fl-governance__control-groups,
+  .fl-governance__lower-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .fl-governance__actions,
+  .fl-governance__actions .fl-btn,
+  .fl-governance__attention-card > .fl-btn {
+    width: 100%;
+  }
+
+  .fl-governance__attention-card,
+  .fl-governance__control-row,
+  .fl-governance__item-meta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 440px) {
   .fl-member-row__admin {
     grid-template-columns: minmax(0, 1fr);
