@@ -31444,6 +31444,98 @@
         },
         "additionalProperties": false
       },
+      "SkeletonRunAgentConfigurationSnapshot": {
+        "required": [
+          "createdUtc",
+          "role",
+          "runId",
+          "snapshotId",
+          "workItemId"
+        ],
+        "type": "object",
+        "properties": {
+          "snapshotId": {
+            "type": "string",
+            "nullable": true
+          },
+          "workItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "runId": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "connectionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "controlledEndpointIdentity": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inputTokenLimit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "outputTokenLimit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "temperature": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "skillVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "skillHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "personalityVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "personalityHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveProfileHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SkeletonRunApplyAttemptTrace": {
         "type": "object",
         "properties": {
@@ -31844,6 +31936,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SkeletonRunTimelineEntry"
+            },
+            "nullable": true
+          },
+          "agentConfigurations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkeletonRunAgentConfigurationSnapshot"
             },
             "nullable": true
           },

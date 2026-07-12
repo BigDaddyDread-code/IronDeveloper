@@ -19,6 +19,9 @@ test('build stage renders the halted run and review renders the matrix and gate'
   await page.getByTestId('flow.workItem.primaryAction').click();
 
   await expect(page.getByTestId('flow.build.status')).toContainText('PausedForApproval');
+  await expect(page.getByTestId('flow.build.agentConfigurations')).toContainText('Builder');
+  await expect(page.getByTestId('flow.build.agentConfigurations')).toContainText('OpenAI/gpt-4o-mini');
+  await expect(page.getByTestId('flow.build.agentConfigurations')).toContainText('grant no authority');
   await expect(page.getByTestId('flow.build.testAuthoring')).toContainText('1 test(s) authored');
   await expect(page.getByTestId('flow.build.timeline')).toContainText('ApprovalRequiredHalt');
   await expect(page.getByTestId('flow.workItem.gate')).toContainText('Halt is not approval');
@@ -400,6 +403,29 @@ async function mockSkeletonRun(
         initialProposal: options.withRepair
           ? { proposalId: `prop-${RUN_ID}`, fileChangeCount: 1, evidenceRef: 'evidence/proposal.json', evidenceExistsOnDisk: true }
           : null,
+        agentConfigurations: [
+          {
+            snapshotId: 'snapshot-builder-1',
+            workItemId: 42,
+            runId: RUN_ID,
+            role: 'Builder',
+            connectionId: 'default',
+            provider: 'OpenAI',
+            controlledEndpointIdentity: 'default',
+            model: 'gpt-4o-mini',
+            timeoutSeconds: 60,
+            inputTokenLimit: null,
+            outputTokenLimit: null,
+            temperature: null,
+            skillVersion: 'sha256:skill',
+            skillHash: 'sha256:skill',
+            personalityVersion: 'sha256:personality',
+            personalityHash: 'sha256:personality',
+            effectiveProfileHash: 'sha256:1234567890abcdef',
+            createdUtc: '2026-07-12T00:00:00Z',
+            boundary: 'Immutable non-secret provenance.'
+          }
+        ],
         repairAttempts: options.withRepair
           ? [
               {

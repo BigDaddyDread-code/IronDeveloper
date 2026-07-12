@@ -20,6 +20,7 @@ public sealed record SkeletonRunReport
     public string Status { get; init; } = string.Empty;
     public string Summary { get; init; } = string.Empty;
     public IReadOnlyList<SkeletonRunTimelineEntry> Timeline { get; init; } = [];
+    public IReadOnlyList<SkeletonRunAgentConfigurationSnapshot> AgentConfigurations { get; init; } = [];
 
     /// <summary>
     /// The FINAL/CURRENT proposal — the one that produced the evidence at the gate
@@ -81,6 +82,33 @@ public sealed record SkeletonRunReport
     public const string BoundaryText =
         "A report is reconstruction from durable evidence. It grants nothing, approves nothing, " +
         "and cannot alter the run. Unverifiable links are named as gaps, never patched over.";
+}
+
+public sealed record SkeletonRunAgentConfigurationSnapshot
+{
+    public required string SnapshotId { get; init; }
+    public required long WorkItemId { get; init; }
+    public required string RunId { get; init; }
+    public required string Role { get; init; }
+    public string ConnectionId { get; init; } = string.Empty;
+    public string Provider { get; init; } = string.Empty;
+    public string ControlledEndpointIdentity { get; init; } = string.Empty;
+    public string Model { get; init; } = string.Empty;
+    public int TimeoutSeconds { get; init; }
+    public int? InputTokenLimit { get; init; }
+    public int? OutputTokenLimit { get; init; }
+    public double? Temperature { get; init; }
+    public string SkillVersion { get; init; } = string.Empty;
+    public string SkillHash { get; init; } = string.Empty;
+    public string PersonalityVersion { get; init; } = string.Empty;
+    public string PersonalityHash { get; init; } = string.Empty;
+    public string EffectiveProfileHash { get; init; } = string.Empty;
+    public required DateTimeOffset CreatedUtc { get; init; }
+    public string Boundary { get; init; } = BoundaryText;
+
+    public const string BoundaryText =
+        "A run configuration snapshot is immutable non-secret provenance. It grants no capability, " +
+        "satisfies no gate, and never contains credentials or retrievable secret references.";
 }
 
 public sealed record SkeletonRunTimelineEntry

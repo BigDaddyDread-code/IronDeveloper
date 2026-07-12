@@ -87,7 +87,12 @@ public sealed class AlphaLoopSmokeTests
                 ["DisposableBuild:EvidenceRoot"] = evidenceRoot,
                 ["DisposableBuild:WorkspaceRoot"] = workspaceParent,
                 ["DisposableBuild:BuildTimeoutSeconds"] = "300",
-                ["DisposableBuild:TestTimeoutSeconds"] = "300"
+                ["DisposableBuild:TestTimeoutSeconds"] = "300",
+                ["AgentProfiles:Root"] = Path.Combine(evidenceRoot, "agent-profiles"),
+                ["Ai:Provider"] = "fake",
+                ["Ai:Model"] = "deterministic-alpha",
+                ["Ai:TimeoutSeconds"] = "60",
+                ["AgentProfiles:AllowFakeProvider"] = "true"
             }).Build();
 
             var service = new TicketSkeletonRunService(
@@ -110,6 +115,7 @@ public sealed class AlphaLoopSmokeTests
                 new EmptyTestAuthoring(),
                 new SkeletonMutationLeaseService(configuration),
                 new StubProjectMembershipService(),
+                new SkeletonAgentProfileService(configuration),
                 configuration);
 
             var run = await service.StartAsync(ProjectId, TicketId);
@@ -215,7 +221,12 @@ public sealed class AlphaLoopSmokeTests
                 ["DisposableBuild:WorkspaceRoot"] = workspaceParent,
                 ["DisposableBuild:BuildTimeoutSeconds"] = "300",
                 ["DisposableBuild:TestTimeoutSeconds"] = "300",
-                ["SkeletonApply:Enabled"] = "true"
+                ["SkeletonApply:Enabled"] = "true",
+                ["AgentProfiles:Root"] = Path.Combine(evidenceRoot, "agent-profiles"),
+                ["Ai:Provider"] = "fake",
+                ["Ai:Model"] = "deterministic-alpha",
+                ["Ai:TimeoutSeconds"] = "60",
+                ["AgentProfiles:AllowFakeProvider"] = "true"
             }).Build();
 
             var service = new TicketSkeletonRunService(
@@ -238,6 +249,7 @@ public sealed class AlphaLoopSmokeTests
                 new EmptyTestAuthoring(),
                 new SkeletonMutationLeaseService(configuration),
                 new StubProjectMembershipService(),
+                new SkeletonAgentProfileService(configuration),
                 configuration);
 
             var run = await service.StartAsync(ProjectId, TicketId);
