@@ -48,6 +48,7 @@ test.describe('LocalTest manual flow-shell smoke', () => {
 
     await page.getByTestId('flow.userMenu').click();
     await page.getByTestId('flow.nav.settings').click();
+    await page.getByTestId('flow.settings.section.safety').click();
     await expect(page.getByTestId('flow.settings.banner')).toContainText('never mutation authority');
     await expect(page.getByText('bob@irondev.local')).toBeVisible({ timeout: 15_000 });
     notes.push('Settings lists the seeded tenant membership from the tenant users API.');

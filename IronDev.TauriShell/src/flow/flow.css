@@ -97,6 +97,36 @@
   font-size: 12px;
 }
 
+.fl-settings-hub {
+  display: flex;
+  gap: 4px;
+  margin: 18px 0 16px;
+  padding-bottom: 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--fl-line);
+}
+
+.fl-settings-hub button {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  color: var(--fl-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fl-settings-hub button.fl-on {
+  color: var(--fl-ink);
+  border-bottom-color: var(--fl-gate);
+}
+
+.fl-settings-section {
+  min-height: 320px;
+}
+
 .fl-brand-proj {
   font-weight: 400;
   color: var(--fl-ink2);
