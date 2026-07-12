@@ -1,0 +1,42 @@
+name: documentation-contract-ci
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-contract-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  documentation-contract-ci:
+    name: Documentation links and truth contracts
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Documentation contract checks
+        shell: pwsh
+        run: ./Scripts/ci/run-documentation-contract-ci.ps1
+
+      - name: Verify evidence artifacts are sanitized
+        if: always()
+        id: artifact-safety
+        shell: pwsh
+        run: ./Scripts/ci/test-ci-evidence-artifact-safety.ps1 -ArtifactDirectory artifacts/ci/documentation-contract
+
+      - name: Upload documentation contract evidence
+        if: ${{ always() && steps.artifact-safety.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-contract-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ci/documentation-contract
+          retention-days: 14
+          if-no-files-found: error

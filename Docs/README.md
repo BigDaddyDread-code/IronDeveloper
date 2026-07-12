@@ -8,6 +8,7 @@ Start with:
 - [Cleanup and Product Completion Plan](product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md) for cleanup-era product status.
 - [Canonical Architecture Index](architecture/CANONICAL_ARCHITECTURE_INDEX.md) for architecture authority by domain.
 - [Documentation Truth Inventory](cleanup/DOCUMENTATION_TRUTH_INVENTORY.md) for the status and owner of every document.
+- [Terminology Deprecation Map](cleanup/TERMINOLOGY_DEPRECATION_MAP.md) for current product language and compatibility boundaries.
 
 ## Canonical Structure
 

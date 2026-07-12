@@ -1,17 +1,16 @@
 # IronDev CI Execution Map
 
 **Status:** Canonical executable CI map
-**Verified against:** CLN-01A branch after `main` at `17a75a77`
-**Last verified:** 12 July 2026
+**Verified against:** CLN-07 documentation contract lane
+**Last verified:** 13 July 2026
 
 This map describes commands GitHub Actions actually executes. Workflow names, test discovery, category listing, local scripts, and manual evidence do not count as execution unless a runner invokes them.
 
 ## Shared Contract
 
-All seven pull-request workflows:
+All eight pull-request workflows:
 
 - run from checked-out repository content;
-- pin .NET SDK `10.0.301`;
 - emit evidence beneath `artifacts/ci/{lane}`;
 - run `Scripts/ci/test-ci-evidence-artifact-safety.ps1` even when the primary lane fails;
 - upload sanitized evidence for 14 days only when artifact safety passes;
@@ -31,6 +30,7 @@ No workflow is triggered by a push to `main`. Every workflow supports `workflow_
 | `full-sql-integration-ci` | Ubuntu + SQL Server 2022 | `main`, legacy governance/CI branches | `run-full-sql-integration-ci.ps1` | Clean migration/API baseline plus named SQL, release, demo, repair, revision, category, catalog, and secret-scan proofs | Yes | `artifacts/ci/full-sql-integration` |
 | `frontend-contract-ci` | Windows | `main` | `run-frontend-contract-ci.ps1` | TypeScript type-check and two OpenAPI/generated-client drift checks | No | `artifacts/ci/frontend-contract` |
 | `frontend-behavior-ci` | Windows | `main` | `run-frontend-behavior-ci.ps1` | Production Vite build and 158 current-product Playwright tests in 18 explicit files | No | `artifacts/ci/frontend-behavior` |
+| `documentation-contract-ci` | Windows | `main` | `run-documentation-contract-ci.ps1` | Documentation inventory, links, identities, status banners, terminology, product routes, and canonical references | No | `artifacts/ci/documentation-contract` |
 
 ## Lane Detail
 
@@ -154,6 +154,16 @@ The lane fails when:
 
 The explicit inventory covers entry, routing, setup, Board, Workshop, Work Item, Documents, Tools, Members, Governance, Audit through the flow-shell contract, agent profiles, AI connections, and product identity. It does not claim ownership of the remaining historical/component Playwright files.
 
+### `documentation-contract-ci`
+
+The workflow runs the repository PowerShell contract directly, with no database, Node, browser, or .NET dependency:
+
+```powershell
+.\Scripts\ci\run-documentation-contract-ci.ps1
+```
+
+The lane requires exact equality between Markdown files and inventory rows, validates every local Markdown target, rejects duplicate Canonical/Supporting H1 identities, checks direct status banners for non-current documents, rejects unambiguous deprecated terminology in canonical/user-facing sources, validates canonical product-route references against the current route contract, and checks documentation entry-point links. It emits a JSON report, runs the shared artifact-safety scan even on failure, and retains sanitized evidence for 14 days.
+
 ## Retry and Quarantine Truth
 
 | Behavior | Current truth |
@@ -209,6 +219,7 @@ The live LocalTest Playwright smoke and non-author Tauri walk require a supporte
 | Migration and named release/database proofs | `full-sql-integration-ci` | CLN-08 resolves unowned category members. |
 | TypeScript/OpenAPI contract | `frontend-contract-ci` | None from CLN-01A. |
 | Current-product frontend behavior and bundle | `frontend-behavior-ci` | CLN-08 assigns remaining historical/component files. |
+| Documentation truth and links | `documentation-contract-ci` | CLN-04 through CLN-07 establish a zero-defect baseline. |
 | Live LocalTest | Manual test contract | Preserve as real-stack evidence. |
 | Tauri desktop | Non-author qualification | Preserve as human release gate. |
 
