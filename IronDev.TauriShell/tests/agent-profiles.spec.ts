@@ -30,6 +30,23 @@ test('agents panel edits a model and voice as a versioned draft', async ({ page 
   expect(state.lastUpdate.role.toLowerCase()).toBe('tester');
   expect(state.lastUpdate.body.provider).toBe('ollama');
   expect(state.lastUpdate.body.model).toBe('llama3');
+  expect(state.lastUpdate.url).toContain('scope=project');
+});
+
+test('agents panel switches explicitly between project overrides and tenant defaults', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockWorkspace(page);
+  await mockAgentProfiles(page);
+
+  await page.goto('/');
+  await page.getByTestId('flow.userMenu').click();
+  await page.getByTestId('flow.nav.settings').click();
+  await page.getByTestId('flow.settings.section.agents').click();
+
+  await expect(page.getByTestId('flow.settings.agents.scope.project')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('flow.settings.agents.scope.tenant').click();
+  await expect(page.getByTestId('flow.settings.agents.scope.tenant')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('flow.settings.agent.builder')).toBeVisible();
 });
 
 test('the orchestrator card is honest — deterministic, no model to configure', async ({ page }) => {
@@ -145,13 +162,13 @@ test('settings advanced shows honest product and runtime identity', async ({ pag
 });
 
 interface AgentState {
-  lastUpdate: { role: string; body: Record<string, unknown> };
+  lastUpdate: { role: string; body: Record<string, unknown>; url: string };
   revision: number;
   publishedVersion: number;
 }
 
 async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; refuseSecret?: boolean } = {}): Promise<AgentState> {
-  const state: AgentState = { lastUpdate: { role: '', body: {} }, revision: 0, publishedVersion: 0 };
+  const state: AgentState = { lastUpdate: { role: '', body: {}, url: '' }, revision: 0, publishedVersion: 0 };
   const roleName = (role: string | number) => {
     if (role === 4 || role === 'Analyst') return 'Workshop guide';
     if (role === 1) return 'Builder';
@@ -223,7 +240,7 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
     });
   });
 
-  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/draft$/i, async (route) => {
+  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/draft(?:\?.*)?$/i, async (route) => {
     const role = route.request().url().split('/agent-profiles/')[1].split('/')[0];
     if (route.request().method() === 'GET') {
       const current = profile(role);
@@ -250,7 +267,7 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
     }
 
     const body = route.request().postDataJSON() as Record<string, unknown>;
-    state.lastUpdate = { role, body };
+    state.lastUpdate = { role, body, url: route.request().url() };
     if (options.refuseSecret) {
       await route.fulfill({
         status: 409,
@@ -281,11 +298,11 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
     });
   });
 
-  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/draft\/test$/i, async (route) => {
+  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/draft\/test(?:\?.*)?$/i, async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ succeeded: true, status: 'Passed', failureReason: '', validationIssues: [], executedAtUtc: '2026-07-12T00:02:00Z', summary: 'Draft configuration passed. No provider request was sent.', boundary: 'Voice and model, never authority.' }) });
   });
 
-  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/draft\/publish$/i, async (route) => {
+  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/draft\/publish(?:\?.*)?$/i, async (route) => {
     const role = route.request().url().split('/agent-profiles/')[1].split('/')[0];
     state.revision += 1;
     state.publishedVersion += 1;
@@ -313,14 +330,14 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
     });
   });
 
-  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/reset$/i, async (route) => {
+  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/reset(?:\?.*)?$/i, async (route) => {
     const role = route.request().url().split('/agent-profiles/')[1].split('/')[0];
     state.revision += 1;
     state.publishedVersion += 1;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ succeeded: true, code: '', failureReason: '', currentRevision: state.revision, publishedVersion: { version: state.publishedVersion, role, values: {}, reason: 'reset', actorUserId: 7, publishedAtUtc: '2026-07-12T00:04:00Z' }, profile: profile(role) }) });
   });
 
-  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/history\/\d+\/restore$/i, async (route) => {
+  await page.route(/\/api\/v1\/agent-profiles\/[a-z]+\/history\/\d+\/restore(?:\?.*)?$/i, async (route) => {
     const role = route.request().url().split('/agent-profiles/')[1].split('/')[0];
     state.revision += 1;
     state.publishedVersion += 1;
@@ -329,7 +346,7 @@ async function mockAgentProfiles(page: Page, options: { numericRoles?: boolean; 
 
   await page.route(/\/api\/v1\/agent-profiles\/[a-z]+$/i, async (route) => {
     const role = route.request().url().split('/agent-profiles/')[1];
-    state.lastUpdate = { role, body: route.request().postDataJSON() as Record<string, unknown> };
+    state.lastUpdate = { role, body: route.request().postDataJSON() as Record<string, unknown>, url: route.request().url() };
     if (options.refuseSecret) {
       await route.fulfill({
         status: 400,

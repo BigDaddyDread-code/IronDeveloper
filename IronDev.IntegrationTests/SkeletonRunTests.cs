@@ -950,8 +950,9 @@ public sealed class SkeletonRunTests
     public async Task RunConfigurationSnapshot_LinksTheExactPublishedProfileVersion()
     {
         var harness = SkeletonHarness.Create();
-        var draft = await harness.Profiles.GetDraftAsync(SkeletonAgentRole.Builder);
-        var saved = await harness.Profiles.SaveDraftAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfileDraftWriteRequest
+        var profileScope = new SkeletonAgentProfileScope { TenantId = 1, ProjectId = ProjectId };
+        var draft = await harness.Profiles.GetDraftAsync(SkeletonAgentRole.Builder, profileScope);
+        var saved = await harness.Profiles.SaveDraftAsync(SkeletonAgentRole.Builder, profileScope, new SkeletonAgentProfileDraftWriteRequest
         {
             ExpectedRevision = draft.Revision,
             Provider = "ollama",
@@ -960,7 +961,7 @@ public sealed class SkeletonRunTests
             Skill = "Use the confirmed contract.",
             Personality = "Direct."
         });
-        var published = await harness.Profiles.PublishDraftAsync(SkeletonAgentRole.Builder, new SkeletonAgentProfilePublishRequest
+        var published = await harness.Profiles.PublishDraftAsync(SkeletonAgentRole.Builder, profileScope, new SkeletonAgentProfilePublishRequest
         {
             ExpectedRevision = saved.CurrentRevision,
             Reason = "Use the local Builder profile."
@@ -972,6 +973,7 @@ public sealed class SkeletonRunTests
 
         var builder = report!.AgentConfigurations.Single(snapshot => snapshot.Role == "Builder");
         Assert.AreEqual(1L, builder.ProfileVersion);
+        Assert.AreEqual("Project", builder.ProfileScopeLayer);
         Assert.AreEqual("ollama", builder.Provider);
         Assert.AreEqual("llama3", builder.Model);
     }

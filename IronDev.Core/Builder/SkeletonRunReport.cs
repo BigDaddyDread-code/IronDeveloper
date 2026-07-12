@@ -91,6 +91,7 @@ public sealed record SkeletonRunAgentConfigurationSnapshot
     public required string RunId { get; init; }
     public required string Role { get; init; }
     public long? ProfileVersion { get; init; }
+    public string ProfileScopeLayer { get; init; } = string.Empty;
     public string ConnectionId { get; init; } = string.Empty;
     public string Provider { get; init; } = string.Empty;
     public string ControlledEndpointIdentity { get; init; } = string.Empty;

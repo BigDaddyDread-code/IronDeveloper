@@ -269,6 +269,9 @@ public sealed record SkeletonAgentProfilePublishedVersion
     public required string Reason { get; init; }
     public required int ActorUserId { get; init; }
     public required DateTimeOffset PublishedAtUtc { get; init; }
+    public string ScopeLayer { get; init; } = "LegacyRole";
+    public int? TenantId { get; init; }
+    public int? ProjectId { get; init; }
 }
 
 public sealed record SkeletonAgentProfileRunUsage
@@ -319,6 +322,13 @@ public static class SkeletonAgentProfileResetScopes
     public const string Tenant = "Tenant";
 }
 
+public sealed record SkeletonAgentProfileScope
+{
+    public required int TenantId { get; init; }
+    public int? ProjectId { get; init; }
+    public string Layer => ProjectId is > 0 ? "Project" : "Tenant";
+}
+
 public sealed record SkeletonAgentProfileResetRequest
 {
     public required long ExpectedRevision { get; init; }
@@ -358,6 +368,7 @@ public sealed record EffectiveSkeletonAgentProfile
     public string? TenantProfileVersion { get; init; }
     public string? ProjectProfileVersion { get; init; }
     public long? PublishedVersion { get; init; }
+    public string PublishedScopeLayer { get; init; } = string.Empty;
     public required string EffectiveHash { get; init; }
     public string Boundary { get; init; } = SkeletonAgentProfile.BoundaryText;
 }
@@ -378,10 +389,17 @@ public interface ISkeletonAgentProfileService
         CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileOutcome> UpdateAsync(SkeletonAgentRole role, SkeletonAgentProfileUpdate update, CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileDraft> GetDraftAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraft> GetDraftAsync(SkeletonAgentRole role, SkeletonAgentProfileScope scope, CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileDraftOutcome> SaveDraftAsync(SkeletonAgentRole role, SkeletonAgentProfileDraftWriteRequest request, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftOutcome> SaveDraftAsync(SkeletonAgentRole role, SkeletonAgentProfileScope scope, SkeletonAgentProfileDraftWriteRequest request, CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileDraftTestOutcome> TestDraftAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftTestOutcome> TestDraftAsync(SkeletonAgentRole role, SkeletonAgentProfileScope scope, CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileDraftOutcome> PublishDraftAsync(SkeletonAgentRole role, SkeletonAgentProfilePublishRequest request, int actorUserId, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftOutcome> PublishDraftAsync(SkeletonAgentRole role, SkeletonAgentProfileScope scope, SkeletonAgentProfilePublishRequest request, int actorUserId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SkeletonAgentProfilePublishedVersion>> ListHistoryAsync(SkeletonAgentRole role, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SkeletonAgentProfilePublishedVersion>> ListHistoryAsync(SkeletonAgentRole role, SkeletonAgentProfileScope scope, CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileDraftOutcome> ResetAsync(SkeletonAgentRole role, SkeletonAgentProfileResetRequest request, int actorUserId, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftOutcome> ResetAsync(SkeletonAgentRole role, SkeletonAgentProfileScope scope, SkeletonAgentProfileResetRequest request, int actorUserId, CancellationToken cancellationToken = default);
     Task<SkeletonAgentProfileDraftOutcome> RestoreAsync(SkeletonAgentRole role, long version, SkeletonAgentProfileRestoreRequest request, int actorUserId, CancellationToken cancellationToken = default);
+    Task<SkeletonAgentProfileDraftOutcome> RestoreAsync(SkeletonAgentRole role, SkeletonAgentProfileScope scope, long version, SkeletonAgentProfileRestoreRequest request, int actorUserId, CancellationToken cancellationToken = default);
 }
