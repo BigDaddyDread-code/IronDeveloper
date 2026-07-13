@@ -10,7 +10,7 @@ import type {
 import { StatusBadge } from '../../components/StatusBadge';
 import { useSessionContext } from '../../state/useSessionContext';
 import { RouteOutcomeScreen } from '../components/RouteOutcomeScreen';
-import { governancePath, navigateProductPath, type GovernanceSection } from '../navigation/productRoutes';
+import { governancePath, navigateProductPath, safeProjectProductPath, type GovernanceSection } from '../navigation/productRoutes';
 import { governanceViewers } from './governanceRoutes';
 
 type LoadState = 'loading' | 'ready' | 'notFound' | 'unavailable';
@@ -75,16 +75,16 @@ export function GovernanceOverview({ projectId, section = 'overview' }: { projec
 }
 
 function GovernanceOverviewContent({ model, section }: { model: ProjectGovernanceOverviewModel; section: GovernanceSection }) {
+  const projectId = model.projectId ?? 0;
   const attention = model.attentionItems ?? [];
   const controls = model.controls ?? [];
   const exceptions = model.exceptions ?? [];
   const decisions = model.recentDecisions ?? [];
   const sectionIssues = model.sectionIssues ?? [];
   const groupedControls = useMemo(() => groupControls(controls), [controls]);
-  const primaryTarget = safeProductRoute(model.primaryAction.targetRoute);
-  const auditTarget = safeProductRoute(model.navigation.audit);
-  const settingsTarget = safeProductRoute(model.navigation.settings);
-  const projectId = model.projectId ?? 0;
+  const primaryTarget = safeProductRoute(model.primaryAction.targetRoute, projectId);
+  const auditTarget = safeProductRoute(model.navigation.audit, projectId);
+  const settingsTarget = safeProductRoute(model.navigation.settings, projectId);
 
   return (
     <main className="fl-governance" data-testid="flow.governance.overview">
@@ -153,14 +153,14 @@ function GovernanceOverviewContent({ model, section }: { model: ProjectGovernanc
         title="Needs attention"
         count={attention.length}
         actionLabel="View exceptions"
-        actionTarget={safeProductRoute(model.navigation.exceptions)}
+        actionTarget={safeProductRoute(model.navigation.exceptions, projectId)}
         testId="flow.governance.attention"
       >
         {attention.length === 0 ? (
           <EmptySection>No governance action is waiting.</EmptySection>
         ) : (
           <div className="fl-governance__attention-list">
-            {attention.map((item) => <AttentionCard key={`${item.workItemId}-${item.kind}`} item={item} />)}
+            {attention.map((item) => <AttentionCard key={`${item.workItemId}-${item.kind}`} item={item} projectId={projectId} />)}
           </div>
         )}
       </GovernanceSection> : null}
@@ -169,7 +169,7 @@ function GovernanceOverviewContent({ model, section }: { model: ProjectGovernanc
         title="Effective controls"
         count={controls.length}
         actionLabel="View all controls"
-        actionTarget={safeProductRoute(model.navigation.controls)}
+        actionTarget={safeProductRoute(model.navigation.controls, projectId)}
         testId="flow.governance.controls"
       >
         <div className="fl-governance__control-groups">
@@ -200,11 +200,11 @@ function GovernanceOverviewContent({ model, section }: { model: ProjectGovernanc
           title="Exceptions and degraded states"
           count={exceptions.length}
           actionLabel="View all exceptions"
-          actionTarget={safeProductRoute(model.navigation.exceptions)}
+          actionTarget={safeProductRoute(model.navigation.exceptions, projectId)}
           testId="flow.governance.exceptions"
         >
           {exceptions.length === 0 ? <EmptySection>No active governance exceptions are recorded.</EmptySection> : (
-            <div className="fl-governance__compact-list">{exceptions.slice(0, 5).map((item) => <ExceptionRow key={item.id ?? `${item.category}-${item.workItemId}`} item={item} />)}</div>
+            <div className="fl-governance__compact-list">{exceptions.slice(0, 5).map((item) => <ExceptionRow key={item.id ?? `${item.category}-${item.workItemId}`} item={item} projectId={projectId} />)}</div>
           )}
         </GovernanceSection>
 
@@ -212,11 +212,11 @@ function GovernanceOverviewContent({ model, section }: { model: ProjectGovernanc
           title="Recent decisions"
           count={decisions.length}
           actionLabel="View decisions"
-          actionTarget={safeProductRoute(model.navigation.decisions)}
+          actionTarget={safeProductRoute(model.navigation.decisions, projectId)}
           testId="flow.governance.decisions"
         >
           {decisions.length === 0 ? <EmptySection>No consequential decisions were returned.</EmptySection> : (
-            <div className="fl-governance__compact-list">{decisions.slice(0, 5).map((item) => <DecisionRow key={item.id ?? `${item.kind}-${item.workItemId}`} item={item} />)}</div>
+            <div className="fl-governance__compact-list">{decisions.slice(0, 5).map((item) => <DecisionRow key={item.id ?? `${item.kind}-${item.workItemId}`} item={item} projectId={projectId} />)}</div>
           )}
         </GovernanceSection>
       </div> : null}
@@ -230,7 +230,7 @@ function GovernanceOverviewContent({ model, section }: { model: ProjectGovernanc
           testId="flow.governance.exceptions.detail"
         >
           {exceptions.length === 0 ? <EmptySection>No active governance exceptions are recorded.</EmptySection> : (
-            <div className="fl-governance__detail-list">{exceptions.map((item) => <ExceptionRow key={item.id ?? `${item.category}-${item.workItemId}`} item={item} />)}</div>
+            <div className="fl-governance__detail-list">{exceptions.map((item) => <ExceptionRow key={item.id ?? `${item.category}-${item.workItemId}`} item={item} projectId={projectId} />)}</div>
           )}
         </GovernanceSection>
       ) : null}
@@ -244,7 +244,7 @@ function GovernanceOverviewContent({ model, section }: { model: ProjectGovernanc
           testId="flow.governance.decisions.detail"
         >
           {decisions.length === 0 ? <EmptySection>No consequential decisions were returned.</EmptySection> : (
-            <div className="fl-governance__detail-list">{decisions.map((item) => <DecisionRow key={item.id ?? `${item.kind}-${item.workItemId}`} item={item} />)}</div>
+            <div className="fl-governance__detail-list">{decisions.map((item) => <DecisionRow key={item.id ?? `${item.kind}-${item.workItemId}`} item={item} projectId={projectId} />)}</div>
           )}
         </GovernanceSection>
       ) : null}
@@ -323,8 +323,8 @@ function GovernanceSection({ title, count, actionLabel, actionTarget, testId, ch
   );
 }
 
-function AttentionCard({ item }: { item: ProjectGovernanceAttentionItem }) {
-  const target = safeProductRoute(item.targetRoute);
+function AttentionCard({ item, projectId }: { item: ProjectGovernanceAttentionItem; projectId: number }) {
+  const target = safeProductRoute(item.targetRoute, projectId);
   return (
     <article className="fl-governance__attention-card">
       <div className="fl-governance__attention-main">
@@ -345,8 +345,8 @@ function AttentionCard({ item }: { item: ProjectGovernanceAttentionItem }) {
   );
 }
 
-function ExceptionRow({ item }: { item: ProjectGovernanceException }) {
-  const target = safeProductRoute(item.targetRoute);
+function ExceptionRow({ item, projectId }: { item: ProjectGovernanceException; projectId: number }) {
+  const target = safeProductRoute(item.targetRoute, projectId);
   return (
     <article>
       <div className="fl-governance__item-heading"><strong>{text(item.title, 'Governance exception')}</strong><StatusBadge status={severityTone(item.severity)}>{severityLabel(item.severity)}</StatusBadge></div>
@@ -356,8 +356,8 @@ function ExceptionRow({ item }: { item: ProjectGovernanceException }) {
   );
 }
 
-function DecisionRow({ item }: { item: ProjectGovernanceDecision }) {
-  const target = safeProductRoute(item.targetRoute);
+function DecisionRow({ item, projectId }: { item: ProjectGovernanceDecision; projectId: number }) {
+  const target = safeProductRoute(item.targetRoute, projectId);
   return (
     <article>
       <strong>{text(item.summary, 'Consequential decision')}</strong>
@@ -384,7 +384,7 @@ function governanceSectionTarget(model: ProjectGovernanceOverviewModel, section:
   const backendTarget = section === 'overview'
     ? model.navigation.overview
     : model.navigation[section];
-  return safeProductRoute(backendTarget) ?? governancePath(projectId, section);
+  return safeProductRoute(backendTarget, projectId) ?? governancePath(projectId, section);
 }
 
 function detailDescription(section: GovernanceSection) {
@@ -395,9 +395,8 @@ function detailDescription(section: GovernanceSection) {
   return '';
 }
 
-function safeProductRoute(value: string | null | undefined): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
-  return value;
+function safeProductRoute(value: string | null | undefined, projectId: number): string | null {
+  return safeProjectProductPath(value, projectId);
 }
 
 function statusTone(status: string | null | undefined): 'ready' | 'warning' | 'danger' | 'neutral' {

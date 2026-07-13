@@ -173,6 +173,7 @@ public class TicketServiceIntegrationTests : IntegrationTestBase
         var referenceService = scope.ServiceProvider.GetRequiredService<IArtifactSourceReferenceService>();
 
         var projectId = await SeedProjectAsync();
+        var (sourceChatSessionId, sourceChatMessageId) = await SeedChatSourceAsync(projectId);
 
         var ticketId = await ticketService.SaveTicketAsync(new ProjectTicket
         {
@@ -183,8 +184,8 @@ public class TicketServiceIntegrationTests : IntegrationTestBase
             Priority = "Medium",
             Status = "Draft",
             Content = "Traceability test",
-            SourceChatSessionId = 3003,
-            SourceChatMessageId = 4004
+            SourceChatSessionId = sourceChatSessionId,
+            SourceChatMessageId = sourceChatMessageId
         });
 
         var references = await referenceService.GetForArtifactAsync(
@@ -196,11 +197,11 @@ public class TicketServiceIntegrationTests : IntegrationTestBase
         Assert.HasCount(2, references);
         Assert.IsTrue(references.Any(r =>
             r.SourceType == "ChatSession" &&
-            r.SourceId == 3003 &&
+            r.SourceId == sourceChatSessionId &&
             r.ReferenceType == "CreatedFrom"));
         Assert.IsTrue(references.Any(r =>
             r.SourceType == "ChatMessage" &&
-            r.SourceId == 4004 &&
+            r.SourceId == sourceChatMessageId &&
             r.ReferenceType == "CreatedFrom"));
     }
 
@@ -208,6 +209,7 @@ public class TicketServiceIntegrationTests : IntegrationTestBase
     public async Task TicketTraceability_WithLegacySchema_ShouldSelfHealColumnsAndReferenceTable()
     {
         var projectId = await SeedProjectAsync();
+        var (sourceChatSessionId, sourceChatMessageId) = await SeedChatSourceAsync(projectId);
 
         await using (var connection = new SqlConnection(ConnectionString))
         {
@@ -237,17 +239,34 @@ public class TicketServiceIntegrationTests : IntegrationTestBase
             Priority = "Medium",
             Status = "Draft",
             Content = "Legacy schema self-heal test",
-            SourceChatSessionId = 9009,
-            SourceChatMessageId = 9010
+            SourceChatSessionId = sourceChatSessionId,
+            SourceChatMessageId = sourceChatMessageId
         });
 
         var loaded = await ticketService.GetTicketByIdAsync(ticketId);
         var references = await referenceService.GetForArtifactAsync(1, projectId, "Ticket", ticketId);
 
         Assert.IsNotNull(loaded);
-        Assert.AreEqual(9009, loaded.SourceChatSessionId);
-        Assert.AreEqual(9010, loaded.SourceChatMessageId);
+        Assert.AreEqual(sourceChatSessionId, loaded.SourceChatSessionId);
+        Assert.AreEqual(sourceChatMessageId, loaded.SourceChatMessageId);
         Assert.HasCount(2, references);
+    }
+
+    private async Task<(long SessionId, long MessageId)> SeedChatSourceAsync(int projectId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        var sessionId = await connection.ExecuteScalarAsync<long>("""
+            INSERT INTO dbo.ProjectChatSessions (TenantId, ProjectId, Title)
+            OUTPUT inserted.Id
+            VALUES (1, @ProjectId, N'Trace source');
+            """, new { ProjectId = projectId });
+        var messageId = await connection.ExecuteScalarAsync<long>("""
+            INSERT INTO dbo.ChatMessages (TenantId, ProjectId, ChatSessionId, Role, Message)
+            OUTPUT inserted.Id
+            VALUES (1, @ProjectId, @SessionId, N'user', N'Trace source message');
+            """, new { ProjectId = projectId, SessionId = sessionId });
+        return (sessionId, messageId);
     }
 
     private async Task<WorkItemIdentityContractRow> LoadIdentityRowAsync(long ticketId)

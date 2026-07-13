@@ -187,7 +187,8 @@ test('audit library route renders read-only ledger rows and filters', async ({ p
   await expect(page.getByTestId('flow.audit.rows')).toContainText('Alice Reviewer');
   await expect(page.getByTestId('flow.audit.rows')).toContainText('WI-42');
   await expect(page.getByTestId('flow.audit.rows')).toContainText('WorkflowContinuationInput');
-  await expect(page.getByTestId('flow.audit.evidence').first()).toContainText('Accepted approval');
+  await expect(page.getByTestId('flow.audit.evidence.unavailable').filter({ hasText: 'Accepted approval' })).toHaveCount(1);
+  await expect(page.getByTestId('flow.audit.evidence').filter({ hasText: 'Project members' })).toHaveCount(1);
   await expect(page.getByTestId('flow.library.auditLedger')).not.toContainText('Not implemented');
   await expect(page.getByRole('button', { name: /approve|apply|continue/i })).toHaveCount(0);
 

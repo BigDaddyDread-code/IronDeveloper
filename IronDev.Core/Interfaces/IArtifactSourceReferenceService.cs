@@ -7,11 +7,6 @@ namespace IronDev.Core.Interfaces;
 
 public interface IArtifactSourceReferenceService
 {
-    Task<IReadOnlyList<ArtifactSourceReference>> GetReferencesForArtifactAsync(
-        string artifactType,
-        long artifactId,
-        CancellationToken ct = default);
-
     Task RecordReferenceAsync(
         ArtifactSourceReference reference,
         CancellationToken ct = default);

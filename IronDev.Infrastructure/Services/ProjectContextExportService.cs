@@ -193,7 +193,11 @@ public class ProjectContextExportService : IProjectContextExportService
                 sb.AppendLine(Scrub(t.Summary));
                 sb.AppendLine();
 
-                var sourceReferences = await _artifactSourceReferenceService.GetReferencesForArtifactAsync("Ticket", t.Id);
+                var sourceReferences = await _artifactSourceReferenceService.GetForArtifactAsync(
+                    project.TenantId,
+                    projectId,
+                    "Ticket",
+                    t.Id);
                 if (sourceReferences.Any())
                 {
                     sb.AppendLine("#### Source Traceability");
