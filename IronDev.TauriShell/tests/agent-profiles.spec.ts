@@ -111,7 +111,7 @@ test('a secret in a profile is refused and shown honestly', async ({ page }) => 
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.agents').click();
 
-  await page.getByTestId('flow.settings.agent.builder.personality').fill('use sk-secret');
+  await page.getByTestId('flow.settings.agent.builder.personality').fill('use a private provider credential');
   await page.getByTestId('flow.settings.agent.builder.save').click();
 
   await expect(page.getByTestId('flow.settings.agents.error')).toContainText('secret');

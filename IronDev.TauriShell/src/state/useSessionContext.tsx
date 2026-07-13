@@ -85,7 +85,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    window.localStorage.setItem('irondev.token', trimmed);
+    window.sessionStorage.setItem('irondev.token', trimmed);
+    window.localStorage.removeItem('irondev.token');
     setTokenDraft('');
     setTokenEditorOpen(false);
     refreshConfig();
@@ -97,6 +98,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearRejectedSession = useCallback(() => {
+    window.sessionStorage.removeItem('irondev.token');
     window.localStorage.removeItem('irondev.token');
     window.localStorage.removeItem('irondev.tenantId');
     window.localStorage.removeItem('irondev.selectedProjectId');
@@ -147,7 +149,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       try {
         const response = await client.login(request);
-        window.localStorage.setItem('irondev.token', response.token);
+        window.sessionStorage.setItem('irondev.token', response.token);
+        window.localStorage.removeItem('irondev.token');
         window.localStorage.removeItem('irondev.tenantId');
         window.localStorage.removeItem('irondev.selectedProjectId');
         setTokenDraft('');
@@ -184,6 +187,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Logout is stateless. Local session removal remains the safe outcome
       // when the API is unavailable.
     } finally {
+      window.sessionStorage.removeItem('irondev.token');
       window.localStorage.removeItem('irondev.token');
       window.localStorage.removeItem('irondev.tenantId');
       window.localStorage.removeItem('irondev.selectedProjectId');
