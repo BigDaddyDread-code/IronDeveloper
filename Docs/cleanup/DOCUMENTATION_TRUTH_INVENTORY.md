@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **664 files** after CLN-31. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **666 files** after CLN-32. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -21,13 +21,13 @@ This inventory classifies every tracked Markdown document under `Docs/`: **664 f
 | Status | Count |
 | --- | ---: |
 | `Canonical` | 65 |
-| `Supporting` | 123 |
-| `HistoricalReceipt` | 420 |
+| `Supporting` | 124 |
+| `HistoricalReceipt` | 421 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **664** |
+| **Total** | **666** |
 
 ## Inventory
 
@@ -697,6 +697,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **664 f
 | `Docs/ux/SHARED_TRUTH_RENDERERS.md` | Shared Truth Renderers | Product and UX | `Canonical` | 2026-07-15 renderer, accessibility, visual-tone, and authority-boundary review | `None; current authority` | Keep aligned with design-system state primitives | Product and client |
 | `Docs/receipts/CLN_31_LEGACY_ROUTE_CONTAINMENT.md` | CLN-31 Legacy Route Containment Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/ux/LEGACY_ROUTE_CONTAINMENT.md` | Legacy Route Containment | Product and UX | `Canonical` | 2026-07-15 alias inventory, resolver, identity-preservation, and notice review | `None; current authority` | Keep aligned with compatibility route handling | Product and client |
+| `Docs/cleanup/COMPONENT_REFACTOR_INVENTORY.md` | Component Refactor Inventory | Cleanup | `Supporting` | Measured and characterized by CLN-32 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Re-measure before each frontend split | Product and client |
+| `Docs/receipts/CLN_32_COMPONENT_REFACTOR_INVENTORY.md` | CLN-32 Component Refactor Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
