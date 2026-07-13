@@ -410,7 +410,8 @@ try {
         "FullyQualifiedName~DryRunReceiptStoreTests",
         "FullyQualifiedName~PatchArtifactStoreTests",
         "FullyQualifiedName~WorkflowTransitionRecordStoreTests",
-        "FullyQualifiedName~ToolRequestStoreTests"
+        "FullyQualifiedName~ToolRequestStoreTests",
+        "FullyQualifiedName~ProjectCanonMemoryLifecycleSqlTests"
     ) -join "|"
 
     Invoke-TestLane -Name "SQL-backed governance stores" -Filter $sqlStoreFilter

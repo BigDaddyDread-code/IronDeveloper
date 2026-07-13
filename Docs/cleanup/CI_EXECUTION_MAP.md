@@ -87,6 +87,7 @@ The workflow starts SQL Server 2022 and creates an `IronDev_CI_*` database ident
 6. `PatchArtifactStoreTests`.
 7. `WorkflowTransitionRecordStoreTests`.
 8. `ToolRequestStoreTests`.
+9. `ProjectCanonMemoryLifecycleSqlTests`.
 
 Only the connectivity probe retries. A failed store test is not reclassified as SQL startup noise.
 

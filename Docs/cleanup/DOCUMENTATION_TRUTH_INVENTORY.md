@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **650 files** after CLN-24. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **652 files** after CLN-25. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **650 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 58 |
+| `Canonical` | 59 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 413 |
+| `HistoricalReceipt` | 414 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **650** |
+| **Total** | **652** |
 
 ## Inventory
 
@@ -683,6 +683,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **650 f
 | `Docs/receipts/CLN_23_CURRENT_MEMORY_REALITY_AUDIT.md` | CLN-23 Current Memory Reality Audit Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/memory/MEMORY_WRITE_AUTHORITY_CONTRACT.md` | Memory Write Authority Contract | Memory | `Canonical` | 2026-07-14 hosted memory mutation review | `-` | Keep aligned with controller, membership, attribution, and promotion gates | Memory and governance |
 | `Docs/receipts/CLN_24_MEMORY_WRITE_AUTHORITY_LOCK.md` | CLN-24 Memory Write Authority Lock Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/memory/PROJECT_CANON_MEMORY_LIFECYCLE.md` | Project Canon Memory Lifecycle | Memory | `Canonical` | 2026-07-14 append-only lifecycle review | `-` | Keep aligned with manifest schema and promotion boundary | Memory and governance |
+| `Docs/receipts/CLN_25_MEMORY_VERSIONING_LIFECYCLE.md` | CLN-25 Memory Versioning and Lifecycle Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
