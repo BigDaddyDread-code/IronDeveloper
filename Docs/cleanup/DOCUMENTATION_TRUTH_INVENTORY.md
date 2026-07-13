@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **643 files** after CLN-20. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **644 files** after CLN-21. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -676,6 +676,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **643 f
 | `Docs/cleanup/DATABASE_SCHEMA_OWNERSHIP.md` | Database Schema Ownership | Cleanup | `Canonical` | 2026-07-13 runtime DDL and migration ownership review | `-` | Keep aligned with manifest-owned schema and runtime boundaries | Database and operations |
 | `Docs/receipts/CLN_19_RUNTIME_SCHEMA_OWNERSHIP.md` | CLN-19 Runtime Schema Ownership Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_20_FRESH_INSTALL_MIGRATION_PROOF.md` | CLN-20 Fresh-Install Migration Proof Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/receipts/CLN_21_UPGRADE_MIGRATION_PROOF.md` | CLN-21 Upgrade Migration Proof Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

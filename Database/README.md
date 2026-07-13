@@ -62,6 +62,14 @@ For the CLN-20 product-level fresh-install proof, run the clean verifier and the
 
 The fresh-install script owns its temporary database by default. It accepts `-KeepDatabase` only for a containing CI lane such as `Scripts/ci/run-platform-baseline-ci.ps1`, which performs the final guarded cleanup after its remaining contract tests.
 
+To prove an upgrade from the last supported pre-CLN-19 database baseline, reconstruct commit `7f0e1058`, apply its manifest through CLN-12, load representative runtime-owned data, apply the current manifest, verify current schema, and assert exact row preservation:
+
+```powershell
+.\Database\verify-upgrade-database.ps1
+```
+
+The baseline schema and runtime fixture are test-only files under `Database/baselines/`. The verifier refuses non-test database names and removes its isolated database unless `-KeepDatabase` is explicitly supplied for diagnosis.
+
 CI supplies its SQL connection and a unique `IronDev_CI_*` database name. The script refuses any target that does not end in `_Test` or start with `IronDev_CI_`. `IRONDEV_MIGRATION_CONNECTION_STRING` is the non-command-line connection seam used by the clean verifier so credentials are not passed to child process arguments.
 
 ## Migration state decision

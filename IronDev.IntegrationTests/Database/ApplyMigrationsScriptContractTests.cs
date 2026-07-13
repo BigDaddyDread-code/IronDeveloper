@@ -59,7 +59,32 @@ public sealed class ApplyMigrationsScriptContractTests
         StringAssert.Contains(ciScript, "FullyQualifiedName~ApplyMigrationsScriptContractTests");
     }
 
+    [TestMethod]
+    public void ApplyMigrations_ThroughMigration_MustResolveBeforeDatabaseMutation()
+    {
+        var valid = ResolveConnectionString(
+            "-Server", @"(localdb)\MSSQLLocalDB",
+            "-Database", "IronDev_Contract_Probe",
+            "-ThroughMigrationId", "2026-07-cln-12-user-mutation-attribution");
+        StringAssert.Contains(valid, "Initial Catalog=IronDev_Contract_Probe");
+
+        var failure = RunResolveConnectionString(
+            "-Server", @"(localdb)\MSSQLLocalDB",
+            "-Database", "IronDev_Contract_Probe",
+            "-ThroughMigrationId", "missing-migration-id");
+        Assert.AreNotEqual(0, failure.ExitCode);
+        StringAssert.Contains(failure.Error, "missing-migration-id");
+        StringAssert.Contains(failure.Error, "manifest");
+    }
+
     private static string ResolveConnectionString(params string[] arguments)
+    {
+        var result = RunResolveConnectionString(arguments);
+        Assert.AreEqual(0, result.ExitCode, $"apply-migrations.ps1 -ResolveConnectionStringOnly failed: {result.Output}{result.Error}");
+        return result.Output.Trim();
+    }
+
+    private static ScriptResult RunResolveConnectionString(params string[] arguments)
     {
         var script = Path.Combine(RepoRoot(), "Database", "apply-migrations.ps1");
         var shell = ResolvePowerShell();
@@ -84,9 +109,10 @@ public sealed class ApplyMigrationsScriptContractTests
         var stderrTask = process.StandardError.ReadToEndAsync();
         Assert.IsTrue(process.WaitForExit(TimeSpan.FromSeconds(60)), "apply-migrations.ps1 -ResolveConnectionStringOnly timed out.");
         Task.WaitAll(stdoutTask, stderrTask);
-        Assert.AreEqual(0, process.ExitCode, $"apply-migrations.ps1 -ResolveConnectionStringOnly failed: {stdoutTask.Result}{stderrTask.Result}");
-        return stdoutTask.Result.Trim();
+        return new ScriptResult(process.ExitCode, stdoutTask.Result, stderrTask.Result);
     }
+
+    private sealed record ScriptResult(int ExitCode, string Output, string Error);
 
     private static string ResolvePowerShell()
     {
