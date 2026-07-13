@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **660 files** after CLN-29. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **662 files** after CLN-30. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **660 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 63 |
+| `Canonical` | 64 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 418 |
+| `HistoricalReceipt` | 419 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **660** |
+| **Total** | **662** |
 
 ## Inventory
 
@@ -693,6 +693,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **660 f
 | `Docs/receipts/CLN_28_MEMORY_QUALITY_BENCHMARK.md` | CLN-28 Memory Quality Benchmark Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_29_CANONICAL_ROUTE_INVENTORY.md` | CLN-29 Canonical Route Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/ux/CANONICAL_ROUTE_INVENTORY.md` | Canonical Route Inventory | Product and UX | `Canonical` | 2026-07-15 exact template, parser-kind, scope, and compatibility review | `None; current authority` | Keep aligned with product route inventory and tests | Product and client |
+| `Docs/receipts/CLN_30_SHARED_TRUTH_RENDERERS.md` | CLN-30 Shared Truth Renderers Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/ux/SHARED_TRUTH_RENDERERS.md` | Shared Truth Renderers | Product and UX | `Canonical` | Verified by CLN-30 renderer contract | `None; current authority` | Keep aligned with design-system state primitives | Product and client |
 
 ## Review Line
 

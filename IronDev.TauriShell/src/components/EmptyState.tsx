@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { TruthStateRenderer } from '../design-system/state/TruthStateRenderer';
 
 interface EmptyStateProps {
   title: string;
@@ -7,14 +8,5 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ title, body, action }: EmptyStateProps) {
-  return (
-    <div className="empty-state">
-      <div className="section-heading">
-        <p className="eyebrow">State</p>
-        <h2>{title}</h2>
-      </div>
-      <p>{body}</p>
-      {action}
-    </div>
-  );
+  return <TruthStateRenderer kind="empty" title={title} body={body} action={action} className="empty-state" headingLevel={2} />;
 }
