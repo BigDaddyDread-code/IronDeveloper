@@ -14,6 +14,7 @@ export function applyLocalTestFreshSessionFromUrl() {
 
   for (const key of localTestClientStateKeys) {
     window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
   }
 
   parameters.delete(freshSessionParameter);

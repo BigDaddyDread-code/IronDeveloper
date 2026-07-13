@@ -101,7 +101,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
       if (profile.selectedTenantId !== tenantId) {
         const response = await client.selectTenant(tenantId);
-        window.localStorage.setItem('irondev.token', response.token);
+        window.sessionStorage.setItem('irondev.token', response.token);
+        window.localStorage.removeItem('irondev.token');
         window.localStorage.setItem('irondev.tenantId', `${tenantId}`);
         window.localStorage.removeItem('irondev.selectedProjectId');
         refreshConfig();
@@ -166,7 +167,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
       try {
         const response = await client.selectTenant(tenantId);
-        window.localStorage.setItem('irondev.token', response.token);
+        window.sessionStorage.setItem('irondev.token', response.token);
+        window.localStorage.removeItem('irondev.token');
         window.localStorage.setItem('irondev.tenantId', `${tenantId}`);
         window.localStorage.removeItem('irondev.selectedProjectId');
         setSelectedTenantId(tenantId);

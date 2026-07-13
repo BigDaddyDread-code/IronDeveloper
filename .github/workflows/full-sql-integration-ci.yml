@@ -22,22 +22,12 @@ env:
   IRONDEV_CI_SQL_PORT: 1433
   IRONDEV_CI_SQL_DATABASE: IronDev_CI_${{ github.run_id }}_${{ github.run_attempt }}
   IRONDEV_CI_SQL_USER: sa
-  IRONDEV_CI_SQL_PASSWORD: ${{ format('IronDev_CI_Strong_{0}_{1}_Passw0rd_123!', github.run_id, github.run_attempt) }}
 
 jobs:
   full-sql-integration-ci:
     name: Full SQL-backed integration lane
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
-    services:
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: Y
-          MSSQL_SA_PASSWORD: ${{ format('IronDev_CI_Strong_{0}_{1}_Passw0rd_123!', github.run_id, github.run_attempt) }}
-        ports:
-          - 1433:1433
 
     steps:
       - name: Checkout
@@ -47,6 +37,14 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.301'
+
+      - name: Start isolated SQL Server
+        shell: pwsh
+        run: |
+          $password = "IronDev!$([Guid]::NewGuid().ToString('N'))aA1"
+          Write-Output "::add-mask::$password"
+          "IRONDEV_CI_SQL_PASSWORD=$password" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          docker run --detach --name irondev-full-sql --env ACCEPT_EULA=Y --env "MSSQL_SA_PASSWORD=$password" --publish 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
 
       - name: Full SQL-backed integration lane
         shell: pwsh

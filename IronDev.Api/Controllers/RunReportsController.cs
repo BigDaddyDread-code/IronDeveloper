@@ -1,5 +1,6 @@
 using IronDev.Core.RunReports;
 using IronDev.Api.Middleware;
+using IronDev.Api.Security;
 using IronDev.Core.Auth;
 using IronDev.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -49,13 +50,19 @@ public sealed class RunReportsController : ControllerBase
 
     [HttpGet("{runId}")]
     [RequireProjectArtifactAccess(ProjectArtifactKind.RunReport, "runId")]
-    public Task<RunReportDetail?> GetRun(string runId, CancellationToken ct) =>
-        _reports.GetRunAsync(runId, ct);
+    public async Task<RunReportDetail?> GetRun(string runId, CancellationToken ct)
+    {
+        var report = await _reports.GetRunAsync(runId, ct);
+        return report is null ? null : RunReportResponseSanitizer.Sanitize(report);
+    }
 
     [HttpGet("{runId}/evidence")]
     [RequireProjectArtifactAccess(ProjectArtifactKind.RunReport, "runId")]
-    public Task<IReadOnlyList<RunEvidenceItem>> GetEvidence(string runId, CancellationToken ct) =>
-        _evidence.GetEvidenceAsync(runId, ct);
+    public async Task<IReadOnlyList<RunEvidenceItem>> GetEvidence(string runId, CancellationToken ct)
+    {
+        var report = await _reports.GetRunAsync(runId, ct);
+        return report is null ? [] : RunReportResponseSanitizer.Sanitize(report).Evidence;
+    }
 
     [HttpGet("{runId}/evidence/text")]
     [RequireProjectArtifactAccess(ProjectArtifactKind.RunReport, "runId")]

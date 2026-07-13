@@ -52,6 +52,8 @@ test('valid LocalTest login auto-selects one tenant and lands on project chooser
   await expect(page.getByTestId('flow.tenantChooser')).toHaveCount(0);
   await expect(page.getByTestId('flow.chooser')).toBeVisible();
   await expect(page.getByTestId('flow.chooser.project.7')).toContainText('BookSeller');
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('irondev.token'))).toBeNull();
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('irondev.token'))).not.toBeNull();
 });
 
 test('multiple tenants render a separate tenant chooser', async ({ page }) => {
@@ -79,6 +81,8 @@ test('multiple tenants render a separate tenant chooser', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByTestId('flow.tenantChooser')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('irondev.token'))).toBeNull();
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('irondev.token'))).toBe('test-token');
   await expect(page.getByText('Welcome, Robert')).toBeVisible();
   await expect(page.getByTestId('auth.form')).toHaveCount(0);
   await expect(page.getByTestId('flow.chooser')).toHaveCount(0);

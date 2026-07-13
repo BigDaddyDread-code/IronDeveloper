@@ -160,8 +160,7 @@ export function getIronDevApiConfig(): IronDevApiConfig {
     `${DEFAULT_PROJECT_ID}`;
   const fallbackProjectId = parseFallbackProjectId(rawFallbackProjectId);
 
-  const token =
-    import.meta.env.VITE_IRONDEV_DEV_TOKEN ?? window.localStorage.getItem('irondev.token') ?? undefined;
+  const token = import.meta.env.VITE_IRONDEV_DEV_TOKEN ?? readSessionToken();
 
   const selectedTenantId = parseOptionalInt(window.localStorage.getItem('irondev.tenantId'));
   const selectedProjectId = parseOptionalInt(window.localStorage.getItem('irondev.selectedProjectId'));
@@ -189,7 +188,7 @@ export async function loadProjectTickets(config: IronDevApiConfig, signal?: Abor
     return {
       tickets: [],
       status: 'authRequired',
-      message: 'Ticket data requires an IronDev API token. Set VITE_IRONDEV_DEV_TOKEN or localStorage irondev.token.'
+      message: 'Ticket data requires an IronDev API token. Sign in again to establish a session.'
     };
   }
 
@@ -202,6 +201,22 @@ export async function loadProjectTickets(config: IronDevApiConfig, signal?: Abor
   }
 
   return createIronDevApiClient(config).getProjectTickets(config.selectedProjectId, signal);
+}
+
+function readSessionToken() {
+  const sessionToken = window.sessionStorage.getItem('irondev.token');
+  if (sessionToken) {
+    return sessionToken;
+  }
+
+  const legacyToken = window.localStorage.getItem('irondev.token');
+  if (!legacyToken) {
+    return undefined;
+  }
+
+  window.sessionStorage.setItem('irondev.token', legacyToken);
+  window.localStorage.removeItem('irondev.token');
+  return legacyToken;
 }
 
 class IronDevApiClient {

@@ -72,9 +72,7 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
             Summary = "Need to allow exporting project context pack.",
             Status = "In Progress",
             Priority = "High",
-            TicketType = "Feature",
-            SourceChatSessionId = 7007,
-            SourceChatMessageId = 8008
+            TicketType = "Feature"
         });
 
         // 2. Execute
@@ -100,9 +98,7 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
         StringAssert.Contains(markdown, "**Authority:** Pending");
         StringAssert.Contains(markdown, "## Recent Tickets");
         StringAssert.Contains(markdown, "Implement Export Feature");
-        StringAssert.Contains(markdown, "#### Source Traceability");
-        StringAssert.Contains(markdown, "ChatSession #7007");
-        StringAssert.Contains(markdown, "ChatMessage #8008");
+        Assert.IsFalse(markdown.Contains("#### Source Traceability", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -117,7 +113,8 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
         await memoryService.SaveSummaryAsync(new ProjectSummary
         {
             ProjectId = projectId,
-            Summary = "Connection string: Server=myServer;Database=myDb;User Id=myUser;" + "Password" + "=SuperSecretPassword123;",
+            Summary = "Connection string: Server=myServer;Database=myDb;User Id=myUser;" + "Password" + "=SuperSecretPassword123; " +
+                      "Bearer abc.def.ghi from C:\\Users\\private-user\\repo",
             UpdatedDate = DateTime.UtcNow
         });
 
@@ -134,6 +131,9 @@ public class ProjectContextExportServiceTests : IntegrationTestBase
 
         Assert.IsFalse(markdown.Contains("SuperSecretPassword123"));
         Assert.IsFalse(markdown.Contains("abcdef-12345-ghijk-67890"));
+        Assert.IsFalse(markdown.Contains("abc.def.ghi"));
+        Assert.IsFalse(markdown.Contains("private-user"));
         StringAssert.Contains(markdown, "[REDACTED]");
+        StringAssert.Contains(markdown, "[LOCAL_PATH]");
     }
 }

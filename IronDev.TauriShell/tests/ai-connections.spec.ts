@@ -47,7 +47,7 @@ test('settings shows tenant AI connection metadata without credential material',
 });
 
 test('settings stores and revokes AI credentials without rendering the secret', async ({ page }) => {
-  const secret = 'sk-local-secret-value';
+  const secret = 'local-provider-credential-value';
   await mockWorkspace(page, {
     connections: [
       {

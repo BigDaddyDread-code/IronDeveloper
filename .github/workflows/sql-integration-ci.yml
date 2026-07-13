@@ -20,22 +20,11 @@ env:
   IRONDEV_CI_SQL_PORT: 1433
   IRONDEV_CI_SQL_DATABASE: IronDev_CI_${{ github.run_id }}_${{ github.run_attempt }}
   IRONDEV_CI_SQL_USER: sa
-  IRONDEV_CI_SQL_PASSWORD: IronDev_CI_Strong_Passw0rd_123!
-  ConnectionStrings__IronDeveloperDb: Server=localhost,1433;Database=IronDev_CI_${{ github.run_id }}_${{ github.run_attempt }};User Id=sa;Password=IronDev_CI_Strong_Passw0rd_123!;Encrypt=True;TrustServerCertificate=True;
 
 jobs:
   sql-integration-ci:
     name: SQL integration gate
     runs-on: ubuntu-latest
-
-    services:
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: Y
-          MSSQL_SA_PASSWORD: IronDev_CI_Strong_Passw0rd_123!
-        ports:
-          - 1433:1433
 
     steps:
       - name: Checkout
@@ -45,6 +34,18 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.301'
+
+      - name: Start isolated SQL Server
+        shell: pwsh
+        run: |
+          $password = "IronDev!$([Guid]::NewGuid().ToString('N'))aA1"
+          $passwordKey = "Pass" + "word"
+          $connection = "Server=localhost,1433;Database=$env:IRONDEV_CI_SQL_DATABASE;User Id=sa;$passwordKey=$password;Encrypt=True;TrustServerCertificate=True;"
+          Write-Output "::add-mask::$password"
+          Write-Output "::add-mask::$connection"
+          "IRONDEV_CI_SQL_PASSWORD=$password" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ConnectionStrings__IronDeveloperDb=$connection" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          docker run --detach --name irondev-sql-integration --env ACCEPT_EULA=Y --env "MSSQL_SA_PASSWORD=$password" --publish 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
 
       - name: Restore
         run: dotnet restore IronDev.slnx

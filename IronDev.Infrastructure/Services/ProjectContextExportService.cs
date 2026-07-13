@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Security;
 using IronDev.Core.Time;
 using IronDev.Data.Models;
 using IronDev.Services;
@@ -54,7 +54,7 @@ public class ProjectContextExportService : IProjectContextExportService
         var indexedFiles = await _codeIndexService.GetIndexedFileCountAsync(projectId);
 
         var sb = new StringBuilder();
-        sb.AppendLine($"# Project Context Pack: {project.Name}");
+        sb.AppendLine($"# Project Context Pack: {Scrub(project.Name)}");
         sb.AppendLine($"IronDev: {AppBuildInfo.DisplayName} ({AppBuildInfo.Version})");
         sb.AppendLine($"Workflow: {AppBuildInfo.WorkflowName}");
         sb.AppendLine($"ExportedUtc: {DateTimeDisplay.ToUtcMetadata(DateTimeOffset.UtcNow)}");
@@ -70,10 +70,10 @@ public class ProjectContextExportService : IProjectContextExportService
         if (profile != null)
         {
             sb.AppendLine("## Project Profile");
-            sb.AppendLine($"- **App Type:** {profile.ApplicationType}");
-            sb.AppendLine($"- **Primary Language:** {profile.PrimaryLanguage}");
-            sb.AppendLine($"- **Framework:** {profile.Framework} ({profile.RuntimeVersion})");
-            sb.AppendLine($"- **Test Framework:** {profile.TestFramework}");
+            sb.AppendLine($"- **App Type:** {Scrub(profile.ApplicationType)}");
+            sb.AppendLine($"- **Primary Language:** {Scrub(profile.PrimaryLanguage)}");
+            sb.AppendLine($"- **Framework:** {Scrub(profile.Framework)} ({Scrub(profile.RuntimeVersion)})");
+            sb.AppendLine($"- **Test Framework:** {Scrub(profile.TestFramework)}");
             if (!string.IsNullOrEmpty(profile.ProfileNotes))
             {
                 sb.AppendLine();
@@ -120,9 +120,9 @@ public class ProjectContextExportService : IProjectContextExportService
             sb.AppendLine("## Project Standards & Rules");
             foreach (var r in rules)
             {
-                sb.AppendLine($"### {r.Name} ({r.Type})");
+                sb.AppendLine($"### {Scrub(r.Name)} ({Scrub(r.Type)})");
                 sb.AppendLine($"- **Level:** {r.EnforcementLevel}");
-                sb.AppendLine($"- **Applies To:** {r.AppliesTo}");
+                sb.AppendLine($"- **Applies To:** {Scrub(r.AppliesTo)}");
                 sb.AppendLine();
                 sb.AppendLine(Scrub(r.Description));
                 if (!string.IsNullOrEmpty(r.ValidationHint))
@@ -141,10 +141,10 @@ public class ProjectContextExportService : IProjectContextExportService
                          .GroupBy(d => d.DocumentType)
                          .OrderBy(g => g.Key))
             {
-                sb.AppendLine($"### {group.Key}");
+                sb.AppendLine($"### {Scrub(group.Key)}");
                 foreach (var d in group)
                 {
-                    sb.AppendLine($"#### {d.Title}");
+                    sb.AppendLine($"#### {Scrub(d.Title)}");
                     sb.AppendLine($"- **Authority:** {d.AuthorityLevel}");
                     sb.AppendLine($"- **Status:** {d.Status}");
                     if (!string.IsNullOrWhiteSpace(d.AppliesToArea))
@@ -168,8 +168,8 @@ public class ProjectContextExportService : IProjectContextExportService
             sb.AppendLine("## Architecture Decisions");
             foreach (var d in decisions)
             {
-                sb.AppendLine($"### {d.Title} ({d.Status})");
-                sb.AppendLine($"- **Category:** {d.Category}");
+                sb.AppendLine($"### {Scrub(d.Title)} ({d.Status})");
+                sb.AppendLine($"- **Category:** {Scrub(d.Category)}");
                 sb.AppendLine($"- **CreatedUtc:** {DateTimeDisplay.ToUtcMetadata(d.CreatedDate)}");
                 sb.AppendLine();
                 sb.AppendLine("#### Detail");
@@ -186,8 +186,8 @@ public class ProjectContextExportService : IProjectContextExportService
             sb.AppendLine("## Recent Tickets");
             foreach (var t in tickets)
             {
-                sb.AppendLine($"### [{t.Status}] {t.Title}");
-                sb.AppendLine($"- **Type:** {t.TicketType}");
+                sb.AppendLine($"### [{t.Status}] {Scrub(t.Title)}");
+                sb.AppendLine($"- **Type:** {Scrub(t.TicketType)}");
                 sb.AppendLine($"- **Priority:** {t.Priority}");
                 sb.AppendLine();
                 sb.AppendLine(Scrub(t.Summary));
@@ -229,34 +229,11 @@ public class ProjectContextExportService : IProjectContextExportService
         return sb.ToString();
     }
 
-    private string Scrub(string? input)
-    {
-        if (string.IsNullOrEmpty(input)) return string.Empty;
-
-        // Basic scrubbing for common secret patterns
-        // Replace potential API keys or secrets with [REDACTED]
-        // This is a simplified version; in production, use a more robust regex or scanning library.
-        
-        var scrubbed = input;
-
-        // Scrub potential GUIDs/UUIDs that look like keys
-        scrubbed = Regex.Replace(scrubbed, @"[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}", "[REDACTED-ID]");
-        
-        // Scrub common assignment patterns: key=..., secret=..., password=...
-        string[] sensitivePatterns = { "api[_-]?key", "secret", "password", "token", "auth", "credential" };
-        foreach (var pattern in sensitivePatterns)
-        {
-            // Match pattern followed by whitespace, colon, or equals, then the value
-            // This is a naive regex but helps catch common cases
-            scrubbed = Regex.Replace(scrubbed, $@"({pattern})\s*[:=]\s*[^\s,;]+", "$1: [REDACTED]", RegexOptions.IgnoreCase);
-        }
-
-        return scrubbed;
-    }
+    private static string Scrub(string? input) => SensitiveDataRedactor.Redact(input);
 
     private static void AppendStateLine(StringBuilder sb, string label, string? value)
     {
         if (!string.IsNullOrWhiteSpace(value))
-            sb.AppendLine($"- **{label}:** {value}");
+            sb.AppendLine($"- **{label}:** {Scrub(value)}");
     }
 }

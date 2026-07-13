@@ -1,6 +1,7 @@
 using IronDev.Core.Runs;
 using IronDev.Core.RunReports;
 using IronDev.Api.Middleware;
+using IronDev.Api.Security;
 using IronDev.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -51,7 +52,7 @@ public sealed class RunsController : ControllerBase
         return Ok(new RunReportDto
         {
             Status = ToStatus(report),
-            Report = report
+            Report = RunReportResponseSanitizer.Sanitize(report)
         });
     }
 
@@ -72,7 +73,7 @@ public sealed class RunsController : ControllerBase
 
         await foreach (var runEvent in _events.StreamEventsAsync(runId, ct))
         {
-            await WriteSseEventAsync(runEvent, ct);
+            await WriteSseEventAsync(RunReportResponseSanitizer.Sanitize(runEvent), ct);
         }
     }
 
