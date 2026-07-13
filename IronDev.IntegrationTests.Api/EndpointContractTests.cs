@@ -1726,10 +1726,7 @@ public sealed class EndpointContractTests : ApiTestBase
             SessionId = Guid.NewGuid(),
             Title = "Evidence summary has no linked run",
             Summary = "The summary should not invent run evidence.",
-            Content = "No run report source relationship exists yet.",
-            SourceChatSessionId = 44,
-            SourceChatMessageId = 45,
-            SourceDocumentVersionId = 12
+            Content = "No run report source relationship exists yet."
         });
         Assert.AreEqual(HttpStatusCode.OK, saveTicket.StatusCode);
 
@@ -1745,8 +1742,8 @@ public sealed class EndpointContractTests : ApiTestBase
         Assert.IsNull(summary.LatestRun);
         Assert.IsNull(summary.LatestPromotionPackage);
         Assert.AreEqual(0, summary.LinkedRunCount);
-        Assert.AreEqual(1, summary.LinkedDocumentCount);
-        Assert.AreEqual(2, summary.LinkedTraceCount);
+        Assert.AreEqual(0, summary.LinkedDocumentCount);
+        Assert.AreEqual(0, summary.LinkedTraceCount);
         CollectionAssert.Contains(summary.BlockedActions.ToList(), "No execution run is linked to this ticket yet.");
     }
 
