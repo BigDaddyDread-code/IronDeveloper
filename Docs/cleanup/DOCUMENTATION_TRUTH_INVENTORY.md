@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **644 files** after CLN-21. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **646 files** after CLN-22. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **644 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 55 |
+| `Canonical` | 56 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 408 |
+| `HistoricalReceipt` | 411 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **642** |
+| **Total** | **646** |
 
 ## Inventory
 
@@ -677,6 +677,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **644 f
 | `Docs/receipts/CLN_19_RUNTIME_SCHEMA_OWNERSHIP.md` | CLN-19 Runtime Schema Ownership Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_20_FRESH_INSTALL_MIGRATION_PROOF.md` | CLN-20 Fresh-Install Migration Proof Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_21_UPGRADE_MIGRATION_PROOF.md` | CLN-21 Upgrade Migration Proof Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/DATABASE_CONSTRAINT_INDEX_AUDIT.md` | Database Constraint and Index Audit | Cleanup | `Canonical` | 2026-07-14 catalog and clean-database review | `-` | Keep aligned with manifest migrations and verifier coverage | Database and operations |
+| `Docs/receipts/CLN_22_CONSTRAINT_INDEX_AUDIT.md` | CLN-22 Constraint and Index Audit Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

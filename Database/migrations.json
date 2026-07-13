@@ -174,6 +174,11 @@
                            "id":  "2026-07-cln-19-runtime-schema-ownership",
                            "path":  "Database/migrate_runtime_schema_ownership.sql",
                            "description":  "Moves Runs, RunEvents, semantic metadata, context documents, source references, and ticket compatibility columns from request-path schema creation into the controlled migration manifest."
+                       },
+                       {
+                           "id":  "2026-07-cln-22-constraint-index-audit",
+                           "path":  "Database/migrate_constraint_index_audit.sql",
+                           "description":  "Adds checked product-scope and typed-source foreign keys plus source, supersession, retrieval, audit-support, and retention indexes identified by the CLN-22 catalog audit."
                        }
                    ]
 }

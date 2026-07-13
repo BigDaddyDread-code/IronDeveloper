@@ -2201,6 +2201,34 @@
                         "appliedByManifest":  false,
                         "verifiedByScript":  false,
                         "notes":  "Exact post-upgrade data-preservation assertions for the isolated CLN-21 test database."
+                    },
+                    {
+                        "id":  "database.migrate-constraint-index-audit",
+                        "path":  "Database/migrate_constraint_index_audit.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "database",
+                        "objectsCreated":  [
+                                               "checked project-scope foreign keys",
+                                               "typed source foreign keys",
+                                               "source and supersession indexes",
+                                               "semantic retrieval indexes",
+                                               "run retention indexes"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.ProjectTickets",
+                                              "dbo.ProjectChatSessions",
+                                              "dbo.ChatMessages",
+                                              "dbo.ProjectDocumentVersions",
+                                              "a2a.AgentHandoff"
+                                          ],
+                        "referencedBy":  [
+                                             "CLN-22 constraint and index audit"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Idempotent catalog-audit remediation. Flexible status vocabularies and the SemanticEmbeddings source-version type mismatch remain explicit P2 contract debt."
                     }
                 ]
 }

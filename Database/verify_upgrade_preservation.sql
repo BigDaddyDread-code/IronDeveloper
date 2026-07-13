@@ -15,6 +15,9 @@ IF NOT EXISTS (SELECT 1 FROM dbo.ProjectContextDocuments WHERE Id = 210101 AND T
 IF NOT EXISTS (SELECT 1 FROM dbo.ProjectTickets WHERE Id = 210103 AND TenantId = 2101 AND ProjectId = 2101 AND Content = N'ticket-payload-2101' AND SourceDocumentVersionId = 210105 AND BlockedByTicketIds = N'[210104]' AND Revision = 7)
     THROW 51000, N'CLN-21 ticket compatibility data was not preserved.', 1;
 
+IF NOT EXISTS (SELECT 1 FROM dbo.ProjectDocumentVersions WHERE Id = 210105 AND DocumentId = 210107 AND ContentMarkdown = N'# CLN-21 preserved source' AND Status = N'Approved')
+    THROW 51000, N'CLN-21 ticket source document version was not preserved.', 1;
+
 IF NOT EXISTS (SELECT 1 FROM dbo.ArtifactSourceReferences WHERE ArtifactSourceReferenceId = 210102 AND TenantId = 2101 AND ProjectId = 2101 AND ArtifactId = 210103 AND SourceId = 210101 AND Summary = N'preserve-source-reference' AND RelevanceScore = 0.8750 AND IsRequired = 1)
     THROW 51000, N'CLN-21 artifact source reference was not preserved.', 1;
 
