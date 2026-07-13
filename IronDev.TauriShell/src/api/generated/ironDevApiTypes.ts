@@ -4760,7 +4760,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -4830,7 +4830,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -4903,7 +4903,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -5180,7 +5180,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -5326,7 +5326,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };

@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **648 files** after CLN-23. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **650 files** after CLN-24. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **648 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 57 |
+| `Canonical` | 58 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 412 |
+| `HistoricalReceipt` | 413 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **648** |
+| **Total** | **650** |
 
 ## Inventory
 
@@ -681,6 +681,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **648 f
 | `Docs/receipts/CLN_22_CONSTRAINT_INDEX_AUDIT.md` | CLN-22 Constraint and Index Audit Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/memory/CURRENT_MEMORY_REALITY_AUDIT.md` | Current Memory Reality Audit | Memory | `Canonical` | 2026-07-14 exhaustive current-state classification | `-` | Block smarter memory whenever an Unknown classification exists | Memory and governance |
 | `Docs/receipts/CLN_23_CURRENT_MEMORY_REALITY_AUDIT.md` | CLN-23 Current Memory Reality Audit Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/memory/MEMORY_WRITE_AUTHORITY_CONTRACT.md` | Memory Write Authority Contract | Memory | `Canonical` | 2026-07-14 hosted memory mutation review | `-` | Keep aligned with controller, membership, attribution, and promotion gates | Memory and governance |
+| `Docs/receipts/CLN_24_MEMORY_WRITE_AUTHORITY_LOCK.md` | CLN-24 Memory Write Authority Lock Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

@@ -138,7 +138,7 @@ test('backend upload refusal preserves the selected file and entered metadata', 
 });
 
 test('a Draft becomes Ready only after exact-version processing completes', async ({ page }) => {
-  const state = await mockDocumentsWorkspace(page, { processDelayMs: 250 });
+  const state = await mockDocumentsWorkspace(page, { holdProcessing: true });
   await page.goto('/projects/7/library/documents/203');
 
   await expect(page.getByTestId('flow.documents.processing')).toContainText('Process this Draft version');
@@ -146,6 +146,7 @@ test('a Draft becomes Ready only after exact-version processing completes', asyn
   await expect(page.getByTestId('flow.documents.process')).toHaveText('Processing...');
   await expect(page.getByTestId('flow.documents.processing')).not.toContainText('Ready for project retrieval');
 
+  state.completeProcessing();
   await expect(page.getByTestId('flow.documents.processing')).toContainText('Ready for project retrieval');
   await expect(page.getByTestId('flow.documents.processing')).toContainText('exact immutable version');
   await expect(page.getByTestId('flow.documents.process')).toHaveCount(0);
@@ -226,7 +227,7 @@ interface DocumentsMockOptions {
   listErrorStatus?: number;
   uploadErrorStatus?: number;
   processFailures?: number;
-  processDelayMs?: number;
+  holdProcessing?: boolean;
   uploadedProcessingStatus?: string;
   uploadedProcessingStartedAtUtc?: string;
 }
@@ -236,10 +237,21 @@ interface DocumentsMockState {
   uploadRequests: number;
   processRequests: number;
   lastUploadBody: string;
+  completeProcessing: () => void;
 }
 
 async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions = {}): Promise<DocumentsMockState> {
-  const state: DocumentsMockState = { listRequests: 0, uploadRequests: 0, processRequests: 0, lastUploadBody: '' };
+  let releaseProcessing = () => {};
+  const processingRelease = new Promise<void>((resolve) => {
+    releaseProcessing = resolve;
+  });
+  const state: DocumentsMockState = {
+    listRequests: 0,
+    uploadRequests: 0,
+    processRequests: 0,
+    lastUploadBody: '',
+    completeProcessing: releaseProcessing
+  };
   let failuresRemaining = options.listFailures ?? 0;
   let processFailuresRemaining = options.processFailures ?? 0;
   const documents = options.documents ?? [
@@ -399,8 +411,8 @@ async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions 
 
   await page.route('**/irondev-api/api/projects/7/documents/203/process', async (route) => {
     state.processRequests += 1;
-    if (options.processDelayMs) {
-      await new Promise((resolve) => setTimeout(resolve, options.processDelayMs));
+    if (options.holdProcessing) {
+      await processingRelease;
     }
 
     const failed = processFailuresRemaining > 0;
