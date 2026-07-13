@@ -3,7 +3,7 @@ import { IronDevApiError } from '../../api/ironDevApi';
 import type { AuditLedgerItem, AuditLedgerResponse, ProjectAuditExport } from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useSessionContext } from '../../state/useSessionContext';
-import { auditEventPath, libraryPath, navigateProductPath, parseProductRoute } from '../navigation/productRoutes';
+import { auditEventPath, libraryPath, navigateProductPath, safeProjectProductPath } from '../navigation/productRoutes';
 
 interface AuditSectionProps {
   projectId: number;
@@ -400,7 +400,7 @@ function EvidenceLinks({ projectId, links }: { projectId: number; links: AuditLe
   return (
     <div className="fl-audit__evidence-links">
       {(links ?? []).map((link) => {
-        const target = safeEvidenceTarget(link.href, projectId);
+        const target = safeProjectProductPath(link.href, projectId);
         const label = safeText(link.label, 'Evidence');
         return target ? (
           <a
@@ -419,17 +419,6 @@ function EvidenceLinks({ projectId, links }: { projectId: number; links: AuditLe
       })}
     </div>
   );
-}
-
-function safeEvidenceTarget(href: string | null | undefined, projectId: number) {
-  const candidate = href?.trim();
-  if (!candidate?.startsWith('/') || candidate.startsWith('//')) return null;
-  const url = new URL(candidate, window.location.origin);
-  if (url.origin !== window.location.origin) return null;
-  if (/^\/governance(?:\/|$)/.test(url.pathname)) return `${url.pathname}${url.search}${url.hash}`;
-  const route = parseProductRoute(url.pathname);
-  if (route.kind === 'notFound' || route.projectId !== projectId) return null;
-  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 function textOrUndefined(value: string) {

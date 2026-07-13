@@ -40,12 +40,20 @@ public sealed class ProjectDocumentServiceTenantTests : IntegrationTestBase
 
         var currentVersion = await tenantOneService.GetCurrentVersionAsync(document.Id)
             ?? throw new InvalidOperationException("Expected current version.");
+        var ticketService = ServiceProvider.GetRequiredService<ITicketService>();
+        var ticketId = await ticketService.SaveTicketAsync(new ProjectTicket
+        {
+            ProjectId = tenantOneProjectId,
+            Title = "Document link target",
+            Status = "Draft",
+            Content = "Same-project link target"
+        });
 
         await tenantOneService.LinkVersionAsync(new LinkProjectDocumentVersionRequest
         {
             DocumentVersionId = currentVersion.Id,
             LinkedEntityType = "Ticket",
-            LinkedEntityId = 42,
+            LinkedEntityId = ticketId,
             LinkType = "References",
             CreatedBy = "test"
         });

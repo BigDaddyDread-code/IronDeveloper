@@ -217,6 +217,17 @@ export function parseProductRoute(pathname: string): ProductRoute {
   return route(normalized, 'notFound');
 }
 
+export function safeProjectProductPath(value: string | null | undefined, projectId: number): string | null {
+  const candidate = value?.trim();
+  if (!candidate?.startsWith('/') || candidate.startsWith('//')) return null;
+
+  const url = new URL(candidate, window.location.origin);
+  if (url.origin !== window.location.origin) return null;
+  const route = parseProductRoute(url.pathname);
+  if (route.kind === 'notFound' || route.projectId !== projectId) return null;
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 export function projectPath(projectId: number, destination: 'setup' | 'board' | 'chat' | 'library'): string {
   const canonicalDestination = destination === 'chat' ? 'workshop' : destination;
   return `/projects/${projectId}/${canonicalDestination}`;

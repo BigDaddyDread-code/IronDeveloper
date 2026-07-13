@@ -17,5 +17,6 @@ This directory owns active cleanup inventories and remediation maps. Start with:
 - [Generated Contract Determinism](GENERATED_CONTRACT_DETERMINISM.md)
 - [Authentication And Tenant Token Contract](AUTHENTICATION_TENANT_TOKEN_CONTRACT.md)
 - [Project Access Sweep](PROJECT_ACCESS_SWEEP.md)
+- [Evidence Link Safety](EVIDENCE_LINK_SAFETY.md)
 
 Cleanup documents may classify and schedule behavior changes. They do not themselves grant runtime authority.

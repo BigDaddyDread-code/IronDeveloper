@@ -44,6 +44,19 @@ public sealed class ProjectDocumentService : IProjectDocumentService, IProjectDo
 
         using var connection = _connectionFactory.CreateConnection();
 
+        var hasSourceType = !string.IsNullOrWhiteSpace(request.SourceEntityType);
+        var hasSourceId = request.SourceEntityId is > 0;
+        if (hasSourceType != hasSourceId)
+            throw new ArgumentException("A document source requires both a supported type and a positive id.", nameof(request));
+        if (hasSourceType && !await TargetExistsAsync(
+                connection,
+                _tenant.TenantId,
+                request.ProjectId,
+                request.SourceEntityType!,
+                request.SourceEntityId!.Value,
+                ct))
+            throw new InvalidOperationException("The document source is malformed or outside the project scope.");
+
         var slug = GenerateSlug(request.Title);
 
         // Step 1: Insert document (no CurrentVersionId yet)
@@ -360,6 +373,14 @@ public sealed class ProjectDocumentService : IProjectDocumentService, IProjectDo
             throw new UnauthorizedAccessException(
                 $"Document version {request.DocumentVersionId} does not belong to tenant {_tenant.TenantId}.");
 
+        if (!await LinkIsValidAsync(
+                connection,
+                request.DocumentVersionId,
+                request.LinkedEntityType,
+                request.LinkedEntityId,
+                ct))
+            throw new InvalidOperationException("The document link target is malformed or outside the document project scope.");
+
         // Idempotency: skip if identical link already exists
         const string existsSql = """
             SELECT COUNT(1)
@@ -419,7 +440,14 @@ public sealed class ProjectDocumentService : IProjectDocumentService, IProjectDo
             new { DocumentVersionId = documentVersionId, TenantId = _tenant.TenantId },
             cancellationToken: ct));
 
-        return rows.ToList();
+        var valid = new List<ProjectDocumentLink>();
+        foreach (var row in rows)
+        {
+            if (await LinkIsValidAsync(connection, row.DocumentVersionId, row.LinkedEntityType, row.LinkedEntityId, ct))
+                valid.Add(row);
+        }
+
+        return valid;
     }
 
     public async Task<ProjectDocument?> TryBeginProcessingAsync(
@@ -606,6 +634,68 @@ public sealed class ProjectDocumentService : IProjectDocumentService, IProjectDo
             sql,
             new { documentVersionId, linkedEntityType, linkedEntityId, linkType, createdBy },
             cancellationToken: ct));
+    }
+
+    private static async Task<bool> LinkIsValidAsync(
+        System.Data.IDbConnection connection,
+        long documentVersionId,
+        string linkedEntityType,
+        long linkedEntityId,
+        CancellationToken ct)
+    {
+        const string scopeSql = """
+            SELECT d.TenantId, d.ProjectId
+            FROM dbo.ProjectDocumentVersions v
+            INNER JOIN dbo.ProjectDocuments d ON d.Id=v.DocumentId
+            WHERE v.Id=@DocumentVersionId;
+            """;
+        var scope = await connection.QuerySingleOrDefaultAsync<LinkScope>(new CommandDefinition(
+            scopeSql,
+            new { DocumentVersionId = documentVersionId },
+            cancellationToken: ct));
+        return scope is not null && await TargetExistsAsync(
+            connection,
+            scope.TenantId,
+            scope.ProjectId,
+            linkedEntityType,
+            linkedEntityId,
+            ct);
+    }
+
+    private static async Task<bool> TargetExistsAsync(
+        System.Data.IDbConnection connection,
+        int tenantId,
+        int projectId,
+        string linkedEntityType,
+        long linkedEntityId,
+        CancellationToken ct)
+    {
+        if (linkedEntityId <= 0)
+            return false;
+
+        var sql = linkedEntityType.Trim() switch
+        {
+            "ProjectContextDocument" => "SELECT COUNT(1) FROM dbo.ProjectContextDocuments WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@LinkedEntityId;",
+            "ChatMessage" => "SELECT COUNT(1) FROM dbo.ChatMessages WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@LinkedEntityId;",
+            "ChatSession" => "SELECT COUNT(1) FROM dbo.ProjectChatSessions WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@LinkedEntityId;",
+            "Ticket" => "SELECT COUNT(1) FROM dbo.ProjectTickets WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@LinkedEntityId AND IsDeleted=0;",
+            "Decision" => "SELECT COUNT(1) FROM dbo.ProjectDecisions WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@LinkedEntityId;",
+            "ProjectDocumentVersion" => "SELECT COUNT(1) FROM dbo.ProjectDocumentVersions v INNER JOIN dbo.ProjectDocuments d ON d.Id=v.DocumentId WHERE d.TenantId=@TenantId AND d.ProjectId=@ProjectId AND v.Id=@LinkedEntityId;",
+            _ => null
+        };
+        if (sql is null)
+            return false;
+
+        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            sql,
+            new { TenantId = tenantId, ProjectId = projectId, LinkedEntityId = linkedEntityId },
+            cancellationToken: ct)) == 1;
+    }
+
+    private sealed class LinkScope
+    {
+        public int TenantId { get; init; }
+        public int ProjectId { get; init; }
     }
 
     /// <summary>SHA-256 hex of UTF-8 content for duplicate-save detection.</summary>

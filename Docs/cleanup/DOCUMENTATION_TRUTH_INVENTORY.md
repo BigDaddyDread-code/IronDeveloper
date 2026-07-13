@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **636 files** after CLN-16. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **638 files** after CLN-17. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **636 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 52 |
+| `Canonical` | 53 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 405 |
+| `HistoricalReceipt` | 406 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **636** |
+| **Total** | **638** |
 
 ## Inventory
 
@@ -669,6 +669,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **636 f
 | `Docs/receipts/CLN_15_AUTHENTICATION_TENANT_TOKEN_CONTRACT.md` | CLN-15 Authentication And Tenant Token Contract Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/PROJECT_ACCESS_SWEEP.md` | Project Access Sweep | Cleanup | `Canonical` | 2026-07-13 project access review | `-` | Keep aligned with membership and artifact guards | Security and API |
 | `Docs/receipts/CLN_16_PROJECT_ACCESS_SWEEP.md` | CLN-16 Project Access Sweep Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/EVIDENCE_LINK_SAFETY.md` | Evidence Link Safety | Cleanup | `Canonical` | 2026-07-13 evidence-link review | `-` | Keep aligned with source, document-link, and client route guards | Security and API |
+| `Docs/receipts/CLN_17_EVIDENCE_LINK_SAFETY.md` | CLN-17 Evidence Link Safety Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

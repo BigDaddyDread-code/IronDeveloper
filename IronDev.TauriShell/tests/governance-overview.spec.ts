@@ -40,6 +40,24 @@ test('controls-active overview renders honest empty states without a primary com
   await expect(page.locator('body')).not.toContainText('Fully compliant');
 });
 
+test('cross-project and malformed backend routes remain inert', async ({ page }) => {
+  await prepareSelectedProject(page);
+  const model = overviewFixture('AttentionRequired');
+  model.primaryAction.targetRoute = '/projects/8/work-items/104';
+  model.attentionItems![0].targetRoute = '/projects/8/work-items/104';
+  model.exceptions![0].targetRoute = '//outside.example/project';
+  model.recentDecisions![0].targetRoute = '/not-a-product-route';
+  model.navigation.audit = '/projects/8/library/audit';
+  model.navigation.settings = 'https://outside.example/settings';
+  await mockOverview(page, model);
+  await page.goto('/projects/7/library/governance');
+
+  await expect(page.getByTestId('flow.governance.primaryAction')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View audit' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open settings' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Open WI-104|Inspect|Open Work Item/ })).toHaveCount(0);
+});
+
 test('degraded overview exposes partial section failure without hiding available controls', async ({ page }) => {
   await prepareSelectedProject(page);
   const model = overviewFixture('Degraded');
