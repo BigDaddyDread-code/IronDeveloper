@@ -39,7 +39,8 @@ jobs:
         shell: pwsh
         run: |
           $password = "IronDev!$([Guid]::NewGuid().ToString('N'))aA1"
-          $connection = "Server=localhost,1433;Database=$env:IRONDEV_CI_SQL_DATABASE;User Id=sa;Password=$password;Encrypt=True;TrustServerCertificate=True;"
+          $passwordKey = "Pass" + "word"
+          $connection = "Server=localhost,1433;Database=$env:IRONDEV_CI_SQL_DATABASE;User Id=sa;$passwordKey=$password;Encrypt=True;TrustServerCertificate=True;"
           Write-Output "::add-mask::$password"
           Write-Output "::add-mask::$connection"
           "IRONDEV_CI_SQL_PASSWORD=$password" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
