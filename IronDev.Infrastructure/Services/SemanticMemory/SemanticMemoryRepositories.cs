@@ -20,7 +20,6 @@ public sealed class SemanticArtefactRepository : ISemanticArtefactRepository
 
     public async Task UpsertArtefactAsync(SemanticArtefactDraft artefact, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             MERGE dbo.SemanticArtefacts AS target
@@ -56,7 +55,6 @@ public sealed class SemanticArtefactRepository : ISemanticArtefactRepository
 
     public async Task<SemanticArtefact?> GetArtefactAsync(Guid artefactId, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         return await connection.QuerySingleOrDefaultAsync<SemanticArtefact>(new CommandDefinition(
             "SELECT * FROM dbo.SemanticArtefacts WHERE Id = @ArtefactId;",
@@ -71,7 +69,6 @@ public sealed class SemanticArtefactRepository : ISemanticArtefactRepository
         string? sourceVersionId = null,
         CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         return await connection.QuerySingleOrDefaultAsync<SemanticArtefact>(new CommandDefinition(
             """
@@ -89,7 +86,6 @@ public sealed class SemanticArtefactRepository : ISemanticArtefactRepository
 
     public async Task<IReadOnlyList<SemanticArtefact>> GetProjectArtefactsAsync(int projectId, bool includeStale = false, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<SemanticArtefact>(new CommandDefinition(
             """
@@ -106,7 +102,6 @@ public sealed class SemanticArtefactRepository : ISemanticArtefactRepository
 
     public async Task MarkStaleAsync(SemanticStaleRequest request, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         await connection.ExecuteAsync(new CommandDefinition(
             """
@@ -122,7 +117,6 @@ public sealed class SemanticArtefactRepository : ISemanticArtefactRepository
             cancellationToken: ct));
     }
 }
-
 public sealed class SemanticChunkRepository : ISemanticChunkRepository
 {
     private readonly IDbConnectionFactory _connectionFactory;
@@ -134,7 +128,6 @@ public sealed class SemanticChunkRepository : ISemanticChunkRepository
 
     public async Task ReplaceChunksAsync(Guid artefactId, IReadOnlyList<SemanticChunkDraft> chunks, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         await connection.ExecuteAsync(new CommandDefinition(
             "UPDATE dbo.SemanticChunks SET IsStale = 1 WHERE ArtefactId = @ArtefactId;",
@@ -166,7 +159,6 @@ public sealed class SemanticChunkRepository : ISemanticChunkRepository
 
     public async Task<IReadOnlyList<SemanticChunk>> GetChunksAsync(Guid artefactId, bool includeStale = false, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<SemanticChunk>(new CommandDefinition(
             """
@@ -183,7 +175,6 @@ public sealed class SemanticChunkRepository : ISemanticChunkRepository
 
     public async Task<SemanticChunk?> GetChunkAsync(Guid chunkId, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         return await connection.QuerySingleOrDefaultAsync<SemanticChunk>(new CommandDefinition(
             "SELECT * FROM dbo.SemanticChunks WHERE Id = @ChunkId;",
@@ -193,7 +184,6 @@ public sealed class SemanticChunkRepository : ISemanticChunkRepository
 
     public async Task MarkProjectStaleAsync(int projectId, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         await connection.ExecuteAsync(new CommandDefinition(
             "UPDATE dbo.SemanticChunks SET IsStale = 1 WHERE ProjectId = @ProjectId;",
@@ -203,7 +193,6 @@ public sealed class SemanticChunkRepository : ISemanticChunkRepository
 
     public async Task MarkArtefactChunksStaleAsync(Guid artefactId, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         await connection.ExecuteAsync(new CommandDefinition(
             "UPDATE dbo.SemanticChunks SET IsStale = 1 WHERE ArtefactId = @ArtefactId;",
@@ -213,7 +202,6 @@ public sealed class SemanticChunkRepository : ISemanticChunkRepository
 
     public async Task MarkEmbeddedAsync(Guid chunkId, string weaviateObjectId, string model, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         await connection.ExecuteAsync(new CommandDefinition(
             """
@@ -240,7 +228,6 @@ public sealed class EmbeddingJobRepository : IEmbeddingJobRepository
 
     public async Task CreateAsync(EmbeddingJob job, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             INSERT INTO dbo.EmbeddingJobs
@@ -253,7 +240,6 @@ public sealed class EmbeddingJobRepository : IEmbeddingJobRepository
 
     public async Task<IReadOnlyList<EmbeddingJob>> GetPendingAsync(int take = 25, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<EmbeddingJob>(new CommandDefinition(
             """
@@ -275,7 +261,6 @@ public sealed class EmbeddingJobRepository : IEmbeddingJobRepository
 
     public async Task MarkFailedAsync(Guid jobId, string error, int maxAttempts = 5, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         await connection.ExecuteAsync(new CommandDefinition(
             """
@@ -292,7 +277,6 @@ public sealed class EmbeddingJobRepository : IEmbeddingJobRepository
 
     private async Task UpdateStatusAsync(Guid jobId, string status, string? error, CancellationToken ct)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         await connection.ExecuteAsync(new CommandDefinition(
             """
@@ -319,7 +303,6 @@ public sealed class SemanticSearchTraceRepository : ISemanticSearchTraceReposito
 
     public async Task<Guid> CreateTraceAsync(SemanticSearchQuery query, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         var id = Guid.NewGuid();
         await connection.ExecuteAsync(new CommandDefinition(
@@ -336,7 +319,6 @@ public sealed class SemanticSearchTraceRepository : ISemanticSearchTraceReposito
 
     public async Task AddResultsAsync(Guid traceId, IReadOnlyList<SemanticSearchResult> results, CancellationToken ct = default)
     {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
         using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             INSERT INTO dbo.SemanticSearchTraceResults
@@ -363,127 +345,5 @@ public sealed class SemanticSearchTraceRepository : ISemanticSearchTraceReposito
                 result.MatchReason
             }, cancellationToken: ct));
         }
-    }
-}
-
-internal static class SemanticMemorySchema
-{
-    public static async Task EnsureAsync(IDbConnectionFactory connectionFactory, CancellationToken ct)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        const string sql = """
-            IF OBJECT_ID('dbo.SemanticSearchTraces', 'U') IS NOT NULL
-               AND EXISTS
-               (
-                   SELECT 1
-                   FROM INFORMATION_SCHEMA.COLUMNS
-                   WHERE TABLE_SCHEMA = 'dbo'
-                     AND TABLE_NAME = 'SemanticSearchTraces'
-                     AND COLUMN_NAME = 'Id'
-                     AND DATA_TYPE <> 'uniqueidentifier'
-               )
-            BEGIN
-                IF OBJECT_ID('dbo.SemanticSearchTraceResults', 'U') IS NOT NULL
-                    DROP TABLE dbo.SemanticSearchTraceResults;
-                DROP TABLE dbo.SemanticSearchTraces;
-            END
-
-            IF OBJECT_ID('dbo.SemanticArtefacts', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.SemanticArtefacts
-                (
-                    Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
-                    TenantId INT NULL,
-                    ProjectId INT NOT NULL,
-                    SourceEntityType NVARCHAR(100) NOT NULL,
-                    SourceEntityId NVARCHAR(100) NOT NULL,
-                    SourceVersionId NVARCHAR(100) NULL,
-                    ArtefactType NVARCHAR(100) NOT NULL,
-                    AuthorityLevel NVARCHAR(50) NOT NULL,
-                    Title NVARCHAR(500) NOT NULL,
-                    Summary NVARCHAR(MAX) NULL,
-                    ContentHash NVARCHAR(128) NOT NULL,
-                    IsStale BIT NOT NULL CONSTRAINT DF_SemanticArtefacts_IsStale DEFAULT 0,
-                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_SemanticArtefacts_CreatedUtc DEFAULT SYSUTCDATETIME(),
-                    UpdatedUtc DATETIME2 NOT NULL CONSTRAINT DF_SemanticArtefacts_UpdatedUtc DEFAULT SYSUTCDATETIME()
-                );
-                CREATE INDEX IX_SemanticArtefacts_Project_Source ON dbo.SemanticArtefacts(ProjectId, SourceEntityType, SourceEntityId, SourceVersionId);
-            END
-
-            IF OBJECT_ID('dbo.SemanticChunks', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.SemanticChunks
-                (
-                    Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
-                    ArtefactId UNIQUEIDENTIFIER NOT NULL,
-                    ProjectId INT NOT NULL,
-                    ChunkIndex INT NOT NULL,
-                    ChunkText NVARCHAR(MAX) NOT NULL,
-                    TokenEstimate INT NULL,
-                    ContentHash NVARCHAR(128) NOT NULL,
-                    WeaviateObjectId NVARCHAR(100) NULL,
-                    EmbeddedAtUtc DATETIME2 NULL,
-                    EmbeddingModel NVARCHAR(200) NULL,
-                    IsStale BIT NOT NULL CONSTRAINT DF_SemanticChunks_IsStale DEFAULT 0,
-                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_SemanticChunks_CreatedUtc DEFAULT SYSUTCDATETIME(),
-                    CONSTRAINT FK_SemanticChunks_SemanticArtefacts FOREIGN KEY (ArtefactId) REFERENCES dbo.SemanticArtefacts(Id)
-                );
-                CREATE INDEX IX_SemanticChunks_Project_Artefact ON dbo.SemanticChunks(ProjectId, ArtefactId, IsStale);
-            END
-
-            IF OBJECT_ID('dbo.EmbeddingJobs', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.EmbeddingJobs
-                (
-                    Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
-                    TenantId INT NULL,
-                    ProjectId INT NOT NULL,
-                    SourceEntityType NVARCHAR(100) NOT NULL,
-                    SourceEntityId NVARCHAR(100) NOT NULL,
-                    SourceVersionId NVARCHAR(100) NULL,
-                    JobType NVARCHAR(50) NOT NULL,
-                    Status NVARCHAR(50) NOT NULL,
-                    Attempts INT NOT NULL CONSTRAINT DF_EmbeddingJobs_Attempts DEFAULT 0,
-                    LastError NVARCHAR(MAX) NULL,
-                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_EmbeddingJobs_CreatedUtc DEFAULT SYSUTCDATETIME(),
-                    StartedUtc DATETIME2 NULL,
-                    CompletedUtc DATETIME2 NULL
-                );
-                CREATE INDEX IX_EmbeddingJobs_Status ON dbo.EmbeddingJobs(Status, CreatedUtc);
-            END
-
-            IF OBJECT_ID('dbo.SemanticSearchTraces', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.SemanticSearchTraces
-                (
-                    Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
-                    ProjectId INT NOT NULL,
-                    QueryText NVARCHAR(MAX) NOT NULL,
-                    Consumer NVARCHAR(100) NOT NULL,
-                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_SemanticSearchTraces_CreatedUtc DEFAULT SYSUTCDATETIME()
-                );
-            END
-
-            IF OBJECT_ID('dbo.SemanticSearchTraceResults', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.SemanticSearchTraceResults
-                (
-                    Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
-                    SearchTraceId UNIQUEIDENTIFIER NOT NULL,
-                    ArtefactId UNIQUEIDENTIFIER NOT NULL,
-                    ChunkId UNIQUEIDENTIFIER NOT NULL,
-                    VectorSimilarity FLOAT NOT NULL,
-                    FinalScore FLOAT NOT NULL,
-                    AuthorityBoost FLOAT NOT NULL,
-                    RecencyBoost FLOAT NOT NULL,
-                    SourceTypeBoost FLOAT NOT NULL,
-                    ExplicitLinkBoost FLOAT NOT NULL,
-                    StalePenalty FLOAT NOT NULL,
-                    MatchReason NVARCHAR(MAX) NULL,
-                    CONSTRAINT FK_SemanticSearchTraceResults_SemanticSearchTraces FOREIGN KEY (SearchTraceId) REFERENCES dbo.SemanticSearchTraces(Id)
-                );
-            END
-            """;
-        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: ct));
     }
 }

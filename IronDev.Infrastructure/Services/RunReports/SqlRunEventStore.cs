@@ -12,7 +12,6 @@ public sealed class SqlRunEventStore : IRunEventStore
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly ConcurrentDictionary<string, RunEventBuffer> _liveRuns = new(StringComparer.OrdinalIgnoreCase);
-    private int _schemaEnsured;
 
     public SqlRunEventStore(IDbConnectionFactory connectionFactory)
     {
@@ -25,8 +24,6 @@ public sealed class SqlRunEventStore : IRunEventStore
             return;
 
         var normalized = Normalize(runEvent);
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
-
         using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             INSERT INTO dbo.RunEvents
@@ -70,7 +67,6 @@ public sealed class SqlRunEventStore : IRunEventStore
         if (string.IsNullOrWhiteSpace(runId))
             return [];
 
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         using var connection = _connectionFactory.CreateConnection();
 
         const string sql = """
@@ -90,7 +86,6 @@ public sealed class SqlRunEventStore : IRunEventStore
 
     public async Task<IReadOnlyList<string>> GetRecentRunIdsAsync(int limit = 50, CancellationToken cancellationToken = default)
     {
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         using var connection = _connectionFactory.CreateConnection();
 
         const string sql = """
@@ -142,36 +137,6 @@ public sealed class SqlRunEventStore : IRunEventStore
         {
             buffer.Unsubscribe(subscription.Channel);
         }
-    }
-
-    private async Task EnsureSchemaAsync(CancellationToken cancellationToken)
-    {
-        if (Volatile.Read(ref _schemaEnsured) == 1)
-            return;
-
-        using var connection = _connectionFactory.CreateConnection();
-        const string sql = """
-            IF OBJECT_ID('dbo.RunEvents', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.RunEvents
-                (
-                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                    EventId UNIQUEIDENTIFIER NOT NULL,
-                    RunId NVARCHAR(100) NOT NULL,
-                    TimestampUtc DATETIME2 NOT NULL,
-                    EventType NVARCHAR(100) NOT NULL,
-                    Message NVARCHAR(MAX) NOT NULL,
-                    PayloadJson NVARCHAR(MAX) NULL,
-                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_RunEvents_CreatedUtc DEFAULT SYSUTCDATETIME()
-                );
-
-                CREATE UNIQUE INDEX UX_RunEvents_EventId ON dbo.RunEvents(EventId);
-                CREATE INDEX IX_RunEvents_RunId_Timestamp ON dbo.RunEvents(RunId, TimestampUtc, Id);
-            END
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
-        Volatile.Write(ref _schemaEnsured, 1);
     }
 
     private static RunEventDto Normalize(RunEventDto runEvent) => runEvent with

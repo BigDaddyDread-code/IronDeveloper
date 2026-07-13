@@ -7,7 +7,6 @@ namespace IronDev.Infrastructure.Services.Runs;
 public sealed class SqlRunStore : IRunStore
 {
     private readonly IDbConnectionFactory _connectionFactory;
-    private int _schemaEnsured;
 
     public SqlRunStore(IDbConnectionFactory connectionFactory)
     {
@@ -18,7 +17,6 @@ public sealed class SqlRunStore : IRunStore
         CreateRunRequest request,
         CancellationToken cancellationToken = default)
     {
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         var runId = string.IsNullOrWhiteSpace(request.RunId) ? Guid.NewGuid().ToString("D") : request.RunId;
         var existing = await GetAsync(runId, cancellationToken).ConfigureAwait(false);
         if (existing is not null)
@@ -77,7 +75,6 @@ public sealed class SqlRunStore : IRunStore
         if (string.IsNullOrWhiteSpace(runId))
             return null;
 
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT TOP (1)
@@ -107,7 +104,6 @@ public sealed class SqlRunStore : IRunStore
 
     public async Task<IReadOnlyList<RunRecord>> GetRecentAsync(int limit = 50, CancellationToken cancellationToken = default)
     {
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT TOP (@Limit)
@@ -140,7 +136,6 @@ public sealed class SqlRunStore : IRunStore
         int limit = 200,
         CancellationToken cancellationToken = default)
     {
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT TOP (@Limit)
@@ -173,7 +168,6 @@ public sealed class SqlRunStore : IRunStore
         RunStateTransition transition,
         CancellationToken cancellationToken = default)
     {
-        await EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
         var existing = await GetAsync(transition.RunId, cancellationToken).ConfigureAwait(false);
         if (existing is null)
             return null;
@@ -211,41 +205,6 @@ public sealed class SqlRunStore : IRunStore
 
         await connection.ExecuteAsync(new CommandDefinition(sql, ToRow(run), cancellationToken: cancellationToken)).ConfigureAwait(false);
         return run;
-    }
-
-    private async Task EnsureSchemaAsync(CancellationToken cancellationToken)
-    {
-        if (Volatile.Read(ref _schemaEnsured) == 1)
-            return;
-
-        using var connection = _connectionFactory.CreateConnection();
-        const string sql = """
-            IF OBJECT_ID('dbo.Runs', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.Runs
-                (
-                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                    RunId NVARCHAR(100) NOT NULL,
-                    ProjectId INT NULL,
-                    TicketId BIGINT NULL,
-                    State NVARCHAR(50) NOT NULL,
-                    IsDisposable BIT NOT NULL CONSTRAINT DF_Runs_IsDisposable DEFAULT 0,
-                    Summary NVARCHAR(MAX) NOT NULL CONSTRAINT DF_Runs_Summary DEFAULT '',
-                    FailureReason NVARCHAR(MAX) NULL,
-                    WorkspacePath NVARCHAR(1000) NULL,
-                    CreatedUtc DATETIME2 NOT NULL,
-                    UpdatedUtc DATETIME2 NOT NULL,
-                    StartedUtc DATETIME2 NULL,
-                    CompletedUtc DATETIME2 NULL
-                );
-
-                CREATE UNIQUE INDEX UX_Runs_RunId ON dbo.Runs(RunId);
-                CREATE INDEX IX_Runs_ProjectTicketUpdated ON dbo.Runs(ProjectId, TicketId, UpdatedUtc DESC);
-            END
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
-        Volatile.Write(ref _schemaEnsured, 1);
     }
 
     private static object ToRow(RunRecord run) => new

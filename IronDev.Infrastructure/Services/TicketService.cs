@@ -44,8 +44,6 @@ public sealed class TicketService : ITicketService
     public async Task<long> SaveTicketAsync(ProjectTicket ticket, CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureTicketSchemaAsync(connection, cancellationToken);
-
         // Ownership guard: reject operations where the project belongs to a different tenant.
         const string ownerSql = "SELECT COUNT(1) FROM dbo.Projects WHERE Id = @ProjectId AND TenantId = @TenantId";
         var owns = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
@@ -201,7 +199,6 @@ public sealed class TicketService : ITicketService
             WHERE Id=@Id AND TenantId=@TenantId AND ProjectId=@ProjectId AND IsDeleted=0 AND Revision=@ExpectedRevision;
             """;
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureTicketSchemaAsync(connection, cancellationToken);
         var affected = await connection.ExecuteAsync(new CommandDefinition(sql, new
         {
             ticket.Id,
@@ -261,8 +258,6 @@ public sealed class TicketService : ITicketService
             """;
 
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureTicketSchemaAsync(connection, cancellationToken);
-
         var rows = await connection.QueryAsync<ProjectTicket>(new CommandDefinition(
             sql,
             new { TenantId = _tenant.TenantId, ProjectId = projectId, Take = take },
@@ -289,8 +284,6 @@ public sealed class TicketService : ITicketService
             """;
 
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureTicketSchemaAsync(connection, cancellationToken);
-
         return await connection.QuerySingleOrDefaultAsync<ProjectTicket>(new CommandDefinition(
             sql,
             new { TicketId = ticketId, TenantId = _tenant.TenantId },
@@ -306,45 +299,12 @@ public sealed class TicketService : ITicketService
             """;
 
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureTicketSchemaAsync(connection, cancellationToken);
         var rowsAffected = await connection.ExecuteAsync(new CommandDefinition(
             sql,
             new { TicketId = ticketId, TenantId = _tenant.TenantId },
             cancellationToken: cancellationToken));
 
         return rowsAffected > 0;
-    }
-
-    private static async Task EnsureTicketSchemaAsync(System.Data.IDbConnection connection, CancellationToken cancellationToken)
-    {
-        const string sql = """
-            IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatSessionId') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ProjectTickets ADD SourceChatSessionId BIGINT NULL;
-            END
-
-            IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatMessageId') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ProjectTickets ADD SourceChatMessageId BIGINT NULL;
-            END
-
-            IF COL_LENGTH('dbo.ProjectTickets', 'SourceDocumentVersionId') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ProjectTickets ADD SourceDocumentVersionId BIGINT NULL;
-            END
-
-            IF COL_LENGTH('dbo.ProjectTickets', 'BlockedByTicketIds') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ProjectTickets ADD BlockedByTicketIds NVARCHAR(MAX) NULL;
-            END
-
-            IF COL_LENGTH('dbo.ProjectTickets', 'Revision') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ProjectTickets ADD Revision BIGINT NOT NULL CONSTRAINT DF_ProjectTickets_Revision DEFAULT 1;
-            END
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken));
     }
 
     private async Task EnsureCreatedFromReferencesAsync(ProjectTicket ticket, long ticketId, CancellationToken cancellationToken)

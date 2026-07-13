@@ -19,5 +19,6 @@ This directory owns active cleanup inventories and remediation maps. Start with:
 - [Project Access Sweep](PROJECT_ACCESS_SWEEP.md)
 - [Evidence Link Safety](EVIDENCE_LINK_SAFETY.md)
 - [Sensitive Data Sweep](SENSITIVE_DATA_SWEEP.md)
+- [Database Schema Ownership](DATABASE_SCHEMA_OWNERSHIP.md)
 
 Cleanup documents may classify and schedule behavior changes. They do not themselves grant runtime authority.

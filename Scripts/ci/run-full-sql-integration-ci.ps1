@@ -422,6 +422,20 @@ try {
 
     Invoke-TestLane -Name "Real database smoke expansion" -Filter $realDatabaseSmokeFilter
 
+    # Legacy store tests above still own isolated fixture teardown. Migrate the
+    # shared API catalog after those lanes and before any product API journey.
+    Invoke-TimedCommand "Primary SQL migration manifest" {
+        $previousMigrationConnection = $env:IRONDEV_MIGRATION_CONNECTION_STRING
+        try {
+            $env:IRONDEV_MIGRATION_CONNECTION_STRING = $connectionString
+            & (Join-Path $script:RepoRoot "Database\apply-migrations.ps1")
+            & (Join-Path $script:RepoRoot "Database\verify-migrations.ps1")
+        }
+        finally {
+            $env:IRONDEV_MIGRATION_CONNECTION_STRING = $previousMigrationConnection
+        }
+    }
+
     Invoke-TestLane `
         -Name "REL-3 SQL API alpha smoke" `
         -Project $script:ApiProject `
