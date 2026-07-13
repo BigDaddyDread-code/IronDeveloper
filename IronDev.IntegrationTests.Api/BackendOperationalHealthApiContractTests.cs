@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using IronDev.Core.Operations;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace IronDev.IntegrationTests.Api;
@@ -70,6 +71,24 @@ public sealed class BackendOperationalHealthApiContractTests : ApiTestBase
         AssertBoundary(json.RootElement.GetProperty("boundary"));
         Assert.IsTrue(json.RootElement.GetProperty("data").GetProperty("isHealthReportOnly").GetBoolean());
         AssertNoUnsafeMaterial(text);
+    }
+
+    [TestMethod]
+    public async Task BackendOperationalHealth_ReturnsAllRequiredDiagnosticsWithoutPromotingDeclaredState()
+    {
+        using var client = await AuthedClientAsync();
+        var json = await ReadJsonAsync(await client.GetAsync("/api/v1/operations/health"));
+        var checks = json.RootElement.GetProperty("data").GetProperty("dependencyChecks").EnumerateArray().ToArray();
+        var kinds = checks.Select(check => check.GetProperty("dependencyKind").GetInt32()).ToArray();
+
+        foreach (var required in BackendOperationalHealthBoundaries.RequiredOperationalDiagnostics)
+            CollectionAssert.Contains(kinds, (int)required);
+
+        foreach (var unverifiedKind in new[] { BackendDependencyKind.MigrationState, BackendDependencyKind.BackgroundReindexState })
+        {
+            var check = checks.Single(item => item.GetProperty("dependencyKind").GetInt32() == (int)unverifiedKind);
+            Assert.AreNotEqual((int)BackendDependencyHealthStatus.Available, check.GetProperty("status").GetInt32());
+        }
     }
 
     [TestMethod]

@@ -1,5 +1,6 @@
 using System.Data;
 using IronDev.Core.Agents;
+using IronDev.Core.Configuration;
 using IronDev.Core.Governance;
 using IronDev.Core.Operations;
 using IronDev.Core.Workflow;
@@ -71,6 +72,13 @@ public sealed class BackendOperationalHealthService : IBackendOperationalHealthS
 
         checks.Add(CheckConfiguration(now));
         checks.Add(await CheckDatabaseAsync(now, cancellationToken));
+        checks.Add(CheckModelProvider(now));
+        checks.Add(CheckVectorProvider(now));
+        checks.Add(CheckWorkspaceRoot(now));
+        checks.Add(CheckGit(now));
+        checks.Add(CheckDiskCapacity(now));
+        checks.Add(CheckMigrationState(now));
+        checks.Add(CheckBackgroundReindexState(now));
         checks.Add(Available("governance-event-read-model", BackendDependencyKind.GovernanceEventReadModel, "Governance event read model dependency is available for read-only inspection.", now));
         checks.Add(Available("workflow-read-model", BackendDependencyKind.WorkflowReadModel, "Workflow read model dependency is available for read-only inspection.", now));
         checks.Add(Available("tool-request-read-model", BackendDependencyKind.ToolRequestReadModel, "Tool request read model dependency is available for read-only inspection.", now));
@@ -190,6 +198,84 @@ public sealed class BackendOperationalHealthService : IBackendOperationalHealthS
         return hasDatabaseSetting && hasJwtSetting
             ? Available("configuration-presence", BackendDependencyKind.ConfigurationPresence, "Required configuration keys are present; values are not exposed.", now)
             : NotConfigured("configuration-presence", BackendDependencyKind.ConfigurationPresence, "One or more required configuration keys are not present; values are not exposed.", now);
+    }
+
+    private BackendDependencyHealthCheck CheckModelProvider(DateTimeOffset now)
+    {
+        var settings = _configuration.AsEnumerable()
+            .Where(entry => entry.Value is not null)
+            .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
+        var issues = EnvironmentConfigurationContract.ValidateAiProvider(settings);
+        return issues.Count == 0 && !string.IsNullOrWhiteSpace(_configuration["Ai:Provider"])
+            ? Available("model-provider", BackendDependencyKind.ModelProvider, "Selected model provider configuration is valid; reachability was not inferred.", now)
+            : NotConfigured("model-provider", BackendDependencyKind.ModelProvider, "Model provider configuration is missing or unsupported; values are not exposed.", now);
+    }
+
+    private BackendDependencyHealthCheck CheckVectorProvider(DateTimeOffset now)
+    {
+        var configuredEnabled = _configuration["Weaviate:Enabled"];
+        if (string.IsNullOrWhiteSpace(configuredEnabled))
+            return NotConfigured("vector-provider", BackendDependencyKind.VectorProvider, "Vector provider enabled state is not configured; no endpoint values are exposed.", now);
+        if (!string.IsNullOrWhiteSpace(configuredEnabled) && !bool.TryParse(configuredEnabled, out _))
+            return Degraded("vector-provider", BackendDependencyKind.VectorProvider, "Vector provider enabled state is invalid; no endpoint values are exposed.", now);
+        if (!bool.Parse(configuredEnabled))
+            return Available("vector-provider", BackendDependencyKind.VectorProvider, "Vector provider is explicitly disabled.", now);
+
+        return string.IsNullOrWhiteSpace(_configuration["Weaviate:Endpoint"])
+            ? NotConfigured("vector-provider", BackendDependencyKind.VectorProvider, "Enabled vector provider has no configured endpoint.", now)
+            : Available("vector-provider", BackendDependencyKind.VectorProvider, "Enabled vector provider endpoint is configured; reachability and credentials are not exposed.", now);
+    }
+
+    private BackendDependencyHealthCheck CheckWorkspaceRoot(DateTimeOffset now)
+    {
+        var root = _configuration["DisposableBuild:WorkspaceRoot"] ?? _configuration["LocalTest:WorkspaceRoot"];
+        if (string.IsNullOrWhiteSpace(root))
+            return NotConfigured("workspace-root", BackendDependencyKind.WorkspaceRoot, "Workspace root is not configured.", now);
+        return Directory.Exists(root)
+            ? Available("workspace-root", BackendDependencyKind.WorkspaceRoot, "Configured workspace root exists; its path is not exposed.", now)
+            : Unavailable("workspace-root", BackendDependencyKind.WorkspaceRoot, "Configured workspace root is unavailable; its path is not exposed.", now);
+    }
+
+    private static BackendDependencyHealthCheck CheckGit(DateTimeOffset now) =>
+        ExecutableExistsOnPath("git")
+            ? Available("git-executable", BackendDependencyKind.GitExecutable, "Git executable is available on PATH.", now)
+            : Unavailable("git-executable", BackendDependencyKind.GitExecutable, "Git executable is unavailable on PATH.", now);
+
+    private BackendDependencyHealthCheck CheckDiskCapacity(DateTimeOffset now)
+    {
+        try
+        {
+            var root = _configuration["DisposableBuild:WorkspaceRoot"] ?? _configuration["LocalTest:WorkspaceRoot"] ?? AppContext.BaseDirectory;
+            var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(root))!);
+            return drive.AvailableFreeSpace >= 5L * 1024 * 1024 * 1024
+                ? Available("disk-capacity", BackendDependencyKind.DiskCapacity, "Workspace volume has at least 5 GiB available; exact capacity is not exposed.", now)
+                : Degraded("disk-capacity", BackendDependencyKind.DiskCapacity, "Workspace volume has less than 5 GiB available; exact capacity is not exposed.", now);
+        }
+        catch
+        {
+            return Unavailable("disk-capacity", BackendDependencyKind.DiskCapacity, "Workspace volume capacity could not be inspected.", now);
+        }
+    }
+
+    private BackendDependencyHealthCheck CheckMigrationState(DateTimeOffset now) =>
+        BackendOperationalHealthBoundaries.ClassifyUnverifiedDeclaredState(_configuration["Database:Migrations:State"]) is BackendDependencyHealthStatus.NotConfigured
+            ? NotConfigured("migration-state", BackendDependencyKind.MigrationState, "No migration-state evidence authority is configured; current state was not inferred.", now)
+            : Degraded("migration-state", BackendDependencyKind.MigrationState, "A migration state was declared by configuration but is not live verification evidence; no migration was run.", now);
+
+    private BackendDependencyHealthCheck CheckBackgroundReindexState(DateTimeOffset now)
+    {
+        var state = _configuration["Weaviate:ReindexState"];
+        return BackendOperationalHealthBoundaries.ClassifyUnverifiedDeclaredState(state) is BackendDependencyHealthStatus.NotConfigured
+            ? NotConfigured("background-reindex-state", BackendDependencyKind.BackgroundReindexState, "No background/reindex state authority is configured; state was not inferred.", now)
+            : Degraded("background-reindex-state", BackendDependencyKind.BackgroundReindexState, "A background/reindex state was declared by configuration but is not live job evidence; payloads are not exposed.", now);
+    }
+
+    private static bool ExecutableExistsOnPath(string executable)
+    {
+        var extensions = OperatingSystem.IsWindows() ? new[] { ".exe", ".cmd", ".bat", string.Empty } : new[] { string.Empty };
+        return (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(directory => extensions.Any(extension => File.Exists(Path.Combine(directory, executable + extension))));
     }
 
     private static BackendDependencyHealthCheck CheckReportSurface(

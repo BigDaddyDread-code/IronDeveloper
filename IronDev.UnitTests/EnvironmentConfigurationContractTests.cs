@@ -72,5 +72,15 @@ public sealed class EnvironmentConfigurationContractTests
         Assert.AreEqual("UnsupportedEnvironmentProfile", unknown.Issues.Single(issue => issue.Key == "ASPNETCORE_ENVIRONMENT").Code);
     }
 
+    [TestMethod]
+    public void Global_provider_contract_matches_runtime_dispatch_options()
+    {
+        Assert.AreEqual(0, EnvironmentConfigurationContract.ValidateAiProvider(Settings(("Ai:Provider", "Fake"))).Count);
+        Assert.AreEqual(0, EnvironmentConfigurationContract.ValidateAiProvider(Settings(("Ai:Provider", "OpenAI"), ("Ai:ApiKey", "external-key"))).Count);
+        Assert.AreEqual(0, EnvironmentConfigurationContract.ValidateAiProvider(Settings(("Ai:Provider", "LocalOpenAI"), ("Ai:BaseUrl", "http://localhost:11434"))).Count);
+        Assert.AreEqual(0, EnvironmentConfigurationContract.ValidateAiProvider(Settings(("Ai:Provider", "Ollama"), ("Ai:BaseUrl", "http://localhost:11434"))).Count);
+        Assert.AreEqual("UnsupportedProviderConfiguration", EnvironmentConfigurationContract.ValidateAiProvider(Settings(("Ai:Provider", "Custom"))).Single().Code);
+    }
+
     private static IReadOnlyDictionary<string, string?> Settings(params (string Key, string? Value)[] values) => values.ToDictionary(value => value.Key, value => value.Value, StringComparer.OrdinalIgnoreCase);
 }
