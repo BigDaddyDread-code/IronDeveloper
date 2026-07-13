@@ -13,6 +13,23 @@ export type LibrarySection =
 
 export type GovernanceSection = 'overview' | 'controls' | 'exceptions' | 'decisions' | 'technical';
 
+export interface LegacyRouteAlias {
+  pattern: string;
+  canonicalSurface: 'board' | 'workshop' | 'library' | 'settings';
+  handling: 'redirect-with-notice';
+}
+
+export const legacyRouteAliases: readonly LegacyRouteAlias[] = [
+  { pattern: '/chat', canonicalSurface: 'workshop', handling: 'redirect-with-notice' },
+  { pattern: '/projects/:projectId/chat[/...]', canonicalSurface: 'workshop', handling: 'redirect-with-notice' },
+  { pattern: '/tickets', canonicalSurface: 'board', handling: 'redirect-with-notice' },
+  { pattern: '/build', canonicalSurface: 'board', handling: 'redirect-with-notice' },
+  { pattern: '/runs', canonicalSurface: 'board', handling: 'redirect-with-notice' },
+  { pattern: '/batch', canonicalSurface: 'board', handling: 'redirect-with-notice' },
+  { pattern: '/knowledge', canonicalSurface: 'library', handling: 'redirect-with-notice' },
+  { pattern: '/settings', canonicalSurface: 'settings', handling: 'redirect-with-notice' }
+] as const;
+
 export type ProductRouteKind =
   | 'root'
   | 'signIn'

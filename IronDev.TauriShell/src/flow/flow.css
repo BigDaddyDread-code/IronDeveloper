@@ -4371,3 +4371,32 @@
     grid-column: auto;
   }
 }
+.fl-legacy-route-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.75rem;
+  background: var(--surface-raised);
+}
+
+.fl-legacy-route-notice > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.fl-legacy-route-notice strong,
+.fl-legacy-route-notice span {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .fl-legacy-route-notice {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

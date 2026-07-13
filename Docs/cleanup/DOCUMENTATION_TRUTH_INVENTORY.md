@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **662 files** after CLN-30. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **664 files** after CLN-31. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **662 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 64 |
+| `Canonical` | 65 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 419 |
+| `HistoricalReceipt` | 420 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **662** |
+| **Total** | **664** |
 
 ## Inventory
 
@@ -695,6 +695,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **662 f
 | `Docs/ux/CANONICAL_ROUTE_INVENTORY.md` | Canonical Route Inventory | Product and UX | `Canonical` | 2026-07-15 exact template, parser-kind, scope, and compatibility review | `None; current authority` | Keep aligned with product route inventory and tests | Product and client |
 | `Docs/receipts/CLN_30_SHARED_TRUTH_RENDERERS.md` | CLN-30 Shared Truth Renderers Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/ux/SHARED_TRUTH_RENDERERS.md` | Shared Truth Renderers | Product and UX | `Canonical` | 2026-07-15 renderer, accessibility, visual-tone, and authority-boundary review | `None; current authority` | Keep aligned with design-system state primitives | Product and client |
+| `Docs/receipts/CLN_31_LEGACY_ROUTE_CONTAINMENT.md` | CLN-31 Legacy Route Containment Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/ux/LEGACY_ROUTE_CONTAINMENT.md` | Legacy Route Containment | Product and UX | `Canonical` | Verified by CLN-31 route and navigation tests | `None; current authority` | Keep aligned with compatibility route handling | Product and client |
 
 ## Review Line
 

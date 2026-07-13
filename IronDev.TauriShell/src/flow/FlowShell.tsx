@@ -11,6 +11,7 @@ import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
 import { BoardScreen } from './board/BoardScreen';
 import { RouteOutcomeScreen, type RouteOutcomeKind } from './components/RouteOutcomeScreen';
+import { LegacyRouteNotice } from './components/LegacyRouteNotice';
 import { ProjectNotificationsMenu } from './components/ProjectNotificationsMenu';
 import { LibraryScreen } from './library/LibraryScreen';
 import {
@@ -66,6 +67,9 @@ export function FlowShell() {
   const [activeTicket, setActiveTicket] = useState<ProjectTicket | null>(null);
   const [routeProjectState, setRouteProjectState] = useState<RouteProjectState>('idle');
   const [workItemLoadState, setWorkItemLoadState] = useState<WorkItemLoadState>('idle');
+  const [legacyRouteSource] = useState(() =>
+    currentRoute.compatibility && currentRoute.librarySection !== 'governance' ? currentRoute.pathname : null
+  );
   const projectSelectionRequest = useRef<number | null>(null);
   const previousProjectId = useRef<number | null>(project.selectedProjectId);
   const healthMenuRef = useRef<HTMLDetailsElement | null>(null);
@@ -274,6 +278,7 @@ export function FlowShell() {
     return (
       <div className="fl-root">
         <main className="fl-main">
+          {legacyRouteSource ? <LegacyRouteNotice sourcePath={legacyRouteSource} canonicalPath="/settings" /> : null}
           <button className="fl-btn" type="button" onClick={() => navigateProductPath('/sign-in')}>
             Back to sign in
           </button>
@@ -506,6 +511,9 @@ export function FlowShell() {
       </header>
 
       <main className="fl-main">
+        {legacyRouteSource ? (
+          <LegacyRouteNotice sourcePath={legacyRouteSource} canonicalPath={window.location.pathname} />
+        ) : null}
         {displayedKind === 'board' ? (
           <BoardScreen onOpenWorkItem={openBoardWorkItem} onOpenProvisioning={() => openProjectSetup()} />
         ) : null}
