@@ -49,6 +49,21 @@ public sealed class ProjectAuditExportProjectorTests
     }
 
     [TestMethod]
+    public void AuditEvidenceLinkSafety_IsTheSingleFailClosedProjectLinkRule()
+    {
+        Assert.IsTrue(AuditEvidenceLinkSafety.IsSafeForProject(7, "/projects/7/work-items/42"));
+        Assert.IsTrue(AuditEvidenceLinkSafety.IsSafeForProject(7, "/governance/timeline"));
+        Assert.IsFalse(AuditEvidenceLinkSafety.IsSafeForProject(7, "/projects/8/work-items/42"));
+        Assert.IsFalse(AuditEvidenceLinkSafety.IsSafeForProject(7, "//example.test/evidence"));
+        Assert.IsFalse(AuditEvidenceLinkSafety.IsSafeForProject(7, "https://example.test/evidence"));
+        Assert.IsFalse(AuditEvidenceLinkSafety.IsSafeForProject(0, "/governance/timeline"));
+        Assert.IsFalse(AuditEvidenceLinkSafety.IsSafeForProject(7, "/projects/7/../8/work-items/42"));
+        Assert.IsFalse(AuditEvidenceLinkSafety.IsSafeForProject(7, "/governance/../projects/8/work-items/42"));
+        Assert.IsFalse(AuditEvidenceLinkSafety.IsSafeForProject(7, "/projects/7/%2e%2e/8/work-items/42"));
+        Assert.IsFalse(AuditEvidenceLinkSafety.IsSafeForProject(7, "/projects/+7/work-items/42"));
+    }
+
+    [TestMethod]
     public void Build_RedactsSecretLookingSummaryAndExcludesForeignRows()
     {
         var secret = Item("event-1") with { Summary = "Bearer abc123 was supplied." };

@@ -125,31 +125,59 @@ public static class ProjectAuditExportProjector
     private static AuditLedgerItem SanitizeItem(int projectId, AuditLedgerItem item) => item with
     {
         Summary = ContainsSecretMarker(item.Summary) ? "[redacted audit summary]" : item.Summary,
-        EvidenceLinks = item.EvidenceLinks.Where(link => IsSafeEvidenceLink(projectId, link.Href)).ToArray()
+        EvidenceLinks = item.EvidenceLinks.Where(link => AuditEvidenceLinkSafety.IsSafeForProject(projectId, link.Href)).ToArray()
     };
 
     private static bool ContainsSecretMarker(string value) =>
         SecretMarkers.Any(marker => value.Contains(marker, StringComparison.OrdinalIgnoreCase));
-
-    private static bool IsSafeEvidenceLink(int projectId, string href)
-    {
-        if (string.IsNullOrWhiteSpace(href) || !href.StartsWith('/') || href.StartsWith("//", StringComparison.Ordinal))
-            return false;
-
-        var projectPrefix = "/projects/";
-        if (!href.StartsWith(projectPrefix, StringComparison.OrdinalIgnoreCase))
-            return href.StartsWith("/governance/", StringComparison.OrdinalIgnoreCase) ||
-                   href.StartsWith("/operations/", StringComparison.OrdinalIgnoreCase) ||
-                   href.StartsWith("/workflows/", StringComparison.OrdinalIgnoreCase);
-
-        var remainder = href[projectPrefix.Length..];
-        var separator = remainder.IndexOf('/');
-        return separator > 0 && int.TryParse(remainder[..separator], out var linkedProjectId) && linkedProjectId == projectId;
-    }
 
     private static void Append(IncrementalHash hash, string? value)
     {
         hash.AppendData(Encoding.UTF8.GetBytes(value ?? string.Empty));
         hash.AppendData([0x1f]);
     }
+}
+
+public static class AuditEvidenceLinkSafety
+{
+    public static bool IsSafeForProject(int projectId, string? href)
+    {
+        if (projectId <= 0 || string.IsNullOrWhiteSpace(href) ||
+            !href.StartsWith('/') || href.StartsWith("//", StringComparison.Ordinal) ||
+            href.Any(character => char.IsControl(character) || character == '\\') ||
+            ContainsEncodedPathControl(href))
+            return false;
+
+        var pathEnd = href.IndexOfAny(['?', '#']);
+        var path = pathEnd >= 0 ? href[..pathEnd] : href;
+        string decodedPath;
+        try
+        {
+            decodedPath = Uri.UnescapeDataString(path);
+        }
+        catch (UriFormatException)
+        {
+            return false;
+        }
+
+        var segments = decodedPath.Split('/');
+        if (segments.Length < 3 || segments[0].Length != 0 ||
+            segments.Skip(1).Take(segments.Length - 2).Any(segment => segment.Length == 0 || segment is "." or ".."))
+            return false;
+
+        if (!segments[1].Equals("projects", StringComparison.OrdinalIgnoreCase))
+            return segments[1].Equals("governance", StringComparison.OrdinalIgnoreCase) ||
+                   segments[1].Equals("operations", StringComparison.OrdinalIgnoreCase) ||
+                   segments[1].Equals("workflows", StringComparison.OrdinalIgnoreCase);
+
+        if (segments.Length < 4 || !segments[2].All(char.IsAsciiDigit))
+            return false;
+
+        return int.TryParse(segments[2], NumberStyles.None, CultureInfo.InvariantCulture, out var linkedProjectId) &&
+               linkedProjectId == projectId;
+    }
+
+    private static bool ContainsEncodedPathControl(string href) =>
+        new[] { "%2e", "%2f", "%5c", "%25" }
+            .Any(token => href.Contains(token, StringComparison.OrdinalIgnoreCase));
 }
