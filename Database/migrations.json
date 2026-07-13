@@ -169,6 +169,11 @@
                            "id":  "2026-07-cln-12-user-mutation-attribution",
                            "path":  "Database/migrate_user_mutation_attribution.sql",
                            "description":  "Creates the append-only attribution ledger for authenticated user mutations, including actor, scope, trace, timestamp, and source client."
+                       },
+                       {
+                           "id":  "2026-07-cln-19-runtime-schema-ownership",
+                           "path":  "Database/migrate_runtime_schema_ownership.sql",
+                           "description":  "Moves Runs, RunEvents, semantic metadata, context documents, source references, and ticket compatibility columns from request-path schema creation into the controlled migration manifest."
                        }
                    ]
 }

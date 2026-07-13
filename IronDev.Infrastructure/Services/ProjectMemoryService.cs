@@ -142,7 +142,6 @@ public sealed class ProjectMemoryService : IProjectMemoryService
         CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureContextDocumentSchemaAsync(connection, cancellationToken);
 
         const string sql = """
             SELECT TOP (@Take)
@@ -191,7 +190,6 @@ public sealed class ProjectMemoryService : IProjectMemoryService
             return await GetContextDocumentsAsync(projectId, take: take, cancellationToken: cancellationToken);
 
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureContextDocumentSchemaAsync(connection, cancellationToken);
 
         const string sql = """
             SELECT TOP (@Take)
@@ -246,7 +244,6 @@ public sealed class ProjectMemoryService : IProjectMemoryService
     public async Task<ProjectContextDocument?> GetContextDocumentByIdAsync(long documentId, CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureContextDocumentSchemaAsync(connection, cancellationToken);
 
         const string sql = """
             SELECT
@@ -267,7 +264,6 @@ public sealed class ProjectMemoryService : IProjectMemoryService
     public async Task<long> SaveContextDocumentAsync(ProjectContextDocument document, CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureContextDocumentSchemaAsync(connection, cancellationToken);
 
         await EnsureProjectOwnershipAsync(connection, document.ProjectId, cancellationToken);
 
@@ -356,7 +352,6 @@ public sealed class ProjectMemoryService : IProjectMemoryService
     public async Task<bool> ArchiveContextDocumentAsync(long documentId, CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
-        await EnsureContextDocumentSchemaAsync(connection, cancellationToken);
 
         const string sql = """
             UPDATE dbo.ProjectContextDocuments
@@ -881,40 +876,6 @@ public sealed class ProjectMemoryService : IProjectMemoryService
 
         if (owns == 0)
             throw new UnauthorizedAccessException($"Project {projectId} does not belong to tenant {_tenant.TenantId}.");
-    }
-
-    private static async Task EnsureContextDocumentSchemaAsync(System.Data.IDbConnection connection, CancellationToken cancellationToken)
-    {
-        const string sql = """
-            IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.ProjectContextDocuments
-                (
-                    Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                    TenantId INT NOT NULL CONSTRAINT DF_ProjectContextDocuments_Tenant DEFAULT 1,
-                    ProjectId INT NOT NULL,
-                    DocumentType NVARCHAR(100) NOT NULL,
-                    AuthorityLevel NVARCHAR(50) NOT NULL,
-                    Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectContextDocuments_Status DEFAULT 'Active',
-                    Title NVARCHAR(200) NOT NULL,
-                    Content NVARCHAR(MAX) NOT NULL,
-                    Summary NVARCHAR(MAX) NULL,
-                    Tags NVARCHAR(MAX) NULL,
-                    AppliesToCapability NVARCHAR(200) NULL,
-                    AppliesToArea NVARCHAR(200) NULL,
-                    Source NVARCHAR(200) NULL,
-                    SupersedesDocumentId BIGINT NULL,
-                    SourceChatMessageId BIGINT NULL,
-                    CreatedDate DATETIME2 NOT NULL CONSTRAINT DF_ProjectContextDocuments_CreatedDate DEFAULT SYSUTCDATETIME(),
-                    UpdatedDate DATETIME2 NULL
-                );
-
-                CREATE INDEX IX_ProjectContextDocuments_Project_Type_Authority
-                    ON dbo.ProjectContextDocuments(ProjectId, DocumentType, AuthorityLevel, Status, CreatedDate DESC);
-            END
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken));
     }
 
     private static IEnumerable<string> ExtractSearchTerms(string text)

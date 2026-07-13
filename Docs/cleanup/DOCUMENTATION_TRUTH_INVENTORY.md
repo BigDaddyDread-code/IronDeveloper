@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **640 files** after CLN-18. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **642 files** after CLN-19. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **640 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 54 |
+| `Canonical` | 55 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 407 |
+| `HistoricalReceipt` | 408 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **640** |
+| **Total** | **642** |
 
 ## Inventory
 
@@ -673,6 +673,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **640 f
 | `Docs/receipts/CLN_17_EVIDENCE_LINK_SAFETY.md` | CLN-17 Evidence Link Safety Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/SENSITIVE_DATA_SWEEP.md` | Sensitive Data Sweep | Cleanup | `Canonical` | 2026-07-13 client, API, export, and CI sensitive-data review | `-` | Keep aligned with current disclosure boundaries and evidence scanning | Security and API |
 | `Docs/receipts/CLN_18_SENSITIVE_DATA_SWEEP.md` | CLN-18 Sensitive Data Sweep Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/DATABASE_SCHEMA_OWNERSHIP.md` | Database Schema Ownership | Cleanup | `Canonical` | 2026-07-13 runtime DDL and migration ownership review | `-` | Keep aligned with manifest-owned schema and runtime boundaries | Database and operations |
+| `Docs/receipts/CLN_19_RUNTIME_SCHEMA_OWNERSHIP.md` | CLN-19 Runtime Schema Ownership Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

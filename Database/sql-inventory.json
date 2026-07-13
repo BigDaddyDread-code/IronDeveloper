@@ -2085,6 +2085,61 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Adds reply linkage for durable exact-version Chat source replay. It grants no document access, workflow authority, approval, execution, or source mutation."
+                    },
+                    {
+                        "id":  "database.migrate-user-mutation-attribution",
+                        "path":  "Database/migrate_user_mutation_attribution.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "audit",
+                        "objectsCreated":  [
+                                               "dbo.UserMutationAttribution",
+                                               "dbo.TR_UserMutationAttribution_BlockUpdateDelete",
+                                               "dbo.IX_UserMutationAttribution_ScopeTime",
+                                               "dbo.IX_UserMutationAttribution_Correlation"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Users"
+                                          ],
+                        "referencedBy":  [
+                                             "CLN-12 durable actor attribution"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Creates the append-only ledger for authenticated user mutation attempts and outcomes."
+                    },
+                    {
+                        "id":  "database.migrate-runtime-schema-ownership",
+                        "path":  "Database/migrate_runtime_schema_ownership.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "database",
+                        "objectsCreated":  [
+                                               "dbo.Runs",
+                                               "dbo.RunEvents",
+                                               "dbo.ProjectContextDocuments",
+                                               "dbo.ArtifactSourceReferences",
+                                               "dbo.SemanticArtefacts",
+                                               "dbo.SemanticChunks",
+                                               "dbo.EmbeddingJobs",
+                                               "dbo.SemanticSearchTraces",
+                                               "dbo.SemanticSearchTraceResults",
+                                               "dbo.SemanticEmbeddings",
+                                               "dbo.SemanticIndexRuns",
+                                               "dbo.ProjectTickets compatibility columns"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Tenants",
+                                              "dbo.Projects",
+                                              "dbo.ChatMessages",
+                                              "dbo.ProjectTickets"
+                                          ],
+                        "referencedBy":  [
+                                             "CLN-19 runtime schema ownership"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Idempotent controlled migration replacing request-path CREATE TABLE and ALTER TABLE behavior. Semantic search traces are derived diagnostics; only an unsupported pre-GUID trace shape is rebuilt."
                     }
                 ]
 }

@@ -118,7 +118,6 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
     {
         if (document == null) return;
         await EnsureInitializedAsync();
-        await EnsureMetadataSchemaAsync(ct);
 
         string text = _contentExtractor.Extract(document);
         var artefactId = GuidFromLong(document.Id);
@@ -207,7 +206,6 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
             return Array.Empty<SemanticSearchResult>();
 
         await EnsureInitializedAsync();
-        await EnsureMetadataSchemaAsync(ct);
 
         var queryEmbedding = await _embeddingProvider.EmbedAsync(query.QueryText, ct);
         string collectionName = _options.CollectionPrefix;
@@ -367,7 +365,6 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
         try
         {
             await EnsureInitializedAsync();
-            await EnsureMetadataSchemaAsync(ct);
 
             var documents = await _projectMemoryService.GetContextDocumentsAsync(
                 projectId: request.ProjectId,
@@ -495,7 +492,6 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
     public async Task DeleteEmbeddingAsync(Guid artefactId, CancellationToken ct = default)
     {
         await EnsureInitializedAsync();
-        await EnsureMetadataSchemaAsync(ct);
         try
         {
             var documentId = LongFromGuid(artefactId);
@@ -522,7 +518,6 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
         try
         {
             await EnsureInitializedAsync();
-            await EnsureMetadataSchemaAsync(ct);
             var documents = await _projectMemoryService.GetContextDocumentsAsync(
                 projectId,
                 status: "Active",
@@ -587,54 +582,6 @@ public sealed class WeaviateSemanticMemoryService : ISemanticMemoryService
             .Where(ch => char.IsLetterOrDigit(ch) || ch == '_')
             .ToArray());
         return string.IsNullOrWhiteSpace(cleaned) ? "IronDevKnowledge" : cleaned;
-    }
-
-    private async Task EnsureMetadataSchemaAsync(CancellationToken ct)
-    {
-        await SemanticMemorySchema.EnsureAsync(_connectionFactory, ct);
-        using var connection = _connectionFactory.CreateConnection();
-        const string sql = """
-            IF OBJECT_ID('dbo.SemanticEmbeddings', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.SemanticEmbeddings
-                (
-                    Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
-                    ProjectId INT NOT NULL,
-                    ArtefactId UNIQUEIDENTIFIER NOT NULL,
-                    ArtefactType NVARCHAR(100) NOT NULL,
-                    DocumentId BIGINT NOT NULL,
-                    SourceDocumentVersionId INT NULL,
-                    ContentHash NVARCHAR(128) NOT NULL,
-                    ModelVersion NVARCHAR(100) NOT NULL,
-                    VectorDimensions INT NOT NULL,
-                    VectorData VARBINARY(MAX) NULL,
-                    Provider NVARCHAR(100) NOT NULL,
-                    CollectionName NVARCHAR(255) NULL,
-                    WeaviateObjectId UNIQUEIDENTIFIER NULL,
-                    EmbeddedAtUtc DATETIME2 NOT NULL,
-                    CreatedUtc DATETIME2 NOT NULL CONSTRAINT DF_SemanticEmbeddings_CreatedUtc DEFAULT SYSUTCDATETIME(),
-                    UpdatedUtc DATETIME2 NULL
-                );
-                CREATE UNIQUE INDEX UX_SemanticEmbeddings_ArtefactId ON dbo.SemanticEmbeddings(ArtefactId);
-                CREATE INDEX IX_SemanticEmbeddings_ProjectId ON dbo.SemanticEmbeddings(ProjectId, ArtefactType);
-            END
-
-            IF OBJECT_ID('dbo.SemanticIndexRuns', 'U') IS NULL
-            BEGIN
-                CREATE TABLE dbo.SemanticIndexRuns
-                (
-                    Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                    ProjectId INT NOT NULL,
-                    StartedAtUtc DATETIME2 NOT NULL,
-                    CompletedAtUtc DATETIME2 NULL,
-                    Status NVARCHAR(50) NOT NULL,
-                    TotalDocuments INT NOT NULL,
-                    ProcessedDocuments INT NOT NULL,
-                    ErrorMessage NVARCHAR(MAX) NULL
-                );
-            END
-            """;
-        await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: ct));
     }
 
     private async Task UpsertEmbeddingMetadataAsync(
