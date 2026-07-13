@@ -47,6 +47,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [configVersion, setConfigVersion] = useState(0);
   const config = useMemo(() => getIronDevApiConfig(), [configVersion]);
   const client = useMemo(() => createIronDevApiClient(config), [config]);
+  const tokenConfigured = Boolean(config.token);
   const [apiStatus, setApiStatus] = useState<ApiStatus>(() => createInitialStatus(config));
   const [environmentInfo, setEnvironmentInfo] = useState<EnvironmentInfo | null>(null);
   const [isConnectionBusy, setIsConnectionBusy] = useState(false);
@@ -61,7 +62,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setApiStatus(createInitialStatus(config));
     setEnvironmentInfo(null);
-  }, [config.apiBaseUrl, config.token]);
+  }, [config.apiBaseUrl, tokenConfigured]);
 
   useEffect(() => {
     if (environmentInfo?.isTestEnvironment) {
@@ -132,14 +133,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    if (!config.token) return () => { active = false; };
+    if (!tokenConfigured) return () => { active = false; };
 
     void client.getEnvironment()
       .then((info) => { if (active) setEnvironmentInfo(info); })
       .catch(() => { if (active) setEnvironmentInfo(null); });
 
     return () => { active = false; };
-  }, [client, config.token]);
+  }, [client, tokenConfigured]);
 
   const signIn = useCallback(
     async (request: LoginRequest) => {
@@ -180,7 +181,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      if (config.token) {
+      if (tokenConfigured) {
         await client.logout();
       }
     } catch {
@@ -196,9 +197,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setTokenEditorOpen(false);
       refreshConfig();
     }
-  }, [client, config.token, refreshConfig]);
-
-  const tokenConfigured = Boolean(config.token);
+  }, [client, refreshConfig, tokenConfigured]);
 
   const value: SessionContextState = useMemo(
     () => ({
