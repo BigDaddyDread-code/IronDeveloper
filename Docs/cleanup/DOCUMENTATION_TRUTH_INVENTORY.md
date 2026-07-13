@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **658 files** after CLN-28. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **660 files** after CLN-29. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **658 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 62 |
+| `Canonical` | 63 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 417 |
+| `HistoricalReceipt` | 418 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **658** |
+| **Total** | **660** |
 
 ## Inventory
 
@@ -691,6 +691,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **658 f
 | `Docs/receipts/CLN_27_MEMORY_INDEX_LIFECYCLE.md` | CLN-27 Memory Index Lifecycle Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/memory/MEMORY_QUALITY_BENCHMARK.md` | Memory Quality Benchmark | Memory | `Canonical` | 2026-07-15 fixed-corpus, fail-closed metric, and retrieval-boundary review | `-` | Version expected corpus; record live provider results without rewriting expectations | Memory and quality |
 | `Docs/receipts/CLN_28_MEMORY_QUALITY_BENCHMARK.md` | CLN-28 Memory Quality Benchmark Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/receipts/CLN_29_CANONICAL_ROUTE_INVENTORY.md` | CLN-29 Canonical Route Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/ux/CANONICAL_ROUTE_INVENTORY.md` | Canonical Route Inventory | Product and UX | `Canonical` | Verified by CLN-29 executable route contract | `None; current authority` | Keep aligned with product route inventory and tests | Product and client |
 
 ## Review Line
 

@@ -27,6 +27,39 @@ export type ProductRouteKind =
   | 'settings'
   | 'notFound';
 
+export type CanonicalSurfaceId =
+  | 'session'
+  | 'projects'
+  | 'board'
+  | 'workItem'
+  | 'library'
+  | 'governance'
+  | 'audit'
+  | 'settings';
+
+export interface CanonicalSurface {
+  id: CanonicalSurfaceId;
+  label: string;
+  routeTemplate: string;
+  primary: boolean;
+  projectScoped: boolean;
+}
+
+/**
+ * The product information architecture, in entry-to-work order. This is the
+ * navigation contract; compatibility paths are deliberately absent.
+ */
+export const canonicalSurfaces: readonly CanonicalSurface[] = [
+  { id: 'session', label: 'Session / front door', routeTemplate: '/', primary: false, projectScoped: false },
+  { id: 'projects', label: 'Project chooser', routeTemplate: '/projects', primary: false, projectScoped: false },
+  { id: 'board', label: 'Board', routeTemplate: '/projects/:projectId/board', primary: true, projectScoped: true },
+  { id: 'workItem', label: 'Work Item', routeTemplate: '/projects/:projectId/work-items/:workItemId', primary: true, projectScoped: true },
+  { id: 'library', label: 'Library', routeTemplate: '/projects/:projectId/library', primary: true, projectScoped: true },
+  { id: 'governance', label: 'Governance', routeTemplate: '/projects/:projectId/library/governance', primary: false, projectScoped: true },
+  { id: 'audit', label: 'Audit', routeTemplate: '/projects/:projectId/library/audit', primary: false, projectScoped: true },
+  { id: 'settings', label: 'Settings', routeTemplate: '/projects/:projectId/library/settings', primary: false, projectScoped: true }
+] as const;
+
 export interface ProductRoute {
   kind: ProductRouteKind;
   pathname: string;
