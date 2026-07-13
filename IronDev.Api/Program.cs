@@ -8,6 +8,7 @@ using IronDev.Api.Filters;
 using IronDev.Api.Middleware;
 using IronDev.Api.Services;
 using IronDev.Core.Builder;
+using IronDev.Core.Configuration;
 using IronDev.Core.Chat;
 using IronDev.Core;
 using IronDev.Core.Audit;
@@ -87,6 +88,7 @@ var allowedCorsOrigins = ResolveAllowedCorsOrigins(builder.Configuration, builde
 StartupEnvironmentSafety.Current = CreateEnvironmentSafetyContext(builder);
 var environmentInfo = CreateEnvironmentInfo(builder);
 ValidateEnvironmentSafety(environmentInfo);
+ValidateEnvironmentConfiguration(builder);
 Log.Information(
     "IronDev.Api starting in {Environment} against database {Database}. WorkspaceRoot={WorkspaceRoot}; LogsRoot={LogsRoot}; DangerRealRepoWritesEnabled={DangerRealRepoWritesEnabled}",
     environmentInfo.Environment,
@@ -462,6 +464,14 @@ static EnvironmentInfoDto CreateEnvironmentInfo(WebApplicationBuilder builder)
         LogsRoot = localTest["LogsRoot"] ?? string.Empty,
         DangerRealRepoWritesEnabled = bool.TryParse(localTest["DangerRealRepoWritesEnabled"], out var enabled) && enabled
     };
+}
+
+static void ValidateEnvironmentConfiguration(WebApplicationBuilder builder)
+{
+    var settings = builder.Configuration.AsEnumerable().Where(entry => entry.Value is not null).ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
+    var result = EnvironmentConfigurationContract.Validate(builder.Environment.EnvironmentName, settings);
+    if (!result.IsValid)
+        throw new InvalidOperationException($"Environment configuration contract failed for {result.Profile}: {string.Join(" ", result.Issues.Select(issue => $"{issue.Code}:{issue.Key}"))}");
 }
 
 static string ResolveDatabaseName(string connectionString)

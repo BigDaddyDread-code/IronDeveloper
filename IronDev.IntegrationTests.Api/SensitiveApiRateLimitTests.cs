@@ -139,6 +139,7 @@ public sealed class SensitiveApiRateLimitTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Test");
+                builder.UseSetting("Ai:Provider", "fake");
                 builder.UseSetting("Jwt:Issuer", "irondev-api");
                 builder.UseSetting("Jwt:Audience", "irondev-client");
                 builder.UseSetting("ConnectionStrings:IronDeveloperDb", TestConnectionString());

@@ -54,6 +54,7 @@ public abstract class ApiTestBase
                 .WithWebHostBuilder(builder =>
                 {
                     builder.UseEnvironment("Test");
+                    builder.UseSetting("Ai:Provider", "fake");
                     // Force non-secret configuration values into the builder so Program.cs picks them up.
                     builder.UseSetting("Jwt:Issuer", "irondev-api");
                     builder.UseSetting("Jwt:Audience", "irondev-client");
