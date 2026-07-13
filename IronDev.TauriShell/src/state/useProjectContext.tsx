@@ -211,7 +211,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setSelectedTenantId(config.selectedTenantId ?? null);
     setSelectedProjectId(config.selectedProjectId ?? null);
     void refreshProjectContext();
-  }, [config.selectedTenantId, config.selectedProjectId, refreshProjectContext, config.token]);
+  }, [config.selectedTenantId, config.selectedProjectId, refreshProjectContext, tokenConfigured]);
 
   const value: ProjectContextState = useMemo(
     () => ({
