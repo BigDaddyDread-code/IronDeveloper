@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **672 files** after CLN-35. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **674 files** after CLN-36. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -21,13 +21,13 @@ This inventory classifies every tracked Markdown document under `Docs/`: **672 f
 | Status | Count |
 | --- | ---: |
 | `Canonical` | 66 |
-| `Supporting` | 126 |
-| `HistoricalReceipt` | 424 |
+| `Supporting` | 127 |
+| `HistoricalReceipt` | 425 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **672** |
+| **Total** | **674** |
 
 ## Inventory
 
@@ -705,6 +705,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **672 f
 | `Docs/receipts/CLN_34_REFACTOR_CANDIDATE_INVENTORY.md` | CLN-34 Refactor Candidate Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/DUPLICATE_TRUTH_OWNERSHIP.md` | Duplicate Truth Ownership | Cleanup | `Canonical` | Verified by CLN-35 conformance tests | `None; current authority map` | Keep aligned with rule owners and deletion tests | Architecture and maintainers |
 | `Docs/receipts/CLN_35_DUPLICATE_TRUTH_OWNERSHIP.md` | CLN-35 Duplicate Truth Ownership Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/DEAD_CODE_COMPATIBILITY_DELETION.md` | Dead Code and Compatibility Deletion | Cleanup | `Supporting` | Verified by CLN-36 import and route tests | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Extend only with five-part deletion proof | Architecture and maintainers |
+| `Docs/receipts/CLN_36_DEAD_CODE_COMPATIBILITY_DELETION.md` | CLN-36 Dead Code and Compatibility Deletion Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
