@@ -65,11 +65,14 @@ test('missing projects and unknown paths do not fall through to Board', async ({
 
   await expect(page.getByTestId('flow.routeOutcome.kind')).toContainText('404');
   await expect(page.getByRole('heading', { name: 'Project not found' })).toBeVisible();
+  await expect(page.getByTestId('flow.routeOutcome')).toHaveAttribute('role', 'alert');
+  await expect(page.getByTestId('flow.routeOutcome')).toBeFocused();
   await expect(page.getByTestId('flow.board.columns')).toHaveCount(0);
 
   await page.goto('/definitely-not-a-route');
   await expect(page.getByTestId('flow.routeOutcome.kind')).toContainText('404');
   await expect(page.getByRole('heading', { name: 'This route does not exist' })).toBeVisible();
+  await expect(page.getByTestId('flow.routeOutcome')).toBeFocused();
 });
 
 test('Documents and its upload child are functional project routes', async ({ page }) => {

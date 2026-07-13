@@ -304,6 +304,33 @@
   max-width: 1180px;
   margin: 0 auto;
   padding: 20px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fl-main:focus {
+  outline: none;
+}
+
+.fl-main:focus-visible {
+  outline: 2px solid var(--fl-blue);
+  outline-offset: -2px;
+}
+
+.fl-skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: 8px;
+  left: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #fff;
+  background: var(--fl-ink);
+  transform: translateY(-160%);
+}
+
+.fl-skip-link:focus {
+  transform: translateY(0);
 }
 
 .fl-section-heading {

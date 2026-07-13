@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 export type RouteOutcomeKind = 'permission' | 'notFound' | 'notImplemented' | 'unavailable' | 'conflict' | 'blocked';
 
 interface RouteOutcomeScreenProps {
@@ -26,8 +28,21 @@ export function RouteOutcomeScreen({
   actionLabel,
   onAction
 }: RouteOutcomeScreenProps) {
+  const outcomeRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    outcomeRef.current?.focus();
+  }, [kind, title]);
+
   return (
-    <section className="fl-route-outcome" data-testid="flow.routeOutcome" aria-labelledby="route-outcome-title">
+    <section
+      ref={outcomeRef}
+      className="fl-route-outcome"
+      data-testid="flow.routeOutcome"
+      aria-labelledby="route-outcome-title"
+      role="alert"
+      tabIndex={-1}
+    >
       <p className="fl-plabel" data-testid="flow.routeOutcome.kind">
         {statusByKind[kind]} {kind.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`)}
       </p>

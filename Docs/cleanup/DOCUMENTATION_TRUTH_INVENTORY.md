@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **666 files** after CLN-32. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **668 files** after CLN-33. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -21,13 +21,13 @@ This inventory classifies every tracked Markdown document under `Docs/`: **666 f
 | Status | Count |
 | --- | ---: |
 | `Canonical` | 65 |
-| `Supporting` | 124 |
-| `HistoricalReceipt` | 421 |
+| `Supporting` | 125 |
+| `HistoricalReceipt` | 422 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **666** |
+| **Total** | **668** |
 
 ## Inventory
 
@@ -699,6 +699,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **666 f
 | `Docs/ux/LEGACY_ROUTE_CONTAINMENT.md` | Legacy Route Containment | Product and UX | `Canonical` | 2026-07-15 alias inventory, resolver, identity-preservation, and notice review | `None; current authority` | Keep aligned with compatibility route handling | Product and client |
 | `Docs/cleanup/COMPONENT_REFACTOR_INVENTORY.md` | Component Refactor Inventory | Cleanup | `Supporting` | 2026-07-15 measured against cumulative CLN-31 head and characterized by CLN-32 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Re-measure before each frontend split | Product and client |
 | `Docs/receipts/CLN_32_COMPONENT_REFACTOR_INVENTORY.md` | CLN-32 Component Refactor Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/receipts/CLN_33_ACCESSIBILITY_RESILIENT_STATE_PASS.md` | CLN-33 Accessibility and Resilient State Pass Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/ux/ACCESSIBILITY_RESILIENT_STATE_PASS.md` | Accessibility and Resilient State Pass | Product and UX | `Supporting` | Verified by CLN-33 automated shell tests | `Docs/product/IRONDEV_PRODUCT_UX_SPEC_V2_SYSTEM.md` | Re-run viewport and resilient-state coverage with UI changes | Product and client |
 
 ## Review Line
 

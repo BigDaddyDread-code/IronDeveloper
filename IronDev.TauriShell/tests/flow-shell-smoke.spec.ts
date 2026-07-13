@@ -111,6 +111,22 @@ test('legacy workspace deep links redirect with a compatibility notice and stay 
   await expect(page.locator('.fl-product-nav')).not.toContainText('Runs');
 });
 
+test('shell supports skip navigation, current-page semantics, and route focus management', async ({ page }) => {
+  await mockSelectedProject(page);
+  await page.goto('/projects/7/board');
+
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('flow.main')).toBeFocused();
+  await expect(page.getByTestId('flow.nav.board')).toHaveAttribute('aria-current', 'page');
+
+  await page.getByTestId('flow.nav.library').click();
+  await expect(page).toHaveURL(/\/projects\/7\/library$/);
+  await expect(page.getByTestId('flow.main')).toBeFocused();
+  await expect(page.getByTestId('flow.nav.library')).toHaveAttribute('aria-current', 'page');
+});
+
 test('shape stage earns promotion through the readiness gate', async ({ page }) => {
   await mockSelectedProject(page);
   await page.goto('/');

@@ -73,6 +73,8 @@ export function FlowShell() {
     canonicalPath: string;
   } | null>(null);
   const projectSelectionRequest = useRef<number | null>(null);
+  const mainContentRef = useRef<HTMLElement | null>(null);
+  const previousPathname = useRef(currentRoute.pathname);
   const previousProjectId = useRef<number | null>(project.selectedProjectId);
   const healthMenuRef = useRef<HTMLDetailsElement | null>(null);
   const userMenuRef = useRef<HTMLDetailsElement | null>(null);
@@ -93,6 +95,13 @@ export function FlowShell() {
       previousProjectId.current = project.selectedProjectId;
     }
   }, [project.selectedProjectId]);
+
+  useEffect(() => {
+    if (previousPathname.current !== currentRoute.pathname) {
+      previousPathname.current = currentRoute.pathname;
+      mainContentRef.current?.focus();
+    }
+  }, [currentRoute.pathname]);
 
   // Canonical URLs follow resolved entry state. Legacy workspace URLs are kept
   // as redirects, while governance evidence links retain their original paths.
@@ -419,6 +428,7 @@ export function FlowShell() {
 
   return (
     <div className="fl-root" data-testid="flow.shell">
+      <a className="fl-skip-link" href="#flow-main">Skip to main content</a>
       <header className="fl-appbar">
         <div className="fl-brand-with-project">
           <IronDevBrand /> <span className="fl-brand-separator">/</span>
@@ -430,6 +440,7 @@ export function FlowShell() {
         <nav className="fl-nav fl-product-nav" aria-label="Project">
           <button
             className={displayedKind === 'board' ? 'fl-on' : ''}
+            aria-current={displayedKind === 'board' ? 'page' : undefined}
             type="button"
             onClick={() => openProjectBoard()}
             data-testid="flow.nav.board"
@@ -438,6 +449,7 @@ export function FlowShell() {
           </button>
           <button
             className={displayedKind === 'chat' ? 'fl-on' : ''}
+            aria-current={displayedKind === 'chat' ? 'page' : undefined}
             type="button"
             onClick={() => navigateProductPath(projectPath(activeProjectId, 'chat'))}
             data-testid="flow.nav.workshop"
@@ -446,6 +458,7 @@ export function FlowShell() {
           </button>
           <button
             className={displayedKind === 'workItem' ? 'fl-on' : ''}
+            aria-current={displayedKind === 'workItem' ? 'page' : undefined}
             type="button"
             disabled={!workItemAvailable}
             title={workItemAvailable ? 'Open the current work item' : 'Select a work item from the Board first'}
@@ -460,6 +473,7 @@ export function FlowShell() {
           </button>
           <button
             className={displayedKind === 'library' ? 'fl-on' : ''}
+            aria-current={displayedKind === 'library' ? 'page' : undefined}
             type="button"
             onClick={() => navigateProductPath(projectPath(activeProjectId, 'library'))}
             data-testid="flow.nav.library"
@@ -505,7 +519,7 @@ export function FlowShell() {
         </div>
       </header>
 
-      <main className="fl-main">
+      <main id="flow-main" className="fl-main" data-testid="flow.main" ref={mainContentRef} tabIndex={-1}>
         {legacyRouteTransition ? <LegacyRouteNotice {...legacyRouteTransition} /> : null}
         {displayedKind === 'board' ? (
           <BoardScreen onOpenWorkItem={openBoardWorkItem} onOpenProvisioning={() => openProjectSetup()} />

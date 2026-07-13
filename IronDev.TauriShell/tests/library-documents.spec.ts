@@ -54,15 +54,17 @@ test('an empty project has a distinct Documents state with a real safe action', 
 });
 
 test('Documents list failure preserves the route and retries backend truth', async ({ page }) => {
-  const state = await mockDocumentsWorkspace(page, { listFailures: 2 });
+  const state = await mockDocumentsWorkspace(page, { listUnavailable: true });
   await page.goto('/projects/7/library/documents');
 
   await expect(page.getByRole('heading', { name: 'Documents unavailable', exact: true })).toBeVisible();
   await expect(page).toHaveURL('/projects/7/library/documents');
+  const requestsBeforeRetry = state.listRequests;
+  state.listUnavailable = false;
   await page.getByTestId('flow.routeOutcome.primary').click();
 
   await expect(page.getByTestId('flow.documents.open.201')).toBeVisible();
-  expect(state.listRequests).toBe(3);
+  expect(state.listRequests).toBe(requestsBeforeRetry + 1);
 });
 
 test('a permission refusal does not disclose document identities', async ({ page }) => {
@@ -223,7 +225,7 @@ test.describe('narrow Documents', () => {
 
 interface DocumentsMockOptions {
   documents?: Array<Record<string, unknown>>;
-  listFailures?: number;
+  listUnavailable?: boolean;
   listErrorStatus?: number;
   uploadErrorStatus?: number;
   processFailures?: number;
@@ -234,6 +236,7 @@ interface DocumentsMockOptions {
 
 interface DocumentsMockState {
   listRequests: number;
+  listUnavailable: boolean;
   uploadRequests: number;
   processRequests: number;
   lastUploadBody: string;
@@ -247,12 +250,12 @@ async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions 
   });
   const state: DocumentsMockState = {
     listRequests: 0,
+    listUnavailable: options.listUnavailable ?? false,
     uploadRequests: 0,
     processRequests: 0,
     lastUploadBody: '',
     completeProcessing: releaseProcessing
   };
-  let failuresRemaining = options.listFailures ?? 0;
   let processFailuresRemaining = options.processFailures ?? 0;
   const documents = options.documents ?? [
     {
@@ -442,8 +445,7 @@ async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions 
     if (options.listErrorStatus) {
       return json(route, { error: 'Document access was refused.' }, options.listErrorStatus);
     }
-    if (failuresRemaining > 0) {
-      failuresRemaining -= 1;
+    if (state.listUnavailable) {
       return json(route, { error: 'Documents store unavailable.' }, 503);
     }
     return json(route, documents);
