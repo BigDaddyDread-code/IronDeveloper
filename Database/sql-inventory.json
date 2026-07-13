@@ -2255,6 +2255,28 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Append-only stable identity and version chain. Current truth excludes any version with a successor; archive and supersession remain inspectable lifecycle records."
+                    },
+                    {
+                        "id":  "database.migrate-memory-index-lifecycle",
+                        "path":  "Database/migrate_memory_index_lifecycle.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+                                               "dbo.MemoryIndexLifecycleEvents",
+                                               "dbo.usp_MemoryIndexLifecycleEvent_Record",
+                                               "dbo.vw_CurrentMemoryIndexLifecycle"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users"
+                                          ],
+                        "referencedBy":  [
+                                             "CLN-27 memory index lifecycle"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Append-only SQL lifecycle authority for rebuildable semantic/vector projections with locked source-level transitions."
                     }
                 ]
 }

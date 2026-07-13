@@ -428,7 +428,12 @@ try {
             ,@{ Name = "Project Canon stable append-only trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.TR_ProjectCanonMemory_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "Project Canon version append-only trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.TR_ProjectCanonMemoryVersion_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "Project Canon current procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_ProjectCanonMemory_GetCurrent', N'P') IS NULL THEN 0 ELSE 1 END" }
-            ,@{ Name = "Project Canon history procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_ProjectCanonMemory_ListHistory', N'P') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Project Canon history procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_ProjectCanonMemory_ListHistory', N'P') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "dbo.MemoryIndexLifecycleEvents table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.MemoryIndexLifecycleEvents', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Memory index lifecycle append-only trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.TR_MemoryIndexLifecycleEvents_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Memory index lifecycle event procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.usp_MemoryIndexLifecycleEvent_Record', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Current memory index lifecycle view"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.vw_CurrentMemoryIndexLifecycle', N'V') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Memory index lifecycle source index"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.MemoryIndexLifecycleEvents') AND name = N'IX_MemoryIndexLifecycleEvents_Source'" }
         )
 
         foreach ($check in $checks) {
