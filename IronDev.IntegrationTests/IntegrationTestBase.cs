@@ -13,6 +13,7 @@ using IronDev.Data;
 using IronDev.Services;
 using IronDev.AI;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Core.WorkItems;
 using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.Services;
@@ -81,6 +82,7 @@ public abstract class IntegrationTestBase
         services.AddSingleton<ICurrentTenantContext>(TenantContext);
 
         services.AddScoped<IProjectService, ProjectService>();
+        services.AddScoped<IProjectMembershipService, ProjectMembershipService>();
         services.AddScoped<IChatTurnPersistenceService, ChatTurnPersistenceService>();
         services.AddScoped<IChatHistoryService, ChatHistoryService>();
         services.AddScoped<IChatBaDraftService, ChatBaDraftService>();
@@ -338,6 +340,31 @@ public abstract class IntegrationTestBase
 
         await connection.ExecuteAsync(sql);
         await ApplySqlFileAsync(connection, "Database", "migrate_work_item_identity.sql");
+    }
+
+    protected async Task<MemoryRetrievalRequestContext> CreateMemoryRetrievalContextAsync(
+        int projectId,
+        int tenantId = 1,
+        string consumer = "IntegrationTest")
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        var actorUserId = await connection.ExecuteScalarAsync<int?>(
+            "SELECT TOP (1) Id FROM dbo.Users WHERE IsActive=1 ORDER BY Id")
+            ?? await connection.ExecuteScalarAsync<int>(
+                "INSERT dbo.Users(Email, DisplayName) OUTPUT INSERTED.Id VALUES (@Email, N'Integration Memory Actor')",
+                new { Email = $"memory-actor-{Guid.NewGuid():N}@irondev.local" });
+        await connection.ExecuteAsync("""
+            IF NOT EXISTS (SELECT 1 FROM dbo.TenantUsers WHERE TenantId=@TenantId AND UserId=@UserId)
+                INSERT dbo.TenantUsers(TenantId, UserId, Role) VALUES (@TenantId, @UserId, N'Owner');
+            IF NOT EXISTS (SELECT 1 FROM dbo.ProjectMembers WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND UserId=@UserId)
+                INSERT dbo.ProjectMembers(TenantId, ProjectId, UserId, ProjectRole, AddedByUserId)
+                VALUES (@TenantId, @ProjectId, @UserId, N'Owner', @UserId);
+            ELSE
+                UPDATE dbo.ProjectMembers SET Status=N'Active', ProjectRole=N'Owner', RemovedByUserId=NULL, RemovedUtc=NULL
+                WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND UserId=@UserId;
+            """, new { TenantId = tenantId, ProjectId = projectId, UserId = actorUserId });
+        return MemoryRetrievalRequestContext.ForProjectChat(tenantId, projectId, actorUserId, consumer);
     }
 
     private static async Task ApplySqlFileAsync(SqlConnection connection, params string[] pathParts)

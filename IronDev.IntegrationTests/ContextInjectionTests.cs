@@ -41,7 +41,7 @@ public class ContextInjectionTests : IntegrationTestBase
         await indexService.IndexDirectoryAsync(projectId, _testDirPath);
 
         // 2. Build prompt with a keyword that matches
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "How does the WorkspaceShell work?");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "How does the WorkspaceShell work?", await CreateMemoryRetrievalContextAsync(projectId));
 
         // 3. Verify the fragment content is in the prompt
         StringAssert.Contains(prompt, "WorkspaceShell.tsx");
@@ -57,7 +57,7 @@ public class ContextInjectionTests : IntegrationTestBase
         var promptBuilder = scope.ServiceProvider.GetRequiredService<IPromptContextBuilder>();
         var projectId = await SeedProjectAsync();
 
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "Hello, how are you?");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "Hello, how are you?", await CreateMemoryRetrievalContextAsync(projectId));
 
         Assert.IsFalse(prompt.Contains("## Relevant Code Context"), "Generic prompt should not trigger code injection");
     }

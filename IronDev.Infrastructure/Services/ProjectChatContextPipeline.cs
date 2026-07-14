@@ -28,6 +28,7 @@ public sealed class ProjectChatContextPipeline
     private readonly ISemanticMemoryEvidenceProvider _semanticMemoryEvidenceProvider;
     private readonly IContextAgentRouteJudge _routeJudge;
     private readonly IContextAgentService _contextAgent;
+    private readonly IProjectMembershipService _projectMembership;
 
     public ProjectChatContextPipeline(
         IProjectService projects,
@@ -35,7 +36,8 @@ public sealed class ProjectChatContextPipeline
         IProjectMemoryService memory,
         ISemanticMemoryEvidenceProvider semanticMemoryEvidenceProvider,
         IContextAgentRouteJudge routeJudge,
-        IContextAgentService contextAgent)
+        IContextAgentService contextAgent,
+        IProjectMembershipService projectMembership)
     {
         _projects = projects;
         _tickets = tickets;
@@ -43,6 +45,7 @@ public sealed class ProjectChatContextPipeline
         _semanticMemoryEvidenceProvider = semanticMemoryEvidenceProvider;
         _routeJudge = routeJudge;
         _contextAgent = contextAgent;
+        _projectMembership = projectMembership;
     }
 
     public async Task<ProjectChatContextPipelineResult?> RunAsync(
@@ -51,6 +54,7 @@ public sealed class ProjectChatContextPipeline
         string prompt,
         string recentConversationSummary,
         string traceGroupId,
+        MemoryRetrievalRequestContext memoryRetrievalContext,
         CancellationToken cancellationToken,
         ChatGovernanceMode? explicitMode = null,
         IReadOnlyList<AttachedChatDocumentContext>? attachedDocumentContexts = null)
@@ -58,6 +62,13 @@ public sealed class ProjectChatContextPipeline
         var project = await _projects.GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
         if (project is null)
             return null;
+        if (memoryRetrievalContext is null || memoryRetrievalContext.ProjectId != projectId ||
+            memoryRetrievalContext.TenantId != project.TenantId || memoryRetrievalContext.ActorUserId <= 0 ||
+            string.IsNullOrWhiteSpace(memoryRetrievalContext.Consumer) ||
+            memoryRetrievalContext.AllowedAuthorityClasses.Count == 0 ||
+            memoryRetrievalContext.AsOfUtc.Kind != DateTimeKind.Utc ||
+            !await _projectMembership.HasAccessAsync(memoryRetrievalContext.TenantId, projectId, memoryRetrievalContext.ActorUserId, cancellationToken).ConfigureAwait(false))
+            throw new UnauthorizedAccessException("Project chat memory retrieval requires an authorized explicit security context.");
 
         var contextAgentTickets = await _tickets.GetRecentTicketsAsync(projectId, 20, cancellationToken).ConfigureAwait(false);
         var contextAgentDecisions = await _memory.GetRecentDecisionsAsync(projectId, 20, cancellationToken).ConfigureAwait(false);
@@ -100,6 +111,7 @@ public sealed class ProjectChatContextPipeline
             recentConversationSummary,
             traceGroupId,
             effectiveRoute,
+            memoryRetrievalContext,
             contextAgentTickets,
             contextAgentDecisions,
             rules,
@@ -145,6 +157,7 @@ public sealed class ProjectChatContextPipeline
         string recentConversationSummary,
         string traceGroupId,
         EffectiveChatRoute effectiveRoute,
+        MemoryRetrievalRequestContext memoryRetrievalContext,
         IReadOnlyList<ProjectTicket> contextAgentTickets,
         IReadOnlyList<ProjectDecision> contextAgentDecisions,
         IReadOnlyList<ProjectRule> rules,
@@ -160,6 +173,7 @@ public sealed class ProjectChatContextPipeline
                 UserRequest = prompt,
                 RecentConversationSummary = recentConversationSummary,
                 EffectiveRoute = effectiveRoute,
+                MemoryRetrievalContext = memoryRetrievalContext,
                 RecentTickets = contextAgentTickets,
                 RecentDecisions = contextAgentDecisions,
                 ProjectRules = rules,

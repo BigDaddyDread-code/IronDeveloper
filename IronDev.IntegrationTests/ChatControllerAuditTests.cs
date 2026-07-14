@@ -240,6 +240,7 @@ public sealed class ChatControllerAuditTests
         public Task<ProjectChatResponseResult?> RespondAsync(
             int projectId,
             string prompt,
+            MemoryRetrievalRequestContext memoryRetrievalContext,
             ChatGovernanceMode? explicitMode = null,
             string? dogfoodTraceId = null,
             string? recentConversationSummary = null,

@@ -424,6 +424,7 @@ public sealed class ProjectChannelChatService : IProjectChannelChatService
                 var answer = await _projectChat.RespondAsync(
                     projectId,
                     turn.Prompt,
+                    MemoryRetrievalRequestContext.ForProjectChat(tenantId, projectId, currentUserId, "ProjectChannelChat"),
                     recentConversationSummary: recentConversationSummary,
                     sourceMessageId: turn.RequestMessageId,
                     cancellationToken: cancellationToken);

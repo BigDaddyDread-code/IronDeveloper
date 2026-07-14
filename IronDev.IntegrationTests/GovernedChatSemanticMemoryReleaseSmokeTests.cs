@@ -38,6 +38,7 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
         var result = await responseService.RespondAsync(
             projectId,
             "What should we remember about governed audit persistence?",
+            await CreateMemoryRetrievalContextAsync(projectId, consumer: "GovernedReleaseSmoke"),
             dogfoodTraceId: "release-smoke",
             recentConversationSummary: "user: we merged atomic audit persistence",
             sessionId: sessionId);
@@ -138,7 +139,8 @@ public sealed class GovernedChatSemanticMemoryReleaseSmokeTests : IntegrationTes
             ServiceProvider.GetRequiredService<IProjectMemoryService>(),
             semanticEvidenceProvider,
             new StubContextAgentRouteJudge(),
-            new StubContextAgentService());
+            new StubContextAgentService(),
+            ServiceProvider.GetRequiredService<IProjectMembershipService>());
 
         return new ProjectChatResponseService(
             contextPipeline,

@@ -34,7 +34,7 @@ public class BuilderSafetyTests : IntegrationTestBase
         await Dapper.SqlMapper.ExecuteAsync(connection, "UPDATE dbo.Projects SET LocalPath = @Path, Name = @Name WHERE Id = @Id", 
             new { Path = project.LocalPath, Name = project.Name, Id = projectId });
 
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "How do I fix the shell?");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "How do I fix the shell?", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(prompt, "Host Application: IronDev");
         StringAssert.Contains(prompt, "Active Target Project: IronDev");
@@ -56,7 +56,7 @@ public class BuilderSafetyTests : IntegrationTestBase
         await Dapper.SqlMapper.ExecuteAsync(connection, "UPDATE dbo.Projects SET LocalPath = @Path, Name = @Name WHERE Id = @Id", 
             new { Path = @"C:\repo\BookSeller", Name = "BookSeller", Id = projectId });
 
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "Implement book search.");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "Implement book search.", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(prompt, "Host Application: IronDev");
         StringAssert.Contains(prompt, "Active Target Project: BookSeller");

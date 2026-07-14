@@ -38,6 +38,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
     public async Task<ProjectChatResponseResult?> RespondAsync(
         int projectId,
         string prompt,
+        MemoryRetrievalRequestContext memoryRetrievalContext,
         ChatGovernanceMode? explicitMode = null,
         string? dogfoodTraceId = null,
         string? recentConversationSummary = null,
@@ -62,6 +63,7 @@ public sealed class ProjectChatResponseService : IProjectChatResponseService
             normalizedPrompt,
             recentSummary,
             correlationId,
+            memoryRetrievalContext,
             cancellationToken,
             explicitMode,
             attachedDocumentContexts).ConfigureAwait(false);

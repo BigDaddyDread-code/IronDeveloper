@@ -9,7 +9,7 @@ namespace IronDev.IntegrationTests.AgentMemory;
 [TestCategory("RequiresRealDatabase")]
 [TestCategory("LongRunning")]
 [TestCategory("Store")]
-public sealed class ProjectCanonMemoryLifecycleSqlTests : IntegrationTestBase
+public sealed partial class ProjectCanonMemoryLifecycleSqlTests : IntegrationTestBase
 {
     [TestInitialize]
     public override async Task TestInitialize()
