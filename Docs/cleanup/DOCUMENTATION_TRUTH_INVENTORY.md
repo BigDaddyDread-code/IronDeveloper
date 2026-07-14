@@ -687,7 +687,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **656 f
 | `Docs/receipts/CLN_25_MEMORY_VERSIONING_LIFECYCLE.md` | CLN-25 Memory Versioning and Lifecycle Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/memory/MEMORY_RETRIEVAL_SECURITY.md` | Memory Retrieval Security | Memory | `Canonical` | 2026-07-15 pre-prompt filter and injection review | `-` | Keep aligned with membership and prompt-builder filters | Memory and security |
 | `Docs/receipts/CLN_26_MEMORY_RETRIEVAL_SECURITY.md` | CLN-26 Memory Retrieval Security Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
-| `Docs/memory/MEMORY_INDEX_LIFECYCLE.md` | Memory Index Lifecycle | Memory | `Canonical` | 2026-07-15 SQL and derived-index lifecycle review | `-` | Keep aligned with lifecycle ledger and provider rebuild behaviour | Memory and database |
+| `Docs/memory/MEMORY_INDEX_LIFECYCLE.md` | Memory Index Lifecycle | Memory | `Canonical` | 2026-07-15 SQL and derived-index lifecycle review | `-` | Keep aligned with lifecycle ledger, source versions, and provider rebuild behaviour | Memory and database |
 | `Docs/receipts/CLN_27_MEMORY_INDEX_LIFECYCLE.md` | CLN-27 Memory Index Lifecycle Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line

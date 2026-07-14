@@ -25,6 +25,10 @@ public sealed class MemoryIndexLifecycleContractTests
         StringAssert.Contains(sql, "Invalid memory index lifecycle transition.");
         StringAssert.Contains(sql, "UPDLOCK, HOLDLOCK");
         StringAssert.Contains(sql, "TR_MemoryIndexLifecycleEvents_BlockUpdateDelete");
+        StringAssert.Contains(sql, "Reindex completion requires an unmatched reindex request");
+        StringAssert.Contains(sql, "does not match the active source version");
+        StringAssert.Contains(sql, "timestamps must be monotonic");
+        StringAssert.Contains(sql, "Derived index lifecycle events require a provider");
     }
 
     [TestMethod]
