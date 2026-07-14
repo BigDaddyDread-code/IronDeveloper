@@ -217,6 +217,22 @@ INSERT dbo.Projects (Id, TenantId, Name, Description, LocalPath, CreatedDate, La
 VALUES (2101, 2101, N'CLN-21 Upgrade Project', N'Preservation fixture', N'C:\IronDevUpgradeTest\Project', '2026-07-01T01:03:03', '2026-07-01T01:04:03', N'Ready', 12);
 SET IDENTITY_INSERT dbo.Projects OFF;
 
+SET IDENTITY_INSERT dbo.ProjectDocuments ON;
+INSERT dbo.ProjectDocuments
+    (Id, TenantId, ProjectId, Title, Slug, DocumentType, Status, CreatedAtUtc, CreatedBy)
+VALUES
+    (210107, 2101, 2101, N'CLN-21 preserved source document', N'cln-21-preserved-source', N'Architecture', N'Active', '2026-07-01T01:04:13', N'cln-21-fixture');
+SET IDENTITY_INSERT dbo.ProjectDocuments OFF;
+
+SET IDENTITY_INSERT dbo.ProjectDocumentVersions ON;
+INSERT dbo.ProjectDocumentVersions
+    (Id, DocumentId, VersionMajor, VersionMinor, ContentMarkdown, ChangeSummary, Status, ContentHash, CreatedAtUtc, CreatedBy)
+VALUES
+    (210105, 210107, 1, 0, N'# CLN-21 preserved source', N'Preservation fixture', N'Approved', N'cln21-source-hash-210105', '2026-07-01T01:04:23', N'cln-21-fixture');
+SET IDENTITY_INSERT dbo.ProjectDocumentVersions OFF;
+
+UPDATE dbo.ProjectDocuments SET CurrentVersionId = 210105 WHERE Id = 210107;
+
 SET IDENTITY_INSERT dbo.ProjectContextDocuments ON;
 INSERT dbo.ProjectContextDocuments
     (Id, TenantId, ProjectId, DocumentType, AuthorityLevel, Status, Title, Content, Summary, Tags, AppliesToCapability, AppliesToArea, Source, CreatedDate)

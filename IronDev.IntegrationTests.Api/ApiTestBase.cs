@@ -600,13 +600,15 @@ public abstract class ApiTestBase
             IF OBJECT_ID('dbo.WorkItems', 'U') IS NOT NULL UPDATE dbo.WorkItems SET CurrentContractId = NULL;
             IF OBJECT_ID('dbo.WorkItemContracts', 'U') IS NOT NULL DELETE FROM dbo.WorkItemContracts;
             IF OBJECT_ID('dbo.WorkItems', 'U') IS NOT NULL DELETE FROM dbo.WorkItems;
+            IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
+            IF OBJECT_ID('dbo.RunEvents', 'U') IS NOT NULL DELETE FROM dbo.RunEvents;
+            IF OBJECT_ID('dbo.Runs', 'U') IS NOT NULL DELETE FROM dbo.Runs;
+            DELETE FROM dbo.ProjectTickets;
             IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectContextDocuments;
             IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;
             IF OBJECT_ID('dbo.ProjectDocumentVersions', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentVersions;
             IF OBJECT_ID('dbo.ProjectDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocuments;
             IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DELETE FROM dbo.ArtifactSourceReferences;
-            IF OBJECT_ID('dbo.RunEvents', 'U') IS NOT NULL DELETE FROM dbo.RunEvents;
-            IF OBJECT_ID('dbo.Runs', 'U') IS NOT NULL DELETE FROM dbo.Runs;
             IF OBJECT_ID('dbo.SemanticSearchTraces', 'U') IS NOT NULL DELETE FROM dbo.SemanticSearchTraces;
             IF OBJECT_ID('dbo.EmbeddingJobs', 'U') IS NOT NULL DELETE FROM dbo.EmbeddingJobs;
             IF OBJECT_ID('dbo.SemanticChunks', 'U') IS NOT NULL DELETE FROM dbo.SemanticChunks;
@@ -616,10 +618,8 @@ public abstract class ApiTestBase
             IF OBJECT_ID('dbo.ProjectCommands', 'U') IS NOT NULL DELETE FROM dbo.ProjectCommands;
             IF OBJECT_ID('dbo.ProjectProfileOptions', 'U') IS NOT NULL DELETE FROM dbo.ProjectProfileOptions;
             IF OBJECT_ID('dbo.ProjectRules', 'U') IS NOT NULL DELETE FROM dbo.ProjectRules;
-            IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
             DELETE FROM dbo.ProjectDecisions;
             DELETE FROM dbo.ProjectSummaries;
-            DELETE FROM dbo.ProjectTickets;
             DELETE FROM dbo.ProjectFiles;
             IF OBJECT_ID('dbo.ProjectObservableStates', 'U') IS NOT NULL DELETE FROM dbo.ProjectObservableStates;
             DELETE FROM dbo.ChatMessages;
