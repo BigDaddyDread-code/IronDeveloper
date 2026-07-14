@@ -54,6 +54,7 @@ public static class MemoryQualityBenchmarkEvaluator
     public static MemoryQualityBenchmarkReport Evaluate(MemoryQualityBenchmarkDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
+        Validate(definition);
         var observed = definition.ReferenceResults.ToDictionary(result => result.CaseId, StringComparer.Ordinal);
         var scorable = definition.Cases.Where(item => item.ExpectedTop1 is not null).ToArray();
         var top1 = 0;
@@ -106,5 +107,65 @@ public static class MemoryQualityBenchmarkEvaluator
         for (var index = 0; index < values.Count; index++)
             if (string.Equals(values[index], expected, StringComparison.Ordinal)) return index;
         return -1;
+    }
+
+    private static void Validate(MemoryQualityBenchmarkDefinition definition)
+    {
+        if (string.IsNullOrWhiteSpace(definition.BenchmarkId))
+            throw new ArgumentException("BenchmarkId is required.", nameof(definition));
+        if (definition.Version <= 0)
+            throw new ArgumentException("Benchmark version must be positive.", nameof(definition));
+        if (definition.Cases.Count == 0)
+            throw new ArgumentException("At least one benchmark case is required.", nameof(definition));
+
+        var caseIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in definition.Cases)
+        {
+            Require(item.CaseId, "CaseId", definition);
+            Require(item.Category, $"Category for {item.CaseId}", definition);
+            Require(item.TenantId, $"TenantId for {item.CaseId}", definition);
+            Require(item.ProjectId, $"ProjectId for {item.CaseId}", definition);
+            Require(item.Query, $"Query for {item.CaseId}", definition);
+            if (!caseIds.Add(item.CaseId))
+                throw new ArgumentException($"Duplicate benchmark case: {item.CaseId}.", nameof(definition));
+            if (item.RequiredTop5.Count > 5 || item.RequiredTop5.Distinct(StringComparer.Ordinal).Count() != item.RequiredTop5.Count)
+                throw new ArgumentException($"RequiredTop5 for {item.CaseId} must contain at most five unique IDs.", nameof(definition));
+            if (item.ExpectedTop1 is not null && !item.RequiredTop5.Contains(item.ExpectedTop1, StringComparer.Ordinal))
+                throw new ArgumentException($"ExpectedTop1 for {item.CaseId} must also appear in RequiredTop5.", nameof(definition));
+            if (item.ExpectedTop1 is null && item.RequiredTop5.Count != 0)
+                throw new ArgumentException($"RequiredTop5 for {item.CaseId} requires ExpectedTop1.", nameof(definition));
+            if (item.ExpectNoResult && (item.ExpectedTop1 is not null || item.RequiredTop5.Count != 0 || item.AuthorityOrder.Count != 0))
+                throw new ArgumentException($"No-result case {item.CaseId} cannot declare expected results or authority ordering.", nameof(definition));
+
+            foreach (var pair in item.AuthorityOrder)
+            {
+                Require(pair.Higher, $"AuthorityOrder higher ID for {item.CaseId}", definition);
+                Require(pair.Lower, $"AuthorityOrder lower ID for {item.CaseId}", definition);
+                if (string.Equals(pair.Higher, pair.Lower, StringComparison.Ordinal))
+                    throw new ArgumentException($"AuthorityOrder for {item.CaseId} must contain distinct IDs.", nameof(definition));
+            }
+        }
+
+        var resultCaseIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var result in definition.ReferenceResults)
+        {
+            Require(result.CaseId, "Observed result CaseId", definition);
+            if (!resultCaseIds.Add(result.CaseId))
+                throw new ArgumentException($"Duplicate observed result for case: {result.CaseId}.", nameof(definition));
+            if (!caseIds.Contains(result.CaseId))
+                throw new ArgumentException($"Observed result references unknown case: {result.CaseId}.", nameof(definition));
+            if (result.ResultIds.Any(string.IsNullOrWhiteSpace) || result.ResultIds.Distinct(StringComparer.Ordinal).Count() != result.ResultIds.Count)
+                throw new ArgumentException($"Observed result IDs for {result.CaseId} must be nonblank and unique.", nameof(definition));
+        }
+
+        var missing = caseIds.Except(resultCaseIds, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        if (missing.Length != 0)
+            throw new ArgumentException($"Observed results are required for every case. Missing: {string.Join(", ", missing)}.", nameof(definition));
+    }
+
+    private static void Require(string? value, string field, MemoryQualityBenchmarkDefinition definition)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException($"{field} is required.", nameof(definition));
     }
 }

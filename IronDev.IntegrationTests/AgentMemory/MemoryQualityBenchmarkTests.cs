@@ -18,8 +18,11 @@ public sealed class MemoryQualityBenchmarkTests
     public void FixedBenchmark_ContainsEveryRequiredCategoryExactlyOnce()
     {
         var benchmark = Load();
+        Assert.AreEqual("irondev-memory-quality-v1", benchmark.BenchmarkId);
         Assert.AreEqual(1, benchmark.Version);
         Assert.AreEqual(10, benchmark.Cases.Count);
+        Assert.AreEqual(10, benchmark.Cases.Select(item => item.CaseId).Distinct(StringComparer.Ordinal).Count());
+        Assert.AreEqual(10, benchmark.ReferenceResults.Select(item => item.CaseId).Distinct(StringComparer.Ordinal).Count());
         foreach (var category in Categories)
             Assert.AreEqual(1, benchmark.Cases.Count(item => item.Category == category), category);
     }
@@ -59,11 +62,61 @@ public sealed class MemoryQualityBenchmarkTests
     }
 
     [TestMethod]
-    public void AutomaticInjection_RemainsDisabledPendingLiveProviderBaseline()
+    public void Evaluator_FailsRankingStaleAndNoResultRegressions()
+    {
+        var benchmark = Load();
+        var altered = benchmark with
+        {
+            ReferenceResults = benchmark.ReferenceResults
+                .Select(result => result.CaseId switch
+                {
+                    "exact-title" => result with { ResultIds = ["wrong-title", "adr-017"] },
+                    "narrow-fact" => result with { ResultIds = ["wrong-fact"] },
+                    "current-stale" => result with { ResultIds = ["current-indexing", "stale-indexing"] },
+                    "no-result" => result with { ResultIds = ["hallucinated-quasar"] },
+                    _ => result
+                })
+                .ToArray()
+        };
+
+        var report = MemoryQualityBenchmarkEvaluator.Evaluate(altered);
+        Assert.IsLessThan(0.80, report.Top1Accuracy);
+        Assert.IsLessThan(1.0, report.Top5Accuracy);
+        Assert.AreEqual(1, report.StaleResultCount);
+        Assert.AreEqual(1, report.NoResultErrors);
+        Assert.IsFalse(report.Acceptable);
+    }
+
+    [TestMethod]
+    public void Evaluator_RejectsIncompleteOrAmbiguousObservedResults()
+    {
+        var benchmark = Load();
+        var missing = benchmark with { ReferenceResults = benchmark.ReferenceResults.Skip(1).ToArray() };
+        Assert.ThrowsExactly<ArgumentException>(() => MemoryQualityBenchmarkEvaluator.Evaluate(missing));
+
+        var duplicateIds = benchmark with
+        {
+            ReferenceResults = benchmark.ReferenceResults
+                .Select(result => result.CaseId == "exact-title" ? result with { ResultIds = ["adr-017", "adr-017"] } : result)
+                .ToArray()
+        };
+        Assert.ThrowsExactly<ArgumentException>(() => MemoryQualityBenchmarkEvaluator.Evaluate(duplicateIds));
+
+        var unknown = benchmark with
+        {
+            ReferenceResults = [.. benchmark.ReferenceResults, new MemoryQualityObservedResult { CaseId = "unknown", ResultIds = [] }]
+        };
+        Assert.ThrowsExactly<ArgumentException>(() => MemoryQualityBenchmarkEvaluator.Evaluate(unknown));
+    }
+
+    [TestMethod]
+    public void SemanticCandidateInjection_RemainsDisabledPendingLiveProviderBaseline()
     {
         var contract = Read("Docs", "memory", "MEMORY_QUALITY_BENCHMARK.md");
         StringAssert.Contains(contract, "not a live SQL, in-memory semantic, OpenAI embedding, or Weaviate provider run");
-        StringAssert.Contains(contract, "Automatic memory injection remains disabled");
+        StringAssert.Contains(contract, "SQL-backed project context assembly is active today");
+        StringAssert.Contains(contract, "Automatic semantic/vector candidate injection remains disabled");
+        StringAssert.Contains(contract, "Live-provider-gated semantic retrieval is future work");
         StringAssert.Contains(contract, "named live provider");
     }
 

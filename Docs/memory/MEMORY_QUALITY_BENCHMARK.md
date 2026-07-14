@@ -2,7 +2,7 @@
 
 **Status:** Canonical benchmark contract
 
-**Last reviewed:** 14 July 2026
+**Last reviewed:** 15 July 2026
 
 **Programme slice:** CLN-28
 
@@ -40,7 +40,11 @@ The executable evaluator reports:
 
 The recorded result is a deterministic reference-harness baseline proving corpus and metric behaviour. It is not a live SQL, in-memory semantic, OpenAI embedding, or Weaviate provider run. Provider acceptance requires recording its observed IDs against this unchanged corpus.
 
-Automatic memory injection remains disabled. The reference harness passing does not authorize injection; a named live provider must separately meet and record the thresholds, and retrieval security/authority gates must still hold.
+SQL-backed project context assembly is active today through the CLN-26 retrieval-security path. That current path is not disabled by this benchmark.
+
+Automatic semantic/vector candidate injection remains disabled. Live-provider-gated semantic retrieval is future work. The reference harness passing does not authorize that future injection; a named live provider must separately meet and record the thresholds, and retrieval security/authority gates must still hold.
+
+The evaluator fails closed when observed results are missing, duplicated, attached to an unknown case, or contain duplicate result IDs. A provider run must submit one explicit result envelope for every fixed case, including an empty envelope for the no-result case.
 
 ## Killjoy Line
 
