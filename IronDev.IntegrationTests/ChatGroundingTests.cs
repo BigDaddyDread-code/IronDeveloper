@@ -210,7 +210,7 @@ public class ChatGroundingTests : IntegrationTestBase
         var promptBuilder = scope.ServiceProvider.GetRequiredService<IPromptContextBuilder>();
         var projectId = await SeedProjectAsync();
 
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(prompt,
             "Do not assume DraftTicket is the saved ticket model.",
@@ -224,7 +224,7 @@ public class ChatGroundingTests : IntegrationTestBase
         var promptBuilder = scope.ServiceProvider.GetRequiredService<IPromptContextBuilder>();
         var projectId = await SeedProjectAsync();
 
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(prompt, "SAVED TICKET MANAGEMENT CONTEXT",
             "Prompt must include the SAVED TICKET MANAGEMENT CONTEXT section for saved ticket queries.");
@@ -257,7 +257,7 @@ public class ChatGroundingTests : IntegrationTestBase
             new { ProjectId = projectId });
 
         var promptBuilder = scope.ServiceProvider.GetRequiredService<IPromptContextBuilder>();
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(prompt, "## Relevant project files (high confidence):",
             "Prompt must include a high-confidence files section when snippets are present.");
@@ -277,7 +277,7 @@ public class ChatGroundingTests : IntegrationTestBase
         var projectId = await SeedProjectAsync();
 
         // Project is newly created — IndexingStatus is NULL (not 'Ready')
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(prompt, "LIMITED CONTEXT WARNING",
             "Prompt must include a limited-context warning when project is not indexed.");
@@ -299,7 +299,7 @@ public class ChatGroundingTests : IntegrationTestBase
             new { ProjectId = projectId });
 
         var promptBuilder = scope.ServiceProvider.GetRequiredService<IPromptContextBuilder>();
-        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files");
+        var prompt = await promptBuilder.BuildAsync(projectId, 0, "delete tickets affected files", await CreateMemoryRetrievalContextAsync(projectId));
 
         Assert.IsFalse(prompt.Contains("LIMITED CONTEXT WARNING"),
             "Prompt must NOT include a limited-context warning when project IndexingStatus = 'Ready'.");
@@ -316,7 +316,7 @@ public class ChatGroundingTests : IntegrationTestBase
         var promptBuilder = scope.ServiceProvider.GetRequiredService<IPromptContextBuilder>();
         var projectId = await SeedProjectAsync();
 
-        var packet = await promptBuilder.BuildPacketAsync(projectId, 0, "what do I have to do to delete tickets, affected files");
+        var packet = await promptBuilder.BuildPacketAsync(projectId, 0, "what do I have to do to delete tickets, affected files", await CreateMemoryRetrievalContextAsync(projectId));
 
         Assert.AreEqual(ChatIntent.SavedTicketManagement, packet.Intent,
             "Packet.Intent must be SavedTicketManagement for the canonical delete-tickets query.");
@@ -329,7 +329,7 @@ public class ChatGroundingTests : IntegrationTestBase
         var promptBuilder = scope.ServiceProvider.GetRequiredService<IPromptContextBuilder>();
         var projectId = await SeedProjectAsync();
 
-        var packet = await promptBuilder.BuildPacketAsync(projectId, 0, "delete tickets affected files");
+        var packet = await promptBuilder.BuildPacketAsync(projectId, 0, "delete tickets affected files", await CreateMemoryRetrievalContextAsync(projectId));
 
         Assert.IsTrue(packet.IsProjectNotIndexed,
             "Packet.IsProjectNotIndexed must be true when project has no Ready IndexingStatus.");

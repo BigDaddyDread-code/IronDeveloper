@@ -121,6 +121,7 @@ public sealed class ContextAgentService : IContextAgentService
                     request.ProjectId,
                     request.SessionId,
                     request.UserRequest,
+                    request.MemoryRetrievalContext ?? throw new UnauthorizedAccessException("Memory retrieval context is required."),
                     ct,
                     request.EffectiveRoute);
             }

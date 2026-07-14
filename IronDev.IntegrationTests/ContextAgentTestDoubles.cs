@@ -25,6 +25,7 @@ internal sealed class StubPromptContextBuilder : IPromptContextBuilder
         int projectId,
         long sessionId,
         string userRequest,
+        MemoryRetrievalRequestContext retrievalContext,
         CancellationToken ct = default,
         EffectiveChatRoute? effectiveRoute = null) =>
         Task.FromResult(_packet.FormattedPrompt);
@@ -33,11 +34,12 @@ internal sealed class StubPromptContextBuilder : IPromptContextBuilder
         int projectId,
         long sessionId,
         string userRequest,
+        MemoryRetrievalRequestContext retrievalContext,
         CancellationToken ct = default,
         EffectiveChatRoute? effectiveRoute = null) =>
         Task.FromResult(_packet);
 
-    public Task<PromptPreviewResult> BuildFullPromptForTestingAsync(int projectId, string userMessage, CancellationToken ct = default) =>
+    public Task<PromptPreviewResult> BuildFullPromptForTestingAsync(int projectId, string userMessage, MemoryRetrievalRequestContext retrievalContext, CancellationToken ct = default) =>
         Task.FromResult(new PromptPreviewResult { PromptText = _packet.FormattedPrompt });
 }
 

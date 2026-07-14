@@ -9,7 +9,7 @@ namespace IronDev.IntegrationTests.AgentMemory;
 [TestCategory("RequiresRealDatabase")]
 [TestCategory("LongRunning")]
 [TestCategory("Store")]
-public sealed class ProjectCanonMemoryLifecycleSqlTests : IntegrationTestBase
+public sealed partial class ProjectCanonMemoryLifecycleSqlTests : IntegrationTestBase
 {
     [TestInitialize]
     public override async Task TestInitialize()
@@ -284,6 +284,18 @@ public sealed class ProjectCanonMemoryLifecycleSqlTests : IntegrationTestBase
     {
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
+        if (await connection.ExecuteScalarAsync<int>("SELECT CASE WHEN COL_LENGTH(N'dbo.ChatMessages', N'ReplyToMessageId') IS NULL THEN 1 ELSE 0 END") == 1)
+        {
+            var chatSourceSql = await File.ReadAllTextAsync(Path.Combine(RepositoryRoot(), "Database", "migrate_chat_document_sources.sql"));
+            foreach (var batch in Regex.Split(chatSourceSql, @"(?im)^\s*GO\s*$").Select(value => value.Trim()).Where(value => value.Length > 0))
+                await connection.ExecuteAsync(batch);
+        }
+        if (await connection.ExecuteScalarAsync<int>("SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectMembers', N'U') IS NULL THEN 1 ELSE 0 END") == 1)
+        {
+            var collaborationSql = await File.ReadAllTextAsync(Path.Combine(RepositoryRoot(), "Database", "migrate_project_collaboration.sql"));
+            foreach (var batch in Regex.Split(collaborationSql, @"(?im)^\s*GO\s*$").Select(value => value.Trim()).Where(value => value.Length > 0))
+                await connection.ExecuteAsync(batch);
+        }
         await connection.ExecuteAsync("""
             IF SCHEMA_ID(N'memory') IS NULL EXEC(N'CREATE SCHEMA memory');
             IF OBJECT_ID(N'memory.usp_ProjectCanonMemory_ListHistory', N'P') IS NOT NULL DROP PROCEDURE memory.usp_ProjectCanonMemory_ListHistory;

@@ -2288,6 +2288,7 @@ public sealed class EndpointContractTests : ApiTestBase
         public Task<IronDev.Core.Chat.ProjectChatResponseResult?> RespondAsync(
             int projectId,
             string prompt,
+            IronDev.Core.Models.MemoryRetrievalRequestContext memoryRetrievalContext,
             IronDev.Core.Chat.ChatGovernanceMode? explicitMode = null,
             string? dogfoodTraceId = null,
             string? recentConversationSummary = null,

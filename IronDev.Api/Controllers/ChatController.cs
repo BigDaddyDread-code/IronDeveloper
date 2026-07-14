@@ -224,6 +224,11 @@ public sealed class ChatController : ControllerBase
             answer = await _projectChat.RespondAsync(
                 projectId,
                 request.Prompt,
+                MemoryRetrievalRequestContext.ForProjectChat(
+                    int.TryParse(User.FindFirst("tenant_id")?.Value, out var tenantId) ? tenantId : 0,
+                    projectId,
+                    int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value, out var actorUserId) ? actorUserId : 0,
+                    "ProjectChatApi"),
                 null,
                 recentConversationSummary: recentConversationSummary,
                 sessionId: request.SessionId,

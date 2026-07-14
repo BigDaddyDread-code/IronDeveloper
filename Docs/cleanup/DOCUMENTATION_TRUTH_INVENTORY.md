@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **652 files** after CLN-25. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **654 files** after CLN-26. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **652 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 59 |
+| `Canonical` | 60 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 414 |
+| `HistoricalReceipt` | 415 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **652** |
+| **Total** | **654** |
 
 ## Inventory
 
@@ -685,6 +685,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **652 f
 | `Docs/receipts/CLN_24_MEMORY_WRITE_AUTHORITY_LOCK.md` | CLN-24 Memory Write Authority Lock Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/memory/PROJECT_CANON_MEMORY_LIFECYCLE.md` | Project Canon Memory Lifecycle | Memory | `Canonical` | 2026-07-14 append-only lifecycle review | `-` | Keep aligned with manifest schema and promotion boundary | Memory and governance |
 | `Docs/receipts/CLN_25_MEMORY_VERSIONING_LIFECYCLE.md` | CLN-25 Memory Versioning and Lifecycle Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/memory/MEMORY_RETRIEVAL_SECURITY.md` | Memory Retrieval Security | Memory | `Canonical` | 2026-07-14 pre-prompt filter and injection review | `-` | Keep aligned with membership and prompt-builder filters | Memory and security |
+| `Docs/receipts/CLN_26_MEMORY_RETRIEVAL_SECURITY.md` | CLN-26 Memory Retrieval Security Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

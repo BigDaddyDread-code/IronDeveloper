@@ -198,6 +198,7 @@ public sealed class ContextAgentRequest
     public string UserRequest { get; init; } = string.Empty;
     public string RecentConversationSummary { get; init; } = string.Empty;
     public EffectiveChatRoute? EffectiveRoute { get; init; }
+    public MemoryRetrievalRequestContext? MemoryRetrievalContext { get; init; }
 
     // Optional navigation context
     public long? TicketId { get; init; }

@@ -95,11 +95,12 @@ public class PromptContextBuilderIntegrationTests : IntegrationTestBase
         });
 
         // The query "App.tsx" will trigger the file search MVP logic
-        var prompt = await promptContextBuilder.BuildAsync(projectId, sessionId, "Generate a ticket for App.tsx");
+        var prompt = await promptContextBuilder.BuildAsync(projectId, sessionId, "Generate a ticket for App.tsx", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(prompt, "IronDev is an API-first AI development platform with a Tauri shell.");
         StringAssert.Contains(prompt, "Use SQL memory");
-        StringAssert.Contains(prompt, "Use constructor injection");
+        Assert.IsFalse(prompt.Contains("Use constructor injection", StringComparison.Ordinal),
+            "Legacy context rows cannot self-assert StrongGuidance into prompt authority.");
         StringAssert.Contains(prompt, "Ticket creation");
         StringAssert.Contains(prompt, "Please create a ticket");
         StringAssert.Contains(prompt, "Generate a ticket for App.tsx");

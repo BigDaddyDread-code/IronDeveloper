@@ -89,7 +89,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
 
         // Ask a delete-ticket question against project B (no index)
         var builder = GetPromptBuilder();
-        var packet  = await builder.BuildPacketAsync(projectB, 0, "What do I have to do to delete tickets?");
+        var packet  = await builder.BuildPacketAsync(projectB, 0, "What do I have to do to delete tickets?", await CreateMemoryRetrievalContextAsync(projectB));
 
         // ProjectB has no snippets — should get zero matched files from ProjectB's index
         Assert.AreEqual(0, packet.MatchedFilePaths.Count,
@@ -123,7 +123,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             new { Id = projectId });
 
         var builder = GetPromptBuilder();
-        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets? What files are affected?");
+        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets? What files are affected?", await CreateMemoryRetrievalContextAsync(projectId));
 
         Assert.IsTrue(packet.MatchedFilePaths.Any(p => p.Contains("TicketService")),
             "Delete-ticket query must retrieve TicketService when indexed.");
@@ -158,7 +158,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             new { Id = projectId });
 
         var builder = GetPromptBuilder();
-        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets?");
+        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets?", await CreateMemoryRetrievalContextAsync(projectId));
 
         var hasDraft = packet.MatchedFilePaths.Any(p => p.Contains("DraftTicket", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(hasDraft,
@@ -187,7 +187,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
 
         var builder = GetPromptBuilder();
         // Explicit DraftTicketFlow query
-        var packet  = await builder.BuildPacketAsync(projectId, 0, "How does the Chat → Draft Ticket generation work? What is DraftTicketService?");
+        var packet  = await builder.BuildPacketAsync(projectId, 0, "How does the Chat → Draft Ticket generation work? What is DraftTicketService?", await CreateMemoryRetrievalContextAsync(projectId));
 
         // Intent must be DraftTicketFlow
         Assert.AreEqual(ChatIntent.DraftTicketFlow, packet.Intent,
@@ -221,7 +221,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             content: "It seems you're asking about deleting old chats. Let's refine the approach for the typical use case.");
 
         var builder = GetPromptBuilder();
-        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets?");
+        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets?", await CreateMemoryRetrievalContextAsync(projectId));
 
         // Junk summary and junk ticket must have been filtered
         Assert.IsTrue(packet.FilteredMemoryCount > 0,
@@ -254,7 +254,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             new { Id = projectId });
 
         var builder = GetPromptBuilder();
-        var packet  = await builder.BuildPacketAsync(projectId, 0, "delete tickets affected files");
+        var packet  = await builder.BuildPacketAsync(projectId, 0, "delete tickets affected files", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(packet.FormattedPrompt, "## Relevant project files (high confidence):",
             "Indexed project prompt must include the high-confidence files section.");
@@ -271,7 +271,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
         var projectId = await SeedProjectAsync(); // IndexingStatus = NULL by default
 
         var builder = GetPromptBuilder();
-        var packet  = await builder.BuildPacketAsync(projectId, 0, "delete tickets affected files");
+        var packet  = await builder.BuildPacketAsync(projectId, 0, "delete tickets affected files", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(packet.FormattedPrompt, "LIMITED CONTEXT WARNING",
             "Non-indexed project prompt must include LIMITED CONTEXT WARNING.");
@@ -305,7 +305,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             new { Id = projectId });
 
         var builder = GetPromptBuilder();
-        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets? What files are affected?");
+        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets? What files are affected?", await CreateMemoryRetrievalContextAsync(projectId));
 
         StringAssert.Contains(packet.FormattedPrompt, "TicketService",
             "Delete-ticket prompt must mention TicketService.");
@@ -334,7 +334,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             new { Id = projectId });
 
         var builder = GetPromptBuilder();
-        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets?");
+        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets?", await CreateMemoryRetrievalContextAsync(projectId));
 
         // The ARCHITECTURAL CONTEXT RULE block in the prompt explicitly states these must not be used.
         // The prompt itself must NOT introduce them as instructions to the LLM.
@@ -370,7 +370,7 @@ public class ChatGroundingQualityTests : IntegrationTestBase
             content: "TicketList.tsx needs a confirmation dialog before DeleteSelectedTicketCommand fires.");
 
         var builder = GetPromptBuilder();
-        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets?");
+        var packet  = await builder.BuildPacketAsync(projectId, 0, "What do I have to do to delete tickets?", await CreateMemoryRetrievalContextAsync(projectId));
 
         // The DraftTicket ticket must be excluded
         var draftTicketInPrompt = packet.Tickets.Any(t =>
