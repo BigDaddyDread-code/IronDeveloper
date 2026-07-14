@@ -124,7 +124,7 @@ try {
     Write-Host "Isolated database: $database"
     Write-Host "Build output: $artifactRoot"
 
-    & (Join-Path $repoRoot "Database\verify-clean-database.ps1") `
+    & (Join-Path $repoRoot "Database\verify-fresh-install.ps1") `
         -ConnectionString $baseBuilder.ConnectionString `
         -Database $database `
         -KeepDatabase
@@ -145,7 +145,7 @@ try {
     }
 
     Write-Host "PASS platform baseline"
-    Write-Host "  Clean migrations: passed"
+    Write-Host "  Fresh install: migrations, seed, API, login, project load, and Board smoke passed"
     Write-Host "  In-process API contract: passed"
     Write-Host "  Frontend/API contract: $(if ($SkipFrontend) { 'skipped by request' } else { 'passed' })"
     $validationPassed = $true

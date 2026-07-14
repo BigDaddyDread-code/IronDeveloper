@@ -54,6 +54,14 @@ For a clean supported baseline, create an isolated test-shaped database, build t
 .\Database\verify-clean-database.ps1
 ```
 
+For the CLN-20 product-level fresh-install proof, run the clean verifier and then prove seed, real API startup, login, tenant selection, seeded project load, and the core Board read against the same isolated database:
+
+```powershell
+.\Database\verify-fresh-install.ps1
+```
+
+The fresh-install script owns its temporary database by default. It accepts `-KeepDatabase` only for a containing CI lane such as `Scripts/ci/run-platform-baseline-ci.ps1`, which performs the final guarded cleanup after its remaining contract tests.
+
 CI supplies its SQL connection and a unique `IronDev_CI_*` database name. The script refuses any target that does not end in `_Test` or start with `IronDev_CI_`. `IRONDEV_MIGRATION_CONNECTION_STRING` is the non-command-line connection seam used by the clean verifier so credentials are not passed to child process arguments.
 
 ## Migration state decision

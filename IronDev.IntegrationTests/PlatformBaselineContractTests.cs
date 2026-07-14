@@ -8,7 +8,7 @@ public sealed class PlatformBaselineContractTests
     {
         var script = Read("Scripts", "ci", "run-platform-baseline-ci.ps1");
 
-        StringAssert.Contains(script, "Database\\verify-clean-database.ps1");
+        StringAssert.Contains(script, "Database\\verify-fresh-install.ps1");
         StringAssert.Contains(script, "EndpointContractTests");
         StringAssert.Contains(script, "ApiTestBaseCatalogGuardContractTests");
         StringAssert.Contains(script, "TestCategory!=ProcessExecution");
@@ -35,6 +35,23 @@ public sealed class PlatformBaselineContractTests
         StringAssert.Contains(fullSql, "Isolated platform baseline");
         StringAssert.Contains(fullSql, "Scripts\\ci\\run-platform-baseline-ci.ps1");
         AssertOrder(fullSql, "Isolated platform baseline", "SQL-backed governance stores");
+    }
+
+    [TestMethod]
+    public void FreshInstallVerifier_ProvesSeededApiLoginProjectAndCoreBoard()
+    {
+        var script = Read("Database", "verify-fresh-install.ps1");
+
+        StringAssert.Contains(script, "verify-clean-database.ps1");
+        StringAssert.Contains(script, "tools\\localtest\\localtest-seed.sql");
+        StringAssert.Contains(script, "IronDev.Api\\IronDev.Api.csproj");
+        StringAssert.Contains(script, "/api/auth/login");
+        StringAssert.Contains(script, "/api/tenants/select");
+        StringAssert.Contains(script, "/api/projects/1");
+        StringAssert.Contains(script, "/api/projects/1/board");
+        StringAssert.Contains(script, "Refusing fresh-install proof against");
+        StringAssert.Contains(script, "PASS fresh-install migration proof");
+        StringAssert.Contains(script, "Remove-TestDatabase");
     }
 
     [TestMethod]
