@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **684 files** after CLN-41. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **686 files** after CLN-42. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **684 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 70 |
+| `Canonical` | 71 |
 | `Supporting` | 128 |
-| `HistoricalReceipt` | 430 |
+| `HistoricalReceipt` | 431 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **684** |
+| **Total** | **686** |
 
 ## Inventory
 
@@ -717,6 +717,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **684 f
 | `Docs/receipts/CLN_40_WORKSPACE_CLEANUP_RETENTION.md` | CLN-40 Workspace Cleanup and Retention Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/LOCALTEST_RESET_AND_SUPPORT_BUNDLE.md` | LocalTest Reset and Support Bundle | Cleanup | `Canonical` | LocalTest operations runbook by CLN-41 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Keep aligned with guarded reset/export script | Operations and support |
 | `Docs/receipts/CLN_41_RESET_SUPPORT_BUNDLE.md` | CLN-41 Reset and Support Bundle Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/CLEAN_CLONE_QUALIFICATION.md` | Clean-Clone Qualification | Cleanup | `Canonical` | Qualification runbook by CLN-42 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Execute from clean machine and retain real evidence | Release and operations |
+| `Docs/receipts/CLN_42_CLEAN_CLONE_QUALIFICATION.md` | CLN-42 Clean-Clone Qualification Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
