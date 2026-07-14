@@ -1,6 +1,8 @@
 using IronDev.Core.KnowledgeCompiler;
+using IronDev.Api.Auth;
 using IronDev.Api.Middleware;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Governance;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Services;
@@ -15,11 +17,13 @@ public sealed class MemoryController : ControllerBase
 {
     private readonly IProjectMemoryService _memory;
     private readonly ISemanticMemoryService _semanticMemory;
+    private readonly IUserService _users;
 
-    public MemoryController(IProjectMemoryService memory, ISemanticMemoryService semanticMemory)
+    public MemoryController(IProjectMemoryService memory, ISemanticMemoryService semanticMemory, IUserService users)
     {
         _memory = memory;
         _semanticMemory = semanticMemory;
+        _users = users;
     }
 
     [HttpGet("api/projects/{projectId:int}/memory/summary")]
@@ -27,16 +31,25 @@ public sealed class MemoryController : ControllerBase
         _memory.GetLatestSummaryAsync(projectId, ct);
 
     [HttpPost("api/projects/{projectId:int}/memory/summary")]
-    public Task<long> SaveSummary(ProjectSummary summary, CancellationToken ct) =>
-        _memory.SaveSummaryAsync(summary, ct);
+    public async Task<ActionResult<long>> SaveSummary(int projectId, ProjectSummary summary, CancellationToken ct)
+    {
+        var scopeError = BindRouteScope(projectId, summary.ProjectId);
+        if (scopeError is not null) return scopeError;
+        summary.ProjectId = projectId;
+        summary.TenantId = CurrentUser().TenantId!.Value;
+        return Ok(await _memory.SaveSummaryAsync(summary, ct));
+    }
 
     [HttpGet("api/projects/{projectId:int}/memory/decisions")]
     public Task<IReadOnlyList<ProjectDecision>> GetDecisions(int projectId, [FromQuery] int take = 10, CancellationToken ct = default) =>
         _memory.GetRecentDecisionsAsync(projectId, take, ct);
 
     [HttpPost("api/projects/{projectId:int}/memory/decisions")]
-    public Task<long> SaveDecision(ProjectDecision decision, CancellationToken ct) =>
-        _memory.SaveDecisionAsync(decision, ct);
+    public ActionResult<long> SaveDecision(int projectId, ProjectDecision decision, CancellationToken ct) =>
+        Conflict(Refusal(
+            "GovernedPromotionRequired",
+            "Direct Project Canon decision writes are disabled. Create a memory proposal and promote it through governed review.",
+            forbiddenActions: ["Write a Project Canon decision without governed promotion evidence."]));
 
     [HttpGet("api/projects/{projectId:int}/memory/documents")]
     public Task<IReadOnlyList<ProjectContextDocument>> GetDocuments(
@@ -117,15 +130,17 @@ public sealed class MemoryController : ControllerBase
     }
 
     [HttpPost("api/projects/{projectId:int}/memory/reindex")]
-    public async Task<MemoryReindexResponseDto> ReindexMemory(int projectId, CancellationToken ct)
+    public async Task<ActionResult<MemoryReindexResponseDto>> ReindexMemory(int projectId, CancellationToken ct)
     {
+        if (!await CanMaintainMemoryAsync(ct))
+            return StatusCode(StatusCodes.Status403Forbidden, MaintenanceRefusal());
         await _semanticMemory.RebuildProjectAsync(projectId, ct);
-        return new MemoryReindexResponseDto
+        return Ok(new MemoryReindexResponseDto
         {
             ProjectId = projectId,
             Status = "completed",
             Message = "Project memory reindex completed."
-        };
+        });
     }
 
     [HttpGet("api/memory/documents/{documentId:long}")]
@@ -134,13 +149,25 @@ public sealed class MemoryController : ControllerBase
         _memory.GetContextDocumentByIdAsync(documentId, ct);
 
     [HttpPost("api/projects/{projectId:int}/memory/documents")]
-    public Task<long> SaveDocument(ProjectContextDocument document, CancellationToken ct) =>
-        _memory.SaveContextDocumentAsync(document, ct);
+    public async Task<ActionResult<long>> SaveDocument(int projectId, ProjectContextDocument document, CancellationToken ct)
+    {
+        var scopeError = BindRouteScope(projectId, document.ProjectId);
+        if (scopeError is not null) return scopeError;
+
+        document.ProjectId = projectId;
+        document.TenantId = CurrentUser().TenantId!.Value;
+        document.AuthorityLevel = "ObservedFact";
+        document.Status = "Active";
+        document.SupersedesDocumentId = null;
+        return Ok(await _memory.SaveContextDocumentAsync(document, ct));
+    }
 
     [HttpDelete("api/memory/documents/{documentId:long}")]
     [RequireProjectArtifactAccess(ProjectArtifactKind.MemoryDocument, "documentId")]
     public async Task<IActionResult> ArchiveDocument(long documentId, CancellationToken ct)
     {
+        if (!await CanMaintainMemoryAsync(ct))
+            return StatusCode(StatusCodes.Status403Forbidden, MaintenanceRefusal());
         var ok = await _memory.ArchiveContextDocumentAsync(documentId, ct);
         return ok ? NoContent() : NotFound();
     }
@@ -160,14 +187,74 @@ public sealed class MemoryController : ControllerBase
         _memory.GetPlanByTicketIdAsync(ticketId, ct);
 
     [HttpPost("api/projects/{projectId:int}/memory/plans")]
-    public Task<long> SavePlan(ProjectImplementationPlan plan, CancellationToken ct) =>
-        _memory.SavePlanAsync(plan, ct);
+    public async Task<ActionResult<long>> SavePlan(int projectId, ProjectImplementationPlan plan, CancellationToken ct)
+    {
+        var scopeError = BindRouteScope(projectId, plan.ProjectId);
+        if (scopeError is not null) return scopeError;
+        plan.ProjectId = projectId;
+        plan.TenantId = CurrentUser().TenantId!.Value;
+        return Ok(await _memory.SavePlanAsync(plan, ct));
+    }
 
     [HttpGet("api/projects/{projectId:int}/memory/rules")]
     public Task<IReadOnlyList<ProjectRule>> GetRules(int projectId, CancellationToken ct) =>
         _memory.GetProjectRulesAsync(projectId, ct);
 
     [HttpPost("api/projects/{projectId:int}/memory/rules")]
-    public Task<long> SaveRule(ProjectRule rule, CancellationToken ct) =>
-        _memory.SaveProjectRuleAsync(rule, ct);
+    public ActionResult<long> SaveRule(int projectId, ProjectRule rule, CancellationToken ct) =>
+        Conflict(Refusal(
+            "GovernedPromotionRequired",
+            "Direct Project Canon rule writes are disabled. Create a memory proposal and promote it through governed review.",
+            forbiddenActions: ["Write an enforced Project Canon rule without governed promotion evidence."]));
+
+    private ActionResult<long>? BindRouteScope(int routeProjectId, int bodyProjectId)
+    {
+        var current = CurrentUser();
+        if (current.TenantId is null || current.UserId <= 0)
+            return StatusCode(StatusCodes.Status403Forbidden, Refusal(
+                "AuthenticatedTenantRequired",
+                "An authenticated user with a selected tenant is required."));
+        if (bodyProjectId > 0 && bodyProjectId != routeProjectId)
+            return BadRequest(Refusal(
+                "ProjectScopeMismatch",
+                "The route project is authoritative.",
+                blockedReasons: ["The body project does not match the route project."],
+                forbiddenActions: ["Write memory across project scope."]));
+        return null;
+    }
+
+    private async Task<bool> CanMaintainMemoryAsync(CancellationToken ct)
+    {
+        var current = CurrentUser();
+        if (current.TenantId is null || current.UserId <= 0)
+            return false;
+        var role = await _users.GetTenantRoleAsync(current.UserId, current.TenantId.Value, ct);
+        return ProjectMemoryCapabilities.CanMaintainProjectMemory(role);
+    }
+
+    private GovernedRefusalEnvelope MaintenanceRefusal() => Refusal(
+        "ProjectMemoryMaintenanceCapabilityRequired",
+        "This operation requires the project-memory maintenance capability.",
+        missingEvidence: [ProjectMemoryCapabilities.MaintainProjectMemory],
+        nextSafeActions: ["Ask a tenant Owner or TenantAdmin to perform the maintenance operation."],
+        forbiddenActions: ["Archive Project Canon context", "Rebuild the derived memory index"]);
+
+    private GovernedRefusalEnvelope Refusal(
+        string reasonCode,
+        string message,
+        IEnumerable<string>? blockedReasons = null,
+        IEnumerable<string>? missingEvidence = null,
+        IEnumerable<string>? nextSafeActions = null,
+        IEnumerable<string>? forbiddenActions = null) =>
+        GovernedRefusal.Create(
+            reasonCode,
+            message,
+            HttpContext.Items[RequestTracingMiddleware.CorrelationHeaderName]?.ToString() ?? HttpContext.TraceIdentifier,
+            blockedReasons,
+            missingEvidence,
+            nextSafeActions,
+            forbiddenActions);
+
+    private CurrentUserContext CurrentUser() =>
+        new(HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
 }

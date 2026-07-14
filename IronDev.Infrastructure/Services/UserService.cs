@@ -82,6 +82,16 @@ public static class TenantUserRoles
         All.First(known => string.Equals(known, role, StringComparison.OrdinalIgnoreCase));
 }
 
+/// <summary>Named product capability for project-memory lifecycle and derived-index maintenance.</summary>
+public static class ProjectMemoryCapabilities
+{
+    public const string MaintainProjectMemory = "project-memory.maintain";
+
+    public static bool CanMaintainProjectMemory(string? tenantRole) =>
+        string.Equals(tenantRole, TenantUserRoles.Owner, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(tenantRole, TenantUserRoles.TenantAdmin, StringComparison.OrdinalIgnoreCase);
+}
+
 public sealed class TenantUserRecord
 {
     public int Id { get; init; }
