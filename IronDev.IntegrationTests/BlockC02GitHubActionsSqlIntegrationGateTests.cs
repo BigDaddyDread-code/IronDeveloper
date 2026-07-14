@@ -15,7 +15,8 @@ public sealed class BlockC02GitHubActionsSqlIntegrationGateTests
         "DryRunReceiptStoreTests",
         "PatchArtifactStoreTests",
         "WorkflowTransitionRecordStoreTests",
-        "ToolRequestStoreTests"
+        "ToolRequestStoreTests",
+        "ProjectCanonMemoryLifecycleSqlTests"
     ];
 
     [TestMethod]

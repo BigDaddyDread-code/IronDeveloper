@@ -420,6 +420,15 @@ try {
             ,@{ Name = "Decision status defaults"; Sql = "SELECT CASE WHEN COUNT(*) = 4 AND MIN(SortOrder) = 1 AND MAX(SortOrder) = 4 THEN 1 ELSE 0 END FROM dbo.DecisionStatuses WHERE Name IN (N'Proposed', N'Accepted', N'Superseded', N'Rejected')" }
             ,@{ Name = "User mutation attribution scope index"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.UserMutationAttribution') AND name = N'IX_UserMutationAttribution_ScopeTime'" }
             ,@{ Name = "Memory proposal project index"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'memory.MemoryProposal') AND name = N'IX_MemoryProposal_Project_Status_CreatedUtc'" }
+            ,@{ Name = "memory.ProjectCanonMemory table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.ProjectCanonMemory', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "memory.ProjectCanonMemoryVersion table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.ProjectCanonMemoryVersion', N'U') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Project Canon current view"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.vw_CurrentProjectCanonMemory', N'V') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Project Canon lifecycle constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'memory.ProjectCanonMemoryVersion') AND name = N'CK_ProjectCanonMemoryVersion_Lifecycle'" }
+            ,@{ Name = "Project Canon supersession scope foreign key"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'memory.ProjectCanonMemoryVersion') AND name = N'FK_ProjectCanonMemoryVersion_SupersedesScope' AND is_not_trusted = 0" }
+            ,@{ Name = "Project Canon stable append-only trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.TR_ProjectCanonMemory_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Project Canon version append-only trigger"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.TR_ProjectCanonMemoryVersion_BlockUpdateDelete', N'TR') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Project Canon current procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_ProjectCanonMemory_GetCurrent', N'P') IS NULL THEN 0 ELSE 1 END" }
+            ,@{ Name = "Project Canon history procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'memory.usp_ProjectCanonMemory_ListHistory', N'P') IS NULL THEN 0 ELSE 1 END" }
         )
 
         foreach ($check in $checks) {

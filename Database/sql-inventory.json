@@ -2229,6 +2229,32 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Idempotent catalog-audit remediation. Flexible status vocabularies and the SemanticEmbeddings source-version type mismatch remain explicit P2 contract debt."
+                    },
+                    {
+                        "id":  "database.migrate-project-canon-memory-lifecycle",
+                        "path":  "Database/migrate_project_canon_memory_lifecycle.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "memory",
+                        "objectsCreated":  [
+                                               "memory.ProjectCanonMemory",
+                                               "memory.ProjectCanonMemoryVersion",
+                                               "memory.vw_CurrentProjectCanonMemory",
+                                               "memory.usp_ProjectCanonMemory_CreateIdentity",
+                                               "memory.usp_ProjectCanonMemory_AppendVersion",
+                                               "memory.usp_ProjectCanonMemory_GetCurrent",
+                                               "memory.usp_ProjectCanonMemory_ListHistory"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users"
+                                          ],
+                        "referencedBy":  [
+                                             "CLN-25 Project Canon memory lifecycle"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Append-only stable identity and version chain. Current truth excludes any version with a successor; archive and supersession remain inspectable lifecycle records."
                     }
                 ]
 }

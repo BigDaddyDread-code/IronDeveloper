@@ -150,7 +150,8 @@ $sqlStoreFilter = @(
     "FullyQualifiedName~DryRunReceiptStoreTests",
     "FullyQualifiedName~PatchArtifactStoreTests",
     "FullyQualifiedName~WorkflowTransitionRecordStoreTests",
-    "FullyQualifiedName~ToolRequestStoreTests"
+    "FullyQualifiedName~ToolRequestStoreTests",
+    "FullyQualifiedName~ProjectCanonMemoryLifecycleSqlTests"
 ) -join "|"
 
 Invoke-TestLaneWithRetry `

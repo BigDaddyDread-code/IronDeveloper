@@ -179,6 +179,11 @@
                            "id":  "2026-07-cln-22-constraint-index-audit",
                            "path":  "Database/migrate_constraint_index_audit.sql",
                            "description":  "Adds checked product-scope and typed-source foreign keys plus source, supersession, retrieval, audit-support, and retention indexes identified by the CLN-22 catalog audit."
+                       },
+                       {
+                           "id":  "2026-07-cln-25-project-canon-memory-lifecycle",
+                           "path":  "Database/migrate_project_canon_memory_lifecycle.sql",
+                           "description":  "Creates append-only stable Project Canon identities, governed versions, lifecycle tombstones, current-truth projection, and inspectable history."
                        }
                    ]
 }
