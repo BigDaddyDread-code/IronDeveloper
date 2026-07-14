@@ -184,6 +184,11 @@
                            "id":  "2026-07-cln-25-project-canon-memory-lifecycle",
                            "path":  "Database/migrate_project_canon_memory_lifecycle.sql",
                            "description":  "Creates append-only stable Project Canon identities, governed versions, lifecycle tombstones, current-truth projection, and inspectable history."
+                       },
+                       {
+                            "id":  "2026-07-cln-27-memory-index-lifecycle",
+                            "path":  "Database/migrate_memory_index_lifecycle.sql",
+                            "description":  "Creates the append-only SQL-authoritative lifecycle ledger and validated transitions for rebuildable semantic/vector projections."
                        }
                    ]
 }
