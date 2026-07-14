@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **642 files** after CLN-19. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **643 files** after CLN-44. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -675,6 +675,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **642 f
 | `Docs/receipts/CLN_18_SENSITIVE_DATA_SWEEP.md` | CLN-18 Sensitive Data Sweep Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/DATABASE_SCHEMA_OWNERSHIP.md` | Database Schema Ownership | Cleanup | `Canonical` | 2026-07-13 runtime DDL and migration ownership review | `-` | Keep aligned with manifest-owned schema and runtime boundaries | Database and operations |
 | `Docs/receipts/CLN_19_RUNTIME_SCHEMA_OWNERSHIP.md` | CLN-19 Runtime Schema Ownership Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/receipts/CLN_44_CLEANUP_COMPLETION_REVIEW.md` | CLN-44 Cleanup Completion Review | Evidence | `HistoricalReceipt` | Not applicable; current completion review evidence | `None; preserve record` | Supersede only with a later evidence-backed review | Evidence and release |
 
 ## Review Line
 
