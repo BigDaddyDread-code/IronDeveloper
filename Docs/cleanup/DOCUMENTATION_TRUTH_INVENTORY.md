@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **646 files** after CLN-22. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **648 files** after CLN-23. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **646 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 56 |
+| `Canonical` | 57 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 411 |
+| `HistoricalReceipt` | 412 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **646** |
+| **Total** | **648** |
 
 ## Inventory
 
@@ -679,6 +679,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **646 f
 | `Docs/receipts/CLN_21_UPGRADE_MIGRATION_PROOF.md` | CLN-21 Upgrade Migration Proof Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/DATABASE_CONSTRAINT_INDEX_AUDIT.md` | Database Constraint and Index Audit | Cleanup | `Canonical` | 2026-07-14 catalog and clean-database review | `-` | Keep aligned with manifest migrations and verifier coverage | Database and operations |
 | `Docs/receipts/CLN_22_CONSTRAINT_INDEX_AUDIT.md` | CLN-22 Constraint and Index Audit Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/memory/CURRENT_MEMORY_REALITY_AUDIT.md` | Current Memory Reality Audit | Memory | `Canonical` | 2026-07-14 exhaustive current-state classification | `-` | Block smarter memory whenever an Unknown classification exists | Memory and governance |
+| `Docs/receipts/CLN_23_CURRENT_MEMORY_REALITY_AUDIT.md` | CLN-23 Current Memory Reality Audit Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
