@@ -211,6 +211,12 @@ Invoke-CliBoundaryTestLane `
     -Name "CLI boundary tests" `
     -Filter $cliBoundaryFilter
 
+Write-Section "LocalTest reset and support bundle contract"
+& (Join-Path $PSScriptRoot "verify-localtest-reset-support-contract.ps1")
+if ($LASTEXITCODE -ne 0) {
+    throw "LocalTest reset and support bundle contract failed."
+}
+
 Write-Section "Governance boundary CI complete"
 Write-Host "A green check is evidence, not permission."
 & (Join-Path $PSScriptRoot "write-ci-evidence-summary.ps1") `
