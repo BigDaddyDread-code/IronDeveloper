@@ -33,11 +33,11 @@ A label does not make a slow test safe.
 - new categories added: `RequiresRealDatabase`, `LongRunning`, `ManualLocal`.
 - categories not added: `Slow`, `Quarantined`, `RequiresExternalDependency`, `RequiresLocalTooling`.
 - counts by category:
-  - `RequiresRealDatabase`: 42 test classes, 430 test methods, 42 files.
-  - `LongRunning`: 42 test classes, 431 test methods, 42 files.
+  - `RequiresRealDatabase`: 43 test classes, 436 test methods, 43 files.
+  - `LongRunning`: 43 test classes, 437 test methods, 43 files.
   - `ManualLocal`: 1 test class, 1 test method, 1 file.
-- test classes affected: 41 store/real-database-shaped integration classes plus 1 manual local legacy class.
-- test methods affected if source-countable: 430 `RequiresRealDatabase` methods, 431 `LongRunning` methods, and 1 `ManualLocal` method.
+- test classes affected: 42 store/real-database-shaped integration classes plus 1 manual local legacy class.
+- test methods affected if source-countable: 436 `RequiresRealDatabase` methods, 437 `LongRunning` methods, and 1 `ManualLocal` method.
 - tests moved into explicit slow/quarantine visibility: store and real-database-shaped classes are now explicitly visible through `RequiresRealDatabase` and `LongRunning`; the existing manual local ignored task is visible through `ManualLocal`.
 - tests remain in default lanes: no CI filters were changed, no tests were deleted, and no default lane exclusion was added.
 - selection-only pending execution proof: most `RequiresRealDatabase`/`LongRunning` rows remain `SelectionOnlyPendingExecution` until a slow/SQL lane executes them.
@@ -385,7 +385,7 @@ A label does not make a slow test safe.
 | `L4ReleaseGateReceipt` | 1 | 9 | 0 | 1 |
 | `LocalBootstrap` | 2 | 30 | 0 | 2 |
 | `LocalSql` | 1 | 16 | 0 | 1 |
-| `LongRunning` | 42 | 431 | 0 | 42 |
+| `LongRunning` | 43 | 437 | 0 | 43 |
 | `ManualLocal` | 1 | 1 | 0 | 1 |
 | `MemoryCannotPromoteItself` | 1 | 67 | 0 | 1 |
 | `MemoryPromotionRequestPackage` | 1 | 7 | 0 | 1 |
@@ -475,7 +475,7 @@ A label does not make a slow test safe.
 | `ReleaseReadinessRegression` | 1 | 14 | 0 | 1 |
 | `ReleaseReadinessReport` | 1 | 23 | 0 | 1 |
 | `RequiresExternalDependency` | 1 | 1 | 0 | 1 |
-| `RequiresRealDatabase` | 42 | 430 | 0 | 42 |
+| `RequiresRealDatabase` | 43 | 436 | 0 | 43 |
 | `Retention` | 2 | 16 | 0 | 2 |
 | `RollbackExecutionAudit` | 1 | 15 | 0 | 1 |
 | `RollbackExecutionReceipt` | 1 | 9 | 0 | 1 |
@@ -506,7 +506,7 @@ A label does not make a slow test safe.
 | `StaticBoundary` | 40 | 303 | 0 | 40 |
 | `SkeletonRun` | 1 | 9 | 0 | 1 |
 | `StorageReview` | 4 | 28 | 0 | 4 |
-| `Store` | 12 | 130 | 0 | 12 |
+| `Store` | 13 | 136 | 0 | 13 |
 | `TenantIsolation` | 1 | 9 | 0 | 1 |
 | `TenantUsersAdmin` | 1 | 12 | 0 | 1 |
 | `TesterCoverage` | 1 | 13 | 0 | 1 |
