@@ -5,6 +5,7 @@ param(
     [string]$ConnectionString,
     [switch]$TrustServerCertificate,
     [switch]$ResolveConnectionStringOnly,
+    [string]$ThroughMigrationId,
     [int]$CommandTimeoutSeconds = 120
 )
 
@@ -116,6 +117,17 @@ try {
         throw "Migration manifest contains no migrations."
     }
 
+    $orderedMigrations = @($manifest.migrations)
+    if (-not [string]::IsNullOrWhiteSpace($ThroughMigrationId)) {
+        $migrationIds = @($orderedMigrations | ForEach-Object { [string]$_.id })
+        $throughIndex = [Array]::IndexOf($migrationIds, $ThroughMigrationId)
+        if ($throughIndex -lt 0) {
+            throw "Through migration '$ThroughMigrationId' was not found in the manifest."
+        }
+
+        $orderedMigrations = @($orderedMigrations[0..$throughIndex])
+    }
+
     $sqlConnectionString = New-ConnectionString
     if ($ResolveConnectionStringOnly) {
         # Test seam: print the resolved connection string and stop before any
@@ -129,7 +141,7 @@ try {
     $connection.Open()
 
     try {
-        foreach ($migration in $manifest.migrations) {
+        foreach ($migration in $orderedMigrations) {
             if ([string]::IsNullOrWhiteSpace($migration.id)) {
                 throw "Migration entry is missing id."
             }

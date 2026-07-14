@@ -398,6 +398,11 @@ try {
             -SkipFrontend
     }
 
+    Invoke-TimedCommand "Supported database upgrade proof" {
+        & (Join-Path $script:RepoRoot "Database\verify-upgrade-database.ps1") `
+            -ConnectionString $connectionString
+    }
+
     $sqlStoreFilter = @(
         "FullyQualifiedName~AcceptedApprovalSqlStoreTests",
         "FullyQualifiedName~PolicySatisfactionSqlStoreTests",

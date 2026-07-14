@@ -2140,6 +2140,67 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Idempotent controlled migration replacing request-path CREATE TABLE and ALTER TABLE behavior. Semantic search traces are derived diagnostics; only an unsupported pre-GUID trace shape is rebuilt."
+                    },
+                    {
+                        "id":  "database.baseline-7f0e1058-rebuild",
+                        "path":  "Database/baselines/7f0e1058_rebuild_db.sql",
+                        "kind":  "test-baseline",
+                        "bucket":  "test-support",
+                        "ownerArea":  "database",
+                        "objectsCreated":  [
+                                               "pre-CLN-19 base schema"
+                                           ],
+                        "objectsCalled":  [
+
+                                          ],
+                        "referencedBy":  [
+                                             "CLN-21 upgrade migration proof"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Immutable test-only snapshot of the base schema at main commit 7f0e1058. It is not a current setup or runtime migration path."
+                    },
+                    {
+                        "id":  "database.baseline-cln-21-pre-cln-19-runtime-fixture",
+                        "path":  "Database/baselines/cln_21_pre_cln_19_runtime_fixture.sql",
+                        "kind":  "test-fixture",
+                        "bucket":  "test-support",
+                        "ownerArea":  "database",
+                        "objectsCreated":  [
+                                               "pre-CLN-19 runtime-owned schema and fixed preservation rows"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Tenants",
+                                              "dbo.Projects",
+                                              "dbo.ProjectTickets",
+                                              "dbo.ProjectContextDocuments",
+                                              "dbo.ArtifactSourceReferences"
+                                          ],
+                        "referencedBy":  [
+                                             "CLN-21 upgrade migration proof"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Test-only reconstruction of request-path-owned schema plus representative data. It refuses non-test databases and grants no runtime schema authority."
+                    },
+                    {
+                        "id":  "database.verify-upgrade-preservation",
+                        "path":  "Database/verify_upgrade_preservation.sql",
+                        "kind":  "test-verifier",
+                        "bucket":  "test-support",
+                        "ownerArea":  "database",
+                        "objectsCreated":  [
+
+                                           ],
+                        "objectsCalled":  [
+                                              "CLN-21 fixed preservation rows"
+                                          ],
+                        "referencedBy":  [
+                                             "Database/verify-upgrade-database.ps1"
+                                         ],
+                        "appliedByManifest":  false,
+                        "verifiedByScript":  false,
+                        "notes":  "Exact post-upgrade data-preservation assertions for the isolated CLN-21 test database."
                     }
                 ]
 }
