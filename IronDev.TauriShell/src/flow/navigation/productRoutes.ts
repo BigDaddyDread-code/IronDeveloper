@@ -13,6 +13,23 @@ export type LibrarySection =
 
 export type GovernanceSection = 'overview' | 'controls' | 'exceptions' | 'decisions' | 'technical';
 
+export interface LegacyRouteAlias {
+  pattern: string;
+  canonicalSurface: 'board' | 'workshop' | 'library' | 'settings';
+  handling: 'redirect-with-notice';
+}
+
+export const legacyRouteAliases: readonly LegacyRouteAlias[] = [
+  { pattern: '/chat', canonicalSurface: 'workshop', handling: 'redirect-with-notice' },
+  { pattern: '/projects/:projectId/chat[/...]', canonicalSurface: 'workshop', handling: 'redirect-with-notice' },
+  { pattern: '/tickets', canonicalSurface: 'board', handling: 'redirect-with-notice' },
+  { pattern: '/build', canonicalSurface: 'board', handling: 'redirect-with-notice' },
+  { pattern: '/runs', canonicalSurface: 'board', handling: 'redirect-with-notice' },
+  { pattern: '/batch', canonicalSurface: 'board', handling: 'redirect-with-notice' },
+  { pattern: '/knowledge', canonicalSurface: 'library', handling: 'redirect-with-notice' },
+  { pattern: '/settings', canonicalSurface: 'settings', handling: 'redirect-with-notice' }
+] as const;
+
 export type ProductRouteKind =
   | 'root'
   | 'signIn'
@@ -133,7 +150,7 @@ export function parseProductRoute(pathname: string): ProductRoute {
   if (workshopChannelMatch) {
     return route(normalized, 'chat', {
       projectId: Number(workshopChannelMatch[1]),
-      chatChannelId: workshopChannelMatch[2]
+      chatChannelId: decodeURIComponent(workshopChannelMatch[2])
     });
   }
 
@@ -153,7 +170,7 @@ export function parseProductRoute(pathname: string): ProductRoute {
   if (chatChannelMatch) {
     return route(normalized, 'chat', {
       projectId: Number(chatChannelMatch[1]),
-      chatChannelId: chatChannelMatch[2],
+      chatChannelId: decodeURIComponent(chatChannelMatch[2]),
       compatibility: true
     });
   }
@@ -307,6 +324,21 @@ export function toolPath(projectId: number, toolId: string): string {
 
 export function auditEventPath(projectId: number, ledgerId: string): string {
   return `${libraryPath(projectId, 'audit')}/events/${encodeURIComponent(ledgerId)}`;
+}
+
+export function legacyCanonicalPath(route: ProductRoute, selectedProjectId: number): string | null {
+  if (!route.compatibility || route.librarySection === 'governance') return null;
+
+  if (route.kind === 'chat') {
+    const projectId = route.projectId ?? selectedProjectId;
+    if (route.chatSessionId !== null) return chatSessionPath(projectId, route.chatSessionId);
+    if (route.chatChannelId !== null) return chatChannelPath(projectId, route.chatChannelId);
+    return projectPath(projectId, 'chat');
+  }
+  if (route.kind === 'board') return projectPath(selectedProjectId, 'board');
+  if (route.kind === 'settings') return libraryPath(selectedProjectId, 'settings');
+  if (route.kind === 'library' && route.pathname === '/knowledge') return projectPath(selectedProjectId, 'library');
+  return null;
 }
 
 export function navigateProductPath(pathname: string, replace = false): void {

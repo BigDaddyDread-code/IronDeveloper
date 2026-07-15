@@ -99,6 +99,18 @@ test('board renders pipeline columns with project tickets', async ({ page }) => 
   await expect(page.getByTestId('flow.board.columns')).toContainText('Add book sorting to catalog');
 });
 
+test('legacy workspace deep links redirect with a compatibility notice and stay out of primary navigation', async ({ page }) => {
+  await mockSelectedProject(page);
+  await page.goto('/tickets');
+
+  await expect(page).toHaveURL(/\/projects\/7\/board$/);
+  await expect(page.getByTestId('flow.legacyRouteNotice')).toContainText('/tickets');
+  await expect(page.getByTestId('flow.legacyRouteNotice')).toContainText('Open canonical surface');
+  await expect(page.locator('.fl-product-nav')).not.toContainText('Tickets');
+  await expect(page.locator('.fl-product-nav')).not.toContainText('Build');
+  await expect(page.locator('.fl-product-nav')).not.toContainText('Runs');
+});
+
 test('shape stage earns promotion through the readiness gate', async ({ page }) => {
   await mockSelectedProject(page);
   await page.goto('/');

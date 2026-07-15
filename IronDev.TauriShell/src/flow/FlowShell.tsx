@@ -11,12 +11,14 @@ import { useProjectContext } from '../state/useProjectContext';
 import { useSessionContext } from '../state/useSessionContext';
 import { BoardScreen } from './board/BoardScreen';
 import { RouteOutcomeScreen, type RouteOutcomeKind } from './components/RouteOutcomeScreen';
+import { LegacyRouteNotice } from './components/LegacyRouteNotice';
 import { ProjectNotificationsMenu } from './components/ProjectNotificationsMenu';
 import { LibraryScreen } from './library/LibraryScreen';
 import {
   chatChannelPath,
   chatSessionPath,
   libraryPath,
+  legacyCanonicalPath,
   navigateProductPath,
   projectPath,
   useProductRoute,
@@ -66,6 +68,10 @@ export function FlowShell() {
   const [activeTicket, setActiveTicket] = useState<ProjectTicket | null>(null);
   const [routeProjectState, setRouteProjectState] = useState<RouteProjectState>('idle');
   const [workItemLoadState, setWorkItemLoadState] = useState<WorkItemLoadState>('idle');
+  const [legacyRouteTransition, setLegacyRouteTransition] = useState<{
+    sourcePath: string;
+    canonicalPath: string;
+  } | null>(null);
   const projectSelectionRequest = useRef<number | null>(null);
   const previousProjectId = useRef<number | null>(project.selectedProjectId);
   const healthMenuRef = useRef<HTMLDetailsElement | null>(null);
@@ -128,21 +134,14 @@ export function FlowShell() {
     }
 
     if (!currentRoute.compatibility || selectedProjectId === null || !hasProjectAccess) return;
-    if (currentRoute.kind === 'chat') {
-      const routeProjectId = currentRoute.projectId ?? selectedProjectId;
-      if (currentRoute.chatSessionId !== null) {
-        navigateProductPath(chatSessionPath(routeProjectId, currentRoute.chatSessionId), true);
-      } else if (currentRoute.chatChannelId !== null) {
-        navigateProductPath(chatChannelPath(routeProjectId, currentRoute.chatChannelId), true);
-      } else {
-        navigateProductPath(projectPath(routeProjectId, 'chat'), true);
-      }
-    }
-    if (currentRoute.kind === 'board') navigateProductPath(projectPath(selectedProjectId, 'board'), true);
-    if (currentRoute.kind === 'settings') navigateProductPath(libraryPath(selectedProjectId, 'settings'), true);
-    if (currentRoute.kind === 'library' && currentRoute.pathname === '/knowledge') {
-      navigateProductPath(projectPath(selectedProjectId, 'library'), true);
-    }
+    const canonicalPath = legacyCanonicalPath(currentRoute, selectedProjectId);
+    if (canonicalPath === null) return;
+    setLegacyRouteTransition((previous) =>
+      previous?.sourcePath === currentRoute.pathname
+        ? previous
+        : { sourcePath: currentRoute.pathname, canonicalPath }
+    );
+    navigateProductPath(canonicalPath, true);
   }, [currentRoute, hasProjectAccess, project.accessStatus, selectedProjectId]);
 
   // A project-scoped deep link selects that project through the existing API.
@@ -274,6 +273,7 @@ export function FlowShell() {
     return (
       <div className="fl-root">
         <main className="fl-main">
+          {legacyRouteTransition ? <LegacyRouteNotice {...legacyRouteTransition} /> : null}
           <button className="fl-btn" type="button" onClick={() => navigateProductPath('/sign-in')}>
             Back to sign in
           </button>
@@ -506,6 +506,7 @@ export function FlowShell() {
       </header>
 
       <main className="fl-main">
+        {legacyRouteTransition ? <LegacyRouteNotice {...legacyRouteTransition} /> : null}
         {displayedKind === 'board' ? (
           <BoardScreen onOpenWorkItem={openBoardWorkItem} onOpenProvisioning={() => openProjectSetup()} />
         ) : null}
