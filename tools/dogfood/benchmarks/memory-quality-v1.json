@@ -1,0 +1,28 @@
+{
+  "benchmarkId": "irondev-memory-quality-v1",
+  "version": 1,
+  "cases": [
+    { "caseId": "exact-title", "category": "exact-title retrieval", "tenantId": "tenant-a", "projectId": "project-a", "query": "ADR-017 Migration State Tracking", "expectedTop1": "adr-017", "requiredTop5": ["adr-017"] },
+    { "caseId": "narrow-fact", "category": "narrow fact retrieval", "tenantId": "tenant-a", "projectId": "project-a", "query": "token lifetime minutes", "expectedTop1": "auth-token-ttl", "requiredTop5": ["auth-token-ttl"] },
+    { "caseId": "architecture", "category": "architecture retrieval", "tenantId": "tenant-a", "projectId": "project-a", "query": "API client boundary", "expectedTop1": "architecture-api-client", "requiredTop5": ["architecture-api-client"] },
+    { "caseId": "accepted-pending", "category": "accepted versus pending", "tenantId": "tenant-a", "projectId": "project-a", "query": "database ownership rule", "expectedTop1": "accepted-db-rule", "requiredTop5": ["accepted-db-rule"], "authorityOrder": [{"higher":"accepted-db-rule","lower":"pending-db-idea"}] },
+    { "caseId": "current-stale", "category": "current versus stale", "tenantId": "tenant-a", "projectId": "project-a", "query": "current indexing contract", "expectedTop1": "current-indexing", "requiredTop5": ["current-indexing"], "staleIds": ["stale-indexing"], "authorityOrder": [{"higher":"current-indexing","lower":"stale-indexing"}] },
+    { "caseId": "wrong-project", "category": "wrong-project rejection", "tenantId": "tenant-a", "projectId": "project-a", "query": "project deployment", "expectedTop1": "project-a-deployment", "requiredTop5": ["project-a-deployment"], "forbiddenScopeIds": ["project-b-deployment"] },
+    { "caseId": "wrong-tenant", "category": "wrong-tenant rejection", "tenantId": "tenant-a", "projectId": "project-a", "query": "tenant deployment", "expectedTop1": "tenant-a-deployment", "requiredTop5": ["tenant-a-deployment"], "forbiddenScopeIds": ["tenant-b-deployment"] },
+    { "caseId": "conflict", "category": "conflict surfacing", "tenantId": "tenant-a", "projectId": "project-a", "query": "conflicting retention decisions", "expectedTop1": "retention-current", "requiredTop5": ["retention-current", "retention-conflict"], "authorityOrder": [{"higher":"retention-current","lower":"retention-conflict"}] },
+    { "caseId": "no-result", "category": "no-result behaviour", "tenantId": "tenant-a", "projectId": "project-a", "query": "nonexistent quasar protocol", "requiredTop5": [], "expectNoResult": true },
+    { "caseId": "broad-doc", "category": "broad-doc domination", "tenantId": "tenant-a", "projectId": "project-a", "query": "exact rollback hash rule", "expectedTop1": "rollback-hash-fact", "requiredTop5": ["rollback-hash-fact"], "authorityOrder": [{"higher":"rollback-hash-fact","lower":"broad-architecture-doc"}] }
+  ],
+  "referenceResults": [
+    { "caseId": "exact-title", "resultIds": ["adr-017"] },
+    { "caseId": "narrow-fact", "resultIds": ["auth-token-ttl"] },
+    { "caseId": "architecture", "resultIds": ["architecture-api-client"] },
+    { "caseId": "accepted-pending", "resultIds": ["accepted-db-rule", "pending-db-idea"] },
+    { "caseId": "current-stale", "resultIds": ["current-indexing"] },
+    { "caseId": "wrong-project", "resultIds": ["project-a-deployment"] },
+    { "caseId": "wrong-tenant", "resultIds": ["tenant-a-deployment"] },
+    { "caseId": "conflict", "resultIds": ["retention-current", "retention-conflict"] },
+    { "caseId": "no-result", "resultIds": [] },
+    { "caseId": "broad-doc", "resultIds": ["rollback-hash-fact", "broad-architecture-doc"] }
+  ]
+}

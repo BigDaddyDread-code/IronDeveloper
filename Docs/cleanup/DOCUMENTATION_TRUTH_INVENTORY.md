@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **656 files** after CLN-27. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **658 files** after CLN-28. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **656 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 61 |
+| `Canonical` | 62 |
 | `Supporting` | 123 |
-| `HistoricalReceipt` | 416 |
+| `HistoricalReceipt` | 417 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **654** |
+| **Total** | **658** |
 
 ## Inventory
 
@@ -689,6 +689,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **656 f
 | `Docs/receipts/CLN_26_MEMORY_RETRIEVAL_SECURITY.md` | CLN-26 Memory Retrieval Security Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/memory/MEMORY_INDEX_LIFECYCLE.md` | Memory Index Lifecycle | Memory | `Canonical` | 2026-07-15 SQL and derived-index lifecycle review | `-` | Keep aligned with lifecycle ledger, source versions, and provider rebuild behaviour | Memory and database |
 | `Docs/receipts/CLN_27_MEMORY_INDEX_LIFECYCLE.md` | CLN-27 Memory Index Lifecycle Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/memory/MEMORY_QUALITY_BENCHMARK.md` | Memory Quality Benchmark | Memory | `Canonical` | 2026-07-15 fixed-corpus, fail-closed metric, and retrieval-boundary review | `-` | Version expected corpus; record live provider results without rewriting expectations | Memory and quality |
+| `Docs/receipts/CLN_28_MEMORY_QUALITY_BENCHMARK.md` | CLN-28 Memory Quality Benchmark Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
