@@ -1,6 +1,7 @@
 using IronDev.Core;
 using IronDev.Core.Agents;
 using Microsoft.Extensions.Configuration;
+using IronDev.Core.RunReadiness;
 
 namespace IronDev.Infrastructure.Services;
 
@@ -13,7 +14,7 @@ namespace IronDev.Infrastructure.Services;
 /// </summary>
 public sealed class DeterministicAlphaSmokeLlmService : ILLMService
 {
-    public const string ProviderName = "alpha-smoke-deterministic";
+    public const string ProviderName = ProjectRunProviders.LocalTestDeterministic;
 
     private readonly string _response;
 

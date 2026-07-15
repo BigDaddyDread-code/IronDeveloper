@@ -22,6 +22,7 @@ export interface MockWorkItemProjectionOptions {
   executionProof?: Record<string, unknown>;
   collaboration?: Record<string, unknown>;
   authority?: Record<string, unknown>;
+  runReadiness?: Record<string, unknown> | null;
 }
 
 export function workItemProjection(options: MockWorkItemProjectionOptions = {}) {
@@ -77,6 +78,7 @@ export function workItemProjection(options: MockWorkItemProjectionOptions = {}) 
       boundary: 'Eligible reviewer and approver lists come from backend project membership.'
     },
     latestRun: null,
+    runReadiness: options.runReadiness ?? null,
     gate: {
       state: options.gateState ?? 'Open',
       reason: options.gateReason ?? 'Build readiness is satisfied.',

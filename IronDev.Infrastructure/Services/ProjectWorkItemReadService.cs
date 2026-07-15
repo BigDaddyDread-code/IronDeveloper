@@ -1,10 +1,13 @@
 using IronDev.Core.Builder;
+using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
+using IronDev.Core.Models;
 using IronDev.Core.Runs;
 using IronDev.Core.WorkItems;
 using IronDev.Services;
 using IronDev.Core.Auth;
 using Microsoft.Extensions.Configuration;
+using IronDev.Core.RunReadiness;
 
 namespace IronDev.Infrastructure.Services;
 
@@ -19,6 +22,7 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
     private readonly IProjectMemberDirectoryService _members;
     private readonly ICurrentTenantContext _tenant;
     private readonly IConfiguration _configuration;
+    private readonly IProjectRunReadinessService? _runReadiness;
 
     public ProjectWorkItemReadService(
         IWorkItemIdentityService identity,
@@ -29,7 +33,8 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
         IProjectWorkItemCollaborationService collaboration,
         IProjectMemberDirectoryService members,
         ICurrentTenantContext tenant,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IProjectRunReadinessService? runReadiness = null)
     {
         _identity = identity;
         _tickets = tickets;
@@ -40,6 +45,7 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
         _members = members;
         _tenant = tenant;
         _configuration = configuration;
+        _runReadiness = runReadiness;
     }
 
     public async Task<ProjectWorkItemReadModel?> GetAsync(
@@ -57,6 +63,7 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
             return null;
 
         var readinessTask = _readiness.EvaluateReadinessAsync(projectId, legacyTicketId, cancellationToken);
+        var runReadinessTask = _runReadiness?.EvaluateAsync(projectId, cancellationToken);
         var projectRuns = await _runs.GetRecentForProjectAsync(projectId, 500, cancellationToken).ConfigureAwait(false);
         var latestRun = projectRuns
             .Where(run => run.TicketId == legacyTicketId)
@@ -74,17 +81,36 @@ public sealed class ProjectWorkItemReadService : IProjectWorkItemReadService
 
         var members = await _members.GetDirectoryAsync(projectId, currentUserId, cancellationToken).ConfigureAwait(false);
 
+        var readiness = await readinessTask.ConfigureAwait(false);
+        if (runReadinessTask is not null)
+            ApplyRunReadiness(readiness, await runReadinessTask.ConfigureAwait(false));
+
         return ProjectWorkItemProjector.Build(
             ticket,
             latestRun,
             report,
-            await readinessTask.ConfigureAwait(false),
+            readiness,
             DateTimeOffset.UtcNow,
             await _collaboration.GetAsync(_tenant.TenantId, projectId, identity.WorkItemId, cancellationToken).ConfigureAwait(false),
             members,
             currentUserId,
             ReadSoloApprovalExceptionAllowed(),
             identity);
+    }
+
+    public static void ApplyRunReadiness(BuildReadinessResult result, ProjectRunReadiness runReadiness)
+    {
+        result.RunReadiness = runReadiness;
+        if (runReadiness.ReadyToRun || !result.IsReady)
+            return;
+
+        result.Status = BuildReadinessStatus.Error;
+        result.Message = runReadiness.State == ProjectRunReadinessStates.RunConfigurationRequired
+            ? $"Run configuration required · {runReadiness.BlockedCount} agent blockers."
+            : "Project setup is incomplete.";
+        result.BlockingIssues = runReadiness.State == ProjectRunReadinessStates.RunConfigurationRequired
+            ? runReadiness.Blockers.Select(blocker => $"{SkeletonAgentRoles.DisplayName(blocker.Role)}: {blocker.Reason}").ToList()
+            : runReadiness.Provisioning?.Checks.Where(check => check.Blocking).Select(check => check.Evidence).ToList() ?? [];
     }
 
     private bool ReadSoloApprovalExceptionAllowed() =>

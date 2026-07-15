@@ -2,6 +2,7 @@ using IronDev.Core.Provisioning;
 using IronDev.Core.Runs;
 using IronDev.Data.Models;
 using IronDev.Core.Models;
+using IronDev.Core.RunReadiness;
 
 namespace IronDev.Core.Board;
 
@@ -27,6 +28,7 @@ public sealed record ProjectBoardReadModel
     public string ProjectName { get; init; } = string.Empty;
     public DateTimeOffset GeneratedUtc { get; init; }
     public required ProjectProvisioningReadiness Readiness { get; init; }
+    public ProjectRunReadiness? RunReadiness { get; init; }
     public IReadOnlyList<ProjectBoardItemReadModel> Items { get; init; } = [];
 }
 
@@ -84,7 +86,8 @@ public static class ProjectBoardProjector
         IReadOnlyList<ProjectTicket> tickets,
         IReadOnlyList<RunRecord> runs,
         DateTimeOffset generatedUtc,
-        IReadOnlyDictionary<long, ProjectWorkItemCollaborationSnapshot>? collaboration = null)
+        IReadOnlyDictionary<long, ProjectWorkItemCollaborationSnapshot>? collaboration = null,
+        ProjectRunReadiness? runReadiness = null)
     {
         var latestRuns = runs
             .Where(run => run.ProjectId == project.Id && run.TicketId.HasValue)
@@ -106,6 +109,7 @@ public static class ProjectBoardProjector
             ProjectName = project.Name,
             GeneratedUtc = generatedUtc,
             Readiness = readiness,
+            RunReadiness = runReadiness,
             Items = items
         };
     }

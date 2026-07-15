@@ -1,6 +1,7 @@
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Runs;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Workflow;
 using IronDev.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
@@ -123,6 +124,19 @@ public sealed class SkeletonBatchRunTests
     }
 
     [TestMethod]
+    public async Task Start_WhenRunReadinessIsBlocked_CreatesNoBatchStateOrRun()
+    {
+        using var harness = BatchHarness.Create(DefaultMap(), runReadiness: StubRunReadiness.Blocked(ProjectId));
+
+        var outcome = await harness.Service.StartAsync(ProjectId, harness.PlanId, "user-9");
+
+        Assert.IsFalse(outcome.Succeeded);
+        StringAssert.Contains(outcome.FailureReason, "Run configuration required · 4 agent blockers");
+        Assert.AreEqual(0, harness.SkeletonRuns.StartedTicketIds.Count);
+        Assert.IsFalse(Directory.Exists(harness.EvidenceRoot), "A blocked readiness check must precede batch state persistence.");
+    }
+
+    [TestMethod]
     public async Task Start_RefusesAnUnschedulablePlan_NamingTheBlockers()
     {
         var cyclic = DefaultMap() with
@@ -193,7 +207,10 @@ public sealed class SkeletonBatchRunTests
         public required string PlanId { get; init; }
         public required string EvidenceRoot { get; init; }
 
-        public static BatchHarness Create(SkeletonBatchMap map, bool planVerifies = true)
+        public static BatchHarness Create(
+            SkeletonBatchMap map,
+            bool planVerifies = true,
+            IProjectRunReadinessService? runReadiness = null)
         {
             var evidenceRoot = Path.Combine(Path.GetTempPath(), $"irondev-batch-run-{Guid.NewGuid():N}");
             var configuration = new ConfigurationBuilder()
@@ -207,7 +224,7 @@ public sealed class SkeletonBatchRunTests
             var skeletonRuns = new StubSkeletonRunService();
             return new BatchHarness
             {
-                Service = new SkeletonBatchRunService(seals, seals, skeletonRuns, skeletonRuns.Runs, configuration),
+                Service = new SkeletonBatchRunService(seals, seals, skeletonRuns, skeletonRuns.Runs, configuration, runReadiness),
                 SkeletonRuns = skeletonRuns,
                 Seals = seals,
                 PlanId = StubSealStore.PlanIdValue,
@@ -229,6 +246,22 @@ public sealed class SkeletonBatchRunTests
                 // best-effort temp cleanup
             }
         }
+    }
+
+    private sealed class StubRunReadiness(ProjectRunReadiness readiness) : IProjectRunReadinessService
+    {
+        public static StubRunReadiness Blocked(int projectId) => new(new ProjectRunReadiness
+        {
+            ProjectId = projectId,
+            ProjectSetupReady = true,
+            ExecutionReady = false,
+            ReadyToRun = false,
+            State = ProjectRunReadinessStates.RunConfigurationRequired,
+            BlockedCount = 4
+        });
+
+        public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(readiness);
     }
 
     /// <summary>Serves the plan (sequenced from the map) and the map, with controllable seal verification.</summary>

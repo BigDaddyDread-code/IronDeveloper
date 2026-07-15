@@ -1,6 +1,7 @@
 using IronDev.Core.Builder;
 using IronDev.Core.Models;
 using IronDev.Core.Runs;
+using IronDev.Core.RunReadiness;
 using IronDev.Data.Models;
 
 namespace IronDev.Core.WorkItems;
@@ -17,6 +18,7 @@ public static class ProjectWorkItemStages
 public static class ProjectWorkItemActionKinds
 {
     public const string ResolveReadiness = "ResolveReadiness";
+    public const string ConfigureRunAgents = "ConfigureRunAgents";
     public const string StartRun = "StartRun";
     public const string RefreshRun = "RefreshRun";
     public const string Review = "Review";
@@ -67,6 +69,7 @@ public sealed record ProjectWorkItemReadModel
     public required ProjectWorkItemApplyRecoveryReadModel ApplyRecovery { get; init; }
     public required ProjectWorkItemExecutionProofReadModel ExecutionProof { get; init; }
     public required ProjectWorkItemEvidenceLinksReadModel EvidenceLinks { get; init; }
+    public ProjectRunReadiness? RunReadiness { get; init; }
     public string Boundary { get; init; } = BoundaryText;
 
     public const string BoundaryText =
@@ -332,7 +335,8 @@ public static class ProjectWorkItemProjector
                     ? null
                     : $"/api/projects/{ticket.ProjectId}/tickets/{ticket.Id}/skeleton-runs/{Uri.EscapeDataString(latestRun.RunId)}/critic-package",
                 GovernanceLibraryPath = $"/projects/{ticket.ProjectId}/library/governance"
-            }
+            },
+            RunReadiness = readiness.RunReadiness
         };
     }
 
@@ -719,6 +723,8 @@ public static class ProjectWorkItemProjector
     {
         if (run is null)
         {
+            if (readiness.RunReadiness?.State == ProjectRunReadinessStates.RunConfigurationRequired)
+                return Gate("Blocked", readiness.Message, "Configure run agents before starting a governed run.", readiness.BlockingIssues);
             return readiness.IsReady
                 ? Gate("Open", readiness.Message, "Start a governed run when you are ready.", readiness.Warnings)
                 : Gate("Blocked", readiness.Message, "Resolve build readiness before starting a governed run.", readiness.BlockingIssues);
@@ -769,6 +775,8 @@ public static class ProjectWorkItemProjector
     {
         if (run is null)
         {
+            if (readiness.RunReadiness?.State == ProjectRunReadinessStates.RunConfigurationRequired)
+                return Action(ProjectWorkItemActionKinds.ConfigureRunAgents, "Configure run agents", true, readiness.Message);
             return readiness.IsReady
                 ? Action(ProjectWorkItemActionKinds.StartRun, "Start governed run", true, readiness.Message)
                 : Action(ProjectWorkItemActionKinds.ResolveReadiness, "Resolve build readiness", false, readiness.Message);

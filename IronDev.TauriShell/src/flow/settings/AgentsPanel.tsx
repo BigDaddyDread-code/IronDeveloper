@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
 import type { AiConnectionMetadata, EffectiveSkeletonAgentProfile, SkeletonAgentProfile, SkeletonAgentProfileDraft, SkeletonAgentProfileHistoryView, SkeletonAgentProfileUpdate } from '../../api/types';
 import { useSessionContext } from '../../state/useSessionContext';
+import { navigateProductPath, settingsPath } from '../navigation/productRoutes';
 
 // AG-5 — per-agent configuration: the model each agent runs on and its skill +
 // personality. Editing here writes the same AgentProfiles/{role}/ files the loop
@@ -47,7 +48,11 @@ export function AgentsPanel() {
       const persistedDrafts = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.getAgentProfileDraft(profile.role, session.config.selectedProjectId, profileScope)] as const));
       const publishedHistory = await Promise.all(editable.map(async (profile) => [profile.role, await session.client.listAgentProfileHistory(profile.role, session.config.selectedProjectId, profileScope)] as const));
       setProfiles(result);
-      setConnections(availableConnections.filter((connection) => connection.enabled && connection.tenantAvailable && connection.projectAvailable));
+      setConnections(availableConnections.filter((connection) =>
+        connection.enabled &&
+        connection.tenantAvailable &&
+        connection.projectAvailable &&
+        connection.providerKind.toLowerCase() !== 'fake'));
       setEffectiveProfiles(Object.fromEntries(effective.map((profile) => [profile.role, profile])));
       setDraftState(Object.fromEntries(persistedDrafts));
       setHistories(Object.fromEntries(publishedHistory));
@@ -206,7 +211,15 @@ export function AgentsPanel() {
 
   return (
     <div data-testid="flow.settings.agents">
-      <p className="fl-plabel">Agents</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+        <p className="fl-plabel">Agents</p>
+        <button
+          className="fl-btn fl-mini"
+          type="button"
+          onClick={() => typeof session.config.selectedProjectId === 'number' && navigateProductPath(settingsPath(session.config.selectedProjectId, 'aiConnections'))}
+          data-testid="flow.settings.agents.openConnections"
+        >Open AI Connections</button>
+      </div>
       <div className="fl-segmented" role="group" aria-label="Profile scope" style={{ marginBottom: 10 }}>
         <button
           className={profileScope === 'project' ? 'active' : ''}
@@ -254,7 +267,16 @@ export function AgentsPanel() {
             <select
               className="fl-select"
               value={draft.aiConnectionId}
-              onChange={(event) => patch(profile.role, { aiConnectionId: event.target.value })}
+              onChange={(event) => {
+                const selected = connections.find((connection) => connection.id === event.target.value);
+                patch(profile.role, {
+                  aiConnectionId: event.target.value,
+                  provider: selected?.providerKind === 'alpha-smoke-deterministic'
+                    ? 'custom'
+                    : PROVIDERS.includes(selected?.providerKind ?? '') ? selected!.providerKind : draft.provider,
+                  model: selected?.availableModels?.[0] ?? draft.model
+                });
+              }}
               data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.connection`}
             >
               {!connectionAvailable ? (

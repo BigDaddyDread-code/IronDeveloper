@@ -1,6 +1,9 @@
 using System.Text.Json;
 using System.Net;
+using System.Runtime.CompilerServices;
 using IronDev.Api.Services;
+using IronDev.Core.Agents;
+using IronDev.Infrastructure.Builder;
 using IronDev.Core.AiConnections;
 using IronDev.Infrastructure.Services;
 using Microsoft.AspNetCore.DataProtection;
@@ -55,6 +58,91 @@ public sealed class AiConnectionContractTests
         Assert.IsFalse(connection.CredentialConfigured);
         Assert.AreEqual("Missing", connection.CredentialStatus);
         Assert.AreEqual("provider-default:openai", connection.ControlledEndpoint);
+    }
+
+    [TestMethod]
+    public async Task LocalTestExplicitlyExposesDeterministicConnection_WithoutMakingFakeExecutable()
+    {
+        var service = Harness(new Dictionary<string, string?>
+        {
+            ["Ai:Provider"] = "fake",
+            ["Ai:Model"] = "gpt-4o",
+            ["IronDev:HostEnvironment"] = "LocalTest",
+            ["RunAgents:LocalTestDeterministicConnectionEnabled"] = "true"
+        });
+
+        var connections = await service.ListAsync(tenantId: 3, userId: 7);
+
+        Assert.AreEqual("fake", connections.Single(connection => connection.Id == "deployment-default").ProviderKind);
+        var deterministic = connections.Single(connection => connection.Id == "localtest-deterministic");
+        Assert.AreEqual("alpha-smoke-deterministic", deterministic.ProviderKind);
+        Assert.AreEqual("Not required", deterministic.CredentialStatus);
+        CollectionAssert.Contains(deterministic.AvailableModels.ToArray(), "localtest-deterministic");
+    }
+
+    [TestMethod]
+    public async Task DeterministicConnection_RemainsHiddenOutsideLocalTest_EvenIfFeatureFlagIsSet()
+    {
+        var service = Harness(new Dictionary<string, string?>
+        {
+            ["Ai:Provider"] = "openai",
+            ["Ai:Model"] = "gpt-4o",
+            ["IronDev:HostEnvironment"] = "Production",
+            ["RunAgents:LocalTestDeterministicConnectionEnabled"] = "true"
+        });
+
+        var connections = await service.ListAsync(tenantId: 3, userId: 7);
+
+        Assert.AreEqual(1, connections.Count);
+        Assert.IsFalse(connections.Any(connection => connection.Id == "localtest-deterministic"));
+    }
+
+    [TestMethod]
+    public async Task ConnectionTest_FakeRefusesButExplicitDeterministicImplementationPasses()
+    {
+        var temp = Directory.CreateTempSubdirectory("irondev-ai-test-deterministic-");
+        try
+        {
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Ai:Provider"] = "fake",
+                ["Ai:Model"] = "gpt-4o",
+                ["IronDev:HostEnvironment"] = "LocalTest",
+                ["RunAgents:LocalTestDeterministicConnectionEnabled"] = "true",
+                ["AiConnections:CredentialStorePath"] = Path.Combine(temp.FullName, "credentials"),
+                ["AiConnections:HealthStorePath"] = Path.Combine(temp.FullName, "health")
+            }).Build();
+            var credentials = new FileSystemAiConnectionCredentialStore(configuration, DataProtectionProvider.Create(Path.Combine(temp.FullName, "keys")));
+            var health = new FileSystemAiConnectionTestHealthStore(configuration);
+            var catalog = new AiConnectionCatalogService(configuration, _ => null, credentials, health);
+            var handler = new RecordingHandler(HttpStatusCode.OK);
+            var service = new AiConnectionTestService(catalog, credentials, health, configuration, new HttpClient(handler), _ => null);
+
+            var fake = await service.TestAsync(3, 7, "deployment-default");
+            var deterministic = await service.TestAsync(3, 7, "localtest-deterministic");
+
+            Assert.IsFalse(fake.Succeeded);
+            Assert.AreEqual("ProviderNotExecutable", fake.Status);
+            Assert.IsTrue(deterministic.Succeeded, deterministic.FailureReason);
+            Assert.AreEqual("Passed", deterministic.Status);
+            Assert.AreEqual(0, handler.CallCount, "The deterministic implementation is local and the Fake provider must never be probed as if healthy.");
+        }
+        finally { temp.Delete(recursive: true); }
+    }
+
+    [TestMethod]
+    public async Task LocalTestDeterministicBuilderResponse_ProducesARealNonEmptyProposal()
+    {
+        var settings = RepositoryFile("IronDev.Api", "appsettings.LocalTest.json");
+        var configuration = new ConfigurationBuilder().AddJsonFile(settings).Build();
+        var provider = new DeterministicAlphaSmokeLlmService(SkeletonAgentRole.Builder, configuration);
+
+        var response = await provider.GetResponseAsync("TinyCalc proposal");
+        var proposal = CodeChangeProposalService.ParseProposal(response, ticketId: 42);
+
+        Assert.AreEqual(1, proposal.FileChanges.Count);
+        Assert.AreEqual("irondev-localtest-proposal.txt", proposal.FileChanges[0].FilePath);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(proposal.FileChanges[0].FullContentAfter));
     }
 
     [TestMethod]
@@ -257,15 +345,15 @@ public sealed class AiConnectionContractTests
 
     private static string RepositoryFile(params string[] parts)
     {
-        var root = AppContext.BaseDirectory;
-        while (root is not null && !File.Exists(Path.Combine(root, "IronDev.slnx")))
-        {
-            root = Path.GetDirectoryName(root);
-        }
+        var root = Path.GetDirectoryName(SourceFilePath());
+        root = root is null ? null : Path.GetDirectoryName(root);
 
-        Assert.IsNotNull(root, "Repository root not found.");
+        Assert.IsNotNull(root, "Repository root not found from the compiled source path.");
+        Assert.IsTrue(File.Exists(Path.Combine(root, "IronDev.slnx")), "Repository solution marker not found.");
         return Path.Combine(root!, Path.Combine(parts));
     }
+
+    private static string SourceFilePath([CallerFilePath] string path = "") => path;
 
     private sealed class RecordingHandler(HttpStatusCode statusCode) : HttpMessageHandler
     {

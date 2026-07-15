@@ -3,10 +3,12 @@ import type { ProjectBoardItemReadModel, ProjectBoardReadModel } from '../../api
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { BatchScreen } from '../batch/BatchScreen';
+import { runAgentRoleLabel } from '../runReadiness';
 
 interface BoardScreenProps {
   onOpenWorkItem: (workItemId: number | null) => void;
   onOpenProvisioning: () => void;
+  onConfigureRunAgents: () => void;
 }
 
 type BoardFilter = 'all' | 'attention' | 'active';
@@ -50,7 +52,7 @@ function itemId(item: ProjectBoardItemReadModel): number | null {
   return typeof item.workItemId === 'number' ? item.workItemId : null;
 }
 
-export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenProps) {
+export function BoardScreen({ onOpenWorkItem, onOpenProvisioning, onConfigureRunAgents }: BoardScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
   const [board, setBoard] = useState<ProjectBoardReadModel | null>(null);
@@ -95,9 +97,22 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenP
   }, [attentionItems, filter, items]);
   const unknownStageCount = visibleItems.filter((item) => !columns.some((column) => column.stage === item.stage)).length;
   const readiness = board?.readiness;
+  const runReadiness = board?.runReadiness;
   const firstAttentionId = attentionItems.map(itemId).find((id): id is number => id !== null);
 
-  const primaryAction = firstAttentionId !== undefined
+  const primaryAction = runReadiness?.projectSetupReady === false
+    ? {
+        label: 'Complete project setup',
+        testid: 'flow.cockpit.primary.setup',
+        run: onOpenProvisioning
+      }
+    : runReadiness?.executionReady === false
+      ? {
+          label: 'Configure run agents',
+          testid: 'flow.cockpit.primary.configureRunAgents',
+          run: onConfigureRunAgents
+        }
+    : firstAttentionId !== undefined
     ? {
         label: 'Review waiting item',
         testid: 'flow.cockpit.primary.review',
@@ -140,9 +155,13 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenP
         <div className="fl-board-actions">
           {loadState === 'loading' ? (
             <span className="fl-tag" data-testid="flow.cockpit.badge" role="status" aria-live="polite">Loading Board...</span>
-          ) : readiness ? (
-            <span className={readiness.isReady ? 'fl-tag fl-green' : 'fl-tag fl-amber'} data-testid="flow.cockpit.badge">
-              {readiness.isReady ? 'Ready to run' : `Setup incomplete · ${readiness.blockedCount ?? 0} blocker(s)`}
+          ) : runReadiness ? (
+            <span className={runReadiness.readyToRun ? 'fl-tag fl-green' : 'fl-tag fl-amber'} data-testid="flow.cockpit.badge">
+              {runReadiness.state === 'SetupIncomplete'
+                ? `Setup incomplete · ${readiness?.blockedCount ?? 0} blocker(s)`
+                : runReadiness.state === 'RunConfigurationRequired'
+                  ? `Run configuration required · ${runReadiness.blockedCount ?? 0} agent blockers`
+                  : 'Ready to run'}
             </span>
           ) : null}
           <button
@@ -181,6 +200,25 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenP
           </div>
           <button className="fl-btn" type="button" onClick={onOpenProvisioning} data-testid="flow.cockpit.setup.open">
             View setup details
+          </button>
+        </section>
+      ) : null}
+
+      {runReadiness?.state === 'RunConfigurationRequired' ? (
+        <section className="fl-board-blocked" data-testid="flow.cockpit.runReadiness">
+          <div>
+            <strong>Project setup complete. Run configuration required · {runReadiness.blockedCount ?? 0} agent blockers.</strong>
+            <p>{runReadiness.nextAction?.nextSafeAction}</p>
+            <ul data-testid="flow.cockpit.runReadiness.blockers">
+              {runReadiness.blockers?.map((blocker) => (
+                <li key={`${blocker.role}-${blocker.reasonCode}`}>
+                  <strong>{runAgentRoleLabel(blocker.role)}</strong>: {blocker.reason} Next: {blocker.nextSafeAction}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button className="fl-btn fl-pri" type="button" onClick={onConfigureRunAgents} data-testid="flow.cockpit.runReadiness.configure">
+            Configure run agents
           </button>
         </section>
       ) : null}

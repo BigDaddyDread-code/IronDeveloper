@@ -7,6 +7,7 @@ using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Core.Runs;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Workflow;
 using IronDev.Core.Workspaces;
 using IronDev.Infrastructure.Services.Workspaces;
@@ -52,6 +53,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private readonly ISkeletonAgentProfileService _agentProfiles;
     private readonly SkeletonRunDriftDetector _driftDetector;
     private readonly IConfiguration _configuration;
+    private readonly IProjectRunReadinessService? _runReadiness;
 
     public TicketSkeletonRunService(
         ITicketService tickets,
@@ -67,7 +69,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         ISkeletonMutationLeaseService mutationLeases,
         IProjectMembershipService projectMemberships,
         ISkeletonAgentProfileService agentProfiles,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IProjectRunReadinessService? runReadiness = null)
     {
         _tickets = tickets;
         _projects = projects;
@@ -84,6 +87,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _agentProfiles = agentProfiles;
         _driftDetector = new SkeletonRunDriftDetector(events);
         _configuration = configuration;
+        _runReadiness = runReadiness;
     }
 
     public async Task<TicketBuildRunDto?> StartAsync(int projectId, long ticketId, CancellationToken cancellationToken = default)
@@ -95,6 +99,13 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         var project = await _projects.GetByIdAsync(projectId, cancellationToken).ConfigureAwait(false);
         if (project is null)
             return null;
+
+        if (_runReadiness is not null)
+        {
+            var readiness = await _runReadiness.EvaluateAsync(projectId, cancellationToken).ConfigureAwait(false);
+            if (!readiness.ReadyToRun)
+                throw new ProjectRunReadinessBlockedException(readiness);
+        }
 
         var run = await _runs.CreateAsync(new CreateRunRequest
         {

@@ -9,7 +9,21 @@ public sealed record GovernedRefusalEnvelope
     public IReadOnlyList<string> MissingEvidence { get; init; } = [];
     public IReadOnlyList<string> NextSafeActions { get; init; } = [];
     public IReadOnlyList<string> ForbiddenActions { get; init; } = [];
+    public string? TargetProductRoute { get; init; }
+    public IReadOnlyList<GovernedRefusalBlocker> Blockers { get; init; } = [];
     public required string CorrelationId { get; init; }
+}
+
+public sealed record GovernedRefusalBlocker
+{
+    public required string Subject { get; init; }
+    public required string ReasonCode { get; init; }
+    public required string Reason { get; init; }
+    public string Provider { get; init; } = string.Empty;
+    public string Model { get; init; } = string.Empty;
+    public string ConnectionId { get; init; } = string.Empty;
+    public string SourceLayer { get; init; } = string.Empty;
+    public required string NextSafeAction { get; init; }
 }
 
 public static class GovernedRefusal
@@ -21,7 +35,9 @@ public static class GovernedRefusal
         IEnumerable<string>? blockedReasons = null,
         IEnumerable<string>? missingEvidence = null,
         IEnumerable<string>? nextSafeActions = null,
-        IEnumerable<string>? forbiddenActions = null) =>
+        IEnumerable<string>? forbiddenActions = null,
+        string? targetProductRoute = null,
+        IEnumerable<GovernedRefusalBlocker>? blockers = null) =>
         new()
         {
             Allowed = false,
@@ -31,7 +47,9 @@ public static class GovernedRefusal
             BlockedReasons = Clean(blockedReasons),
             MissingEvidence = Clean(missingEvidence),
             NextSafeActions = Clean(nextSafeActions),
-            ForbiddenActions = Clean(forbiddenActions)
+            ForbiddenActions = Clean(forbiddenActions),
+            TargetProductRoute = string.IsNullOrWhiteSpace(targetProductRoute) ? null : targetProductRoute.Trim(),
+            Blockers = blockers?.ToArray() ?? []
         };
 
     private static IReadOnlyList<string> Clean(IEnumerable<string>? values) =>

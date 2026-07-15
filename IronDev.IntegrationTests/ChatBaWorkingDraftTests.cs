@@ -1,9 +1,11 @@
 using IronDev.Api.Controllers;
+using IronDev.Core.Agents;
 using IronDev.Core.Auth;
 using IronDev.Core.Builder;
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.RunReadiness;
 using IronDev.Data.Models;
 using IronDev.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -250,5 +252,30 @@ public sealed class ChatBaWorkingDraftTests : IntegrationTestBase
             null!,
             ServiceProvider.GetRequiredService<IChatHistoryService>(),
             ServiceProvider.GetRequiredService<IArtifactSourceReferenceService>(),
-            ServiceProvider.GetRequiredService<ICurrentTenantContext>());
+            ServiceProvider.GetRequiredService<ICurrentTenantContext>(),
+            new FailClosedRunReadinessService());
+
+    private sealed class FailClosedRunReadinessService : IProjectRunReadinessService
+    {
+        public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ProjectRunReadiness
+            {
+                ProjectId = projectId,
+                ProjectSetupReady = false,
+                ExecutionReady = false,
+                ReadyToRun = false,
+                State = ProjectRunReadinessStates.RunConfigurationRequired,
+                BlockedCount = 1,
+                Blockers =
+                [
+                    new ProjectRunReadinessBlocker
+                    {
+                        Role = SkeletonAgentRole.Builder,
+                        ReasonCode = ProjectRunReadinessReasonCodes.RunAgentProfileMissing,
+                        Reason = "The direct controller test uses an explicit fail-closed readiness fixture.",
+                        NextSafeAction = "Inject the real project run-readiness service before testing readiness."
+                    }
+                ]
+            });
+    }
 }

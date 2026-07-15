@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { readyToRunReadiness, runConfigurationRequiredReadiness, setupIncompleteRunReadiness } from './helpers/mockBoard';
 
 test('Board renders backend-owned attention, waiting, assignment, state, and event truth', async ({ page }) => {
   await mockBoardEntry(page, boardResponse());
@@ -37,12 +38,28 @@ test('project readiness is concise and switches the primary action to setup', as
       nextSafeAction: 'Confirm the detected test command before running governed work.'
     }
   };
+  board.runReadiness = setupIncompleteRunReadiness(7, board.readiness);
   await mockBoardEntry(page, board);
   await page.goto('/projects/7/board');
 
   await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Setup incomplete · 2 blocker(s)');
   await expect(page.getByTestId('flow.cockpit.primary.setup')).toHaveText('Complete project setup');
   await expect(page.getByTestId('flow.cockpit.setup')).toContainText('Confirm the detected test command');
+});
+
+test('provisioning green with Fake agents shows four execution blockers and opens project Agents', async ({ page }) => {
+  const board = boardResponse();
+  board.items = [];
+  board.runReadiness = runConfigurationRequiredReadiness(7);
+  await mockBoardEntry(page, board);
+  await page.goto('/projects/7/board');
+
+  await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Run configuration required · 4 agent blockers');
+  await expect(page.getByTestId('flow.cockpit.runReadiness')).toContainText('Project setup complete.');
+  await expect(page.getByTestId('flow.cockpit.runReadiness.blockers').getByRole('listitem')).toHaveCount(4);
+  await page.getByTestId('flow.cockpit.primary.configureRunAgents').click();
+  await expect(page).toHaveURL(/\/projects\/7\/library\/settings\/agents$/);
+  await expect(page.getByTestId('flow.settings.section.agents')).toHaveAttribute('aria-selected', 'true');
 });
 
 test('Board failure refuses to infer pipeline state from the legacy ticket list', async ({ page }) => {
@@ -94,6 +111,7 @@ function boardResponse() {
       proposedProfile: null,
       boundary: 'Backend readiness truth.'
     },
+    runReadiness: readyToRunReadiness(7),
     items: [
       {
         workItemId: 41,

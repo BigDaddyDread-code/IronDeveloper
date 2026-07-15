@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using IronDev.Core.RunReadiness;
 
 namespace IronDev.Core.Models;
 
@@ -88,6 +89,7 @@ public sealed class BuildReadinessResult
     public string Message { get; set; } = "Ready to build.";
     public List<string> Warnings { get; set; } = new();
     public List<string> BlockingIssues { get; set; } = new();
+    public ProjectRunReadiness? RunReadiness { get; set; }
     
     public bool IsReady => Status == BuildReadinessStatus.ReadyToBuild;
 }

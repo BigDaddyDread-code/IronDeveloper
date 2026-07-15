@@ -6,6 +6,7 @@ using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Runs;
 using IronDev.Core.Workflow;
 using IronDev.Data.Models;
@@ -393,6 +394,8 @@ public sealed class FindingDrivenRevisionApiDrivenTests : ApiTestBase
             PrepareRestoredBookSellerSource(sampleCopy);
             GitInit(sampleCopy);
 
+            var expectedRunReadiness = new ExpectedProjectRunReadinessService();
+
             var factory = Factory.WithWebHostBuilder(hostBuilder =>
             {
                 hostBuilder.UseEnvironment("Test");
@@ -411,6 +414,8 @@ public sealed class FindingDrivenRevisionApiDrivenTests : ApiTestBase
                     services.RemoveAll<ISkeletonCriticReviewService>();
                     services.AddScoped<ISkeletonCriticReviewService>(sp =>
                         new DeterministicFindingCritic(sp.GetRequiredService<IRunEventStore>(), findingIds));
+                    services.RemoveAll<IProjectRunReadinessService>();
+                    services.AddSingleton<IProjectRunReadinessService>(expectedRunReadiness);
                 });
             });
 
@@ -419,6 +424,7 @@ public sealed class FindingDrivenRevisionApiDrivenTests : ApiTestBase
 
             var fixture = new RevisionFixture(sampleCopy, workspaceParent, evidenceRoot, factory, client, noNodeReuse);
             await fixture.CreateProjectAndTicketAsync();
+            expectedRunReadiness.ExpectProject(fixture.ProjectId);
             return fixture;
         }
 

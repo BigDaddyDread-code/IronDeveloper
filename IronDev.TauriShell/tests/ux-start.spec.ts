@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readyToRunReadiness, setupIncompleteRunReadiness } from './helpers/mockBoard';
 
 // UX-START-0/1 — the session front door and the project-scoped Board. The project is
 // the authority boundary: no project, no work item; no readiness, no run. These
@@ -284,11 +285,15 @@ async function mockStart(
 }
 
 function boardProjection(tickets: Array<Record<string, unknown>>, readiness: Record<string, unknown>) {
+  const runReadiness = readiness.isReady === true
+    ? readyToRunReadiness(7)
+    : setupIncompleteRunReadiness(7, readiness);
   return {
     projectId: 7,
     projectName: 'BookSeller',
     generatedUtc: '2026-07-11T01:00:00Z',
     readiness,
+    runReadiness,
     items: tickets.map((ticket) => {
       const status = String(ticket.status ?? 'Ready');
       const review = status.toLowerCase().includes('approval') || status.toLowerCase().includes('review');

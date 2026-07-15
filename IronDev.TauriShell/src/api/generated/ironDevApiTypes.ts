@@ -6958,6 +6958,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/run-readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectRunReadiness"];
+                        "application/json": components["schemas"]["ProjectRunReadiness"];
+                        "text/json": components["schemas"]["ProjectRunReadiness"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -12504,6 +12543,7 @@ export interface components {
             message?: string | null;
             warnings?: string[] | null;
             blockingIssues?: string[] | null;
+            runReadiness?: components["schemas"]["ProjectRunReadiness"];
             readonly isReady?: boolean;
         };
         /**
@@ -13407,6 +13447,16 @@ export interface components {
             content: string | null;
             sha256: string | null;
         };
+        GovernedRefusalBlocker: {
+            subject: string | null;
+            reasonCode: string | null;
+            reason: string | null;
+            provider?: string | null;
+            model?: string | null;
+            connectionId?: string | null;
+            sourceLayer?: string | null;
+            nextSafeAction: string | null;
+        };
         GovernedRefusalEnvelope: {
             allowed?: boolean;
             reasonCode: string | null;
@@ -13415,6 +13465,8 @@ export interface components {
             missingEvidence?: string[] | null;
             nextSafeActions?: string[] | null;
             forbiddenActions?: string[] | null;
+            targetProductRoute?: string | null;
+            blockers?: components["schemas"]["GovernedRefusalBlocker"][] | null;
             correlationId: string | null;
         };
         GovernedReleaseGateApiBoundary: {
@@ -14306,6 +14358,7 @@ export interface components {
             /** Format: date-time */
             generatedUtc?: string;
             readiness: components["schemas"]["ProjectProvisioningReadiness"];
+            runReadiness?: components["schemas"]["ProjectRunReadiness"];
             items?: components["schemas"]["ProjectBoardItemReadModel"][] | null;
         };
         ProjectBoardRunReadModel: {
@@ -14919,6 +14972,47 @@ export interface components {
             /** Format: date-time */
             updatedDate?: string | null;
         };
+        ProjectRunAgentReadiness: {
+            role: components["schemas"]["SkeletonAgentRole"];
+            isReady: boolean;
+            effectiveProvider?: string | null;
+            effectiveModel?: string | null;
+            connectionId?: string | null;
+            sourceLayer?: string | null;
+            connectionHealth?: string | null;
+            blockers?: components["schemas"]["ProjectRunReadinessBlocker"][] | null;
+        };
+        ProjectRunReadiness: {
+            /** Format: int32 */
+            projectId?: number;
+            projectSetupReady?: boolean;
+            executionReady?: boolean;
+            readyToRun?: boolean;
+            state?: string | null;
+            /** Format: int32 */
+            blockedCount?: number;
+            provisioning?: components["schemas"]["ProjectProvisioningReadiness"];
+            agents?: components["schemas"]["ProjectRunAgentReadiness"][] | null;
+            blockers?: components["schemas"]["ProjectRunReadinessBlocker"][] | null;
+            nextAction?: components["schemas"]["ProjectRunReadinessNextAction"];
+            boundary?: string | null;
+        };
+        ProjectRunReadinessBlocker: {
+            role: components["schemas"]["SkeletonAgentRole"];
+            effectiveProvider?: string | null;
+            effectiveModel?: string | null;
+            connectionId?: string | null;
+            sourceLayer?: string | null;
+            reasonCode: string | null;
+            reason: string | null;
+            nextSafeAction: string | null;
+        };
+        ProjectRunReadinessNextAction: {
+            kind?: string | null;
+            label?: string | null;
+            nextSafeAction?: string | null;
+            targetProductRoute?: string | null;
+        };
         ProjectServicesStatusDto: {
             /** Format: int32 */
             projectId?: number;
@@ -15205,6 +15299,7 @@ export interface components {
             applyRecovery: components["schemas"]["ProjectWorkItemApplyRecoveryReadModel"];
             executionProof: components["schemas"]["ProjectWorkItemExecutionProofReadModel"];
             evidenceLinks: components["schemas"]["ProjectWorkItemEvidenceLinksReadModel"];
+            runReadiness?: components["schemas"]["ProjectRunReadiness"];
             boundary?: string | null;
         };
         ProjectWorkItemRunReadModel: {

@@ -6,6 +6,7 @@ using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Core.Runs;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Workflow;
 using IronDev.Core.Workspaces;
 using IronDev.Data.Models;
@@ -47,6 +48,29 @@ public sealed class SkeletonRunTests
 
         Assert.IsNull(result);
         Assert.AreEqual(0, harness.Workspaces.Requests.Count);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_RunReadinessBlocked_CreatesNoRunWorkspaceOrEvent()
+    {
+        var blocked = new ProjectRunReadiness
+        {
+            ProjectId = ProjectId,
+            ProjectSetupReady = true,
+            ExecutionReady = false,
+            ReadyToRun = false,
+            State = ProjectRunReadinessStates.RunConfigurationRequired,
+            BlockedCount = 4
+        };
+        var harness = SkeletonHarness.Create(runReadiness: new StubRunReadinessService(blocked));
+
+        var exception = await Assert.ThrowsAsync<ProjectRunReadinessBlockedException>(
+            () => harness.Service.StartAsync(ProjectId, TicketId));
+
+        Assert.AreSame(blocked, exception.Readiness);
+        Assert.AreEqual(0, (await harness.Runs.GetRecentAsync()).Count, "The readiness refusal must precede run creation.");
+        Assert.AreEqual(0, (await harness.Events.GetRecentRunIdsAsync()).Count, "The readiness refusal must precede RunStarted and every other event.");
+        Assert.AreEqual(0, harness.Workspaces.Requests.Count, "The readiness refusal must precede workspace creation.");
     }
 
     [TestMethod]
@@ -1485,7 +1509,8 @@ public sealed class SkeletonRunTests
             string? acceptanceCriteria = null,
             int? leaseTimeoutMinutes = null,
             bool allowSoloApproval = false,
-            IReadOnlyList<ProjectMembershipEntry>? members = null)
+            IReadOnlyList<ProjectMembershipEntry>? members = null,
+            IProjectRunReadinessService? runReadiness = null)
         {
             var sourceDir = Path.Combine(Path.GetTempPath(), "irondev-skel-src-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(sourceDir);
@@ -1531,7 +1556,8 @@ public sealed class SkeletonRunTests
                 leases,
                 new StubProjectMembershipService(members ?? DefaultMembers()),
                 profiles,
-                configuration);
+                configuration,
+                runReadiness);
 
             return new SkeletonHarness
             {
@@ -1552,6 +1578,12 @@ public sealed class SkeletonRunTests
         Member(7, "Bob Developer", ProjectMemberRoles.Owner),
         Member(8, "Alice Reviewer", ProjectMemberRoles.Contributor)
     ];
+
+    private sealed class StubRunReadinessService(ProjectRunReadiness readiness) : IProjectRunReadinessService
+    {
+        public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(readiness);
+    }
 
     private static ProjectMembershipEntry Member(int userId, string displayName, string role) =>
         new(userId, displayName, $"{displayName.Split(' ')[0].ToLowerInvariant()}@irondev.local", role, userId.ToString() == BobUserId, DateTimeOffset.UtcNow);

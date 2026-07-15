@@ -2,6 +2,8 @@ using System.Net.Http.Headers;
 using IronDev.Core.AiConnections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using IronDev.Core.Agents;
+using IronDev.Core.RunReadiness;
 
 namespace IronDev.Infrastructure.Services;
 
@@ -65,8 +67,14 @@ public sealed class AiConnectionTestService : IAiConnectionTestService
             return await FailureAsync(tenantId, userId, connectionId, "Unavailable", "The AI connection is not enabled and available.", null, cancellationToken).ConfigureAwait(false);
 
         var provider = connection.ProviderKind.Trim().ToLowerInvariant();
-        if (provider == "fake")
+        if (provider == SkeletonAgentProviders.Fake)
+            return await FailureAsync(tenantId, userId, connectionId, "ProviderNotExecutable", "The Fake provider always refuses model calls and cannot prove execution health.", null, cancellationToken).ConfigureAwait(false);
+        if (provider == ProjectRunProviders.LocalTestDeterministic)
+        {
+            var probe = new DeterministicAlphaSmokeLlmService(SkeletonAgentRole.Analyst, _configuration);
+            await probe.GetResponseAsync("LocalTest execution probe", cancellationToken).ConfigureAwait(false);
             return await SuccessAsync(tenantId, userId, connectionId, null, cancellationToken).ConfigureAwait(false);
+        }
 
         var credential = await _credentials.GetCredentialForUseAsync(tenantId, connectionId, cancellationToken).ConfigureAwait(false)
             ?? DeploymentCredential();

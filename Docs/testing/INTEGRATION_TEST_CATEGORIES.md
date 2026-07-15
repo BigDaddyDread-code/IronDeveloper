@@ -14,10 +14,10 @@ A label does not make a slow test safe.
 
 ## Totals
 
-- Source files scanned: 625
-- Test classes found: 619
-- Test methods found: 9849
-- Category names found: 239
+- Source files scanned: 694
+- Test classes found: 691
+- Test methods found: 11191
+- Category names found: 244
 
 ## G13 Category Changes
 
@@ -487,6 +487,7 @@ A label does not make a slow test safe.
 | `RollbackRegression` | 2 | 19 | 0 | 2 |
 | `RollbackSupportReceiptReadApi` | 1 | 5 | 0 | 1 |
 | `RollbackSupportReceiptStore` | 1 | 23 | 0 | 1 |
+| `RunReadiness` | 1 | 3 | 0 | 1 |
 | `SecretSafety` | 1 | 11 | 0 | 1 |
 | `SemanticMemory` | 1 | 9 | 0 | 1 |
 | `SealedRolePackage` | 1 | 14 | 0 | 1 |
