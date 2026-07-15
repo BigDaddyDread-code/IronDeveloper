@@ -241,6 +241,28 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
   await page.route('**/irondev-api/health', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) })
   );
+  await page.route('**/irondev-api/api/localtest/preflight', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        state: 'LocalTestReady',
+        environment: 'LocalTest',
+        database: 'IronDeveloper_Test',
+        apiBuildIdentity: '1.0.0+test-commit',
+        apiBuildCommit: 'test-commit',
+        launcherRepositoryCommit: 'test-commit',
+        sessionId: 'playwright-session',
+        apiBaseUrl: 'http://localhost:5000',
+        apiPid: 1234,
+        seedContractVersion: 1,
+        seededLoginCheckResult: 'Passed',
+        nextSafeAction: 'Sign in with the documented LocalTest credentials.',
+        resetCommand: null,
+        detail: 'LocalTest front door is ready.'
+      })
+    })
+  );
   await page.route('**/irondev-api/api/environment', (route) =>
     route.fulfill({
       status: 200,

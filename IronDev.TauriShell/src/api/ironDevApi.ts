@@ -67,6 +67,7 @@ import type {
   EnvironmentInfo,
   LoginRequest,
   LoginResponse,
+  LocalTestPreflightInfo,
   PlannedSurfaceEnvelope,
   ProjectBoardReadModel,
   ProjectAuditExport,
@@ -252,6 +253,14 @@ class IronDevApiClient {
     return this.request<EnvironmentInfo>('/api/environment', {
       method: 'GET',
       signal
+    });
+  }
+
+  async getLocalTestPreflight(signal?: AbortSignal): Promise<LocalTestPreflightInfo> {
+    return this.request<LocalTestPreflightInfo>('/api/localtest/preflight', {
+      method: 'GET',
+      signal,
+      skipAuth: true
     });
   }
 

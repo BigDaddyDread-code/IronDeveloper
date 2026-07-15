@@ -56,21 +56,24 @@ const string CorsPolicyName = "IronDevCors";
 const string AuthLoginRateLimitPolicyName = "AuthLoginPolicy";
 const string SensitiveApiRateLimitPolicyName = "SensitiveApiPolicy";
 
-var logDirectory = Path.Combine(
+var defaultLogDirectory = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
     "IronDev",
     "api-logs");
-
-Directory.CreateDirectory(logDirectory);
+var sessionLogPath = Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_API_LOG_PATH");
+var apiLogPath = string.IsNullOrWhiteSpace(sessionLogPath)
+    ? Path.Combine(defaultLogDirectory, "irondev-api-.log")
+    : Path.GetFullPath(sessionLogPath);
+Directory.CreateDirectory(Path.GetDirectoryName(apiLogPath)!);
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .Enrich.FromLogContext()
     .WriteTo.File(
-        Path.Combine(logDirectory, "irondev-api-.log"),
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 14,
+        apiLogPath,
+        rollingInterval: string.IsNullOrWhiteSpace(sessionLogPath) ? RollingInterval.Day : RollingInterval.Infinite,
+        retainedFileCountLimit: string.IsNullOrWhiteSpace(sessionLogPath) ? 14 : 1,
         shared: true,
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
     .CreateLogger();
@@ -162,6 +165,7 @@ builder.Services.AddRateLimiter(options =>
 
 // Infrastructure
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
+builder.Services.AddScoped<ILocalTestPreflightService, LocalTestPreflightService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();

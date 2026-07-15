@@ -4555,6 +4555,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/localtest/preflight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["LocalTestPreflightResponse"];
+                        "application/json": components["schemas"]["LocalTestPreflightResponse"];
+                        "text/json": components["schemas"]["LocalTestPreflightResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/manual-critic/reviews": {
         parameters: {
             query?: never;
@@ -13431,6 +13468,24 @@ export interface components {
             startedUtc?: string | null;
             /** Format: date-time */
             completedUtc?: string | null;
+        };
+        LocalTestPreflightResponse: {
+            state?: string | null;
+            environment?: string | null;
+            database?: string | null;
+            apiBuildIdentity?: string | null;
+            apiBuildCommit?: string | null;
+            launcherRepositoryCommit?: string | null;
+            sessionId?: string | null;
+            apiBaseUrl?: string | null;
+            /** Format: int32 */
+            apiPid?: number;
+            /** Format: int32 */
+            seedContractVersion?: number | null;
+            seededLoginCheckResult?: string | null;
+            nextSafeAction?: string | null;
+            resetCommand?: string | null;
+            detail?: string | null;
         };
         LoginRequest: {
             email?: string | null;

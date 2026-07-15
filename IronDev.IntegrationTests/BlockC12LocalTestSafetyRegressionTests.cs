@@ -189,6 +189,72 @@ public sealed class BlockC12LocalTestSafetyRegressionTests
     }
 
     [TestMethod]
+    public void Dux1_LocalTestLauncher_KeepsStableDatabaseAliasAndChecksFrontDoorBeforeUi()
+    {
+        var launcher = ReadRepositoryFile("tools", "localtest", "start-alpha-localtest.ps1");
+        var smoke = ReadRepositoryFile("tools", "localtest", "Invoke-LocalTestSmoke.ps1");
+        var preflightIndex = launcher.IndexOf("$preflight = Get-LocalTestPreflight", StringComparison.Ordinal);
+        var loginIndex = launcher.IndexOf("$login = Test-LocalTestAuthenticationContract", StringComparison.Ordinal);
+        var browserStartIndex = launcher.IndexOf("$uiProcess = Start-BrowserShell", StringComparison.Ordinal);
+
+        Assert.IsTrue(preflightIndex >= 0, "The launcher must call the LocalTest preflight.");
+        Assert.IsTrue(loginIndex > preflightIndex, "The real seeded login must run after preflight.");
+        Assert.IsTrue(browserStartIndex > loginIndex, "The UI must start only after preflight and seeded login pass.");
+        AssertDoesNotContain(launcher, "Resolve-LocalDbDataSource", "LocalTest launcher");
+        AssertDoesNotContain(smoke, "Resolve-LocalDbDataSource", "LocalTest smoke");
+        AssertDoesNotContain(launcher, "return \"np:$pipe\"", "LocalTest launcher");
+        AssertDoesNotContain(smoke, "return \"np:$pipe\"", "LocalTest smoke");
+    }
+
+    [TestMethod]
+    public void Dux1_LocalTestLauncher_WritesSessionIdentityManifestAndUniqueLogs()
+    {
+        var launcher = ReadRepositoryFile("tools", "localtest", "start-alpha-localtest.ps1");
+
+        StringAssert.Contains(launcher, "$sessionId = [Guid]::NewGuid()");
+        StringAssert.Contains(launcher, "irondev-localtest-sessions");
+        StringAssert.Contains(launcher, "session-manifest.json");
+        foreach (var requiredField in new[]
+        {
+            "repositoryCommit",
+            "apiPid",
+            "uiPid",
+            "apiBaseUrl",
+            "uiUrl",
+            "databaseName",
+            "environment",
+            "seedContractVersion",
+            "seededLoginCheckResult",
+            "startupTimestampUtc"
+        })
+        {
+            StringAssert.Contains(launcher, requiredField);
+        }
+
+        StringAssert.Contains(launcher, "IRONDEV_LOCALTEST_SESSION_ID");
+        StringAssert.Contains(launcher, "VITE_IRONDEV_LOCALTEST_SESSION_ID");
+        StringAssert.Contains(launcher, "IRONDEV_LOCALTEST_API_LOG_PATH");
+    }
+
+    [TestMethod]
+    public void Dux1_LocalTestLauncher_FailureStopsBothSurfacesAndPrintsOneSafeReset()
+    {
+        var launcher = ReadRepositoryFile("tools", "localtest", "start-alpha-localtest.ps1");
+        var failureIndex = launcher.IndexOf("$failure = $_.Exception.Message", StringComparison.Ordinal);
+        const string resetCommand = @".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset";
+
+        Assert.IsTrue(failureIndex >= 0, "The launcher must have a unified failure handler.");
+        var failureBlock = launcher[failureIndex..];
+
+        StringAssert.Contains(failureBlock, "Stop-Listener -Port $UiPort");
+        StringAssert.Contains(failureBlock, "Stop-Listener -Port $apiPort");
+        StringAssert.Contains(failureBlock, "-Status \"Failed\"");
+        StringAssert.Contains(failureBlock, "Safe reset: $resetCommand");
+        StringAssert.Contains(launcher, resetCommand);
+        AssertDoesNotContain(launcher, "silently resets", "LocalTest launcher");
+    }
+
+    [TestMethod]
     public void BlockC12_LocalTestSeedSql_ContainsEveryContractedIdentity()
     {
         using var document = JsonDocument.Parse(ReadRepositoryFile("tools", "localtest", "localtest-seed-contract.json"));
