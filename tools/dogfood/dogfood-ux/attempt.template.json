@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0",
+  "recordKind": "AttemptEvidence",
+  "campaignId": "replace-campaign-id",
+  "attemptId": "replace-attempt-id",
+  "project": "replace-project",
+  "ironDevCommit": "0000000",
+  "startedAtUtc": "1970-01-01T00:00:00Z",
+  "completedAtUtc": null,
+  "outcome": "InProgress",
+  "highestFindingSeverity": "None",
+  "findingCounts": {
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "p3": 0
+  },
+  "timing": {
+    "wallClockElapsedSeconds": 0,
+    "activeJourneySeconds": 0,
+    "pausedSeconds": 0,
+    "productWorkSeconds": 0,
+    "governanceCeremonySeconds": 0,
+    "archaeologyRecoverySeconds": 0,
+    "averageTimeToNextMeaningfulActionSeconds": 0,
+    "maximumTimeToNextMeaningfulActionSeconds": 0,
+    "flowEfficiency": 0
+  },
+  "counts": {
+    "actions": 0,
+    "backtracks": 0,
+    "deadEnds": 0,
+    "refusals": 0,
+    "usefulRefusals": 0,
+    "hiddenKnowledgeEvents": 0,
+    "workarounds": 0,
+    "directApiCalls": 0,
+    "directSqlOperations": 0,
+    "manualFilesystemOperations": 0,
+    "undocumentedCommands": 0
+  },
+  "deviations": [],
+  "transitions": [],
+  "stageRatings": [],
+  "score": null,
+  "tinyCalcAcceptance": null
+}

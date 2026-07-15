@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **688 files** after CLN-43. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **689 files** after the DOGFOOD-UX Flow Ease protocol was added. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **688 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 71 |
+| `Canonical` | 73 |
 | `Supporting` | 128 |
-| `HistoricalReceipt` | 431 |
+| `HistoricalReceipt` | 432 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **686** |
+| **Total** | **689** |
 
 ## Inventory
 
@@ -142,6 +142,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **688 f
 | `Docs/dogfood/DEMO-REHEARSAL-001.md` | DEMO-REHEARSAL-001 | Dogfood | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Dogfood |
 | `Docs/dogfood/DOGFOOD2_SECOND_REPO_CYCLE_001.md` | DOGFOOD-2 â€” Second Repo Cycle 001 (author dry-run) | Dogfood | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Dogfood |
 | `Docs/dogfood/DOGFOOD2_SECOND_REPO_RUNBOOK.md` | DOGFOOD-2 â€” Second Repo Runbook | Dogfood | `Supporting` | Not reverified by CLN-04 | `-` | Keep bounded; add canonical pointer if it can appear current | Dogfood |
+| `Docs/dogfood/DOGFOOD_UX_FLOW_EASE.md` | DOGFOOD-UX Flow Ease Protocol | Dogfood | `Canonical` | 2026-07-16 protocol and validator review | `-` | Required for every DOGFOOD-UX attempt | Dogfood |
 | `Docs/dogfood/PR22_NO_APPROVAL_PROPOSAL_ONLY_LANE.md` | PR22 No-Approval ProposalOnly Dogfood Task | Governance | `ArchiveCandidate` | Historical context; not current | `Docs/architecture/CANONICAL_ARCHITECTURE_INDEX.md` | Move only in CLN-05 when references can be updated safely | Governance |
 | `Docs/dogfood/PR23_ASK_BEFORE_MUTATION_BOUNDARY_LANE.md` | PR23 Ask-Before-Mutation Boundary Dogfood Task | Dogfood | `ArchiveCandidate` | Historical context; not current | `Docs/architecture/CANONICAL_ARCHITECTURE_INDEX.md` | Move only in CLN-05 when references can be updated safely | Dogfood |
 | `Docs/dogfood/PR24_BOUNDED_AUTHORITY_DRAFT_PR_LANE.md` | PR24 Bounded Authority Draft PR Dogfood Task | Governance | `ArchiveCandidate` | Historical context; not current | `Docs/architecture/CANONICAL_ARCHITECTURE_INDEX.md` | Move only in CLN-05 when references can be updated safely | Governance |

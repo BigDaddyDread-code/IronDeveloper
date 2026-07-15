@@ -256,6 +256,15 @@ foreach ($path in $requiredReferences.Keys) {
 }
 Add-Check -Name "Canonical document references" -Passed ($referenceFailures.Count -eq 0) -Detail $(if ($referenceFailures.Count) { ($referenceFailures -join "; ") } else { "All canonical entry points link to their authority documents" })
 
+$dogfoodUxIntegrityTest = Join-Path $repoRoot "tools\dogfood\Test-DogfoodUxEvidenceIntegrity.ps1"
+try {
+    & $dogfoodUxIntegrityTest -RepositoryRoot $repoRoot
+    Add-Check -Name "DOGFOOD-UX evidence integrity" -Passed $true -Detail "Findings-derived severity and timestamp-bound timing tamper tests passed"
+}
+catch {
+    Add-Check -Name "DOGFOOD-UX evidence integrity" -Passed $false -Detail $_.Exception.Message
+}
+
 $report = [ordered]@{
     schemaVersion = 1
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")

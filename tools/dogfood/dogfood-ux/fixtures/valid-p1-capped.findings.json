@@ -1,0 +1,21 @@
+[
+  {
+    "findingId": "DUX-VALIDATOR-P1",
+    "project": "TinyCalc",
+    "screenStep": "Start governed run",
+    "severity": "P1",
+    "observedBehavior": "The validation fixture records a P1 stop finding.",
+    "expectedBehavior": "The severity cap must be derived from this retained finding.",
+    "evidence": [
+      "fixture://valid-p1-capped"
+    ],
+    "reasonCodes": [
+      "FixtureP1"
+    ],
+    "visibleRemedy": "Use the validator fixture only for contract testing.",
+    "actualWorkaround": null,
+    "authorityImpact": "The fixture proves that P1 evidence caps the calculated score.",
+    "repeatability": "Deterministic validation fixture.",
+    "proposedOwningSlice": "DOGFOOD-UX evidence-integrity validation."
+  }
+]

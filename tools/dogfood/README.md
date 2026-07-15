@@ -8,6 +8,37 @@ The harness is built around one rule:
 Every run gets a DogfoodRunId, and every trace/result/artifact should be stamped with it.
 ```
 
+## DOGFOOD-UX Flow Ease attempts
+
+Visible-product exploratory campaigns use the retained protocol in `Docs/dogfood/DOGFOOD_UX_FLOW_EASE.md`.
+
+Start each attempt with:
+
+```powershell
+.\tools\dogfood\New-DogfoodUxAttempt.ps1 `
+  -CampaignId dogfood-ux-1-<date>-<commit> `
+  -AttemptId dogfood-ux-1-<date>-<commit>-tinycalc `
+  -Project TinyCalc `
+  -IronDevCommit <commit>
+```
+
+The initializer creates `manifest.json`, `attempt.json`, `findings.json`, and `operator-log.md` together beneath `artifacts/dogfood-ux`. It refuses unsafe path segments and existing attempt directories. The JSON and Markdown templates remain available under `tools/dogfood/dogfood-ux/` for review.
+
+Complete `attempt.json` and `findings.json`, then validate finding-derived severity counts, timestamp-bound wall/active/paused timings, weighted score, P0/P1 cap, and TinyCalc progression predicates:
+
+```powershell
+.\tools\dogfood\Test-DogfoodUxAttempt.ps1 `
+  -Path .\artifacts\dogfood-ux\<campaign-id>\<project>\<attempt-id>\attempt.json
+```
+
+The committed `fixtures/valid-completed.json` and `fixtures/valid-p1-capped.json` records plus their matching `*.findings.json` files are validator test data only. Fixtures must pass their findings path explicitly. They prove the smooth path, findings-derived P1 cap, and timestamp-bound timing model. They are not campaign evidence and must never be copied into an attempt evidence package.
+
+Run the full positive and tamper regression pack with:
+
+```powershell
+.\tools\dogfood\Test-DogfoodUxEvidenceIntegrity.ps1
+```
+
 Example:
 
 ```text
