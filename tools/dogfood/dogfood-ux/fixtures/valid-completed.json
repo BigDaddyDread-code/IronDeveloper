@@ -6,7 +6,7 @@
   "project": "TinyCalc",
   "ironDevCommit": "0000000",
   "startedAtUtc": "2026-07-16T00:00:00Z",
-  "completedAtUtc": "2026-07-16T00:00:40Z",
+  "completedAtUtc": "2026-07-16T00:00:50Z",
   "outcome": "Completed",
   "highestFindingSeverity": "None",
   "findingCounts": {
@@ -16,7 +16,9 @@
     "p3": 0
   },
   "timing": {
-    "totalJourneySeconds": 40,
+    "wallClockElapsedSeconds": 50,
+    "activeJourneySeconds": 40,
+    "pausedSeconds": 10,
     "productWorkSeconds": 30,
     "governanceCeremonySeconds": 10,
     "archaeologyRecoverySeconds": 0,

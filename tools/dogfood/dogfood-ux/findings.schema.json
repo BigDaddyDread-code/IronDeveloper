@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://irondev.local/schemas/dogfood-ux-findings.schema.json",
+  "title": "DOGFOOD-UX findings evidence",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/finding"
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullableNonEmptyString": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "findingId",
+        "project",
+        "screenStep",
+        "severity",
+        "observedBehavior",
+        "expectedBehavior",
+        "evidence",
+        "reasonCodes",
+        "visibleRemedy",
+        "actualWorkaround",
+        "authorityImpact",
+        "repeatability",
+        "proposedOwningSlice"
+      ],
+      "properties": {
+        "findingId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "project": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "screenStep": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "P0",
+            "P1",
+            "P2",
+            "P3"
+          ]
+        },
+        "observedBehavior": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "expectedBehavior": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "reasonCodes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "visibleRemedy": {
+          "$ref": "#/$defs/nullableNonEmptyString"
+        },
+        "actualWorkaround": {
+          "$ref": "#/$defs/nullableNonEmptyString"
+        },
+        "authorityImpact": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "repeatability": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "proposedOwningSlice": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    }
+  }
+}

@@ -3,6 +3,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Path,
 
+    [string]$FindingsPath,
+
     [switch]$AllowInProgress,
 
     [switch]$PassThru
@@ -75,6 +77,41 @@ function Assert-Rating {
     }
 }
 
+function Assert-NonEmptyString {
+    param(
+        [Parameter(Mandatory = $true)]$Value,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    if ($Value -isnot [string] -or [string]::IsNullOrWhiteSpace($Value)) {
+        throw "$Label must be a non-empty string."
+    }
+}
+
+function Assert-StringArray {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()]$Value,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [switch]$RequireItem
+    )
+
+    if ($Value -is [string] -or $Value -isnot [array]) {
+        throw "$Label must be an array of strings."
+    }
+
+    $items = @($Value)
+    if ($RequireItem -and $items.Count -eq 0) {
+        throw "$Label must retain at least one item."
+    }
+    foreach ($item in $items) {
+        Assert-NonEmptyString -Value $item -Label "$Label item"
+    }
+    $duplicate = $items | Group-Object | Where-Object Count -gt 1 | Select-Object -First 1
+    if ($null -ne $duplicate) {
+        throw "$Label contains duplicate item '$($duplicate.Name)'."
+    }
+}
+
 function Round-Score {
     param([Parameter(Mandatory = $true)][double]$Value)
     return [Math]::Round($Value, 2, [MidpointRounding]::AwayFromZero)
@@ -133,6 +170,84 @@ foreach ($name in $requiredTopLevel) {
 Assert-Value -Actual $attempt.schemaVersion -Expected "1.0" -Label "schemaVersion"
 if ($attempt.recordKind -notin @("AttemptEvidence", "ValidationFixture")) {
     throw "recordKind must be AttemptEvidence or ValidationFixture."
+}
+
+if ([string]::IsNullOrWhiteSpace($FindingsPath)) {
+    if ($attempt.recordKind -eq "ValidationFixture") {
+        throw "ValidationFixture records must explicitly supply -FindingsPath."
+    }
+
+    $attemptDirectory = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Path))
+    $FindingsPath = Join-Path $attemptDirectory "findings.json"
+}
+if (-not (Test-Path -LiteralPath $FindingsPath -PathType Leaf)) {
+    throw "DOGFOOD-UX findings file not found: $FindingsPath"
+}
+
+$findingsJson = Get-Content -LiteralPath $FindingsPath -Raw
+if ([string]::IsNullOrWhiteSpace($findingsJson) -or $findingsJson.TrimStart()[0] -ne '[') {
+    throw "DOGFOOD-UX findings evidence must be a JSON array."
+}
+
+$parsedFindings = $findingsJson | ConvertFrom-Json
+$findings = @($parsedFindings)
+$requiredFindingProperties = @(
+    "findingId",
+    "project",
+    "screenStep",
+    "severity",
+    "observedBehavior",
+    "expectedBehavior",
+    "evidence",
+    "reasonCodes",
+    "visibleRemedy",
+    "actualWorkaround",
+    "authorityImpact",
+    "repeatability",
+    "proposedOwningSlice"
+)
+$findingIds = @{}
+foreach ($finding in $findings) {
+    foreach ($name in $requiredFindingProperties) {
+        Assert-Property -Object $finding -Name $name -Context "finding"
+    }
+
+    $unexpectedProperties = @($finding.PSObject.Properties.Name | Where-Object { $_ -notin $requiredFindingProperties })
+    if ($unexpectedProperties.Count -gt 0) {
+        throw "Finding '$($finding.findingId)' contains unsupported property '$($unexpectedProperties[0])'."
+    }
+
+    foreach ($name in @(
+        "findingId",
+        "project",
+        "screenStep",
+        "observedBehavior",
+        "expectedBehavior",
+        "authorityImpact",
+        "repeatability",
+        "proposedOwningSlice"
+    )) {
+        Assert-NonEmptyString -Value $finding.$name -Label "finding.$name"
+    }
+    if ($finding.severity -notin @("P0", "P1", "P2", "P3")) {
+        throw "Finding '$($finding.findingId)' has unknown severity '$($finding.severity)'."
+    }
+    Assert-StringArray -Value $finding.evidence -Label "finding.evidence" -RequireItem
+    Assert-StringArray -Value $finding.reasonCodes -Label "finding.reasonCodes"
+    foreach ($nullableStringName in @("visibleRemedy", "actualWorkaround")) {
+        if ($null -ne $finding.$nullableStringName) {
+            Assert-NonEmptyString -Value $finding.$nullableStringName -Label "finding.$nullableStringName"
+        }
+    }
+
+    $findingId = [string]$finding.findingId
+    if ($findingId -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+        throw "finding.findingId must be one safe identifier containing only letters, digits, dot, underscore, or hyphen."
+    }
+    if ($findingIds.ContainsKey($findingId)) {
+        throw "findings.json contains duplicate findingId '$findingId'."
+    }
+    $findingIds[$findingId] = $finding
 }
 
 foreach ($name in @("campaignId", "attemptId", "project", "ironDevCommit", "startedAtUtc")) {
@@ -347,6 +462,9 @@ foreach ($deviation in $deviations) {
     if ([string]::IsNullOrWhiteSpace([string]$deviation.reason) -or [string]::IsNullOrWhiteSpace([string]$deviation.findingId)) {
         throw "Every deviation must name its reason and findingId."
     }
+    if (-not $findingIds.ContainsKey([string]$deviation.findingId)) {
+        throw "Deviation findingId '$($deviation.findingId)' does not exist in findings.json."
+    }
 }
 
 $expectedWorkarounds = Get-OccurrenceSum -Deviations $deviations
@@ -367,19 +485,27 @@ if ($attempt.outcome -eq "CompletedWithWorkaround" -and $expectedWorkarounds -eq
     throw "CompletedWithWorkaround requires at least one structured deviation."
 }
 
-$p0 = [int]$attempt.findingCounts.p0
-$p1 = [int]$attempt.findingCounts.p1
-$p2 = [int]$attempt.findingCounts.p2
-$p3 = [int]$attempt.findingCounts.p3
+$p0 = @($findings | Where-Object severity -eq "P0").Count
+$p1 = @($findings | Where-Object severity -eq "P1").Count
+$p2 = @($findings | Where-Object severity -eq "P2").Count
+$p3 = @($findings | Where-Object severity -eq "P3").Count
+Assert-Value -Actual $attempt.findingCounts.p0 -Expected $p0 -Label "findingCounts.p0"
+Assert-Value -Actual $attempt.findingCounts.p1 -Expected $p1 -Label "findingCounts.p1"
+Assert-Value -Actual $attempt.findingCounts.p2 -Expected $p2 -Label "findingCounts.p2"
+Assert-Value -Actual $attempt.findingCounts.p3 -Expected $p3 -Label "findingCounts.p3"
 $expectedSeverity = if ($p0 -gt 0) { "P0" } elseif ($p1 -gt 0) { "P1" } elseif ($p2 -gt 0) { "P2" } elseif ($p3 -gt 0) { "P3" } else { "None" }
 Assert-Value -Actual $attempt.highestFindingSeverity -Expected $expectedSeverity -Label "highestFindingSeverity"
 
-$total = [double]$attempt.timing.totalJourneySeconds
+$wallClock = [double]$attempt.timing.wallClockElapsedSeconds
+$active = [double]$attempt.timing.activeJourneySeconds
+$paused = [double]$attempt.timing.pausedSeconds
 $product = [double]$attempt.timing.productWorkSeconds
 $governance = [double]$attempt.timing.governanceCeremonySeconds
 $recovery = [double]$attempt.timing.archaeologyRecoverySeconds
 foreach ($timingName in @(
-    "totalJourneySeconds",
+    "wallClockElapsedSeconds",
+    "activeJourneySeconds",
+    "pausedSeconds",
     "productWorkSeconds",
     "governanceCeremonySeconds",
     "archaeologyRecoverySeconds",
@@ -392,12 +518,15 @@ foreach ($timingName in @(
         throw "timing.$timingName must not be negative."
     }
 }
-if ($total -le 0) {
-    throw "Final totalJourneySeconds must be greater than zero."
+if ($active -le 0) {
+    throw "Final activeJourneySeconds must be greater than zero."
 }
-Assert-Number -Actual $total -Expected ($product + $governance + $recovery) -Label "Timing bucket total"
+$elapsedFromTimestamps = [Math]::Round(($completedAt - $startedAt).TotalSeconds, 2, [MidpointRounding]::AwayFromZero)
+Assert-Number -Actual $wallClock -Expected $elapsedFromTimestamps -Label "timing.wallClockElapsedSeconds"
+Assert-Number -Actual $wallClock -Expected ($active + $paused) -Label "Wall-clock timing total"
+Assert-Number -Actual $active -Expected ($product + $governance + $recovery) -Label "Active timing bucket total"
 
-$flowEfficiency = [Math]::Round(($product + $governance) / $total, 4, [MidpointRounding]::AwayFromZero)
+$flowEfficiency = [Math]::Round(($product + $governance) / $active, 4, [MidpointRounding]::AwayFromZero)
 $averageNextAction = [Math]::Round(($transitionTimes | Measure-Object -Average).Average, 2, [MidpointRounding]::AwayFromZero)
 $maximumNextAction = [Math]::Round(($transitionTimes | Measure-Object -Maximum).Maximum, 2, [MidpointRounding]::AwayFromZero)
 Assert-Number -Actual $attempt.timing.flowEfficiency -Expected $flowEfficiency -Label "timing.flowEfficiency" -Tolerance 0.00005
@@ -522,7 +651,7 @@ foreach ($name in $expectedAcceptance.Keys) {
 }
 
 Write-Host "DOGFOOD-UX attempt valid: $($attempt.attemptId)"
-Write-Host "Flow Ease Score: $finalScore/100 ($band); flow efficiency: $flowEfficiency; TinyCalc eligible: $eligibleToProceed"
+Write-Host "Flow Ease Score: $finalScore/100 ($band); wall clock: $wallClock seconds; active: $active seconds; paused: $paused seconds; flow efficiency: $flowEfficiency; TinyCalc eligible: $eligibleToProceed"
 
 if ($PassThru) {
     [pscustomobject]@{
@@ -531,6 +660,9 @@ if ($PassThru) {
         RawScore = $rawScore
         FinalScore = $finalScore
         Band = $band
+        WallClockElapsedSeconds = $wallClock
+        ActiveJourneySeconds = $active
+        PausedSeconds = $paused
         FlowEfficiency = $flowEfficiency
         TinyCalcEligible = $eligibleToProceed
         Final = $true

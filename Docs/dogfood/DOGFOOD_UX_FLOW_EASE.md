@@ -36,7 +36,7 @@ artifacts/dogfood-ux/<campaign-id>/<project>/<attempt-id>/
   ...the remaining campaign evidence
 ```
 
-Initialize the evidence package so the manifest, score record, and operator log are created together:
+Initialize the evidence package so the manifest, score record, findings record, and operator log are created together:
 
 ```powershell
 .\tools\dogfood\New-DogfoodUxAttempt.ps1 `
@@ -46,14 +46,16 @@ Initialize the evidence package so the manifest, score record, and operator log 
   -IronDevCommit <commit>
 ```
 
-The initializer writes only beneath `artifacts/dogfood-ux`, refuses unsafe path segments, and never overwrites an existing attempt. `manifest.json` references `attempt.json`. `attempt.json` conforms to [the attempt schema](../../tools/dogfood/dogfood-ux/attempt.schema.json) and passes:
+The initializer writes only beneath `artifacts/dogfood-ux`, refuses unsafe path segments, and never overwrites an existing attempt. `manifest.json` references both `attempt.json` and `findings.json`. `attempt.json` conforms to [the attempt schema](../../tools/dogfood/dogfood-ux/attempt.schema.json), while `findings.json` conforms to [the findings schema](../../tools/dogfood/dogfood-ux/findings.schema.json), and the package passes:
 
 ```powershell
 .\tools\dogfood\Test-DogfoodUxAttempt.ps1 `
   -Path .\artifacts\dogfood-ux\<campaign-id>\<project>\<attempt-id>\attempt.json
 ```
 
-The validator calculates expected values independently and refuses a stored score, count, timing summary, severity cap, or progression decision that does not match the retained transitions and deviations.
+For real `AttemptEvidence`, the validator resolves the sibling `findings.json` automatically. Validation fixtures must pass an explicit `-FindingsPath` so fixture evidence cannot be confused with campaign evidence.
+
+The validator calculates expected values independently and refuses a stored score, count, timing summary, severity cap, or progression decision that does not match the retained transitions, deviations, findings, and timestamp boundary.
 
 ## Evidence to record
 
@@ -63,7 +65,9 @@ Measure for every attempt:
 | --- | --- |
 | Task completion | Completed, completed with workaround, or blocked |
 | Time to next meaningful action | Seconds until the operator knows what to do next |
-| Total journey time | Sign-in through final outcome |
+| Wall-clock elapsed time | Timestamp interval from sign-in through final outcome, including pauses |
+| Active journey time | Product, governance, and recovery time while the attempt is active |
+| Paused time | Explicitly excluded wall-clock time when the attempt is not active |
 | Product work | Shaping, reviewing, testing, and deciding |
 | Required governance ceremony | Deliberate review, disposition, approval, and apply boundaries |
 | Product archaeology/recovery | Searching, retrying, interpreting errors, and recovering |
@@ -143,25 +147,50 @@ RecoverFromFailure
 
 Blocked attempts rate every stage they reached, including the blocked stage. They do not invent ratings for stages never reached.
 
+## Findings evidence
+
+Final `AttemptEvidence` requires a sibling `findings.json`. It is a structured array; every entry records:
+
+- a unique finding ID;
+- project and screen/step;
+- severity from `P0` through `P3`;
+- observed and expected behavior;
+- retained evidence references and reason codes;
+- visible remedy and actual workaround, when present;
+- authority impact, repeatability, and proposed owning slice.
+
+The validator derives P0/P1/P2/P3 counts and the highest severity from this file, then compares them with `attempt.json`. Every deviation must reference a finding ID that exists in `findings.json`. A stored score cannot suppress a retained P0/P1 finding by editing only `attempt.json`.
+
 ## Flow efficiency
 
-Record three elapsed-time buckets in seconds:
+Record the wall-clock boundary, active journey, pauses, and three active-time buckets in seconds:
 
 ```text
+wallClockElapsedSeconds
+activeJourneySeconds
+pausedSeconds
 productWorkSeconds
 governanceCeremonySeconds
 archaeologyRecoverySeconds
 ```
 
-They must sum exactly to `totalJourneySeconds`.
+`wallClockElapsedSeconds` is the `completedAtUtc - startedAtUtc` interval rounded to two decimal places. The validator requires:
+
+```text
+wallClockElapsedSeconds = activeJourneySeconds + pausedSeconds
+activeJourneySeconds =
+  productWorkSeconds
+  + governanceCeremonySeconds
+  + archaeologyRecoverySeconds
+```
 
 ```text
 flowEfficiency =
   (productWorkSeconds + governanceCeremonySeconds)
-  / totalJourneySeconds
+  / activeJourneySeconds
 ```
 
-The stored value is rounded to four decimal places. A final attempt with zero total time is invalid.
+The stored efficiency is rounded to four decimal places. A final attempt with zero active time is invalid. Reports still expose wall-clock elapsed and paused time, so pauses cannot disappear from the retained journey evidence.
 
 ## Flow Ease Score
 
@@ -256,6 +285,6 @@ Tooltips explain. The main screen still tells the operator what to do.
 
 Stop immediately for P0/P1 safety, authority, tenant/project isolation, false-green, manual SQL, or filesystem-surgery findings. Capture evidence and end the attempt as `Blocked` unless a reviewer explicitly authorizes a documented investigative deviation.
 
-After each project, present completion, friction, deviations, findings, evidence gaps, Flow Ease Score, flow efficiency, stage ratings, and the computed progression predicates. The human reviewer decides `Proceed`, `Repeat`, `Fix before proceeding`, or `Unsupported`.
+After each project, present completion, friction, deviations, findings, evidence gaps, Flow Ease Score, wall-clock/active/paused time, flow efficiency, stage ratings, and the computed progression predicates. The human reviewer decides `Proceed`, `Repeat`, `Fix before proceeding`, or `Unsupported`.
 
 Governance should be felt as confidence, not experienced as paperwork.

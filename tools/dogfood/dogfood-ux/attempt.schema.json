@@ -102,7 +102,9 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "totalJourneySeconds",
+        "wallClockElapsedSeconds",
+        "activeJourneySeconds",
+        "pausedSeconds",
         "productWorkSeconds",
         "governanceCeremonySeconds",
         "archaeologyRecoverySeconds",
@@ -111,7 +113,13 @@
         "flowEfficiency"
       ],
       "properties": {
-        "totalJourneySeconds": {
+        "wallClockElapsedSeconds": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "activeJourneySeconds": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "pausedSeconds": {
           "$ref": "#/$defs/nonNegativeNumber"
         },
         "productWorkSeconds": {

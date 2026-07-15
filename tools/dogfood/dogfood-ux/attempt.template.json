@@ -16,7 +16,9 @@
     "p3": 0
   },
   "timing": {
-    "totalJourneySeconds": 0,
+    "wallClockElapsedSeconds": 0,
+    "activeJourneySeconds": 0,
+    "pausedSeconds": 0,
     "productWorkSeconds": 0,
     "governanceCeremonySeconds": 0,
     "archaeologyRecoverySeconds": 0,

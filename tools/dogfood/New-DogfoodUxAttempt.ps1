@@ -47,9 +47,11 @@ if (Test-Path -LiteralPath $attemptDirectory) {
 
 $templateRoot = Join-Path $PSScriptRoot "dogfood-ux"
 $attemptTemplate = Join-Path $templateRoot "attempt.template.json"
+$findingsTemplate = Join-Path $templateRoot "findings.template.json"
+$findingsSchema = Join-Path $templateRoot "findings.schema.json"
 $operatorLogTemplate = Join-Path $templateRoot "operator-log.template.md"
 $validator = Join-Path $PSScriptRoot "Test-DogfoodUxAttempt.ps1"
-foreach ($requiredFile in @($attemptTemplate, $operatorLogTemplate, $validator)) {
+foreach ($requiredFile in @($attemptTemplate, $findingsTemplate, $findingsSchema, $operatorLogTemplate, $validator)) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
         throw "Required DOGFOOD-UX template/tool is missing: $requiredFile"
     }
@@ -70,6 +72,9 @@ try {
     $attemptPath = Join-Path $attemptDirectory "attempt.json"
     [IO.File]::WriteAllText($attemptPath, ($attempt | ConvertTo-Json -Depth 30), $utf8NoBom)
 
+    $findingsPath = Join-Path $attemptDirectory "findings.json"
+    [IO.File]::WriteAllText($findingsPath, (Get-Content -LiteralPath $findingsTemplate -Raw), $utf8NoBom)
+
     $operatorLog = Get-Content -LiteralPath $operatorLogTemplate -Raw
     $operatorLog = $operatorLog.Replace("**Campaign ID:**", "**Campaign ID:** $CampaignId")
     $operatorLog = $operatorLog.Replace("**Attempt ID:**", "**Attempt ID:** $AttemptId")
@@ -87,6 +92,7 @@ try {
         startedAtUtc = $startedAtUtc
         evidenceStatus = "InProgress"
         flowEaseRecord = "attempt.json"
+        findings = "findings.json"
         operatorLog = "operator-log.md"
     }
     [IO.File]::WriteAllText((Join-Path $attemptDirectory "manifest.json"), ($manifest | ConvertTo-Json -Depth 10), $utf8NoBom)

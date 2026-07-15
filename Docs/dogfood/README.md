@@ -8,4 +8,4 @@ Dogfood success is evidence. It is not release approval, production support, sou
 
 ## Current protocols
 
-- [DOGFOOD-UX Flow Ease](DOGFOOD_UX_FLOW_EASE.md) defines the mandatory per-attempt journey record, reproducible Flow Ease Score, transition log, and TinyCalc progression gate for visible-product exploratory campaigns.
+- [DOGFOOD-UX Flow Ease](DOGFOOD_UX_FLOW_EASE.md) defines the mandatory per-attempt journey and findings records, timestamp-bound Flow Ease Score, transition log, and TinyCalc progression gate for visible-product exploratory campaigns.

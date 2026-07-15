@@ -31,13 +31,16 @@ Direct API, SQL, filesystem, and undocumented-command investigation remains a de
 ## Findings and evidence
 
 - Finding IDs:
+- Findings file: `findings.json`
 - Screenshots:
 - Run/report references:
 - Evidence gaps:
 
 ## Final measurement
 
-- Total journey seconds:
+- Wall-clock elapsed seconds:
+- Active journey seconds:
+- Paused seconds:
 - Product work seconds:
 - Required governance ceremony seconds:
 - Product archaeology/recovery seconds:
@@ -53,4 +56,4 @@ Direct API, SQL, filesystem, and undocumented-command investigation remains a de
 - Final Flow Ease Score and band:
 - TinyCalc eligible to proceed: Yes / No
 
-The structured `attempt.json` is authoritative for calculation. This log explains the observed experience and links evidence.
+The structured `attempt.json` and `findings.json` are authoritative calculation inputs. This log explains the observed experience and links evidence.

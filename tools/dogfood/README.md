@@ -22,16 +22,22 @@ Start each attempt with:
   -IronDevCommit <commit>
 ```
 
-The initializer creates `manifest.json`, `attempt.json`, and `operator-log.md` together beneath `artifacts/dogfood-ux`. It refuses unsafe path segments and existing attempt directories. The JSON and Markdown templates remain available under `tools/dogfood/dogfood-ux/` for review.
+The initializer creates `manifest.json`, `attempt.json`, `findings.json`, and `operator-log.md` together beneath `artifacts/dogfood-ux`. It refuses unsafe path segments and existing attempt directories. The JSON and Markdown templates remain available under `tools/dogfood/dogfood-ux/` for review.
 
-Complete `attempt.json`, then validate its counts, timings, weighted score, P0/P1 cap, and TinyCalc progression predicates:
+Complete `attempt.json` and `findings.json`, then validate finding-derived severity counts, timestamp-bound wall/active/paused timings, weighted score, P0/P1 cap, and TinyCalc progression predicates:
 
 ```powershell
 .\tools\dogfood\Test-DogfoodUxAttempt.ps1 `
   -Path .\artifacts\dogfood-ux\<campaign-id>\<project>\<attempt-id>\attempt.json
 ```
 
-The committed `fixtures/valid-completed.json` and `fixtures/valid-p1-capped.json` files are validator test data only. They prove the smooth path and mandatory P1 cap. They are not campaign evidence and must never be copied into an attempt evidence package.
+The committed `fixtures/valid-completed.json` and `fixtures/valid-p1-capped.json` records plus their matching `*.findings.json` files are validator test data only. Fixtures must pass their findings path explicitly. They prove the smooth path, findings-derived P1 cap, and timestamp-bound timing model. They are not campaign evidence and must never be copied into an attempt evidence package.
+
+Run the full positive and tamper regression pack with:
+
+```powershell
+.\tools\dogfood\Test-DogfoodUxEvidenceIntegrity.ps1
+```
 
 Example:
 
