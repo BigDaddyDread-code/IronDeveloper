@@ -223,6 +223,8 @@ public sealed class ProductionEnvironmentSafetyTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment(environmentName);
+                builder.UseSetting("Ai:Provider", "fake");
+                builder.UseSetting("Cors:AllowedOrigins:0", "https://app.irondev.example");
                 builder.UseSetting("Jwt:Issuer", "irondev-api");
                 builder.UseSetting("Jwt:Audience", "irondev-client");
                 builder.UseSetting("ConnectionStrings:IronDeveloperDb", connectionString);

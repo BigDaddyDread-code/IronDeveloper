@@ -155,6 +155,7 @@ public sealed class CorsPolicyTests : ApiTestBase
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment(environmentName);
+                builder.UseSetting("Ai:Provider", "fake");
                 builder.UseSetting("Jwt:Issuer", "irondev-api");
                 builder.UseSetting("Jwt:Audience", "irondev-client");
                 builder.UseSetting("ConnectionStrings:IronDeveloperDb", TestConnectionString());
