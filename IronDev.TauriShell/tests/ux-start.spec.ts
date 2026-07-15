@@ -18,6 +18,8 @@ test('an unreachable API gets a named preflight with a retry, not a dead chip', 
   await expect(page.getByTestId('flow.preflight')).toBeVisible();
   await expect(page.getByTestId('flow.preflight.detail')).toContainText('No response from');
   await expect(page.getByTestId('flow.preflight.retry')).toBeEnabled();
+  await expect(page.getByTestId('flow.preflight')).toHaveAttribute('aria-live', 'assertive');
+  await expect(page.getByTestId('flow.preflight.retry')).toHaveAttribute('type', 'button');
   await expect(page.getByText('start-pr-manual-test.ps1')).toBeVisible();
 });
 

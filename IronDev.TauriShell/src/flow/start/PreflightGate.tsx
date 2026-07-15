@@ -11,10 +11,16 @@ export function PreflightGate({ onOpenSettings }: PreflightGateProps) {
   const offline = project.accessStatus === 'apiOffline';
 
   return (
-    <main className="fl-root" data-testid="flow.preflight">
+    <main
+      className="fl-root"
+      data-testid="flow.preflight"
+      aria-labelledby="preflight-title"
+      aria-describedby="preflight-detail"
+      aria-live="assertive"
+    >
       <div style={{ maxWidth: 560, margin: '12vh auto', padding: 24 }}>
-        <h1 className="fl-h1">Cannot reach the IronDev API</h1>
-        <p className="fl-sub" data-testid="flow.preflight.detail">
+        <h1 id="preflight-title" className="fl-h1">Cannot reach the IronDev API</h1>
+        <p id="preflight-detail" className="fl-sub" data-testid="flow.preflight.detail">
           {offline
             ? `No response from ${session.config.apiBaseUrl}. The backend is probably not running.`
             : `The API at ${session.config.apiBaseUrl} answered with an error.`}
@@ -29,13 +35,14 @@ export function PreflightGate({ onOpenSettings }: PreflightGateProps) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             className="fl-btn fl-pri"
+            type="button"
             data-testid="flow.preflight.retry"
             disabled={project.isRefreshing}
             onClick={() => void project.refreshProjectContext()}
           >
             {project.isRefreshing ? 'Checking...' : 'Retry'}
           </button>
-          <button className="fl-btn" data-testid="flow.preflight.settings" onClick={onOpenSettings}>
+          <button className="fl-btn" type="button" data-testid="flow.preflight.settings" onClick={onOpenSettings}>
             Connection settings
           </button>
         </div>

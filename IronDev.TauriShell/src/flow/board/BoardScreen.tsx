@@ -117,7 +117,7 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenP
 
   if (loadState === 'error') {
     return (
-      <section className="fl-board-state" data-testid="flow.board.error">
+      <section className="fl-board-state" data-testid="flow.board.error" role="alert" aria-live="assertive">
         <p className="fl-eyebrow">Board unavailable</p>
         <h1 className="fl-h1">Current work could not be loaded.</h1>
         <p className="fl-sub">{errorMessage}</p>
@@ -139,7 +139,7 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning }: BoardScreenP
         </div>
         <div className="fl-board-actions">
           {loadState === 'loading' ? (
-            <span className="fl-tag" data-testid="flow.cockpit.badge">Loading Board...</span>
+            <span className="fl-tag" data-testid="flow.cockpit.badge" role="status" aria-live="polite">Loading Board...</span>
           ) : readiness ? (
             <span className={readiness.isReady ? 'fl-tag fl-green' : 'fl-tag fl-amber'} data-testid="flow.cockpit.badge">
               {readiness.isReady ? 'Ready to run' : `Setup incomplete · ${readiness.blockedCount ?? 0} blocker(s)`}
