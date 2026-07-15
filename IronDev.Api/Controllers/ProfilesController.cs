@@ -23,8 +23,11 @@ public sealed class ProfilesController : ControllerBase
         _profiles.GetProjectProfileAsync(projectId, ct);
 
     [HttpPost("api/projects/{projectId:int}/profile")]
-    public async Task<IActionResult> SaveProfile(ProjectProfile profile, CancellationToken ct)
+    public async Task<IActionResult> SaveProfile(int projectId, ProjectProfile profile, CancellationToken ct)
     {
+        // The global route/body scope filter refuses a conflicting non-zero body id.
+        // The route remains authoritative when the body omits the id.
+        profile.ProjectId = projectId;
         await _profiles.SaveProjectProfileAsync(profile, ct);
         return Ok();
     }

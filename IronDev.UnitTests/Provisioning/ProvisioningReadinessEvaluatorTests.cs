@@ -199,7 +199,8 @@ public sealed class ProvisioningReadinessEvaluatorTests
         CollectionAssert.Contains(result.BlockedStates.ToList(), ProvisioningBlockedStates.ProjectNotIndexed);
         var check = result.Checks.Single(c => c.Name == "Code index");
         Assert.IsTrue(check.Blocking);
-        StringAssert.Contains(check.Remedy, "code-index");
+        StringAssert.Contains(check.Remedy, "Index project");
+        Assert.AreEqual(ProvisioningActionKinds.IndexProject, check.ActionKind);
     }
 
     [TestMethod]
@@ -227,8 +228,9 @@ public sealed class ProvisioningReadinessEvaluatorTests
         CollectionAssert.Contains(result.BlockedStates.ToList(), ProvisioningBlockedStates.BuilderApplyDisabled);
         var check = result.Checks.Single(c => c.Name == "Builder apply permission");
         Assert.IsTrue(check.Blocking);
-        StringAssert.Contains(check.Remedy, "allowBuilderApply");
-        StringAssert.Contains(check.Remedy, "workspace writes only");
+        StringAssert.Contains(check.Remedy, "governed Builder workspace writes");
+        StringAssert.Contains(check.Remedy, "does not approve");
+        Assert.AreEqual(ProvisioningActionKinds.EnableBuilderApply, check.ActionKind);
     }
 
     [TestMethod]
@@ -270,6 +272,36 @@ public sealed class ProvisioningReadinessEvaluatorTests
         Assert.AreEqual(ProvisioningActionKinds.ConfirmTestCommand, result.NextAction.Kind);
         Assert.AreEqual(ProvisioningCheckCodes.TestCommand, result.NextAction.CheckCode);
         Assert.AreEqual(ProvisioningBlockedStates.MissingTestCommand, result.NextAction.ReasonCode);
+    }
+
+    [TestMethod]
+    public void MissingCodeIndex_UsesSemanticIndexActionWithoutRawApiRecipe()
+    {
+        var result = ProvisioningReadinessEvaluator.Evaluate(FullyConfirmedInput() with
+        {
+            HasCodeIndex = false,
+            IndexingStatus = null
+        });
+
+        var check = result.Checks.Single(candidate => candidate.Code == ProvisioningCheckCodes.CodeIndex);
+        Assert.AreEqual(ProvisioningActionKinds.IndexProject, check.ActionKind);
+        Assert.AreEqual(ProvisioningActionKinds.IndexProject, result.NextAction.Kind);
+        Assert.IsFalse(check.Remedy.Contains("POST /api/", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void DisabledBuilderApply_UsesSemanticPermissionActionWithoutProfileRoundTripRecipe()
+    {
+        var input = FullyConfirmedInput();
+        input.StoredProfile!.AllowBuilderApply = false;
+
+        var result = ProvisioningReadinessEvaluator.Evaluate(input);
+
+        var check = result.Checks.Single(candidate => candidate.Code == ProvisioningCheckCodes.BuilderApplyPermission);
+        Assert.AreEqual(ProvisioningActionKinds.EnableBuilderApply, check.ActionKind);
+        Assert.AreEqual(ProvisioningActionKinds.EnableBuilderApply, result.NextAction.Kind);
+        Assert.IsFalse(check.Remedy.Contains("GET /api/", StringComparison.Ordinal));
+        Assert.IsFalse(check.Remedy.Contains("POST", StringComparison.Ordinal));
     }
 
     [TestMethod]

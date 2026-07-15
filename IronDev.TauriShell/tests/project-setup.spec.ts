@@ -16,8 +16,12 @@ function setupCheck(
       : code === 'TestCommand'
         ? 'ConfirmTestCommand'
         : code === 'ProjectProfile'
-          ? 'ConfirmProjectProfile'
-          : code === 'RepositoryAccess' || code === 'RootSafety'
+        ? 'ConfirmProjectProfile'
+        : code === 'CodeIndex'
+          ? 'IndexProject'
+          : code === 'BuilderApplyPermission'
+            ? 'EnableBuilderApply'
+        : code === 'RepositoryAccess' || code === 'RootSafety'
             ? 'ChangeRepository'
             : 'ResolveAdditionalSetup';
   return {
@@ -79,6 +83,8 @@ interface SetupMockOptions {
   onCommand?: (body: { commandType: string; commandText: string }) => Promise<{ status: number; body?: unknown }> | { status: number; body?: unknown };
   onProfile?: (body: Record<string, unknown>) => void;
   onLocalPath?: (body: { localPath: string }) => void;
+  onIndex?: (requestBody: string | null) => Promise<{ status: number; body?: unknown }> | { status: number; body?: unknown };
+  onBuilderPermission?: (body: { enabled: boolean }) => Promise<{ status: number; body?: unknown }> | { status: number; body?: unknown };
   projectPath?: () => string;
   readinessRoute?: (route: Route, requestNumber: number) => Promise<void>;
 }
@@ -151,6 +157,27 @@ async function mockSetup(page: Page, options: SetupMockOptions) {
     options.onLocalPath?.(route.request().postDataJSON() as { localPath: string });
     await route.fulfill({ status: 204, body: '' });
   });
+  await page.route('**/irondev-api/api/projects/7/provisioning/code-index', async (route) => {
+    const result = options.onIndex
+      ? await options.onIndex(route.request().postData())
+      : { status: 200, body: { allowed: true, status: 'Succeeded', message: 'Indexed 24 files.', changed: true, correlationId: 'index-correlation', indexResult: { storedFileCount: 24 } } };
+    await route.fulfill({
+      status: result.status,
+      contentType: 'application/json',
+      body: result.body === undefined ? '' : JSON.stringify(result.body)
+    });
+  });
+  await page.route('**/irondev-api/api/projects/7/provisioning/builder-workspace-permission', async (route) => {
+    const body = route.request().postDataJSON() as { enabled: boolean };
+    const result = options.onBuilderPermission
+      ? await options.onBuilderPermission(body)
+      : { status: 200, body: { allowed: true, status: 'Succeeded', message: 'Builder permission updated.', changed: true, correlationId: 'builder-correlation' } };
+    await route.fulfill({
+      status: result.status,
+      contentType: 'application/json',
+      body: result.body === undefined ? '' : JSON.stringify(result.body)
+    });
+  });
 }
 
 async function openSetup(page: Page) {
@@ -222,6 +249,120 @@ test('project structure confirmation posts the proposal and re-evaluates', async
   await page.getByTestId('flow.projectSetup.confirm.ProjectProfile').click();
   await expect(page.getByTestId('flow.projectSetup.ready')).toBeVisible();
   expect(savedProfiles[0].projectId).toBe(7);
+});
+
+test('code index is a semantic action and advances to Builder permission', async ({ page }) => {
+  let stage: 'index' | 'builder' = 'index';
+  let requestBody: string | null = 'not-called';
+  const indexCheck = setupCheck('CodeIndex', 'Code index', 'Missing', '', 'Use Index project.');
+  const builderCheck = setupCheck('BuilderApplyPermission', 'Builder apply permission');
+  await mockSetup(page, {
+    readiness: () => stage === 'index' ? blockedReadiness(indexCheck) : blockedReadiness(builderCheck),
+    onIndex: (body) => {
+      requestBody = body;
+      stage = 'builder';
+      return {
+        status: 200,
+        body: {
+          allowed: true,
+          status: 'Succeeded',
+          message: 'Indexed 24 files.',
+          changed: true,
+          correlationId: 'index-24',
+          indexResult: { storedFileCount: 24 }
+        }
+      };
+    }
+  });
+  await openSetup(page);
+
+  await expect(page.getByRole('heading', { name: 'Code index required' })).toBeVisible();
+  await expect(page.getByTestId('flow.projectSetup.next')).not.toContainText('POST /api/');
+  await page.getByTestId('flow.projectSetup.indexProject').click();
+  await expect(page.getByTestId('flow.projectSetup.completion')).toContainText('Indexed 24 files');
+  await expect(page.getByRole('button', { name: 'Continue setup' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Enable governed Builder workspace writes' })).toBeVisible();
+  expect(requestBody).toBeNull();
+});
+
+test('Builder permission requires confirmation, explains the boundary, and advances to Ready', async ({ page }) => {
+  let ready = false;
+  const requests: Array<{ enabled: boolean }> = [];
+  const check = setupCheck('BuilderApplyPermission', 'Builder apply permission');
+  await mockSetup(page, {
+    readiness: () => ready ? READY_READINESS : blockedReadiness(check),
+    onBuilderPermission: (body) => {
+      requests.push(body);
+      ready = true;
+      return { status: 200, body: { allowed: true, status: 'Succeeded', message: 'Enabled.', changed: true, correlationId: 'builder-enable' } };
+    }
+  });
+  await openSetup(page);
+
+  const next = page.getByTestId('flow.projectSetup.next');
+  await expect(next).toContainText('only inside IronDev-controlled disposable workspaces');
+  await expect(next).toContainText('It does not approve changes.');
+  await expect(next).toContainText('It does not apply to the source repository.');
+  await expect(next).toContainText('It does not commit, push, merge, release or deploy.');
+  await expect(page.getByTestId('flow.projectSetup.enableBuilderApply')).toBeDisabled();
+  await page.getByTestId('flow.projectSetup.confirmBuilderBoundary').check();
+  await page.getByTestId('flow.projectSetup.enableBuilderApply').click();
+  await expect(page.getByTestId('flow.projectSetup.ready')).toContainText('Ready for governed runs');
+  expect(requests).toEqual([{ enabled: true }]);
+});
+
+test('semantic action failure shows the backend reason and a visible retry', async ({ page }) => {
+  let attempts = 0;
+  let stage: 'index' | 'builder' = 'index';
+  const indexCheck = setupCheck('CodeIndex', 'Code index', 'Missing');
+  const builderCheck = setupCheck('BuilderApplyPermission', 'Builder apply permission');
+  await mockSetup(page, {
+    readiness: () => stage === 'index' ? blockedReadiness(indexCheck) : blockedReadiness(builderCheck),
+    onIndex: () => {
+      attempts += 1;
+      if (attempts === 1) {
+        return {
+          status: 409,
+          body: {
+            allowed: false,
+            reasonCode: 'project_setup_repository_path_unsafe',
+            message: 'The configured repository path is unsafe.',
+            nextSafeActions: ['Select a safe repository root, then retry.'],
+            correlationId: 'index-refusal'
+          }
+        };
+      }
+      stage = 'builder';
+      return { status: 200, body: { allowed: true, status: 'Succeeded', message: 'Indexed 1 files.', changed: true, correlationId: 'index-retry', indexResult: { storedFileCount: 1 } } };
+    }
+  });
+  await openSetup(page);
+
+  await page.getByTestId('flow.projectSetup.indexProject').click();
+  await expect(page.getByRole('alert')).toContainText('The configured repository path is unsafe.');
+  await expect(page.getByTestId('flow.projectSetup.indexProject')).toBeVisible();
+  await page.getByTestId('flow.projectSetup.indexProject').click();
+  await expect(page.getByRole('heading', { name: 'Enable governed Builder workspace writes' })).toBeVisible();
+  expect(attempts).toBe(2);
+});
+
+test('Ready setup can disable Builder workspace permission through the narrow action', async ({ page }) => {
+  let ready = true;
+  const bodies: Array<{ enabled: boolean }> = [];
+  const builderCheck = setupCheck('BuilderApplyPermission', 'Builder apply permission');
+  await mockSetup(page, {
+    readiness: () => ready ? READY_READINESS : blockedReadiness(builderCheck),
+    onBuilderPermission: (body) => {
+      bodies.push(body);
+      ready = false;
+      return { status: 200, body: { allowed: true, status: 'Succeeded', message: 'Disabled.', changed: true, correlationId: 'builder-disable' } };
+    }
+  });
+  await openSetup(page);
+
+  await page.getByTestId('flow.projectSetup.disableBuilderApply').click();
+  await expect(page.getByRole('heading', { name: 'Enable governed Builder workspace writes' })).toBeVisible();
+  expect(bodies).toEqual([{ enabled: false }]);
 });
 
 test('repository path change saves then re-evaluates backend truth', async ({ page }) => {

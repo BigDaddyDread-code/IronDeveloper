@@ -5,7 +5,9 @@ export const setupCheckCodes = {
   rootSafety: 'RootSafety',
   buildCommand: 'BuildCommand',
   testCommand: 'TestCommand',
-  projectProfile: 'ProjectProfile'
+  projectProfile: 'ProjectProfile',
+  codeIndex: 'CodeIndex',
+  builderApplyPermission: 'BuilderApplyPermission'
 } as const;
 
 export const setupActionKinds = {
@@ -15,6 +17,9 @@ export const setupActionKinds = {
   confirmProjectProfile: 'ConfirmProjectProfile',
   recheckSetup: 'RecheckSetup',
   resolveAdditionalSetup: 'ResolveAdditionalSetup',
+  indexProject: 'IndexProject',
+  enableBuilderApply: 'EnableBuilderApply',
+  disableBuilderApply: 'DisableBuilderApply',
   openBoard: 'OpenBoard'
 } as const;
 

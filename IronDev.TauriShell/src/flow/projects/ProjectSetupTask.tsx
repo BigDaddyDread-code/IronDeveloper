@@ -1,3 +1,5 @@
+import { BuilderWorkspacePermissionTask } from './BuilderWorkspacePermissionTask';
+import { CodeIndexTask } from './CodeIndexTask';
 import { CommandConfirmationTask } from './CommandConfirmationTask';
 import { ProjectProfileTask } from './ProjectProfileTask';
 import { RepositoryTask } from './RepositoryTask';
@@ -15,6 +17,8 @@ interface ProjectSetupTaskProps {
   onRepositoryChange: (value: string) => void;
   onSaveRepository: () => void;
   onRecheck: () => void;
+  onIndexProject: () => void;
+  onEnableBuilderApply: () => void;
 }
 
 function taskTitle(kind: string): string {
@@ -29,6 +33,10 @@ function taskTitle(kind: string): string {
       return 'Confirm project structure';
     case setupActionKinds.recheckSetup:
       return 'Re-check project setup';
+    case setupActionKinds.indexProject:
+      return 'Code index required';
+    case setupActionKinds.enableBuilderApply:
+      return 'Enable governed Builder workspace writes';
     default:
       return 'Additional setup required';
   }
@@ -73,6 +81,19 @@ export function ProjectSetupTask(props: ProjectSetupTaskProps) {
           busy={busy}
           errorMessage={errorMessage}
           onConfirm={props.onConfirmProfile}
+        />
+      ) : kind === setupActionKinds.indexProject ? (
+        <CodeIndexTask
+          check={check}
+          busy={busy}
+          errorMessage={errorMessage}
+          onIndex={props.onIndexProject}
+        />
+      ) : kind === setupActionKinds.enableBuilderApply ? (
+        <BuilderWorkspacePermissionTask
+          busy={busy}
+          errorMessage={errorMessage}
+          onEnable={props.onEnableBuilderApply}
         />
       ) : kind === setupActionKinds.recheckSetup ? (
         <>
