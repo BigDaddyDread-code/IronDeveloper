@@ -1,13 +1,17 @@
 using IronDev.Core.Builder;
+using IronDev.Core.Agents;
 using IronDev.Api.Middleware;
 using IronDev.Core.Auth;
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Governance;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 using IronDev.Services;
+using IronDev.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -36,6 +40,7 @@ public sealed class TicketsController : ControllerBase
     private readonly IChatHistoryService _chatHistory;
     private readonly IArtifactSourceReferenceService _sourceReferences;
     private readonly ICurrentTenantContext _tenant;
+    private readonly IProjectRunReadinessService? _runReadiness;
 
     public TicketsController(
         ITicketService tickets,
@@ -56,7 +61,8 @@ public sealed class TicketsController : ControllerBase
         IBuilderProposalService proposals,
         IChatHistoryService chatHistory,
         IArtifactSourceReferenceService sourceReferences,
-        ICurrentTenantContext tenant)
+        ICurrentTenantContext tenant,
+        IProjectRunReadinessService? runReadiness = null)
     {
         _tickets = tickets;
         _drafts = drafts;
@@ -77,6 +83,7 @@ public sealed class TicketsController : ControllerBase
         _chatHistory = chatHistory;
         _sourceReferences = sourceReferences;
         _tenant = tenant;
+        _runReadiness = runReadiness;
     }
 
     [HttpGet("api/projects/{projectId:int}/tickets")]
@@ -369,8 +376,15 @@ public sealed class TicketsController : ControllerBase
         long ticketId,
         CancellationToken ct)
     {
-        var result = await _skeletonRuns.StartAsync(projectId, ticketId, ct);
-        return result is null ? NotFound() : Ok(result);
+        try
+        {
+            var result = await _skeletonRuns.StartAsync(projectId, ticketId, ct);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (ProjectRunReadinessBlockedException exception)
+        {
+            return Conflict(ReadinessRefusal(exception.Readiness));
+        }
     }
 
     /// <summary>
@@ -733,8 +747,44 @@ public sealed class TicketsController : ControllerBase
     }
 
     [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/build-readiness")]
-    public Task<BuildReadinessResult> EvaluateReadiness(int projectId, long ticketId, CancellationToken ct) =>
-        _readiness.EvaluateReadinessAsync(projectId, ticketId, ct);
+    public async Task<BuildReadinessResult> EvaluateReadiness(int projectId, long ticketId, CancellationToken ct)
+    {
+        var result = await _readiness.EvaluateReadinessAsync(projectId, ticketId, ct).ConfigureAwait(false);
+        if (_runReadiness is not null)
+        {
+            ProjectWorkItemReadService.ApplyRunReadiness(
+                result,
+                await _runReadiness.EvaluateAsync(projectId, ct).ConfigureAwait(false));
+        }
+        return result;
+    }
+
+    private static GovernedRefusalEnvelope ReadinessRefusal(ProjectRunReadiness readiness) => GovernedRefusal.Create(
+        reasonCode: "ProjectRunNotReady",
+        message: readiness.State == ProjectRunReadinessStates.RunConfigurationRequired
+            ? $"Run configuration required · {readiness.BlockedCount} agent blockers."
+            : "Project setup is incomplete. No run was created.",
+        correlationId: Guid.NewGuid().ToString("N"),
+        blockedReasons: readiness.Blockers.Select(blocker => blocker.Reason),
+        missingEvidence: readiness.Blockers.Select(blocker => blocker.ReasonCode),
+        nextSafeActions: [readiness.NextAction.NextSafeAction],
+        forbiddenActions:
+        [
+            "Do not create a run, workspace, or run event while readiness is blocked.",
+            "Do not auto-publish agent profiles or silently replace credentials."
+        ],
+        targetProductRoute: readiness.NextAction.TargetProductRoute,
+        blockers: readiness.Blockers.Select(blocker => new GovernedRefusalBlocker
+        {
+            Subject = SkeletonAgentRoles.DisplayName(blocker.Role),
+            ReasonCode = blocker.ReasonCode,
+            Reason = blocker.Reason,
+            Provider = blocker.EffectiveProvider,
+            Model = blocker.EffectiveModel,
+            ConnectionId = blocker.ConnectionId,
+            SourceLayer = blocker.SourceLayer,
+            NextSafeAction = blocker.NextSafeAction
+        }));
 
     [HttpGet("api/projects/{projectId:int}/tickets/{ticketId:long}/evidence-summary")]
     public async Task<ActionResult<TicketEvidenceSummaryDto>> GetEvidenceSummary(int projectId, long ticketId, CancellationToken ct)

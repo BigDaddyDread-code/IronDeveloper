@@ -12,6 +12,7 @@ export type LibrarySection =
   | 'settings';
 
 export type GovernanceSection = 'overview' | 'controls' | 'exceptions' | 'decisions' | 'technical';
+export type SettingsSection = 'project' | 'aiConnections' | 'agents' | 'safety' | 'runtime' | 'advanced';
 
 export interface LegacyRouteAlias {
   pattern: string;
@@ -86,6 +87,7 @@ export interface ProductRoute {
   workItemId: number | 'new' | null;
   librarySection: LibrarySection | null;
   governanceSection: GovernanceSection | null;
+  settingsSection: SettingsSection | null;
   libraryDocumentId: number | null;
   libraryDocumentVersionId: number | null;
   libraryDocumentAction: 'upload' | null;
@@ -110,6 +112,7 @@ function route(
     workItemId: options.workItemId ?? null,
     librarySection: options.librarySection ?? null,
     governanceSection: options.governanceSection ?? null,
+    settingsSection: options.settingsSection ?? null,
     libraryDocumentId: options.libraryDocumentId ?? null,
     libraryDocumentVersionId: options.libraryDocumentVersionId ?? null,
     libraryDocumentAction: options.libraryDocumentAction ?? null,
@@ -245,6 +248,15 @@ export function parseProductRoute(pathname: string): ProductRoute {
     });
   }
 
+  const settingsSectionMatch = normalized.match(/^\/projects\/(\d+)\/library\/settings\/(ai-connections|agents)$/);
+  if (settingsSectionMatch) {
+    return route(normalized, 'library', {
+      projectId: Number(settingsSectionMatch[1]),
+      librarySection: 'settings',
+      settingsSection: settingsSectionMatch[2] === 'ai-connections' ? 'aiConnections' : 'agents'
+    });
+  }
+
   const libraryMatch = normalized.match(/^\/projects\/(\d+)\/library(?:\/(explorer|documents|tools|members|provisioning|audit|settings))?$/);
   if (libraryMatch) {
     return route(normalized, 'library', {
@@ -304,6 +316,10 @@ export function libraryPath(projectId: number, section: LibrarySection): string 
 export function governancePath(projectId: number, section: GovernanceSection = 'overview'): string {
   const root = libraryPath(projectId, 'governance');
   return section === 'overview' ? root : `${root}/${section}`;
+}
+
+export function settingsPath(projectId: number, section: 'aiConnections' | 'agents'): string {
+  return `${libraryPath(projectId, 'settings')}/${section === 'aiConnections' ? 'ai-connections' : 'agents'}`;
 }
 
 export function documentPath(projectId: number, documentId: number): string {

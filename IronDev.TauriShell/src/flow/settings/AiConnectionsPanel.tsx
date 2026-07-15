@@ -3,6 +3,7 @@ import { IronDevApiError } from '../../api/ironDevApi';
 import type { AiConnectionMetadata } from '../../api/types';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useSessionContext } from '../../state/useSessionContext';
+import { navigateProductPath, settingsPath } from '../navigation/productRoutes';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -48,9 +49,17 @@ export function AiConnectionsPanel() {
           <p className="fl-plabel" style={{ marginTop: 0 }}>AI connections</p>
           <h2 id="ai-connections-heading" style={{ margin: '4px 0 0', fontSize: 18 }}>Tenant connection metadata</h2>
         </div>
-        <StatusBadge status={connections.length === 0 ? 'warning' : 'ready'} data-testid="flow.settings.aiConnections.count">
-          {connections.length === 0 ? 'None configured' : `${connections.length} available`}
-        </StatusBadge>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            className="fl-btn fl-mini"
+            type="button"
+            onClick={() => typeof session.config.selectedProjectId === 'number' && navigateProductPath(settingsPath(session.config.selectedProjectId, 'agents'))}
+            data-testid="flow.settings.aiConnections.openAgents"
+          >Open project agent profiles</button>
+          <StatusBadge status={connections.length === 0 ? 'warning' : 'ready'} data-testid="flow.settings.aiConnections.count">
+            {connections.length === 0 ? 'None configured' : `${connections.length} available`}
+          </StatusBadge>
+        </div>
       </div>
 
       {connections.length === 0 ? (

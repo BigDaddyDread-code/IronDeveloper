@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
 import { NotImplementedPanel } from '../components/NotImplementedPanel';
-import { navigateProductPath, projectPath } from '../navigation/productRoutes';
+import { navigateProductPath, projectPath, type SettingsSection } from '../navigation/productRoutes';
 import { AboutPanel } from './AboutPanel';
 import { AgentsPanel } from './AgentsPanel';
 import { AiConnectionsPanel } from './AiConnectionsPanel';
@@ -13,8 +13,6 @@ import {
   saveApprovalPolicy
 } from './approvalPolicy';
 
-type SettingsSection = 'project' | 'aiConnections' | 'agents' | 'safety' | 'runtime' | 'advanced';
-
 const sections: Array<{ id: SettingsSection; label: string }> = [
   { id: 'project', label: 'Project' },
   { id: 'aiConnections', label: 'AI Connections' },
@@ -24,13 +22,15 @@ const sections: Array<{ id: SettingsSection; label: string }> = [
   { id: 'advanced', label: 'Advanced' }
 ];
 
-export function SettingsScreen() {
+export function SettingsScreen({ initialSection = 'project' }: { initialSection?: SettingsSection }) {
   const project = useProjectContext();
   const session = useSessionContext();
-  const [section, setSection] = useState<SettingsSection>('project');
+  const [section, setSection] = useState<SettingsSection>(initialSection);
   const [policy, setPolicy] = useState<ApprovalPolicyDraft>(() => loadApprovalPolicy());
   const [policySaved, setPolicySaved] = useState(false);
   const currentTenant = project.tenants.find((tenant) => tenant.id === project.selectedTenantId);
+
+  useEffect(() => setSection(initialSection), [initialSection]);
 
   const updatePolicy = (next: ApprovalPolicyDraft) => {
     setPolicy(next);

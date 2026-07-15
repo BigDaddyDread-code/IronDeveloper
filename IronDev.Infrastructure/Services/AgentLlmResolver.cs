@@ -2,6 +2,7 @@ using IronDev.Core;
 using IronDev.Core.Agents;
 using IronDev.Core.AiConnections;
 using IronDev.Core.Models;
+using IronDev.Core.RunReadiness;
 using Microsoft.Extensions.Configuration;
 
 namespace IronDev.Infrastructure.Services;
@@ -108,6 +109,17 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
             if (Uri.TryCreate(connection.ControlledEndpoint, UriKind.Absolute, out var endpoint) && endpoint.Scheme is "http" or "https")
                 baseUrl = endpoint.ToString().TrimEnd('/');
             apiKey = await _credentials.GetCredentialForUseAsync(tenantId, connection.Id, cancellationToken).ConfigureAwait(false) ?? apiKey;
+        }
+
+        if (provider.Equals(ProjectRunProviders.LocalTestDeterministic, StringComparison.OrdinalIgnoreCase))
+        {
+            return new SkeletonAgentLlm
+            {
+                Role = role,
+                Llm = new DeterministicAlphaSmokeLlmService(role, _configuration),
+                Provider = ProjectRunProviders.LocalTestDeterministic,
+                Model = profile.Model
+            };
         }
 
         return Create(role, new LlmOptions

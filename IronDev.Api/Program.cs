@@ -21,6 +21,7 @@ using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.Promotion;
 using IronDev.Core.Runs;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workspaces;
 using IronDev.Core.Governance;
@@ -79,6 +80,7 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration["IronDev:HostEnvironment"] = builder.Environment.EnvironmentName;
 Program.AddDevelopmentLocalConfiguration(builder);
 builder.Host.UseSerilog();
 builder.Host.UseDefaultServiceProvider(options =>
@@ -227,6 +229,7 @@ builder.Services.AddScoped<IBuilderProposalService, BuilderProposalService>();
 builder.Services.AddScoped<ICodebaseTicketGeneratorService, CodebaseTicketGeneratorService>();
 builder.Services.AddScoped<IBuildErrorClassifierService, BuildErrorClassifierService>();
 builder.Services.AddScoped<IBuilderReadinessService, BuilderReadinessService>();
+builder.Services.AddScoped<IProjectRunReadinessService, ProjectRunReadinessService>();
 builder.Services.AddScoped<ITicketEvidenceSummaryService, TicketEvidenceSummaryService>();
 builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();

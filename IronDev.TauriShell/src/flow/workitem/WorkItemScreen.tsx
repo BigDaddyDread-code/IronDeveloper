@@ -20,6 +20,7 @@ import { StageRail } from '../components/StageRail';
 import { GateInfo, ShapeDraft, WorkItemStage, emptyShapeDraft } from '../flowTypes';
 import { BuildStage, statusTone } from './BuildStage';
 import { ReviewStage } from './ReviewStage';
+import { runAgentRoleLabel } from '../runReadiness';
 
 interface WorkItemScreenProps {
   ticket: ProjectTicket | null;
@@ -27,6 +28,7 @@ interface WorkItemScreenProps {
   onBackToBoard: () => void;
   onOpenGovernanceLibrary: () => void;
   onDiscussInChat: (sessionId?: number | null) => void;
+  onConfigureRunAgents: () => void;
 }
 
 interface DiscussionEntry {
@@ -134,7 +136,8 @@ export function WorkItemScreen({
   onTicketCreated,
   onBackToBoard,
   onOpenGovernanceLibrary,
-  onDiscussInChat
+  onDiscussInChat,
+  onConfigureRunAgents
 }: WorkItemScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
@@ -756,6 +759,9 @@ export function WorkItemScreen({
       case 'StartRun':
         void startBuildRun();
         break;
+      case 'ConfigureRunAgents':
+        onConfigureRunAgents();
+        break;
       case 'RefreshRun':
         if (run) {
           void refreshRunEvidence(run).then(() => refreshWorkItemProjection());
@@ -777,7 +783,7 @@ export function WorkItemScreen({
       default:
         break;
     }
-  }, [workItem?.primaryAction.kind, startBuildRun, run, refreshRunEvidence, refreshWorkItemProjection]);
+  }, [workItem?.primaryAction.kind, startBuildRun, run, refreshRunEvidence, refreshWorkItemProjection, onConfigureRunAgents]);
 
   if (ticket && workItemLoadState === 'loading' && workItem === null) {
     return <p className="fl-empty" data-testid="flow.workItemProjection.loading">Loading current Work Item truth...</p>;
@@ -849,6 +855,22 @@ export function WorkItemScreen({
               <ul>{workItem.gate.technicalDetails?.map((detail) => <li key={detail}>{detail}</li>)}</ul>
             </details>
           ) : null}
+        </section>
+      ) : null}
+
+      {workItem?.runReadiness?.state === 'RunConfigurationRequired' ? (
+        <section className="fl-board-blocked" data-testid="flow.workItem.runReadiness">
+          <div>
+            <strong>Run configuration required · {workItem.runReadiness.blockedCount ?? 0} agent blockers.</strong>
+            <ul>
+              {workItem.runReadiness.blockers?.map((blocker) => (
+                <li key={`${blocker.role}-${blocker.reasonCode}`}>{runAgentRoleLabel(blocker.role)}: {blocker.reason}</li>
+              ))}
+            </ul>
+          </div>
+          <button className="fl-btn fl-pri" type="button" onClick={onConfigureRunAgents} data-testid="flow.workItem.configureRunAgents">
+            Configure run agents
+          </button>
         </section>
       ) : null}
 

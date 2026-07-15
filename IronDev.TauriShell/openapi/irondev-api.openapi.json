@@ -9558,6 +9558,46 @@
         }
       }
     },
+    "/api/projects/{projectId}/run-readiness": {
+      "get": {
+        "tags": [
+          "ProjectRunReadiness"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRunReadiness"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRunReadiness"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRunReadiness"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "tags": [
@@ -18880,6 +18920,9 @@
             },
             "nullable": true
           },
+          "runReadiness": {
+            "$ref": "#/components/schemas/ProjectRunReadiness"
+          },
           "isReady": {
             "type": "boolean",
             "readOnly": true
@@ -22493,6 +22536,50 @@
         },
         "additionalProperties": false
       },
+      "GovernedRefusalBlocker": {
+        "required": [
+          "nextSafeAction",
+          "reason",
+          "reasonCode",
+          "subject"
+        ],
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "connectionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceLayer": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "GovernedRefusalEnvelope": {
         "required": [
           "correlationId",
@@ -22537,6 +22624,17 @@
             "type": "array",
             "items": {
               "type": "string"
+            },
+            "nullable": true
+          },
+          "targetProductRoute": {
+            "type": "string",
+            "nullable": true
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GovernedRefusalBlocker"
             },
             "nullable": true
           },
@@ -25788,6 +25886,9 @@
           "readiness": {
             "$ref": "#/components/schemas/ProjectProvisioningReadiness"
           },
+          "runReadiness": {
+            "$ref": "#/components/schemas/ProjectRunReadiness"
+          },
           "items": {
             "type": "array",
             "items": {
@@ -27733,6 +27834,165 @@
         },
         "additionalProperties": false
       },
+      "ProjectRunAgentReadiness": {
+        "required": [
+          "isReady",
+          "role"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/SkeletonAgentRole"
+          },
+          "isReady": {
+            "type": "boolean"
+          },
+          "effectiveProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveModel": {
+            "type": "string",
+            "nullable": true
+          },
+          "connectionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceLayer": {
+            "type": "string",
+            "nullable": true
+          },
+          "connectionHealth": {
+            "type": "string",
+            "nullable": true
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectRunReadinessBlocker"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectRunReadiness": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "projectSetupReady": {
+            "type": "boolean"
+          },
+          "executionReady": {
+            "type": "boolean"
+          },
+          "readyToRun": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "blockedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "provisioning": {
+            "$ref": "#/components/schemas/ProjectProvisioningReadiness"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectRunAgentReadiness"
+            },
+            "nullable": true
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectRunReadinessBlocker"
+            },
+            "nullable": true
+          },
+          "nextAction": {
+            "$ref": "#/components/schemas/ProjectRunReadinessNextAction"
+          },
+          "boundary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectRunReadinessBlocker": {
+        "required": [
+          "nextSafeAction",
+          "reason",
+          "reasonCode",
+          "role"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/SkeletonAgentRole"
+          },
+          "effectiveProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveModel": {
+            "type": "string",
+            "nullable": true
+          },
+          "connectionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceLayer": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectRunReadinessNextAction": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetProductRoute": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ProjectServicesStatusDto": {
         "type": "object",
         "properties": {
@@ -28692,6 +28952,9 @@
           },
           "evidenceLinks": {
             "$ref": "#/components/schemas/ProjectWorkItemEvidenceLinksReadModel"
+          },
+          "runReadiness": {
+            "$ref": "#/components/schemas/ProjectRunReadiness"
           },
           "boundary": {
             "type": "string",
@@ -38651,6 +38914,9 @@
     },
     {
       "name": "ProjectNotifications"
+    },
+    {
+      "name": "ProjectRunReadiness"
     },
     {
       "name": "Projects"

@@ -1,4 +1,4 @@
-import { libraryPath, navigateProductPath, type GovernanceSection, type LibrarySection } from '../navigation/productRoutes';
+import { libraryPath, navigateProductPath, type GovernanceSection, type LibrarySection, type SettingsSection } from '../navigation/productRoutes';
 import { GovernanceHost } from './GovernanceHost';
 import { AuditSection } from './AuditSection';
 import { ProvisioningSection } from './PlannedSections';
@@ -12,6 +12,7 @@ interface LibraryScreenProps {
   projectId: number;
   section: LibrarySection;
   governanceSection?: GovernanceSection | null;
+  settingsSection?: SettingsSection | null;
   documentId?: number | null;
   documentVersionId?: number | null;
   documentAction?: 'upload' | null;
@@ -37,6 +38,7 @@ export function LibraryScreen({
   projectId,
   section,
   governanceSection = null,
+  settingsSection = null,
   documentId = null,
   documentVersionId = null,
   documentAction = null,
@@ -98,7 +100,7 @@ export function LibraryScreen({
         <ProvisioningSection onBackToProjects={onBackToProjects} onOpenBoard={onOpenBoard} />
       ) : null}
       {section === 'audit' ? <AuditSection projectId={projectId} ledgerId={auditLedgerId} /> : null}
-      {section === 'settings' ? <SettingsScreen /> : null}
+      {section === 'settings' ? <SettingsScreen initialSection={settingsSection ?? 'project'} /> : null}
       {preserveGovernancePath ? (
         <span className="fl-visually-hidden" data-testid="flow.library.compatibilityPath">
           Legacy governance deep link preserved

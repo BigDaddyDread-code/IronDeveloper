@@ -21,6 +21,7 @@ import {
   legacyCanonicalPath,
   navigateProductPath,
   projectPath,
+  settingsPath,
   useProductRoute,
   workItemPath,
   type ProductRouteKind
@@ -522,7 +523,11 @@ export function FlowShell() {
       <main id="flow-main" className="fl-main" data-testid="flow.main" ref={mainContentRef} tabIndex={-1}>
         {legacyRouteTransition ? <LegacyRouteNotice {...legacyRouteTransition} /> : null}
         {displayedKind === 'board' ? (
-          <BoardScreen onOpenWorkItem={openBoardWorkItem} onOpenProvisioning={() => openProjectSetup()} />
+          <BoardScreen
+            onOpenWorkItem={openBoardWorkItem}
+            onOpenProvisioning={() => openProjectSetup()}
+            onConfigureRunAgents={() => navigateProductPath(settingsPath(activeProjectId, 'agents'))}
+          />
         ) : null}
         {displayedKind === 'chat' && currentRoute.chatChannelId ? (
           <SharedChannelRoute
@@ -564,6 +569,7 @@ export function FlowShell() {
             }}
             onBackToBoard={() => openProjectBoard()}
             onOpenGovernanceLibrary={() => navigateProductPath(libraryPath(activeProjectId, 'governance'))}
+            onConfigureRunAgents={() => navigateProductPath(settingsPath(activeProjectId, 'agents'))}
             onDiscussInChat={(sessionId) => navigateProductPath(
               sessionId ? chatSessionPath(activeProjectId, sessionId) : projectPath(activeProjectId, 'chat')
             )}
@@ -574,6 +580,7 @@ export function FlowShell() {
             projectId={activeProjectId}
             section={currentRoute.librarySection ?? 'settings'}
             governanceSection={currentRoute.governanceSection}
+            settingsSection={currentRoute.settingsSection}
             documentId={currentRoute.libraryDocumentId}
             documentVersionId={currentRoute.libraryDocumentVersionId}
             documentAction={currentRoute.libraryDocumentAction}

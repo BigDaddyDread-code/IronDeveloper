@@ -2,6 +2,7 @@ using System.Text.Json;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Runs;
+using IronDev.Core.RunReadiness;
 using Microsoft.Extensions.Configuration;
 
 namespace IronDev.Infrastructure.Services;
@@ -39,19 +40,22 @@ public sealed class SkeletonBatchRunService : ISkeletonBatchRunService
     private readonly ITicketSkeletonRunService _skeletonRuns;
     private readonly IRunStore _runs;
     private readonly IConfiguration _configuration;
+    private readonly IProjectRunReadinessService? _runReadiness;
 
     public SkeletonBatchRunService(
         ISkeletonBatchPlanService plans,
         ISkeletonBatchMapService maps,
         ITicketSkeletonRunService skeletonRuns,
         IRunStore runs,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IProjectRunReadinessService? runReadiness = null)
     {
         _plans = plans;
         _maps = maps;
         _skeletonRuns = skeletonRuns;
         _runs = runs;
         _configuration = configuration;
+        _runReadiness = runReadiness;
     }
 
     public async Task<SkeletonBatchRunOutcome> StartAsync(
@@ -60,6 +64,15 @@ public sealed class SkeletonBatchRunService : ISkeletonBatchRunService
         string requestedByUserId,
         CancellationToken cancellationToken = default)
     {
+        if (_runReadiness is not null)
+        {
+            var readiness = await _runReadiness.EvaluateAsync(projectId, cancellationToken).ConfigureAwait(false);
+            if (!readiness.ReadyToRun)
+                return Failure(readiness.State == ProjectRunReadinessStates.RunConfigurationRequired
+                    ? $"Run configuration required · {readiness.BlockedCount} agent blockers. No batch state or run was created."
+                    : "Project setup is incomplete. No batch state or run was created.");
+        }
+
         var plan = await _plans.GetAsync(projectId, planId, cancellationToken).ConfigureAwait(false);
         if (plan is null)
             return Failure($"Batch plan '{planId}' was not found for project {projectId}. Plan the batch first.");
@@ -106,6 +119,15 @@ public sealed class SkeletonBatchRunService : ISkeletonBatchRunService
         string batchId,
         CancellationToken cancellationToken = default)
     {
+        if (_runReadiness is not null)
+        {
+            var readiness = await _runReadiness.EvaluateAsync(projectId, cancellationToken).ConfigureAwait(false);
+            if (!readiness.ReadyToRun)
+                return Failure(readiness.State == ProjectRunReadinessStates.RunConfigurationRequired
+                    ? $"Run configuration required · {readiness.BlockedCount} agent blockers. No additional run was created."
+                    : "Project setup is incomplete. No additional run was created.");
+        }
+
         var state = await LoadStateAsync(projectId, batchId, cancellationToken).ConfigureAwait(false);
         if (state is null)
             return Failure($"Batch run '{batchId}' was not found for project {projectId}.");

@@ -31,6 +31,41 @@ test('Work Item renders backend stage, gate, contract, and primary action truth'
   await expect(page.getByText('dotnet test returned exit code 1')).toBeVisible();
 });
 
+test('Work Item names numeric backend agent roles and opens the project repair corridor', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockProjectWorkItem(page, {
+    primaryActionKind: 'ConfigureRunAgents',
+    primaryActionLabel: 'Configure run agents',
+    runReadiness: {
+      projectId: 7,
+      projectSetupReady: true,
+      executionReady: false,
+      readyToRun: false,
+      state: 'RunConfigurationRequired',
+      blockedCount: 4,
+      blockers: [[4, 'Analyst'], [1, 'Builder'], [2, 'Tester'], [3, 'Critic']].map(([role, label]) => ({
+        role,
+        effectiveProvider: 'fake',
+        effectiveModel: 'gpt-4o',
+        connectionId: 'deployment-default',
+        sourceLayer: 'BuiltIn',
+        reasonCode: 'RunAgentProviderNotExecutable',
+        reason: `Provider 'fake' cannot execute ${label}.`,
+        nextSafeAction: 'Test an executable connection and publish the project profile.'
+      }))
+    }
+  });
+
+  await page.goto('/projects/7/work-items/42');
+
+  const readiness = page.getByTestId('flow.workItem.runReadiness');
+  await expect(readiness).toContainText('Run configuration required · 4 agent blockers');
+  await expect(readiness).toContainText('Analyst');
+  await expect(readiness.getByRole('listitem')).toHaveCount(4);
+  await page.getByTestId('flow.workItem.configureRunAgents').click();
+  await expect(page).toHaveURL(/\/projects\/7\/library\/settings\/agents$/);
+});
+
 test('Work Item projection failure offers retry and never reconstructs lifecycle truth', async ({ page }) => {
   await mockWorkspace(page);
   let attempts = 0;

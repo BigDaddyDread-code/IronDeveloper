@@ -1,5 +1,6 @@
 using IronDev.Core.AiConnections;
 using Microsoft.Extensions.Configuration;
+using IronDev.Core.RunReadiness;
 
 namespace IronDev.Infrastructure.Services;
 
@@ -80,8 +81,8 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
         var credentialStatus = storedCredential?.CredentialStatus ?? CredentialStatus(provider, deploymentCredentialConfigured);
         var enabled = !string.IsNullOrWhiteSpace(provider);
 
-        IReadOnlyList<AiConnectionMetadata> connections =
-        [
+        var connections = new List<AiConnectionMetadata>
+        {
             new AiConnectionMetadata
             {
                 Id = connectionId,
@@ -107,7 +108,40 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
                 Version = ContractVersion,
                 Boundary = Boundary
             }
-        ];
+        };
+
+        if (string.Equals(
+                _configuration["RunAgents:LocalTestDeterministicConnectionEnabled"],
+                "true",
+                StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(_configuration["IronDev:HostEnvironment"], "LocalTest", StringComparison.Ordinal))
+        {
+            const string deterministicConnectionId = "localtest-deterministic";
+            var deterministicHealth = _healthStore is null
+                ? null
+                : await _healthStore.GetAsync(tenantId, deterministicConnectionId, cancellationToken).ConfigureAwait(false);
+            connections.Add(new AiConnectionMetadata
+            {
+                Id = deterministicConnectionId,
+                TenantId = tenantId,
+                DisplayName = "LocalTest deterministic",
+                ProviderKind = ProjectRunProviders.LocalTestDeterministic,
+                ControlledEndpointId = deterministicConnectionId,
+                ControlledEndpoint = "localtest:deterministic-model-words",
+                CredentialConfigured = true,
+                CredentialStatus = "Not required",
+                LastSuccessfulTestUtc = deterministicHealth?.LastSuccessfulTestUtc,
+                LastFailedTestUtc = deterministicHealth?.LastFailedTestUtc,
+                AvailableModels = ["localtest-deterministic"],
+                Enabled = true,
+                TenantAvailable = true,
+                ProjectAvailable = true,
+                CreatedByUserId = 0,
+                UpdatedByUserId = 0,
+                Version = ContractVersion,
+                Boundary = Boundary
+            });
+        }
 
         return connections;
     }

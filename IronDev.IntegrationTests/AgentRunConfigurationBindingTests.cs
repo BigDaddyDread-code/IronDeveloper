@@ -2,6 +2,7 @@ using IronDev.Core;
 using IronDev.Core.Agents;
 using IronDev.Core.AiConnections;
 using IronDev.Core.Builder;
+using IronDev.Core.RunReadiness;
 using IronDev.Infrastructure.Builder;
 using IronDev.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
@@ -30,6 +31,24 @@ public sealed class AgentRunConfigurationBindingTests : IDisposable
         Assert.IsInstanceOfType<FakeLlmService>(resolved.Llm);
         Assert.AreEqual(7, credentials.ReadTenantId);
         Assert.AreEqual("controlled-builder", credentials.ReadConnectionId);
+    }
+
+    [TestMethod]
+    public async Task ScopedResolver_ExplicitDeterministicConnection_ResolvesActualDeterministicService()
+    {
+        var (profiles, configuration) = Harness();
+        await PublishBuilderAsync(profiles);
+        var resolver = new AgentLlmResolver(
+            profiles,
+            configuration,
+            new ControlledCatalog(ProjectRunProviders.LocalTestDeterministic),
+            new RecordingCredentialStore());
+
+        var resolved = await resolver.ResolveAsync(SkeletonAgentRole.Builder, tenantId: 7, projectId: 11);
+
+        Assert.AreEqual(ProjectRunProviders.LocalTestDeterministic, resolved.Provider);
+        Assert.IsInstanceOfType<DeterministicAlphaSmokeLlmService>(resolved.Llm);
+        Assert.IsFalse(resolved.Llm is FakeLlmService);
     }
 
     [TestMethod]
@@ -101,7 +120,7 @@ public sealed class AgentRunConfigurationBindingTests : IDisposable
         catch { }
     }
 
-    private sealed class ControlledCatalog : IAiConnectionCatalogService
+    private sealed class ControlledCatalog(string provider = "fake") : IAiConnectionCatalogService
     {
         public Task<IReadOnlyList<AiConnectionMetadata>> ListAsync(int tenantId, int userId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AiConnectionMetadata>>
@@ -111,7 +130,7 @@ public sealed class AgentRunConfigurationBindingTests : IDisposable
                     Id = "controlled-builder",
                     TenantId = tenantId,
                     DisplayName = "Controlled builder",
-                    ProviderKind = "fake",
+                    ProviderKind = provider,
                     ControlledEndpointId = "local-fake",
                     ControlledEndpoint = "provider-default:fake",
                     CredentialConfigured = true,
