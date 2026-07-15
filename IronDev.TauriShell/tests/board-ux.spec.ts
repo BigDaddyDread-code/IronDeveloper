@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { readyToRunReadiness, runConfigurationRequiredReadiness, setupIncompleteRunReadiness } from './helpers/mockBoard';
 
 test('Board renders backend-owned attention, waiting, assignment, state, and event truth', async ({ page }) => {
   await mockBoardEntry(page, boardResponse());
@@ -37,13 +38,7 @@ test('project readiness is concise and switches the primary action to setup', as
       nextSafeAction: 'Confirm the detected test command before running governed work.'
     }
   };
-  board.runReadiness = {
-    ...board.runReadiness,
-    projectSetupReady: false,
-    executionReady: true,
-    readyToRun: false,
-    state: 'SetupIncomplete'
-  };
+  board.runReadiness = setupIncompleteRunReadiness(7, board.readiness);
   await mockBoardEntry(page, board);
   await page.goto('/projects/7/board');
 
@@ -55,30 +50,7 @@ test('project readiness is concise and switches the primary action to setup', as
 test('provisioning green with Fake agents shows four execution blockers and opens project Agents', async ({ page }) => {
   const board = boardResponse();
   board.items = [];
-  board.runReadiness = {
-    ...board.runReadiness,
-    projectSetupReady: true,
-    executionReady: false,
-    readyToRun: false,
-    state: 'RunConfigurationRequired',
-    blockedCount: 4,
-    blockers: [[4, 'Analyst'], [1, 'Builder'], [2, 'Tester'], [3, 'Critic']].map(([role, label]) => ({
-      role,
-      effectiveProvider: 'fake',
-      effectiveModel: 'gpt-4o',
-      connectionId: 'deployment-default',
-      sourceLayer: 'BuiltIn',
-      reasonCode: 'RunAgentProviderNotExecutable',
-      reason: `Provider 'fake' cannot execute ${label}.`,
-      nextSafeAction: 'Test an executable connection and publish the project profile.'
-    })),
-    nextAction: {
-      kind: 'ConfigureRunAgents',
-      label: 'Configure run agents',
-      nextSafeAction: 'Open AI Connections, test an executable connection, then publish each project agent profile.',
-      targetProductRoute: '/projects/7/library/settings/agents'
-    }
-  };
+  board.runReadiness = runConfigurationRequiredReadiness(7);
   await mockBoardEntry(page, board);
   await page.goto('/projects/7/board');
 
@@ -139,33 +111,7 @@ function boardResponse() {
       proposedProfile: null,
       boundary: 'Backend readiness truth.'
     },
-    runReadiness: {
-      projectId: 7,
-      projectSetupReady: true,
-      executionReady: true,
-      readyToRun: true,
-      state: 'ReadyToRun',
-      blockedCount: 0,
-      provisioning: null,
-      agents: [],
-      blockers: [] as Array<{
-        role: string | number;
-        effectiveProvider: string;
-        effectiveModel: string;
-        connectionId: string;
-        sourceLayer: string;
-        reasonCode: string;
-        reason: string;
-        nextSafeAction: string;
-      }>,
-      nextAction: {
-        kind: 'StartRun',
-        label: 'Ready to run',
-        nextSafeAction: 'Open a Work Item and start a governed run.',
-        targetProductRoute: ''
-      },
-      boundary: 'Backend run readiness truth.'
-    },
+    runReadiness: readyToRunReadiness(7),
     items: [
       {
         workItemId: 41,

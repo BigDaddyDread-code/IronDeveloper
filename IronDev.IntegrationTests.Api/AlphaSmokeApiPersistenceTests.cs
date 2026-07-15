@@ -11,6 +11,7 @@ using IronDev.Core.Governance;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 using IronDev.Infrastructure.Services;
@@ -80,6 +81,8 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
             PrepareRestoredBookSellerSource(sampleCopy);
             GitInit(sampleCopy);
 
+            var expectedRunReadiness = new ExpectedProjectRunReadinessService();
+
             using var factory = Factory.WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Test");
@@ -96,6 +99,8 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
                     services.AddScoped<ISkeletonTestAuthoringService, EmptyTestAuthoring>();
                     services.RemoveAll<ISkeletonCriticReviewService>();
                     services.AddScoped<ISkeletonCriticReviewService, DeterministicCleanCriticReviewService>();
+                    services.RemoveAll<IProjectRunReadinessService>();
+                    services.AddSingleton<IProjectRunReadinessService>(expectedRunReadiness);
                 });
             });
 
@@ -103,6 +108,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
             await AuthenticateAsync(client);
 
             var project = await CreateProjectAsync(client, sampleCopy);
+            expectedRunReadiness.ExpectProject(project.Id);
             using var reviewerClient = await CreateReviewerClientAsync(project.Id);
             var ticket = await CreateTicketAsync(client, project.Id);
 
@@ -298,6 +304,8 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
             PrepareRestoredBookSellerSource(sampleCopy);
             GitInit(sampleCopy);
 
+            var expectedRunReadiness = new ExpectedProjectRunReadinessService();
+
             using var factory = Factory.WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Test");
@@ -318,6 +326,8 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
                     services.AddScoped<IProjectChatResponseService, DeterministicFormalizationChatResponseService>();
                     services.RemoveAll<IDraftTicketService>();
                     services.AddScoped<IDraftTicketService, DeterministicRel5DraftTicketService>();
+                    services.RemoveAll<IProjectRunReadinessService>();
+                    services.AddSingleton<IProjectRunReadinessService>(expectedRunReadiness);
                 });
             });
 
@@ -329,6 +339,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
                 sampleCopy,
                 "BookSeller REL-5",
                 "REL-5 chat to confirmed ticket to governed run smoke fixture.");
+            expectedRunReadiness.ExpectProject(project.Id);
 
             var sessionId = await PostJsonAsync<long>(
                 client,

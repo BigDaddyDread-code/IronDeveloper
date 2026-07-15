@@ -12,6 +12,7 @@ using IronDev.Core.Governance;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 using IronDev.Infrastructure.Services;
@@ -157,6 +158,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             PrepareRestoredBookSellerSource(sampleCopy);
             GitInit(sampleCopy);
 
+            var expectedRunReadiness = new ExpectedProjectRunReadinessService();
+
             using var factory = Factory.WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Test");
@@ -173,6 +176,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                     services.AddScoped<ISkeletonTestAuthoringService, EmptyTestAuthoring>();
                     services.RemoveAll<ISkeletonCriticReviewService>();
                     services.AddScoped<ISkeletonCriticReviewService, DeterministicCleanCriticReviewService>();
+                    services.RemoveAll<IProjectRunReadinessService>();
+                    services.AddSingleton<IProjectRunReadinessService>(expectedRunReadiness);
                 });
             });
 
@@ -180,6 +185,7 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             await AuthenticateAsync(client);
 
             var project = await CreateProjectAsync(client, sampleCopy);
+            expectedRunReadiness.ExpectProject(project.Id);
             using var reviewerClient = await CreateReviewerClientAsync(project.Id);
             var validateTicket = await CreateFixtureTicketAsync(client, project.Id, ValidateBookKey);
             var searchTicket = await CreateFixtureTicketAsync(client, project.Id, SearchByAuthorKey);
@@ -288,6 +294,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             PrepareRestoredBookSellerSource(sampleCopy);
             GitInit(sampleCopy);
 
+            var expectedRunReadiness = new ExpectedProjectRunReadinessService();
+
             using var factory = Factory.WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Test");
@@ -307,6 +315,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                     services.AddScoped<IProjectChatResponseService, DemoFormalizationChatResponseService>();
                     services.RemoveAll<IDraftTicketService>();
                     services.AddScoped<IDraftTicketService, DemoDraftTicketService>();
+                    services.RemoveAll<IProjectRunReadinessService>();
+                    services.AddSingleton<IProjectRunReadinessService>(expectedRunReadiness);
                 });
             });
 
@@ -318,6 +328,7 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                 sampleCopy,
                 "BookSeller DEMO-2",
                 "DEMO-2 chat to visible confirmed ticket fixture.");
+            expectedRunReadiness.ExpectProject(project.Id);
 
             var sessionId = await PostJsonAsync<long>(
                 client,
@@ -420,6 +431,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             PrepareRestoredBookSellerSource(sampleCopy);
             GitInit(sampleCopy);
 
+            var expectedRunReadiness = new ExpectedProjectRunReadinessService();
+
             using var factory = Factory.WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Test");
@@ -436,6 +449,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                     services.AddScoped<ISkeletonTestAuthoringService, EmptyTestAuthoring>();
                     services.RemoveAll<ISkeletonCriticReviewService>();
                     services.AddScoped<ISkeletonCriticReviewService, DemoAdvisoryCriticReviewService>();
+                    services.RemoveAll<IProjectRunReadinessService>();
+                    services.AddSingleton<IProjectRunReadinessService>(expectedRunReadiness);
                 });
             });
 
@@ -447,6 +462,7 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                 sampleCopy,
                 "BookSeller HERO-1",
                 "HERO-1 advisory finding disposition gate fixture.");
+            expectedRunReadiness.ExpectProject(project.Id);
             var ticket = await CreateFixtureTicketAsync(client, project.Id, BulkDiscountKey);
             ticketKinds[ticket.Id] = BulkDiscountKey;
             using var reviewerClient = await CreateReviewerClientAsync(project.Id);

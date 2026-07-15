@@ -18,6 +18,92 @@ export const readyBoardReadiness = {
   boundary: 'Backend readiness truth.'
 };
 
+export interface RunReadinessFixture {
+  projectId: number;
+  projectSetupReady: boolean;
+  executionReady: boolean;
+  readyToRun: boolean;
+  state: string;
+  blockedCount: number;
+  provisioning: Record<string, unknown> | null;
+  agents: Array<Record<string, unknown>>;
+  blockers: Array<Record<string, unknown>>;
+  nextAction: {
+    kind: string;
+    label: string;
+    nextSafeAction: string;
+    targetProductRoute: string;
+  };
+  boundary: string;
+}
+
+export function readyToRunReadiness(projectId = 7): RunReadinessFixture {
+  return {
+    projectId,
+    projectSetupReady: true,
+    executionReady: true,
+    readyToRun: true,
+    state: 'ReadyToRun',
+    blockedCount: 0,
+    provisioning: null,
+    agents: [],
+    blockers: [],
+    nextAction: {
+      kind: 'StartRun',
+      label: 'Ready to run',
+      nextSafeAction: 'Open a Work Item and start a governed run.',
+      targetProductRoute: ''
+    },
+    boundary: 'Backend run readiness truth.'
+  };
+}
+
+export function runConfigurationRequiredReadiness(projectId = 7): RunReadinessFixture {
+  const roles = [[4, 'Analyst'], [1, 'Builder'], [2, 'Tester'], [3, 'Critic']] as const;
+  return {
+    ...readyToRunReadiness(projectId),
+    executionReady: false,
+    readyToRun: false,
+    state: 'RunConfigurationRequired',
+    blockedCount: roles.length,
+    blockers: roles.map(([role, label]) => ({
+      role,
+      effectiveProvider: 'fake',
+      effectiveModel: 'gpt-4o',
+      connectionId: 'deployment-default',
+      sourceLayer: 'BuiltIn',
+      reasonCode: 'RunAgentProviderNotExecutable',
+      reason: `Provider 'fake' cannot execute ${label}.`,
+      nextSafeAction: 'Test an executable connection and publish the project profile.'
+    })),
+    nextAction: {
+      kind: 'ConfigureRunAgents',
+      label: 'Configure run agents',
+      nextSafeAction: 'Open AI Connections, test an executable connection, then publish each project agent profile.',
+      targetProductRoute: `/projects/${projectId}/library/settings/agents`
+    }
+  };
+}
+
+export function setupIncompleteRunReadiness(
+  projectId = 7,
+  provisioning: Record<string, unknown> | null = null
+): RunReadinessFixture {
+  return {
+    ...readyToRunReadiness(projectId),
+    projectSetupReady: false,
+    readyToRun: false,
+    state: 'SetupIncomplete',
+    provisioning,
+    nextAction: {
+      kind: 'ResolveProjectSetup',
+      label: 'Resolve project setup',
+      nextSafeAction: 'Complete project setup and re-check readiness.',
+      targetProductRoute: `/projects/${projectId}/setup`
+    }
+  };
+}
+
 interface BoardTicketFixture {
   id?: number;
   title?: string;
@@ -48,6 +134,7 @@ export interface BoardFixtureOptions {
     projectName?: string;
     tickets?: BoardTicketFixture[];
     readiness?: Record<string, unknown>;
+    runReadiness?: RunReadinessFixture;
     latestRuns?: Record<number, BoardRunFixture>;
 }
 
@@ -55,12 +142,14 @@ export function projectBoardResponse(options: BoardFixtureOptions = {}) {
   const projectId = options.projectId ?? 7;
   const tickets = options.tickets ?? [];
   const readiness = { ...readyBoardReadiness, projectId, ...(options.readiness ?? {}) };
+  const runReadiness = options.runReadiness ?? readyToRunReadiness(projectId);
   const items = tickets.map((ticket) => itemFrom(ticket, options.latestRuns?.[ticket.id ?? 0]));
   return {
     projectId,
     projectName: options.projectName ?? 'IronDeveloper',
     generatedUtc: '2026-07-11T01:00:00Z',
     readiness,
+    runReadiness,
     items
   };
 }

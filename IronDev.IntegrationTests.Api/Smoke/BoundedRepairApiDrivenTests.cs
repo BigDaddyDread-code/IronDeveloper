@@ -5,6 +5,7 @@ using Dapper;
 using IronDev.Core.Builder;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Workflow;
 using IronDev.Data.Models;
 using Microsoft.AspNetCore.Hosting;
@@ -313,6 +314,8 @@ public sealed class BoundedRepairApiDrivenTests : ApiTestBase
             PrepareRestoredBookSellerSource(sampleCopy);
             GitInit(sampleCopy);
 
+            var expectedRunReadiness = new ExpectedProjectRunReadinessService();
+
             var factory = Factory.WithWebHostBuilder(hostBuilder =>
             {
                 hostBuilder.UseEnvironment("Test");
@@ -328,6 +331,8 @@ public sealed class BoundedRepairApiDrivenTests : ApiTestBase
                     services.AddScoped<IBuilderProposalService>(_ => builder);
                     services.RemoveAll<ISkeletonTestAuthoringService>();
                     services.AddScoped<ISkeletonTestAuthoringService, EmptyTestAuthoring>();
+                    services.RemoveAll<IProjectRunReadinessService>();
+                    services.AddSingleton<IProjectRunReadinessService>(expectedRunReadiness);
                 });
             });
 
@@ -336,6 +341,7 @@ public sealed class BoundedRepairApiDrivenTests : ApiTestBase
 
             var fixture = new RepairFixture(sampleCopy, workspaceParent, evidenceRoot, factory, client, noNodeReuse);
             await fixture.CreateProjectAndTicketAsync();
+            expectedRunReadiness.ExpectProject(fixture.ProjectId);
             return fixture;
         }
 
