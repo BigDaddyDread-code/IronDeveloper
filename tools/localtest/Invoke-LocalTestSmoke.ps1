@@ -291,8 +291,8 @@ SELECT
   (SELECT COUNT(*) FROM dbo.ProjectTickets WHERE Id IN ($ticketIds)) AS Tickets,
   (SELECT COUNT(*) FROM dbo.RunEvents WHERE RunId IN ($runIds)) AS RunEvents,
   (SELECT COUNT(*) FROM dbo.Runs WHERE ProjectId = $($baselineProject.id) AND TicketId IS NOT NULL AND IsDisposable = 1) AS DisposableRuns,
-  (SELECT COUNT(*) FROM dbo.RunEvents WHERE EventType IN ('DisposableCommandCompleted','DisposableCommandFailed')) AS DisposableCommandEvents,
-  (SELECT COUNT(*) FROM dbo.RunEvents WHERE EventType = 'DisposableWorkspaceCreated') AS DisposableWorkspaceEvents;
+  (SELECT COUNT(*) FROM dbo.RunEvents WHERE RunId IN ($runIds) AND EventType = 'ToolCallCompleted' AND ISJSON(PayloadJson) = 1 AND JSON_VALUE(PayloadJson, '$.disposableRun') = 'true') AS DisposableToolCallEvents,
+  (SELECT COUNT(*) FROM dbo.RunEvents WHERE RunId IN ($runIds) AND EventType = 'StepCompleted' AND ISJSON(PayloadJson) = 1 AND JSON_VALUE(PayloadJson, '$.disposableRun') = 'true' AND JSON_VALUE(PayloadJson, '$.node') = 'LoadTicket') AS DisposableWorkspacePreparationEvents;
 "@
 
     try {
@@ -326,8 +326,8 @@ SELECT
             tickets = [int]$parts[2]
             runEvents = [int]$parts[3]
             disposableRuns = [int]$parts[4]
-            disposableCommandEvents = [int]$parts[5]
-            disposableWorkspaceEvents = [int]$parts[6]
+            disposableToolCallEvents = [int]$parts[5]
+            disposableWorkspacePreparationEvents = [int]$parts[6]
         }
     }
     catch {
@@ -515,11 +515,11 @@ try {
     if (-not $localTestCounts.available) {
         throw "Could not verify disposable run SQL evidence: $($localTestCounts.reason)"
     }
-    if ($localTestCounts.disposableRuns -lt 1 -or $localTestCounts.disposableCommandEvents -lt 1 -or $localTestCounts.disposableWorkspaceEvents -lt 1) {
-        throw "Disposable run SQL proof failed. Runs=$($localTestCounts.disposableRuns), commandEvents=$($localTestCounts.disposableCommandEvents), workspaceEvents=$($localTestCounts.disposableWorkspaceEvents)."
+    if ($localTestCounts.disposableRuns -lt 1 -or $localTestCounts.disposableToolCallEvents -lt 1 -or $localTestCounts.disposableWorkspacePreparationEvents -lt 1) {
+        throw "Disposable run SQL proof failed. Runs=$($localTestCounts.disposableRuns), toolCallEvents=$($localTestCounts.disposableToolCallEvents), workspacePreparationEvents=$($localTestCounts.disposableWorkspacePreparationEvents)."
     }
 
-    $checks.Add([ordered]@{ name = "Disposable run SQL proof"; status = "PASS"; detail = "Runs=$($localTestCounts.disposableRuns), command events=$($localTestCounts.disposableCommandEvents), workspace events=$($localTestCounts.disposableWorkspaceEvents)" })
+    $checks.Add([ordered]@{ name = "Disposable run SQL proof"; status = "PASS"; detail = "Runs=$($localTestCounts.disposableRuns), tool-call events=$($localTestCounts.disposableToolCallEvents), workspace-preparation events=$($localTestCounts.disposableWorkspacePreparationEvents)" })
     $passed = $true
 }
 catch {

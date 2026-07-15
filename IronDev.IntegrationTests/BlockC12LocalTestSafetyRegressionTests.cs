@@ -179,6 +179,10 @@ public sealed class BlockC12LocalTestSafetyRegressionTests
 
         StringAssert.Contains(reset, "Assert-LocalTestSeedTarget");
         StringAssert.Contains(reset, "New-LocalTestSeedValidationSql");
+        StringAssert.Contains(smoke, "ToolCallCompleted");
+        StringAssert.Contains(smoke, "StepCompleted");
+        AssertDoesNotContain(smoke, "DisposableCommandCompleted", "LocalTest smoke current run-event vocabulary");
+        AssertDoesNotContain(smoke, "DisposableWorkspaceCreated", "LocalTest smoke current run-event vocabulary");
         StringAssert.Contains(helper, "productionEnabled");
         StringAssert.Contains(helper, "requiredNamePattern");
         StringAssert.Contains(helper, "PASS LocalTest seed contract.");
