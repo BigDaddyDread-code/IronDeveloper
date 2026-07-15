@@ -1,5 +1,11 @@
 # Canonical Route Inventory
 
+**Status:** Canonical product navigation contract
+
+**Last reviewed:** 15 July 2026
+
+**Programme slice:** CLN-29
+
 This is the navigation contract for the IronDev product shell. It names product surfaces, not every URL the router can resolve. Compatibility URLs may remain safe deep links, but they are not product information architecture and must not appear in primary navigation.
 
 | Order | Surface | Canonical route | Scope | Primary IA |
@@ -15,7 +21,7 @@ This is the navigation contract for the IronDev product shell. It names product 
 
 Board, Work Item, and Library are the primary product IA. Governance and Audit are explicit read/evidence surfaces under Library; neither grants approval or execution authority. Session entry and project selection establish scope before project work. Project Settings describes the client environment and does not establish backend readiness; `/settings` remains an unscoped compatibility entry path.
 
-The executable counterpart is `canonicalSurfaces` in `IronDev.TauriShell/src/flow/navigation/productRoutes.ts`. `canonical-route-inventory.spec.ts` locks the membership, order, primary set, and non-compatibility classification.
+The executable counterpart is `canonicalSurfaces` in `IronDev.TauriShell/src/flow/navigation/productRoutes.ts`. `canonical-route-inventory.spec.ts` locks the exact membership, order, templates, primary set, parser kind, project scope, and non-compatibility classification. A route that resolves to `notFound` does not satisfy the contract merely because it is not marked as a compatibility alias.
 
 ## Route ownership rules
 

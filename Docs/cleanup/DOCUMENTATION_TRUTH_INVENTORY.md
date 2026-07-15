@@ -692,7 +692,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **660 f
 | `Docs/memory/MEMORY_QUALITY_BENCHMARK.md` | Memory Quality Benchmark | Memory | `Canonical` | 2026-07-15 fixed-corpus, fail-closed metric, and retrieval-boundary review | `-` | Version expected corpus; record live provider results without rewriting expectations | Memory and quality |
 | `Docs/receipts/CLN_28_MEMORY_QUALITY_BENCHMARK.md` | CLN-28 Memory Quality Benchmark Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/receipts/CLN_29_CANONICAL_ROUTE_INVENTORY.md` | CLN-29 Canonical Route Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
-| `Docs/ux/CANONICAL_ROUTE_INVENTORY.md` | Canonical Route Inventory | Product and UX | `Canonical` | Verified by CLN-29 executable route contract | `None; current authority` | Keep aligned with product route inventory and tests | Product and client |
+| `Docs/ux/CANONICAL_ROUTE_INVENTORY.md` | Canonical Route Inventory | Product and UX | `Canonical` | 2026-07-15 exact template, parser-kind, scope, and compatibility review | `None; current authority` | Keep aligned with product route inventory and tests | Product and client |
 
 ## Review Line
 
