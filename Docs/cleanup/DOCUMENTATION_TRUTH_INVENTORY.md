@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **686 files** after CLN-42. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **688 files** after CLN-43. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -719,6 +719,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **686 f
 | `Docs/receipts/CLN_41_RESET_SUPPORT_BUNDLE.md` | CLN-41 Reset and Support Bundle Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/CLEAN_CLONE_QUALIFICATION.md` | Clean-Clone Qualification | Cleanup | `Canonical` | Qualification runbook by CLN-42 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Execute from clean machine and retain real evidence | Release and operations |
 | `Docs/receipts/CLN_42_CLEAN_CLONE_QUALIFICATION.md` | CLN-42 Clean-Clone Qualification Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/NON_AUTHOR_OPERATOR_WALK.md` | Non-Author Operator Walk | Cleanup | `Canonical` | Human qualification gate by CLN-43 | `Docs/product/V2_NON_AUTHOR_QUALIFICATION.md` | Complete through a non-author tester | Release and operations |
+| `Docs/receipts/CLN_43_NON_AUTHOR_OPERATOR_WALK.md` | CLN-43 Non-Author Operator Walk Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; append future evidence separately | Evidence and audit |
 
 ## Review Line
 
