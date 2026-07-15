@@ -33,6 +33,9 @@
     <Content Include="appsettings.Test.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\tools\localtest\localtest-seed-contract.json"
+             Link="localtest-seed-contract.json"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

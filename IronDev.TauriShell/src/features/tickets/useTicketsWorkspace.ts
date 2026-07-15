@@ -971,8 +971,9 @@ export function useTicketsWorkspace() {
   }, [refreshEvidence, selectedTicket?.id]);
 
   const onSignIn = useCallback(async () => {
-    await session.signIn({ email: session.email.trim(), password: session.password });
-    await project.refreshProjectContext();
+    if (await session.signIn({ email: session.email.trim(), password: session.password })) {
+      await project.refreshProjectContext();
+    }
   }, [project, session]);
 
   const state: TicketsWorkspaceState = {

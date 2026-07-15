@@ -92,73 +92,6 @@ function New-LocalTestJwtKey {
     }
 }
 
-function Resolve-LocalDbDataSource {
-    param([Parameter(Mandatory = $true)][string]$DataSource)
-
-    if ($DataSource -notmatch '^\(localdb\)\\(?<instance>.+)$') {
-        return $DataSource
-    }
-
-    $instance = $Matches.instance
-    $localDb = Get-Command sqllocaldb -ErrorAction SilentlyContinue
-    if ($null -ne $localDb) {
-        $startExitCode = 0
-        $startOutput = @()
-        try {
-            $startOutput = & $localDb.Source start $instance 2>&1
-            $startExitCode = $LASTEXITCODE
-        }
-        catch {
-            $startOutput += $_.Exception.Message
-            $startExitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 1 }
-        }
-        if ($startExitCode -ne 0) {
-            Write-Warning "Could not start LocalDB instance '$instance' through sqllocaldb; attempting to resolve an existing named pipe."
-            if ($startOutput.Count -gt 0) {
-                Write-Warning (($startOutput | Out-String).Trim())
-            }
-        }
-
-        $info = @()
-        try {
-            $info = & $localDb.Source info $instance 2>$null
-        }
-        catch {
-            $info = @()
-        }
-        foreach ($line in $info) {
-            $match = [regex]::Match($line, '^\s*Instance pipe name:\s*(?<pipe>.+?)\s*$')
-            if ($match.Success -and -not [string]::IsNullOrWhiteSpace($match.Groups['pipe'].Value)) {
-                $pipe = $match.Groups['pipe'].Value.Trim()
-                if ($pipe.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase)) {
-                    return $pipe
-                }
-                return "np:$pipe"
-            }
-        }
-    }
-
-    $errorLog = Join-Path $env:LOCALAPPDATA "Microsoft\Microsoft SQL Server Local DB\Instances\$instance\error.log"
-    if (Test-Path -LiteralPath $errorLog -PathType Leaf) {
-        $pipeAnnouncement = Select-String -LiteralPath $errorLog -Pattern 'Server local connection provider is ready to accept connection on' |
-            Select-Object -Last 1
-        if ($null -ne $pipeAnnouncement) {
-            $match = [regex]::Match($pipeAnnouncement.Line, 'Server local connection provider is ready to accept connection on \[(?<pipe>[^\]]+)\]')
-            if ($match.Success) {
-                $pipe = $match.Groups['pipe'].Value.Trim()
-                if ($pipe -like '\\.\pipe\*\tsql\query') {
-                    if ($pipe.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase)) {
-                        return $pipe
-                    }
-                    return "np:$pipe"
-                }
-            }
-        }
-    }
-
-    throw "Could not resolve LocalDB instance '$instance' to a SQL Server named pipe."
-}
-
 function Invoke-JsonRequest {
     param(
         [Parameter(Mandatory = $true)][ValidateSet("GET", "POST")][string]$Method,
@@ -226,7 +159,7 @@ function Test-LocalTestAuthenticationContract {
         return $login
     }
     catch {
-        throw "FAIL LocalTest authentication contract`nExpected seeded account was rejected.`nRun reset-localtest-data.ps1 or inspect the API error log.`n$($_.Exception.Message)"
+        throw "FAIL LocalTest authentication contract`nExpected seeded account was rejected.`nSafe reset: .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset`n$($_.Exception.Message)"
     }
 }
 
@@ -244,7 +177,9 @@ function Get-LocalTestConnectionInfo {
 
     Add-Type -AssemblyName System.Data
     $builder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder($connectionString)
-    $builder["Data Source"] = Resolve-LocalDbDataSource -DataSource $builder.DataSource
+    if ($builder.DataSource -notmatch '^\(localdb\)\\') {
+        throw "LocalTest must use a stable LocalDB instance alias, not '$($builder.DataSource)'."
+    }
     $normalDatabase = if ($builder.InitialCatalog -match "(?i)_Test$") {
         $builder.InitialCatalog -replace "(?i)_Test$", ""
     }

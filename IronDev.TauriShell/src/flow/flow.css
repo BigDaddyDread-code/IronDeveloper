@@ -2910,6 +2910,41 @@
   padding: 9px 11px;
 }
 
+.fl-auth-remedy {
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--fl-red) 42%, var(--fl-line));
+  border-radius: 8px;
+  background: var(--fl-red-soft);
+  color: var(--fl-red);
+  padding: 10px 11px;
+  font-size: 13px;
+}
+
+.fl-auth-remedy p {
+  margin: 0;
+}
+
+.fl-auth-command-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fl-auth-command-row code {
+  min-width: 0;
+  flex: 1 1 320px;
+  border: 1px solid var(--fl-line2);
+  border-radius: 6px;
+  background: var(--fl-panel);
+  color: var(--fl-ink);
+  font-family: var(--fl-mono);
+  padding: 7px 9px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .fl-auth-connection-details {
   border: 1px solid var(--fl-line);
   border-radius: 8px;

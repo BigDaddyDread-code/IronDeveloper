@@ -452,6 +452,14 @@ try {
         -Project $script:ApiProject `
         -Filter "FullyQualifiedName~AlphaSmokeApiPersistenceTests.Rel5_ChatConfirmedTicket_StartsGovernedRun_ThroughSqlBackedApi"
 
+    # DUX1 front-door trust must execute against the real API and SQL catalog.
+    # Category selection above proves discovery only; this exact lane proves the
+    # seeded login and named missing-user/hash/membership/database states.
+    Invoke-TestLane `
+        -Name "DUX1 LocalTest front-door trust" `
+        -Project $script:ApiProject `
+        -Filter "FullyQualifiedName~LocalTestFrontDoorTrustTests"
+
     # Selection is not execution: the DEMO/HERO seed proofs were previously only
     # SELECTED by the category lanes above, never executed. Execute them by exact
     # name so the demo baseline, post-seed usability probe, chat-ticket proof, and

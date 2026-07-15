@@ -1,6 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { IronDevApiError, createIronDevApiClient, getIronDevApiConfig, type IronDevApiConfig } from '../api/ironDevApi';
-import type { ApiConnectionStatus, ApiStatus, EnvironmentInfo, LoginRequest } from '../api/types';
+import type {
+  ApiConnectionStatus,
+  ApiStatus,
+  EnvironmentInfo,
+  LocalTestPreflightInfo,
+  LocalTestPreflightState,
+  LoginRequest
+} from '../api/types';
 
 interface SessionContextState {
   config: IronDevApiConfig;
@@ -12,6 +19,7 @@ interface SessionContextState {
   isTokenEditorOpen: boolean;
   apiStatus: ApiStatus;
   environmentInfo: EnvironmentInfo | null;
+  localTestPreflight: LocalTestPreflightInfo | null;
   tokenDraft: string;
   email: string;
   password: string;
@@ -22,7 +30,7 @@ interface SessionContextState {
   clearRejectedSession: () => void;
   checkApiConnection: () => Promise<ApiStatus>;
   saveToken: () => void;
-  signIn: (request: LoginRequest) => Promise<void>;
+  signIn: (request: LoginRequest) => Promise<boolean>;
   signOut: () => Promise<void>;
   setTokenDraft: (value: string) => void;
   setEmail: (value: string) => void;
@@ -34,12 +42,75 @@ const SessionContext = createContext<SessionContextState | null>(null);
 const initialApiStatusStatus: ApiConnectionStatus = 'loading';
 const localTestEmail = 'bob@irondev.local';
 const localTestPassword = 'change-me-local-only';
+const localTestResetCommand = '.\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset';
 
 function createInitialStatus(config: IronDevApiConfig): ApiStatus {
   return {
     status: initialApiStatusStatus,
     baseUrl: config.apiBaseUrl,
     message: 'Checking IronDev.Api...'
+  };
+}
+
+function clientPreflight(
+  state: LocalTestPreflightState,
+  config: IronDevApiConfig,
+  detail: string,
+  resetCommand: string | null = null
+): LocalTestPreflightInfo {
+  return {
+    state,
+    environment: import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_ID ? 'LocalTest' : 'Unknown',
+    database: null,
+    apiBuildIdentity: 'Not reported',
+    apiBuildCommit: 'Not reported',
+    launcherRepositoryCommit: import.meta.env.VITE_IRONDEV_LOCALTEST_REPOSITORY_COMMIT ?? null,
+    sessionId: import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_ID ?? null,
+    apiBaseUrl: config.apiBaseUrl,
+    apiPid: 0,
+    seedContractVersion: null,
+    seededLoginCheckResult: 'NotChecked',
+    nextSafeAction: state === 'ApiOffline'
+      ? 'Start the supported LocalTest launcher and retry the connection.'
+      : 'Wait for the LocalTest identity and seed checks to complete.',
+    resetCommand,
+    detail
+  };
+}
+
+function normalizeUrl(value: string | null | undefined) {
+  return value?.trim().replace(/\/+$/, '').replace('://localhost', '://127.0.0.1') ?? '';
+}
+
+function verifyBrowserIdentity(info: LocalTestPreflightInfo, config: IronDevApiConfig): LocalTestPreflightInfo {
+  const expectedSessionId = import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_ID;
+  const expectedCommit = import.meta.env.VITE_IRONDEV_LOCALTEST_REPOSITORY_COMMIT;
+  const expectedApiBaseUrl = import.meta.env.VITE_IRONDEV_LOCALTEST_API_BASE_URL;
+  const reportedApiMismatch =
+    info.environment === 'LocalTest' &&
+    Boolean(info.apiBaseUrl) &&
+    normalizeUrl(info.apiBaseUrl) !== normalizeUrl(config.apiBaseUrl);
+  if (!expectedSessionId && !expectedCommit && !expectedApiBaseUrl && !reportedApiMismatch) {
+    return info;
+  }
+
+  const identityMatches =
+    (!expectedSessionId || info.sessionId === expectedSessionId) &&
+    (!expectedCommit || (info.launcherRepositoryCommit === expectedCommit && info.apiBuildCommit === expectedCommit)) &&
+    normalizeUrl(info.apiBaseUrl) === normalizeUrl(expectedApiBaseUrl || config.apiBaseUrl) &&
+    (!expectedApiBaseUrl || normalizeUrl(config.apiBaseUrl) === normalizeUrl(expectedApiBaseUrl));
+
+  if (identityMatches) {
+    return info;
+  }
+
+  return {
+    ...info,
+    state: 'ApiIdentityMismatch',
+    seededLoginCheckResult: 'NotChecked',
+    nextSafeAction: 'Stop. Restart LocalTest through the supported launcher so the browser and API share one session identity.',
+    resetCommand: localTestResetCommand,
+    detail: 'The browser launcher identity does not match the connected API identity.'
   };
 }
 
@@ -50,6 +121,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const tokenConfigured = Boolean(config.token);
   const [apiStatus, setApiStatus] = useState<ApiStatus>(() => createInitialStatus(config));
   const [environmentInfo, setEnvironmentInfo] = useState<EnvironmentInfo | null>(null);
+  const [localTestPreflight, setLocalTestPreflight] = useState<LocalTestPreflightInfo | null>(null);
   const [isConnectionBusy, setIsConnectionBusy] = useState(false);
   const [isAuthBusy, setIsAuthBusy] = useState(false);
   const [isTokenEditorOpen, setTokenEditorOpen] = useState(false);
@@ -62,10 +134,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setApiStatus(createInitialStatus(config));
     setEnvironmentInfo(null);
+    setLocalTestPreflight(null);
   }, [config.apiBaseUrl, tokenConfigured]);
 
   useEffect(() => {
-    if (environmentInfo?.isTestEnvironment) {
+    const isLocalTest = environmentInfo?.isTestEnvironment || localTestPreflight?.environment === 'LocalTest';
+    if (isLocalTest) {
       setEmail((value) => value || localTestEmail);
       setPassword((value) => value || localTestPassword);
       return;
@@ -73,7 +147,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     setEmail((value) => (value === localTestEmail ? '' : value));
     setPassword((value) => (value === localTestPassword ? '' : value));
-  }, [environmentInfo?.isTestEnvironment]);
+  }, [environmentInfo?.isTestEnvironment, localTestPreflight?.environment]);
 
   const refreshConfig = useCallback(() => {
     setConfigVersion((value) => value + 1);
@@ -116,6 +190,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const status = await client.checkHealth();
       setApiStatus(status);
       if (status.status === 'connected') {
+        setLocalTestPreflight(clientPreflight('ApiConnected', config, 'The API is reachable; LocalTest identity and seed checks are in progress.'));
+        try {
+          setLocalTestPreflight(verifyBrowserIdentity(await client.getLocalTestPreflight(), config));
+        } catch {
+          setLocalTestPreflight(clientPreflight('ApiConnected', config, 'The API is reachable but did not report a LocalTest preflight identity.'));
+        }
         try {
           setEnvironmentInfo(await client.getEnvironment());
         } catch {
@@ -123,13 +203,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setEnvironmentInfo(null);
+        setLocalTestPreflight(clientPreflight('ApiOffline', config, status.message));
       }
 
       return status;
     } finally {
       setIsConnectionBusy(false);
     }
-  }, [client]);
+  }, [client, config]);
 
   useEffect(() => {
     let active = true;
@@ -158,25 +239,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setTokenEditorOpen(false);
         setPassword('');
         refreshConfig();
+        return true;
       } catch (error) {
-        if (error instanceof IronDevApiError) {
-          if (environmentInfo?.isTestEnvironment) {
-            setErrorMessage('LocalTest sign in failed. Reset the LocalTest data and retry.');
-          } else {
-            setErrorMessage('Sign in failed. Check the email and password and try again.');
-          }
+        const isLocalTest = environmentInfo?.isTestEnvironment || localTestPreflight?.environment === 'LocalTest';
+        if (isLocalTest) {
+          const state: LocalTestPreflightState = error instanceof IronDevApiError && error.status === 401
+            ? 'SeedCredentialInvalid'
+            : 'ApiConnected';
+          setLocalTestPreflight((current) => ({
+            ...(current ?? clientPreflight(state, config, 'LocalTest sign in failed.', localTestResetCommand)),
+            state,
+            seededLoginCheckResult: 'Failed',
+            nextSafeAction: 'Run the explicit LocalTest reset command, then start a fresh supported session.',
+            resetCommand: localTestResetCommand,
+            detail: error instanceof Error ? error.message : 'The seeded LocalTest login was rejected.'
+          }));
+          setErrorMessage('LocalTest sign in failed. Use the exact safe reset command shown below.');
         } else {
-          setErrorMessage(
-            environmentInfo?.isTestEnvironment
-              ? 'LocalTest sign in failed. Reset the LocalTest data and retry.'
-              : 'Sign in failed. Check the email and password and try again.'
-          );
+          setErrorMessage('Sign in failed. Check the email and password and try again.');
         }
+        return false;
       } finally {
         setIsAuthBusy(false);
       }
     },
-    [client, environmentInfo?.isTestEnvironment, refreshConfig]
+    [client, config, environmentInfo?.isTestEnvironment, localTestPreflight?.environment, refreshConfig]
   );
 
   const signOut = useCallback(async () => {
@@ -206,10 +293,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       tokenConfigured,
       isConnectionBusy,
       isAuthBusy,
-      isConnectionReady: !isConnectionBusy && !isAuthBusy && apiStatus.status === 'connected',
+      isConnectionReady:
+        !isConnectionBusy &&
+        !isAuthBusy &&
+        apiStatus.status === 'connected' &&
+        (localTestPreflight?.state === 'LocalTestReady' ||
+          (localTestPreflight?.environment !== 'LocalTest' && localTestPreflight?.state !== 'ApiIdentityMismatch')),
       isTokenEditorOpen,
       apiStatus,
       environmentInfo,
+      localTestPreflight,
       tokenDraft,
       email,
       password,
@@ -236,6 +329,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       config,
       email,
       environmentInfo,
+      localTestPreflight,
       errorMessage,
       isAuthBusy,
       isConnectionBusy,

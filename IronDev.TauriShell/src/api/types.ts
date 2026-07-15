@@ -31,6 +31,35 @@ export interface EnvironmentInfo {
   dangerRealRepoWritesEnabled: boolean;
 }
 
+export type LocalTestPreflightState =
+  | 'ApiOffline'
+  | 'ApiConnected'
+  | 'WrongEnvironment'
+  | 'WrongDatabase'
+  | 'SeedUserMissing'
+  | 'SeedCredentialInvalid'
+  | 'SeedMembershipMissing'
+  | 'ApiIdentityMismatch'
+  | 'DatabaseUnavailable'
+  | 'LocalTestReady';
+
+export interface LocalTestPreflightInfo {
+  state: LocalTestPreflightState;
+  environment: string;
+  database: string | null;
+  apiBuildIdentity: string;
+  apiBuildCommit: string;
+  launcherRepositoryCommit: string | null;
+  sessionId: string | null;
+  apiBaseUrl: string | null;
+  apiPid: number;
+  seedContractVersion: number | null;
+  seededLoginCheckResult: string;
+  nextSafeAction: string;
+  resetCommand: string | null;
+  detail: string;
+}
+
 export type ProjectTicket = components['schemas']['ProjectTicket'] & { revision?: number };
 export type ProjectSummary = components['schemas']['Project'];
 export type ProjectGovernanceOverview = components['schemas']['ProjectGovernanceOverview'];

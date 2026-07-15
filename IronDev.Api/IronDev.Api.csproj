@@ -20,4 +20,11 @@
     <ProjectReference Include="..\IronDev.Infrastructure\IronDev.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\tools\localtest\localtest-seed-contract.json"
+             Link="localtest-seed-contract.json"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

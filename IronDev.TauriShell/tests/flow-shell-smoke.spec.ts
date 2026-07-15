@@ -36,10 +36,62 @@ test('invalid credentials render one inline sign-in error', async ({ page }) => 
   await page.getByTestId('auth.password').fill('wrong-password');
   await page.getByTestId('auth.submit').click();
 
-  await expect(page.getByTestId('auth.error')).toHaveText('LocalTest sign in failed. Reset the LocalTest data and retry.');
+  await expect(page.getByTestId('auth.error')).toHaveText(
+    'LocalTest sign in failed. Use the exact safe reset command shown below.'
+  );
   await expect(page.getByTestId('auth.error')).toHaveCount(1);
+  await expect(page.getByTestId('auth.localtestResetCommand')).toHaveText(
+    '.\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset'
+  );
   await expect(page.locator('body')).not.toContainText('TOKEN REJECTED');
   await expect(page.locator('body')).not.toContainText('Authentication failed');
+});
+
+test('browser and launcher API URL mismatch is visible and blocks LocalTest readiness', async ({ page }) => {
+  await mockHealthyApi(page, { apiBaseUrl: 'http://localhost:5001' });
+  await page.goto('/');
+
+  await expect(page.getByTestId('auth.apiStatusChip')).toContainText('ApiIdentityMismatch');
+  await expect(page.getByTestId('auth.localtestSeedStatus')).toHaveText('ApiIdentityMismatch');
+  await expect(page.getByTestId('auth.localtestNextAction')).toContainText('browser and API share one session identity');
+  await expect(page.getByTestId('auth.submit')).toBeDisabled();
+  await expect(page.getByTestId('auth.localtestResetCommand')).toHaveText(
+    '.\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset'
+  );
+});
+
+test('production sign-in exposes no LocalTest reset guidance', async ({ page }) => {
+  await page.route('**/irondev-api/health', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) });
+  });
+  await page.route('**/irondev-api/api/localtest/preflight', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(localTestPreflight({
+        state: 'WrongEnvironment',
+        environment: 'Production',
+        database: null,
+        resetCommand: null,
+        nextSafeAction: 'Sign in with your production account.'
+      }))
+    });
+  });
+  await page.route('**/irondev-api/api/environment', async (route) => {
+    await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
+  });
+  await page.route('**/irondev-api/api/auth/login', async (route) => {
+    await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
+  });
+  await page.goto('/');
+
+  await page.getByTestId('auth.email').fill('person@example.com');
+  await page.getByTestId('auth.password').fill('wrong-password');
+  await page.getByTestId('auth.submit').click();
+
+  await expect(page.getByTestId('auth.error')).toHaveText('Sign in failed. Check the email and password and try again.');
+  await expect(page.getByTestId('auth.localtestRemedy')).toHaveCount(0);
+  await expect(page.locator('body')).not.toContainText('start-pr-manual-test.ps1');
 });
 
 test('valid LocalTest login auto-selects one tenant and lands on project chooser', async ({ page }) => {
@@ -300,9 +352,19 @@ test('audit event deep link reports an event outside the bounded result honestly
   await expect(page.getByTestId('flow.audit.detail.missing')).toContainText('No details have been inferred');
 });
 
-async function mockHealthyApi(page: import('@playwright/test').Page) {
+async function mockHealthyApi(
+  page: import('@playwright/test').Page,
+  preflightOverrides: Record<string, unknown> = {}
+) {
   await page.route('**/irondev-api/health', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) });
+  });
+  await page.route('**/irondev-api/api/localtest/preflight', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(localTestPreflight(preflightOverrides))
+    });
   });
   await page.route('**/irondev-api/api/environment', async (route) => {
     await route.fulfill({
@@ -319,6 +381,26 @@ async function mockHealthyApi(page: import('@playwright/test').Page) {
       })
     });
   });
+}
+
+function localTestPreflight(overrides: Record<string, unknown> = {}) {
+  return {
+    state: 'LocalTestReady',
+    environment: 'LocalTest',
+    database: 'IronDeveloper_Test',
+    apiBuildIdentity: '1.0.0+test-commit',
+    apiBuildCommit: 'test-commit',
+    launcherRepositoryCommit: 'test-commit',
+    sessionId: 'playwright-session',
+    apiBaseUrl: 'http://localhost:5000',
+    apiPid: 1234,
+    seedContractVersion: 1,
+    seededLoginCheckResult: 'Passed',
+    nextSafeAction: 'Sign in with the documented LocalTest credentials.',
+    resetCommand: null,
+    detail: 'LocalTest front door is ready.',
+    ...overrides
+  };
 }
 
 async function mockSelectedProject(page: import('@playwright/test').Page) {

@@ -17,10 +17,24 @@ if ($ProjectId -le 0) {
     $ProjectId = [int]$baselineProject.id
 }
 $shellRoot = Join-Path $repoRoot "IronDev.TauriShell"
-$apiOut = Join-Path $env:TEMP "irondev-localtest-api.out.log"
-$apiErr = Join-Path $env:TEMP "irondev-localtest-api.err.log"
-$uiOut = Join-Path $env:TEMP "irondev-localtest-ui.out.log"
-$uiErr = Join-Path $env:TEMP "irondev-localtest-ui.err.log"
+$startupTimestampUtc = [DateTimeOffset]::UtcNow.ToString("o")
+$sessionId = [Guid]::NewGuid().ToString("N")
+$sessionRoot = Join-Path $env:TEMP ("irondev-localtest-sessions\{0}" -f $sessionId)
+New-Item -ItemType Directory -Force -Path $sessionRoot | Out-Null
+$apiOut = Join-Path $sessionRoot "api.stdout.log"
+$apiErr = Join-Path $sessionRoot "api.stderr.log"
+$apiApplicationLog = Join-Path $sessionRoot "api.application.log"
+$uiOut = Join-Path $sessionRoot "ui.stdout.log"
+$uiErr = Join-Path $sessionRoot "ui.stderr.log"
+$sessionManifestPath = Join-Path $sessionRoot "session-manifest.json"
+$resetCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset"
+$configuredDatabaseName = [string]$seedContract.database.name
+$apiBuildIdentity = $null
+$apiBuildCommit = $null
+$repositoryCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryCommit)) {
+    throw "Could not resolve the repository commit for the LocalTest session manifest."
+}
 $apiPort = ([Uri]$ApiBaseUrl).Port
 
 function Stop-Listener {
@@ -84,73 +98,6 @@ function New-LocalTestJwtKey {
     }
 }
 
-function Resolve-LocalDbDataSource {
-    param([Parameter(Mandatory = $true)][string]$DataSource)
-
-    if ($DataSource -notmatch '^\(localdb\)\\(?<instance>.+)$') {
-        return $DataSource
-    }
-
-    $instance = $Matches.instance
-    $localDb = Get-Command sqllocaldb -ErrorAction SilentlyContinue
-    if ($null -ne $localDb) {
-        $startExitCode = 0
-        $startOutput = @()
-        try {
-            $startOutput = & $localDb.Source start $instance 2>&1
-            $startExitCode = $LASTEXITCODE
-        }
-        catch {
-            $startOutput += $_.Exception.Message
-            $startExitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 1 }
-        }
-        if ($startExitCode -ne 0) {
-            Write-Warning "Could not start LocalDB instance '$instance' through sqllocaldb; attempting to resolve an existing named pipe."
-            if ($startOutput.Count -gt 0) {
-                Write-Warning (($startOutput | Out-String).Trim())
-            }
-        }
-
-        $info = @()
-        try {
-            $info = & $localDb.Source info $instance 2>$null
-        }
-        catch {
-            $info = @()
-        }
-        foreach ($line in $info) {
-            $match = [regex]::Match($line, '^\s*Instance pipe name:\s*(?<pipe>.+?)\s*$')
-            if ($match.Success -and -not [string]::IsNullOrWhiteSpace($match.Groups['pipe'].Value)) {
-                $pipe = $match.Groups['pipe'].Value.Trim()
-                if ($pipe.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase)) {
-                    return $pipe
-                }
-                return "np:$pipe"
-            }
-        }
-    }
-
-    $errorLog = Join-Path $env:LOCALAPPDATA "Microsoft\Microsoft SQL Server Local DB\Instances\$instance\error.log"
-    if (Test-Path -LiteralPath $errorLog -PathType Leaf) {
-        $pipeAnnouncement = Select-String -LiteralPath $errorLog -Pattern 'Server local connection provider is ready to accept connection on' |
-            Select-Object -Last 1
-        if ($null -ne $pipeAnnouncement) {
-            $match = [regex]::Match($pipeAnnouncement.Line, 'Server local connection provider is ready to accept connection on \[(?<pipe>[^\]]+)\]')
-            if ($match.Success) {
-                $pipe = $match.Groups['pipe'].Value.Trim()
-                if ($pipe -like '\\.\pipe\*\tsql\query') {
-                    if ($pipe.StartsWith("np:", [StringComparison]::OrdinalIgnoreCase)) {
-                        return $pipe
-                    }
-                    return "np:$pipe"
-                }
-            }
-        }
-    }
-
-    throw "Could not resolve LocalDB instance '$instance' to a SQL Server named pipe."
-}
-
 function Get-ResolvedLocalTestConnectionString {
     $settingsPath = Join-Path $repoRoot "IronDev.Api\appsettings.LocalTest.json"
     if (-not (Test-Path $settingsPath)) {
@@ -165,7 +112,12 @@ function Get-ResolvedLocalTestConnectionString {
 
     Add-Type -AssemblyName System.Data
     $builder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder($connectionString)
-    $builder["Data Source"] = Resolve-LocalDbDataSource -DataSource $builder.DataSource
+    if ($builder.DataSource -notmatch '^\(localdb\)\\') {
+        throw "LocalTest must use a stable LocalDB instance alias, not '$($builder.DataSource)'."
+    }
+
+    # Never replace the stable LocalDB alias with its ephemeral named pipe. The
+    # pipe changes whenever LocalDB restarts while the API process is alive.
     return $builder.ConnectionString
 }
 
@@ -222,29 +174,64 @@ function Test-LocalTestAuthenticationContract {
         [int]$TimeoutSeconds = 60
     )
 
-    try {
-        $login = Invoke-JsonRequest `
-            -Method "POST" `
-            -Uri "$BaseUrl/api/auth/login" `
-            -Body $seedContract.credentials `
-            -TimeoutSeconds $TimeoutSeconds
+    $login = Invoke-JsonRequest `
+        -Method "POST" `
+        -Uri "$BaseUrl/api/auth/login" `
+        -Body $seedContract.credentials `
+        -TimeoutSeconds $TimeoutSeconds
 
-        if ($null -eq $login -or [string]::IsNullOrWhiteSpace($login.token)) {
-            throw "Login returned no token."
+    if ($null -eq $login -or [string]::IsNullOrWhiteSpace($login.token)) {
+        throw "LocalTest seeded-login check returned no token."
+    }
+
+    return $login
+}
+
+function Get-LocalTestPreflight {
+    param([string]$BaseUrl)
+
+    return Invoke-JsonRequest -Method "GET" -Uri "$BaseUrl/api/localtest/preflight" -TimeoutSeconds 30
+}
+
+function Write-LocalTestSessionManifest {
+    param(
+        [Parameter(Mandatory = $true)][string]$Status,
+        [int]$ApiProcessId = 0,
+        [int]$UiProcessId = 0,
+        [string]$UiUrl,
+        [string]$PreflightState = "ApiOffline",
+        [string]$SeededLoginCheckResult = "NotChecked",
+        [string]$Failure
+    )
+
+    [ordered]@{
+        schemaVersion = 1
+        sessionId = $sessionId
+        status = $Status
+        repositoryCommit = $repositoryCommit
+        apiPid = if ($ApiProcessId -gt 0) { $ApiProcessId } else { $null }
+        uiPid = if ($UiProcessId -gt 0) { $UiProcessId } else { $null }
+        apiBaseUrl = $ApiBaseUrl
+        uiUrl = $UiUrl
+        databaseName = $configuredDatabaseName
+        environment = $seedContract.environment
+        seedContractVersion = $seedContract.schemaVersion
+        apiBuildIdentity = $apiBuildIdentity
+        apiBuildCommit = $apiBuildCommit
+        preflightState = $PreflightState
+        seededLoginCheckResult = $SeededLoginCheckResult
+        startupTimestampUtc = $startupTimestampUtc
+        updatedTimestampUtc = [DateTimeOffset]::UtcNow.ToString("o")
+        logs = [ordered]@{
+            apiStdout = $apiOut
+            apiStderr = $apiErr
+            apiApplication = $apiApplicationLog
+            uiStdout = $uiOut
+            uiStderr = $uiErr
         }
-
-        return $login
-    }
-    catch {
-        Stop-Listener -Port $apiPort
-        Write-Host ""
-        Write-Host "FAIL LocalTest authentication contract"
-        Write-Host "Expected seeded account was rejected."
-        Write-Host "Run reset-localtest-data.ps1 or inspect the API error log."
-        Write-Host "  API log: $apiErr"
-        Write-Host "  Error: $($_.Exception.Message)"
-        throw "LocalTest authentication contract failed."
-    }
+        failure = if ([string]::IsNullOrWhiteSpace($Failure)) { $null } else { $Failure }
+        resetCommand = $resetCommand
+    } | ConvertTo-Json -Depth 5 | Set-Content -Path $sessionManifestPath -Encoding UTF8
 }
 
 function Get-LocalTestEnvironment {
@@ -309,15 +296,16 @@ function Start-BrowserShell {
     Stop-Listener -Port $Port
     $node = Get-NodeCommand
 
-    Start-Process -FilePath $node `
+    $process = Start-Process -FilePath $node `
         -ArgumentList @("node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", "$Port", "--mode", "localtest") `
         -WorkingDirectory $shellRoot `
         -PassThru `
         -WindowStyle Hidden `
         -RedirectStandardOutput $uiOut `
-        -RedirectStandardError $uiErr | Out-Null
+        -RedirectStandardError $uiErr
 
     Wait-HttpOk -Uri "http://127.0.0.1:$Port/"
+    return $process
 }
 
 function Get-TauriDesktopProcesses {
@@ -349,122 +337,225 @@ function Stop-TauriDesktopProcesses {
     throw "Existing Tauri desktop shell is still running. Close it and rerun LocalTest startup."
 }
 
-Stop-RepoLocalTestProcesses
-Stop-Listener -Port $apiPort
-Stop-Listener -Port $UiPort
-
-if ($Reset) {
-    & (Join-Path $PSScriptRoot "reset-localtest-data.ps1")
-}
-
-$apiConnectionString = Get-ResolvedLocalTestConnectionString
-$previousJwtKey = $env:IRONDEV_JWT_KEY
-$previousConnectionString = $env:ConnectionStrings__IronDeveloperDb
-$env:IRONDEV_JWT_KEY = New-LocalTestJwtKey
-$env:ConnectionStrings__IronDeveloperDb = $apiConnectionString
-try {
-    Start-Process -FilePath dotnet `
-        -ArgumentList @("run", "--launch-profile", "LocalTest", "--project", "IronDev.Api\IronDev.Api.csproj") `
-        -WorkingDirectory $repoRoot `
-        -PassThru `
-        -WindowStyle Hidden `
-        -RedirectStandardOutput $apiOut `
-        -RedirectStandardError $apiErr | Out-Null
-}
-finally {
-    $env:IRONDEV_JWT_KEY = $previousJwtKey
-    $env:ConnectionStrings__IronDeveloperDb = $previousConnectionString
-}
-
-Wait-HttpOk -Uri "$ApiBaseUrl/health" -TimeoutSeconds 90
-$login = Test-LocalTestAuthenticationContract -BaseUrl $ApiBaseUrl
-$environment = Get-LocalTestEnvironment -BaseUrl $ApiBaseUrl -Token $login.token
-
-if ($environment.environment -ne $seedContract.environment -or
-    $environment.database -ne $seedContract.database.name -or
-    -not $environment.isTestEnvironment) {
-    Stop-Listener -Port $apiPort
-    throw "API environment check failed. Refusing to start UI against $($environment.environment)/$($environment.database)."
-}
-
-$env:VITE_IRONDEV_API_BASE_URL = $ApiBaseUrl
-$env:VITE_IRONDEV_PROJECT_ID = if ($FreshSession) { "none" } else { "$ProjectId" }
-$env:IRONDEV_API_PROXY_TARGET = $ApiBaseUrl
+$apiLauncherProcess = $null
+$apiRuntimeProcessId = 0
+$uiProcess = $null
 $uiUrl = Get-LocalTestUiUrl -Port $UiPort -UseFreshSession ([bool]$FreshSession)
+$preflightState = "ApiOffline"
+$seededLoginCheckResult = "NotChecked"
 
-Write-Host ""
-Write-Host "PASS LocalTest API started"
-Write-Host "  API: $ApiBaseUrl"
-Write-Host "  Environment: $($environment.environment)"
-Write-Host "  Database: $($environment.database)"
-Write-Host "  Workspace: $($environment.workspaceRoot)"
-Write-Host "PASS LocalTest authentication contract"
-Write-Host "  Login: $($seedContract.credentials.email)"
-if ($FreshSession) {
-    Write-Host "PASS LocalTest fresh client session requested"
-    Write-Host "  Clears only: irondev.token, irondev.tenantId, irondev.selectedProjectId"
-}
-Write-Host ""
+Write-LocalTestSessionManifest -Status "Starting" -UiUrl $uiUrl
 
-if ($BrowserOnly) {
-    Start-BrowserShell -Port $UiPort
+try {
+    Stop-RepoLocalTestProcesses
+    Stop-Listener -Port $apiPort
+    Stop-Listener -Port $UiPort
+
+    if ($Reset) {
+        & (Join-Path $PSScriptRoot "reset-localtest-data.ps1")
+    }
+
+    $apiConnectionString = Get-ResolvedLocalTestConnectionString
+    $configuredDatabaseName = ([System.Data.SqlClient.SqlConnectionStringBuilder]::new($apiConnectionString)).InitialCatalog
+    $apiEnvironmentVariables = [ordered]@{
+        IRONDEV_JWT_KEY = New-LocalTestJwtKey
+        ConnectionStrings__IronDeveloperDb = $apiConnectionString
+        IRONDEV_LOCALTEST_SESSION_ID = $sessionId
+        IRONDEV_LOCALTEST_REPOSITORY_COMMIT = $repositoryCommit
+        IRONDEV_LOCALTEST_API_BASE_URL = $ApiBaseUrl.TrimEnd('/')
+        IRONDEV_LOCALTEST_API_LOG_PATH = $apiApplicationLog
+    }
+    $previousApiEnvironment = @{}
+    foreach ($entry in $apiEnvironmentVariables.GetEnumerator()) {
+        $previousApiEnvironment[$entry.Key] = [Environment]::GetEnvironmentVariable($entry.Key, "Process")
+        [Environment]::SetEnvironmentVariable($entry.Key, [string]$entry.Value, "Process")
+    }
+
+    try {
+        $apiLauncherProcess = Start-Process -FilePath dotnet `
+            -ArgumentList @("run", "--launch-profile", "LocalTest", "--project", "IronDev.Api\IronDev.Api.csproj") `
+            -WorkingDirectory $repoRoot `
+            -PassThru `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $apiOut `
+            -RedirectStandardError $apiErr
+    }
+    finally {
+        foreach ($entry in $previousApiEnvironment.GetEnumerator()) {
+            [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, "Process")
+        }
+    }
+
+    Wait-HttpOk -Uri "$ApiBaseUrl/health" -TimeoutSeconds 90
+    $preflightState = "ApiConnected"
+    Write-LocalTestSessionManifest `
+        -Status "Preflight" `
+        -ApiProcessId $apiLauncherProcess.Id `
+        -UiUrl $uiUrl `
+        -PreflightState $preflightState
+
+    $preflight = Get-LocalTestPreflight -BaseUrl $ApiBaseUrl
+    $preflightState = [string]$preflight.state
+    $apiRuntimeProcessId = [int]$preflight.apiPid
+    $apiBuildIdentity = [string]$preflight.apiBuildIdentity
+    $apiBuildCommit = [string]$preflight.apiBuildCommit
+    if ($preflightState -ne "LocalTestReady") {
+        throw "LocalTest preflight returned $preflightState. $($preflight.detail)"
+    }
+    if ($preflight.apiBaseUrl.TrimEnd('/') -ne $ApiBaseUrl.TrimEnd('/')) {
+        throw "LocalTest preflight API identity '$($preflight.apiBaseUrl)' does not match launcher API '$ApiBaseUrl'."
+    }
+
+    try {
+        $login = Test-LocalTestAuthenticationContract -BaseUrl $ApiBaseUrl
+        $seededLoginCheckResult = "Passed"
+    }
+    catch {
+        $seededLoginCheckResult = "Failed"
+        throw
+    }
+    $environment = Get-LocalTestEnvironment -BaseUrl $ApiBaseUrl -Token $login.token
+
+    if ($environment.environment -ne $seedContract.environment -or
+        $environment.database -ne $seedContract.database.name -or
+        -not $environment.isTestEnvironment) {
+        throw "API environment check failed. Refusing to start UI against $($environment.environment)/$($environment.database)."
+    }
+
+    $env:VITE_IRONDEV_API_BASE_URL = $ApiBaseUrl.TrimEnd('/')
+    $env:VITE_IRONDEV_PROJECT_ID = if ($FreshSession) { "none" } else { "$ProjectId" }
+    $env:IRONDEV_API_PROXY_TARGET = $ApiBaseUrl.TrimEnd('/')
+    $env:VITE_IRONDEV_LOCALTEST_SESSION_ID = $sessionId
+    $env:VITE_IRONDEV_LOCALTEST_REPOSITORY_COMMIT = $repositoryCommit
+    $env:VITE_IRONDEV_LOCALTEST_API_BASE_URL = $ApiBaseUrl.TrimEnd('/')
+
+    Write-Host ""
+    Write-Host "PASS LocalTest API started"
+    Write-Host "  API: $ApiBaseUrl"
+    Write-Host "  API PID: $apiRuntimeProcessId"
+    Write-Host "  API build: $($preflight.apiBuildIdentity)"
+    Write-Host "  Environment: $($environment.environment)"
+    Write-Host "  Database: $($environment.database)"
+    Write-Host "  Workspace: $($environment.workspaceRoot)"
+    Write-Host "PASS LocalTest authentication contract"
+    Write-Host "  Login: $($seedContract.credentials.email)"
+    if ($FreshSession) {
+        Write-Host "PASS LocalTest fresh client session requested"
+        Write-Host "  Clears only: irondev.token, irondev.tenantId, irondev.selectedProjectId"
+    }
+    Write-Host ""
+
+    if ($BrowserOnly) {
+        $uiProcess = Start-BrowserShell -Port $UiPort
+        Write-LocalTestSessionManifest `
+            -Status "Ready" `
+            -ApiProcessId $apiRuntimeProcessId `
+            -UiProcessId $uiProcess.Id `
+            -UiUrl $uiUrl `
+            -PreflightState $preflightState `
+            -SeededLoginCheckResult $seededLoginCheckResult
+        Write-Host "PASS LocalTest browser shell started"
+        Write-Host "  UI: $uiUrl"
+        Write-Host "  UI PID: $($uiProcess.Id)"
+        Write-Host "  Session manifest: $sessionManifestPath"
+        Write-Host ""
+        Write-Host "Processes are left running. Stop ports $apiPort/$UiPort when finished."
+        return
+    }
+
+    Write-Host "Starting Tauri desktop shell. Close the desktop window or stop this command when finished."
+    $node = Get-NodeCommand
+    $tauriCli = Join-Path $shellRoot "node_modules\@tauri-apps\cli\tauri.js"
+    if (-not (Test-Path $tauriCli)) {
+        throw "Tauri CLI was not found at $tauriCli. Restore IronDev.TauriShell dependencies first."
+    }
+
+    $tauriLocalTestConfig = Join-Path $sessionRoot "irondev-tauri-localtest.conf.json"
+    @{
+        build = @{
+            beforeDevCommand = ""
+            devUrl = $uiUrl
+        }
+    } | ConvertTo-Json -Depth 4 | Set-Content -Path $tauriLocalTestConfig -Encoding UTF8
+
+    Stop-TauriDesktopProcesses
+    $uiProcess = Start-BrowserShell -Port $UiPort
+    Write-LocalTestSessionManifest `
+        -Status "Ready" `
+        -ApiProcessId $apiRuntimeProcessId `
+        -UiProcessId $uiProcess.Id `
+        -UiUrl $uiUrl `
+        -PreflightState $preflightState `
+        -SeededLoginCheckResult $seededLoginCheckResult
     Write-Host "PASS LocalTest browser shell started"
     Write-Host "  UI: $uiUrl"
+    Write-Host "  Session manifest: $sessionManifestPath"
     Write-Host ""
-    Write-Host "Processes are left running. Stop ports 5000/$UiPort when finished."
-    exit 0
-}
 
-Write-Host "Starting Tauri desktop shell. Close the desktop window or stop this command when finished."
-$node = Get-NodeCommand
-$tauriCli = Join-Path $shellRoot "node_modules\@tauri-apps\cli\tauri.js"
-if (-not (Test-Path $tauriCli)) {
-    throw "Tauri CLI was not found at $tauriCli. Restore IronDev.TauriShell dependencies first."
-}
+    Push-Location $shellRoot
+    try {
+        $existingDesktopProcessIds = @(Get-TauriDesktopProcesses | Select-Object -ExpandProperty ProcessId)
 
-$tauriLocalTestConfig = Join-Path $env:TEMP "irondev-tauri-localtest.conf.json"
-@{
-    build = @{
-        beforeDevCommand = ""
-        devUrl = $uiUrl
-    }
-} | ConvertTo-Json -Depth 4 | Set-Content -Path $tauriLocalTestConfig -Encoding UTF8
+        $tauriProcess = Start-Process -FilePath $node `
+            -ArgumentList @($tauriCli, "dev", "--config", $tauriLocalTestConfig, "--no-dev-server-wait") `
+            -WorkingDirectory $shellRoot `
+            -NoNewWindow `
+            -PassThru `
+            -Wait
 
-Stop-TauriDesktopProcesses
-Start-BrowserShell -Port $UiPort
-Write-Host "PASS LocalTest browser shell started"
-Write-Host "  UI: $uiUrl"
-Write-Host ""
+        if ($tauriProcess.ExitCode -ne 0) {
+            $desktopProcess = Get-TauriDesktopProcesses |
+                Where-Object { $existingDesktopProcessIds -notcontains $_.ProcessId } |
+                Select-Object -First 1
 
-Push-Location $shellRoot
-try {
-    $existingDesktopProcessIds = @(Get-TauriDesktopProcesses | Select-Object -ExpandProperty ProcessId)
+            if ($desktopProcess) {
+                Write-Host "PASS LocalTest Tauri desktop shell started"
+                Write-Host "  ProcessId: $($desktopProcess.ProcessId)"
+                Write-Host "  Tauri CLI exited with code $($tauriProcess.ExitCode) after launching the desktop process."
+                Write-Host "  Waiting for the desktop shell to close."
+                Wait-Process -Id $desktopProcess.ProcessId
+                return
+            }
 
-    $tauriProcess = Start-Process -FilePath $node `
-        -ArgumentList @($tauriCli, "dev", "--config", $tauriLocalTestConfig, "--no-dev-server-wait") `
-        -WorkingDirectory $shellRoot `
-        -NoNewWindow `
-        -PassThru `
-        -Wait
-
-    if ($tauriProcess.ExitCode -ne 0) {
-        $desktopProcess = Get-TauriDesktopProcesses |
-            Where-Object { $existingDesktopProcessIds -notcontains $_.ProcessId } |
-            Select-Object -First 1
-
-        if ($desktopProcess) {
-            Write-Host "PASS LocalTest Tauri desktop shell started"
-            Write-Host "  ProcessId: $($desktopProcess.ProcessId)"
-            Write-Host "  Tauri CLI exited with code $($tauriProcess.ExitCode) after launching the desktop process."
-            Write-Host "  Waiting for the desktop shell to close."
-            Wait-Process -Id $desktopProcess.ProcessId
-            return
+            throw "Tauri desktop shell exited with code $($tauriProcess.ExitCode)."
         }
-
-        throw "Tauri desktop shell exited with code $($tauriProcess.ExitCode)."
+    }
+    finally {
+        Pop-Location
+        Stop-Listener -Port $UiPort
     }
 }
-finally {
-    Pop-Location
+catch {
+    $failure = $_.Exception.Message
+    if ($null -ne $uiProcess) {
+        Stop-Process -Id $uiProcess.Id -Force -ErrorAction SilentlyContinue
+    }
     Stop-Listener -Port $UiPort
+    Stop-Listener -Port $apiPort
+    if ($apiRuntimeProcessId -gt 0) {
+        Stop-Process -Id $apiRuntimeProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $apiLauncherProcess) {
+        Stop-Process -Id $apiLauncherProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-LocalTestSessionManifest `
+        -Status "Failed" `
+        -ApiProcessId $(if ($apiRuntimeProcessId -gt 0) { $apiRuntimeProcessId } elseif ($null -ne $apiLauncherProcess) { $apiLauncherProcess.Id } else { 0 }) `
+        -UiProcessId $(if ($null -ne $uiProcess) { $uiProcess.Id } else { 0 }) `
+        -UiUrl $uiUrl `
+        -PreflightState $preflightState `
+        -SeededLoginCheckResult $seededLoginCheckResult `
+        -Failure $failure
+
+    Write-Host ""
+    Write-Host "FAIL LocalTest front-door trust"
+    Write-Host "  State: $preflightState"
+    Write-Host "  Error: $failure"
+    Write-Host "  Safe reset: $resetCommand"
+    Write-Host "  Session manifest: $sessionManifestPath"
+    Write-Host "  API stdout: $apiOut"
+    Write-Host "  API stderr: $apiErr"
+    Write-Host "  API error log: $apiApplicationLog"
+    throw
 }

@@ -14,7 +14,15 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
   const passwordRef = useRef<HTMLInputElement>(null);
   const didSetInitialFocus = useRef(false);
   const [lastRetry, setLastRetry] = useState<string | null>(null);
-  const isLocalTestEnvironment = Boolean(session.environmentInfo?.isTestEnvironment);
+  const [resetCommandCopied, setResetCommandCopied] = useState(false);
+  const preflight = session.localTestPreflight;
+  const isLocalTestEnvironment = Boolean(
+    session.environmentInfo?.isTestEnvironment ||
+      preflight?.environment === 'LocalTest' ||
+      (preflight?.state === 'ApiIdentityMismatch' && preflight.resetCommand)
+  );
+  const resetCommand = isLocalTestEnvironment ? preflight?.resetCommand : null;
+  const blocksLocalTestSignIn = isLocalTestEnvironment && preflight?.state !== 'LocalTestReady';
   const inlineError = session.errorMessage;
   const inlineMessage = !inlineError ? session.sessionMessage : null;
 
@@ -28,8 +36,9 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
   }, [session.apiStatus.status, session.email]);
 
   const signIn = useCallback(async () => {
-    await session.signIn({ email: session.email.trim(), password: session.password });
-    await project.refreshProjectContext();
+    if (await session.signIn({ email: session.email.trim(), password: session.password })) {
+      await project.refreshProjectContext();
+    }
   }, [project, session]);
 
   const retryConnection = useCallback(async () => {
@@ -42,8 +51,12 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
       <header className="fl-auth-header">
         <IronDevBrand descriptor />
         <span className="fl-auth-environment" data-testid="auth.apiStatusChip">
-          {session.environmentInfo?.environment ? `${session.environmentInfo.environment} · ` : ''}
-          {apiStatusLabel(session.apiStatus.status)}
+          {preflight?.environment && preflight.environment !== 'Unknown'
+            ? `${preflight.environment} · `
+            : session.environmentInfo?.environment
+              ? `${session.environmentInfo.environment} · `
+              : ''}
+          {preflightStatusLabel(session.apiStatus.status, preflight?.state, preflight?.environment)}
         </span>
       </header>
 
@@ -105,7 +118,12 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
               }}
             />
           </label>
-          <button className="fl-btn fl-pri" data-testid="auth.submit" type="submit" disabled={session.isAuthBusy}>
+          <button
+            className="fl-btn fl-pri"
+            data-testid="auth.submit"
+            type="submit"
+            disabled={session.isAuthBusy || blocksLocalTestSignIn}
+          >
             {session.isAuthBusy ? 'Signing in...' : 'Sign in'}
           </button>
           {inlineError ? (
@@ -118,9 +136,32 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
               {inlineMessage}
             </p>
           ) : null}
+          {resetCommand ? (
+            <section className="fl-auth-remedy" data-testid="auth.localtestRemedy" aria-label="LocalTest recovery">
+              <strong>Exact safe action</strong>
+              <p>{preflight?.nextSafeAction}</p>
+              <div className="fl-auth-command-row">
+                <code data-testid="auth.localtestResetCommand">{resetCommand}</code>
+                <button
+                  className="fl-btn fl-mini"
+                  data-testid="auth.copyLocaltestResetCommand"
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(resetCommand).then(() => setResetCommandCopied(true));
+                  }}
+                >
+                  {resetCommandCopied ? 'Copied' : 'Copy command'}
+                </button>
+              </div>
+            </section>
+          ) : null}
         </form>
 
-        <details className="fl-auth-connection-details" data-testid="auth.connectionDetails">
+        <details
+          className="fl-auth-connection-details"
+          data-testid="auth.connectionDetails"
+          open={isLocalTestEnvironment}
+        >
           <summary>Connection details</summary>
           <dl>
             <div>
@@ -131,11 +172,41 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
             </div>
             <div>
               <dt>Environment</dt>
-              <dd>{session.environmentInfo?.environment ?? 'Not reported yet'}</dd>
+              <dd data-testid="auth.localtestEnvironment">
+                {preflight?.environment ?? session.environmentInfo?.environment ?? 'Not reported yet'}
+              </dd>
             </div>
             <div>
-              <dt>API status</dt>
-              <dd>{apiStatusLabel(session.apiStatus.status)}</dd>
+              <dt>Database</dt>
+              <dd data-testid="auth.localtestDatabase">
+                {preflight?.database ?? session.environmentInfo?.database ?? 'Not reported yet'}
+              </dd>
+            </div>
+            <div>
+              <dt>Front door</dt>
+              <dd data-testid="auth.localtestSeedStatus">
+                {preflightStatusLabel(session.apiStatus.status, preflight?.state, preflight?.environment)}
+              </dd>
+            </div>
+            <div>
+              <dt>API build</dt>
+              <dd data-testid="auth.localtestApiBuild">{preflight?.apiBuildIdentity ?? 'Not reported yet'}</dd>
+            </div>
+            <div>
+              <dt>Repository</dt>
+              <dd data-testid="auth.localtestRepositoryCommit">
+                {preflight?.launcherRepositoryCommit ?? 'Not reported yet'}
+              </dd>
+            </div>
+            <div>
+              <dt>Session</dt>
+              <dd data-testid="auth.localtestSessionId">{preflight?.sessionId ?? 'Not reported yet'}</dd>
+            </div>
+            <div>
+              <dt>Next action</dt>
+              <dd data-testid="auth.localtestNextAction">
+                {preflight?.nextSafeAction ?? session.apiStatus.message}
+              </dd>
             </div>
             <div>
               <dt>Last retry</dt>
@@ -207,5 +278,24 @@ function apiStatusLabel(status: string) {
       return 'API needs attention';
     default:
       return `API ${status}`;
+  }
+}
+
+function preflightStatusLabel(apiStatus: string, preflightState?: string, environment?: string) {
+  if (apiStatus !== 'connected') {
+    return apiStatusLabel(apiStatus);
+  }
+
+  switch (preflightState) {
+    case 'LocalTestReady':
+      return 'LocalTest ready';
+    case 'ApiConnected':
+      return 'API connected · checks incomplete';
+    case 'WrongEnvironment':
+      return environment === 'LocalTest' ? 'WrongEnvironment' : 'API connected';
+    case undefined:
+      return 'API connected';
+    default:
+      return preflightState;
   }
 }

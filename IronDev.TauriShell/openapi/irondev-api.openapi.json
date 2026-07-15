@@ -6388,6 +6388,35 @@
         }
       }
     },
+    "/api/localtest/preflight": {
+      "get": {
+        "tags": [
+          "LocalTestPreflight"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalTestPreflightResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalTestPreflightResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalTestPreflightResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/manual-critic/reviews": {
       "post": {
         "tags": [
@@ -23018,6 +23047,69 @@
         },
         "additionalProperties": false
       },
+      "LocalTestPreflightResponse": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "environment": {
+            "type": "string",
+            "nullable": true
+          },
+          "database": {
+            "type": "string",
+            "nullable": true
+          },
+          "apiBuildIdentity": {
+            "type": "string",
+            "nullable": true
+          },
+          "apiBuildCommit": {
+            "type": "string",
+            "nullable": true
+          },
+          "launcherRepositoryCommit": {
+            "type": "string",
+            "nullable": true
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "apiBaseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "apiPid": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seedContractVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "seededLoginCheckResult": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          },
+          "resetCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "LoginRequest": {
         "type": "object",
         "properties": {
@@ -38183,6 +38275,9 @@
     },
     {
       "name": "IronDev.Api"
+    },
+    {
+      "name": "LocalTestPreflight"
     },
     {
       "name": "ManualCriticReviewsV1"
