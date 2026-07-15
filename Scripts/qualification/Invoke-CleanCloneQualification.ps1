@@ -46,12 +46,27 @@ try {
     Invoke-Check "clone" { git clone --quiet --no-tags $RepositoryUrl $cloneRoot }
     Invoke-Check "checkout" { git -C $cloneRoot checkout --quiet $Ref }
     Invoke-Check "dotnet-restore" { dotnet restore (Join-Path $cloneRoot "IronDev.slnx") }
+    Invoke-Check "dotnet-vulnerability-audit" {
+        $auditOutput = & dotnet package list --project (Join-Path $cloneRoot "IronDev.slnx") --vulnerable --include-transitive --format json
+        if ($LASTEXITCODE -ne 0) { throw "dotnet vulnerability audit failed with exit code $LASTEXITCODE." }
+        $audit = $auditOutput | ConvertFrom-Json
+        $vulnerablePackages = @(
+            $audit.projects |
+                ForEach-Object { $_.frameworks } |
+                ForEach-Object { @($_.topLevelPackages) + @($_.transitivePackages) } |
+                Where-Object { $null -ne $_ -and $null -ne $_.vulnerabilities -and @($_.vulnerabilities).Count -gt 0 }
+        )
+        if ($vulnerablePackages.Count -gt 0) {
+            throw "dotnet vulnerability audit found $($vulnerablePackages.Count) vulnerable package occurrence(s)."
+        }
+    }
     Invoke-Check "dotnet-build" { dotnet build (Join-Path $cloneRoot "IronDev.slnx") --no-restore }
     Invoke-Check "documentation-contract" { powershell -ExecutionPolicy Bypass -File (Join-Path $cloneRoot "Scripts\ci\run-documentation-contract-ci.ps1") }
     if (-not $SkipFrontend) {
         Push-Location (Join-Path $cloneRoot "IronDev.TauriShell")
         try {
             Invoke-Check "frontend-locked-install" { npm ci }
+            Invoke-Check "frontend-vulnerability-audit" { npm audit --audit-level=low }
             Invoke-Check "frontend-build" { npm run build }
             Invoke-Check "tauri-cargo-check" { cargo check --manifest-path src-tauri\Cargo.toml }
         }

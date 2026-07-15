@@ -10,7 +10,7 @@ On a clean machine with Git, .NET 10, Node/npm, and Rust/Cargo installed:
 .\Scripts\qualification\Invoke-CleanCloneQualification.ps1 -RepositoryUrl <repository-url> -Ref <commit-or-branch>
 ```
 
-The script creates a new temporary clone, checks out the requested ref, restores and builds the solution, runs the documentation contract, performs locked frontend installation/build, and runs Cargo check. Its JSON evidence contains real timestamps only for checks actually executed.
+The script creates a new temporary clone, checks out the requested ref, restores and builds the solution, refuses known .NET and npm vulnerabilities, runs the documentation contract, performs locked frontend installation/build, and runs Cargo check. Its JSON evidence contains real timestamps only for checks actually executed.
 
 Use `-ClonePath <empty-directory-path> -KeepClone` when the live LocalTest gate will continue from the same clone. The evidence records the exact checked-out commit and is also written after a failed or incomplete run.
 
