@@ -697,7 +697,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **666 f
 | `Docs/ux/SHARED_TRUTH_RENDERERS.md` | Shared Truth Renderers | Product and UX | `Canonical` | 2026-07-15 renderer, accessibility, visual-tone, and authority-boundary review | `None; current authority` | Keep aligned with design-system state primitives | Product and client |
 | `Docs/receipts/CLN_31_LEGACY_ROUTE_CONTAINMENT.md` | CLN-31 Legacy Route Containment Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/ux/LEGACY_ROUTE_CONTAINMENT.md` | Legacy Route Containment | Product and UX | `Canonical` | 2026-07-15 alias inventory, resolver, identity-preservation, and notice review | `None; current authority` | Keep aligned with compatibility route handling | Product and client |
-| `Docs/cleanup/COMPONENT_REFACTOR_INVENTORY.md` | Component Refactor Inventory | Cleanup | `Supporting` | Measured and characterized by CLN-32 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Re-measure before each frontend split | Product and client |
+| `Docs/cleanup/COMPONENT_REFACTOR_INVENTORY.md` | Component Refactor Inventory | Cleanup | `Supporting` | 2026-07-15 measured against cumulative CLN-31 head and characterized by CLN-32 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Re-measure before each frontend split | Product and client |
 | `Docs/receipts/CLN_32_COMPONENT_REFACTOR_INVENTORY.md` | CLN-32 Component Refactor Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line

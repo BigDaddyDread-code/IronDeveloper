@@ -1,6 +1,10 @@
 # Component Refactor Inventory
 
-**Snapshot:** 14 July 2026
+**Status:** Supporting refactor inventory
+
+**Snapshot:** 15 July 2026
+
+**Programme slice:** CLN-32
 
 This inventory identifies frontend refactor seams before code is split. Line counts are a prioritisation signal, not a quality verdict. No candidate should be split until its observable routing, authority, loading, failure, and action-blocking behavior has characterization coverage.
 
@@ -13,7 +17,7 @@ This inventory identifies frontend refactor seams before code is split. Line cou
 | `features/governance/WorkflowRunStepViewerRoute.tsx` | 917 | search, list/detail selection, evidence rendering, paging/error state | High | governance viewer tests | Extract read-model/query state from presentation |
 | `features/chatToBuild/useProjectChat.ts` | 830 | session history, completion, audit replay, persistence, error/retry | Critical | chat navigation/governance suites; CLN-32 gate test | Separate request lifecycle from backend gate projection |
 | `flow/library/DocumentsScreen.tsx` | 803 | browse, detail, version, upload, navigation, error mapping | Medium | library document tests | Extract route-specific panels around one API-owned document model |
-| `flow/FlowShell.tsx` | 575 | access routing, project deep links, work-item load, primary nav, shell chrome | Critical | flow shell suite; CLN-32 route test | Extract route-outcome orchestration; keep access decisions in contexts/API truth |
+| `flow/FlowShell.tsx` | 576 | access routing, project deep links, work-item load, primary nav, shell chrome | Critical | flow shell suite; CLN-32 route test | Extract route-outcome orchestration; keep access decisions in contexts/API truth |
 
 Generated `api/generated/ironDevApiTypes.ts` (17,586 lines), public API aliases in `api/types.ts` (2,066), and the API facade (1,737) are large but are not UI-component split candidates. Generated output must remain generated; facade decomposition belongs to an API-client contract slice.
 

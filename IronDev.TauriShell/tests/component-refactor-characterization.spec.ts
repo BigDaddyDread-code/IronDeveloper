@@ -28,6 +28,26 @@ test('chat gate seam never manufactures permissions from mode or action labels',
     showGovernanceActions: false
   });
   expect(withoutBackendGate.governanceActions).toEqual([]);
+
+  const withExplicitBackendGate = getChatModeGate({
+    gate: {
+      mode: 'Formalization',
+      canSaveDiscussion: true,
+      canCreateTicket: false,
+      canViewSources: true,
+      canCopyMarkdown: false,
+      governanceActions: ['SaveDiscussion', 'ViewSources']
+    }
+  } as never);
+  expect(withExplicitBackendGate).toMatchObject({
+    mode: 'Formalization',
+    canSaveDiscussion: true,
+    canCreateTicket: false,
+    canViewSources: true,
+    canCopyMarkdown: false,
+    showGovernanceActions: true,
+    governanceActions: ['SaveDiscussion', 'ViewSources']
+  });
 });
 
 test('build-stage tone mapping remains a presentation-only projection', () => {
