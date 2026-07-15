@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "result": "RepositoryQualificationPassed",
+  "repositoryRef": "47851dea1acab33c77f8c7b611c3b90f14b8aec5",
+  "checkedOutCommit": "47851dea1acab33c77f8c7b611c3b90f14b8aec5",
+  "completedUtc": "2026-07-15T06:31:19.1941928+00:00",
+  "checks": [
+    {
+      "name": "clone",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:23:46.6001602+00:00",
+      "completedUtc": "2026-07-15T06:23:52.6807561+00:00"
+    },
+    {
+      "name": "checkout",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:23:52.6921454+00:00",
+      "completedUtc": "2026-07-15T06:23:52.9955553+00:00"
+    },
+    {
+      "name": "dotnet-restore",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:23:52.9955553+00:00",
+      "completedUtc": "2026-07-15T06:23:59.4110955+00:00"
+    },
+    {
+      "name": "dotnet-vulnerability-audit",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:23:59.4110955+00:00",
+      "completedUtc": "2026-07-15T06:24:27.1451479+00:00"
+    },
+    {
+      "name": "dotnet-build",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:24:27.1451479+00:00",
+      "completedUtc": "2026-07-15T06:26:41.4091017+00:00"
+    },
+    {
+      "name": "documentation-contract",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:26:41.4091017+00:00",
+      "completedUtc": "2026-07-15T06:26:59.0050491+00:00"
+    },
+    {
+      "name": "frontend-locked-install",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:26:59.0123932+00:00",
+      "completedUtc": "2026-07-15T06:27:07.9176475+00:00"
+    },
+    {
+      "name": "frontend-vulnerability-audit",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:27:07.9176475+00:00",
+      "completedUtc": "2026-07-15T06:27:09.9765868+00:00"
+    },
+    {
+      "name": "frontend-build",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:27:09.9765868+00:00",
+      "completedUtc": "2026-07-15T06:27:29.0943747+00:00"
+    },
+    {
+      "name": "tauri-cargo-check",
+      "status": "PASS",
+      "startedUtc": "2026-07-15T06:27:29.0943747+00:00",
+      "completedUtc": "2026-07-15T06:31:19.1091457+00:00"
+    }
+  ],
+  "frontendQualification": "Passed",
+  "liveLocalTestJourney": "RecordedSeparately",
+  "boundary": "Repository qualification does not substitute for database reset, visible UI login, governed smoke, audit inspection, support export, or non-author qualification."
+}
