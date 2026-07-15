@@ -1,8 +1,14 @@
 # CLN-31 Legacy Route Containment Receipt
 
+**Status:** Historical receipt
+
+**Date:** 15 July 2026
+
 ## Outcome
 
 Legacy workspace aliases have an executable inventory and redirect with a visible compatibility notice. Retained governance evidence deep links remain explicitly read-only with links back to canonical surfaces. Legacy labels are absent from primary navigation.
+
+The shared resolver is exercised for every unscoped alias plus project-scoped chat root, session, and encoded-channel paths. The notice retains the exact source-to-canonical transition instead of deriving its target from ambient browser state.
 
 ## Evidence
 

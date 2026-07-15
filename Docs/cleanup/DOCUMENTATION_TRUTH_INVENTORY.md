@@ -696,7 +696,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **664 f
 | `Docs/receipts/CLN_30_SHARED_TRUTH_RENDERERS.md` | CLN-30 Shared Truth Renderers Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/ux/SHARED_TRUTH_RENDERERS.md` | Shared Truth Renderers | Product and UX | `Canonical` | 2026-07-15 renderer, accessibility, visual-tone, and authority-boundary review | `None; current authority` | Keep aligned with design-system state primitives | Product and client |
 | `Docs/receipts/CLN_31_LEGACY_ROUTE_CONTAINMENT.md` | CLN-31 Legacy Route Containment Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
-| `Docs/ux/LEGACY_ROUTE_CONTAINMENT.md` | Legacy Route Containment | Product and UX | `Canonical` | Verified by CLN-31 route and navigation tests | `None; current authority` | Keep aligned with compatibility route handling | Product and client |
+| `Docs/ux/LEGACY_ROUTE_CONTAINMENT.md` | Legacy Route Containment | Product and UX | `Canonical` | 2026-07-15 alias inventory, resolver, identity-preservation, and notice review | `None; current authority` | Keep aligned with compatibility route handling | Product and client |
 
 ## Review Line
 
