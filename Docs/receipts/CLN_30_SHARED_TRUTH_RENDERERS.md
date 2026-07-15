@@ -1,8 +1,14 @@
 # CLN-30 Shared Truth Renderers Receipt
 
+**Status:** Historical receipt
+
+**Date:** 15 July 2026
+
 ## Outcome
 
 The Tauri design system has one authority-neutral renderer contract for all twelve required product truth states. Existing loading, error, and empty primitives delegate to it.
+
+Focused contract tests prove the alert/status role, live-region priority, and loading busy-state calculation used by the compiled component. The migrated primitives retain their existing layout classes; the shared renderer supplies common heading, test-ID, tone, and action hooks.
 
 ## Evidence
 

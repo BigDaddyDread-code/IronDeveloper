@@ -694,7 +694,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **662 f
 | `Docs/receipts/CLN_29_CANONICAL_ROUTE_INVENTORY.md` | CLN-29 Canonical Route Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/ux/CANONICAL_ROUTE_INVENTORY.md` | Canonical Route Inventory | Product and UX | `Canonical` | 2026-07-15 exact template, parser-kind, scope, and compatibility review | `None; current authority` | Keep aligned with product route inventory and tests | Product and client |
 | `Docs/receipts/CLN_30_SHARED_TRUTH_RENDERERS.md` | CLN-30 Shared Truth Renderers Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
-| `Docs/ux/SHARED_TRUTH_RENDERERS.md` | Shared Truth Renderers | Product and UX | `Canonical` | Verified by CLN-30 renderer contract | `None; current authority` | Keep aligned with design-system state primitives | Product and client |
+| `Docs/ux/SHARED_TRUTH_RENDERERS.md` | Shared Truth Renderers | Product and UX | `Canonical` | 2026-07-15 renderer, accessibility, visual-tone, and authority-boundary review | `None; current authority` | Keep aligned with design-system state primitives | Product and client |
 
 ## Review Line
 

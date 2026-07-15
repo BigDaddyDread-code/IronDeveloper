@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { truthStateDescriptors } from '../src/design-system/state/TruthStateRenderer';
+import { truthStateAccessibility, truthStateDescriptors } from '../src/design-system/state/TruthStateRenderer';
 
 test('shared renderer covers every cleanup truth state exactly once', () => {
   expect(Object.keys(truthStateDescriptors)).toEqual([
@@ -25,4 +25,9 @@ test('only failures interrupt assistive technology and loading stays explicitly 
     'apiUnreachable',
     'error'
   ]);
+
+  expect(truthStateAccessibility('loading')).toEqual({ role: 'status', live: 'polite', busy: true });
+  expect(truthStateAccessibility('apiUnreachable')).toEqual({ role: 'alert', live: 'assertive', busy: undefined });
+  expect(truthStateAccessibility('error')).toEqual({ role: 'alert', live: 'assertive', busy: undefined });
+  expect(truthStateAccessibility('empty')).toEqual({ role: 'status', live: 'polite', busy: undefined });
 });

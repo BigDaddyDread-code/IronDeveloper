@@ -1,8 +1,14 @@
 # Shared Truth Renderers
 
+**Status:** Canonical client presentation contract
+
+**Last reviewed:** 15 July 2026
+
+**Programme slice:** CLN-30
+
 `TruthStateRenderer` is the Tauri shell's common presentation primitive for backend-derived state. It covers authentication required, API unreachable, tenant required, project required, readiness, governed refusal, not implemented, loading, empty, error, stale data, and partial data.
 
-The renderer owns labels, visual tone, stable test identity, and live-region behavior. It does not fetch data, infer scope, calculate readiness, interpret evidence as approval, or decide whether an action is permitted. Callers supply the title, message, and any already-authorized action from their existing backend contract.
+The renderer owns labels, visual tone, stable test identity, heading structure, busy state, and live-region behavior. Assertive failure states render as alerts; non-interrupting states render as status regions; only loading is marked busy. It does not fetch data, infer scope, calculate readiness, interpret evidence as approval, or decide whether an action is permitted. Callers supply the title, message, and any already-authorized action from their existing backend contract.
 
 `LoadingState`, `ErrorState`, and `EmptyState` now delegate to the shared renderer so existing call sites gain the contract without a broad screen rewrite. Further migrations should preserve each screen's backend-owned state machine and replace presentation only.
 

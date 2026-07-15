@@ -35,6 +35,21 @@ export const truthStateDescriptors: Record<TruthStateKind, TruthStateDescriptor>
   partialData: { eyebrow: 'Partial data', tone: 'warning', live: 'polite' }
 };
 
+export interface TruthStateAccessibility {
+  role: 'status' | 'alert';
+  live: 'polite' | 'assertive';
+  busy: true | undefined;
+}
+
+export function truthStateAccessibility(kind: TruthStateKind): TruthStateAccessibility {
+  const descriptor = truthStateDescriptors[kind];
+  return {
+    role: descriptor.live === 'assertive' ? 'alert' : 'status',
+    live: descriptor.live,
+    busy: kind === 'loading' ? true : undefined
+  };
+}
+
 interface TruthStateRendererProps {
   kind: TruthStateKind;
   title: string;
@@ -56,6 +71,7 @@ export function TruthStateRenderer({
   testId = `truth-state.${kind}`
 }: TruthStateRendererProps) {
   const descriptor = truthStateDescriptors[kind];
+  const accessibility = truthStateAccessibility(kind);
   const Heading = headingLevel === 2 ? 'h2' : 'h3';
   const classes = ['truth-state', `truth-state--${descriptor.tone}`, className].filter(Boolean).join(' ');
 
@@ -64,12 +80,14 @@ export function TruthStateRenderer({
       className={classes}
       data-state-kind={kind}
       data-testid={testId}
-      role={descriptor.live === 'assertive' ? 'alert' : 'status'}
-      aria-live={descriptor.live}
-      aria-busy={kind === 'loading' ? true : undefined}
+      role={accessibility.role}
+      aria-live={accessibility.live}
+      aria-busy={accessibility.busy}
     >
-      <p className="eyebrow">{descriptor.eyebrow}</p>
-      <Heading>{title}</Heading>
+      <div className="section-heading">
+        <p className="eyebrow">{descriptor.eyebrow}</p>
+        <Heading>{title}</Heading>
+      </div>
       <p>{body}</p>
       {action ? <div className="truth-state__action">{action}</div> : null}
     </section>
