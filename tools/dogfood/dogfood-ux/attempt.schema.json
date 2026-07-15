@@ -1,0 +1,557 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://irondev.local/schemas/dogfood-ux-attempt.schema.json",
+  "title": "IronDev DOGFOOD-UX Attempt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "recordKind",
+    "campaignId",
+    "attemptId",
+    "project",
+    "ironDevCommit",
+    "startedAtUtc",
+    "completedAtUtc",
+    "outcome",
+    "highestFindingSeverity",
+    "findingCounts",
+    "timing",
+    "counts",
+    "deviations",
+    "transitions",
+    "stageRatings",
+    "score",
+    "tinyCalcAcceptance"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "recordKind": {
+      "type": "string",
+      "enum": [
+        "AttemptEvidence",
+        "ValidationFixture"
+      ]
+    },
+    "campaignId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attemptId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ironDevCommit": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{7,40}$"
+    },
+    "startedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completedAtUtc": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "InProgress",
+        "Completed",
+        "CompletedWithWorkaround",
+        "Blocked"
+      ]
+    },
+    "highestFindingSeverity": {
+      "$ref": "#/$defs/severity"
+    },
+    "findingCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "p0",
+        "p1",
+        "p2",
+        "p3"
+      ],
+      "properties": {
+        "p0": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "p1": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "p2": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "p3": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "totalJourneySeconds",
+        "productWorkSeconds",
+        "governanceCeremonySeconds",
+        "archaeologyRecoverySeconds",
+        "averageTimeToNextMeaningfulActionSeconds",
+        "maximumTimeToNextMeaningfulActionSeconds",
+        "flowEfficiency"
+      ],
+      "properties": {
+        "totalJourneySeconds": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "productWorkSeconds": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "governanceCeremonySeconds": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "archaeologyRecoverySeconds": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "averageTimeToNextMeaningfulActionSeconds": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "maximumTimeToNextMeaningfulActionSeconds": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "flowEfficiency": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actions",
+        "backtracks",
+        "deadEnds",
+        "refusals",
+        "usefulRefusals",
+        "hiddenKnowledgeEvents",
+        "workarounds",
+        "directApiCalls",
+        "directSqlOperations",
+        "manualFilesystemOperations",
+        "undocumentedCommands"
+      ],
+      "properties": {
+        "actions": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "backtracks": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "deadEnds": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "refusals": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "usefulRefusals": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "hiddenKnowledgeEvents": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "workarounds": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "directApiCalls": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "directSqlOperations": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "manualFilesystemOperations": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "undocumentedCommands": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "deviations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/deviation"
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transition"
+      }
+    },
+    "stageRatings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/stageRating"
+      }
+    },
+    "score": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/score"
+        }
+      ]
+    },
+    "tinyCalcAcceptance": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/tinyCalcAcceptance"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "nonNegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "rating": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 7
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "None",
+        "P3",
+        "P2",
+        "P1",
+        "P0"
+      ]
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "SignIn",
+        "SelectTenantOrProject",
+        "CreateProject",
+        "CompleteSetup",
+        "ShapeWorkItem",
+        "StartRun",
+        "UnderstandRunOutput",
+        "ReviewCriticFindings",
+        "DispositionFindings",
+        "Approve",
+        "Continue",
+        "Apply",
+        "InspectGovernance",
+        "InspectAudit",
+        "RecoverFromFailure"
+      ]
+    },
+    "deviation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "occurrences",
+        "documentedBeforeUse",
+        "reason",
+        "findingId"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "DirectApi",
+            "DirectSql",
+            "ManualFilesystem",
+            "UndocumentedCommand",
+            "Other"
+          ]
+        },
+        "occurrences": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "documentedBeforeUse": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "findingId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timestampUtc",
+        "stage",
+        "currentScreen",
+        "operatorIntent",
+        "actionTaken",
+        "expectedOutcome",
+        "actualOutcome",
+        "timeToNextMeaningfulActionSeconds",
+        "nextActionVisible",
+        "nextActionKnownWithinFiveSeconds",
+        "backtrackRequired",
+        "helpKind",
+        "recoveryClassification",
+        "easeScore"
+      ],
+      "properties": {
+        "timestampUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "stage": {
+          "$ref": "#/$defs/stage"
+        },
+        "currentScreen": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operatorIntent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actionTaken": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedOutcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actualOutcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeToNextMeaningfulActionSeconds": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "nextActionVisible": {
+          "type": "boolean"
+        },
+        "nextActionKnownWithinFiveSeconds": {
+          "type": "boolean"
+        },
+        "backtrackRequired": {
+          "type": "boolean"
+        },
+        "helpKind": {
+          "type": "string",
+          "enum": [
+            "None",
+            "ContextualHelp",
+            "Documentation",
+            "HiddenKnowledge"
+          ]
+        },
+        "recoveryClassification": {
+          "type": "string",
+          "enum": [
+            "None",
+            "UsefulRefusal",
+            "UnhelpfulRefusal",
+            "DeadEnd"
+          ]
+        },
+        "easeScore": {
+          "$ref": "#/$defs/rating"
+        }
+      }
+    },
+    "stageRating": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "ease",
+        "flowClarity",
+        "helpUsefulness",
+        "bureaucracyFelt",
+        "confidence"
+      ],
+      "properties": {
+        "stage": {
+          "$ref": "#/$defs/stage"
+        },
+        "ease": {
+          "$ref": "#/$defs/rating"
+        },
+        "flowClarity": {
+          "$ref": "#/$defs/rating"
+        },
+        "helpUsefulness": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/rating"
+            }
+          ]
+        },
+        "bureaucracyFelt": {
+          "$ref": "#/$defs/rating"
+        },
+        "confidence": {
+          "$ref": "#/$defs/rating"
+        }
+      }
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskCompletion",
+        "noUndocumentedWorkaround",
+        "clearNextActions",
+        "usefulRecovery",
+        "efficientJourney",
+        "operatorConfidence",
+        "rawScore",
+        "severityCapApplied",
+        "finalScore",
+        "band"
+      ],
+      "properties": {
+        "taskCompletion": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "noUndocumentedWorkaround": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "clearNextActions": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "usefulRecovery": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "efficientJourney": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "operatorConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "rawScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "severityCapApplied": {
+          "type": "boolean"
+        },
+        "finalScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "band": {
+          "type": "string",
+          "enum": [
+            "Smooth",
+            "UsableWithMinorFriction",
+            "Difficult",
+            "SeriouslyObstructed",
+            "BrokenCorridor"
+          ]
+        }
+      }
+    },
+    "tinyCalcAcceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completedWithoutWorkaround",
+        "noP0OrP1",
+        "averageEaseAtLeastFive",
+        "noMajorStepBelowFour",
+        "averageFlowClarityAtLeastFive",
+        "helpUsefulnessAtLeastFiveWhenUsed",
+        "averageBureaucracyAtMostThree",
+        "averageConfidenceAtLeastFive",
+        "flowEfficiencyAtLeast075",
+        "zeroHiddenActions",
+        "eligibleToProceed"
+      ],
+      "properties": {
+        "completedWithoutWorkaround": {
+          "type": "boolean"
+        },
+        "noP0OrP1": {
+          "type": "boolean"
+        },
+        "averageEaseAtLeastFive": {
+          "type": "boolean"
+        },
+        "noMajorStepBelowFour": {
+          "type": "boolean"
+        },
+        "averageFlowClarityAtLeastFive": {
+          "type": "boolean"
+        },
+        "helpUsefulnessAtLeastFiveWhenUsed": {
+          "type": "boolean"
+        },
+        "averageBureaucracyAtMostThree": {
+          "type": "boolean"
+        },
+        "averageConfidenceAtLeastFive": {
+          "type": "boolean"
+        },
+        "flowEfficiencyAtLeast075": {
+          "type": "boolean"
+        },
+        "zeroHiddenActions": {
+          "type": "boolean"
+        },
+        "eligibleToProceed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

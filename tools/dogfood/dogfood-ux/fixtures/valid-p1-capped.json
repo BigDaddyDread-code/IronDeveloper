@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "1.0",
+  "recordKind": "ValidationFixture",
+  "campaignId": "validator-fixture",
+  "attemptId": "validator-fixture-p1-cap",
+  "project": "TinyCalc",
+  "ironDevCommit": "0000000",
+  "startedAtUtc": "2026-07-16T00:00:00Z",
+  "completedAtUtc": "2026-07-16T00:00:10Z",
+  "outcome": "Blocked",
+  "highestFindingSeverity": "P1",
+  "findingCounts": {
+    "p0": 0,
+    "p1": 1,
+    "p2": 0,
+    "p3": 0
+  },
+  "timing": {
+    "totalJourneySeconds": 10,
+    "productWorkSeconds": 10,
+    "governanceCeremonySeconds": 0,
+    "archaeologyRecoverySeconds": 0,
+    "averageTimeToNextMeaningfulActionSeconds": 3,
+    "maximumTimeToNextMeaningfulActionSeconds": 3,
+    "flowEfficiency": 1
+  },
+  "counts": {
+    "actions": 1,
+    "backtracks": 0,
+    "deadEnds": 0,
+    "refusals": 1,
+    "usefulRefusals": 1,
+    "hiddenKnowledgeEvents": 0,
+    "workarounds": 0,
+    "directApiCalls": 0,
+    "directSqlOperations": 0,
+    "manualFilesystemOperations": 0,
+    "undocumentedCommands": 0
+  },
+  "deviations": [],
+  "transitions": [
+    {
+      "timestampUtc": "2026-07-16T00:00:03Z",
+      "stage": "StartRun",
+      "currentScreen": "Work Item",
+      "operatorIntent": "Start a governed run.",
+      "actionTaken": "Selected Start run.",
+      "expectedOutcome": "Begin proposal generation.",
+      "actualOutcome": "A P1 refusal stopped the attempt and named the safe next action.",
+      "timeToNextMeaningfulActionSeconds": 3,
+      "nextActionVisible": true,
+      "nextActionKnownWithinFiveSeconds": true,
+      "backtrackRequired": false,
+      "helpKind": "None",
+      "recoveryClassification": "UsefulRefusal",
+      "easeScore": 7
+    }
+  ],
+  "stageRatings": [
+    {
+      "stage": "StartRun",
+      "ease": 7,
+      "flowClarity": 7,
+      "helpUsefulness": null,
+      "bureaucracyFelt": 1,
+      "confidence": 7
+    }
+  ],
+  "score": {
+    "taskCompletion": 0,
+    "noUndocumentedWorkaround": 20,
+    "clearNextActions": 15,
+    "usefulRecovery": 15,
+    "efficientJourney": 10,
+    "operatorConfidence": 10,
+    "rawScore": 70,
+    "severityCapApplied": true,
+    "finalScore": 59,
+    "band": "SeriouslyObstructed"
+  },
+  "tinyCalcAcceptance": {
+    "completedWithoutWorkaround": false,
+    "noP0OrP1": false,
+    "averageEaseAtLeastFive": true,
+    "noMajorStepBelowFour": true,
+    "averageFlowClarityAtLeastFive": true,
+    "helpUsefulnessAtLeastFiveWhenUsed": true,
+    "averageBureaucracyAtMostThree": true,
+    "averageConfidenceAtLeastFive": true,
+    "flowEfficiencyAtLeast075": true,
+    "zeroHiddenActions": true,
+    "eligibleToProceed": false
+  }
+}

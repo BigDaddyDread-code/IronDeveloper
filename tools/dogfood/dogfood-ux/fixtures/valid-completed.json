@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "1.0",
+  "recordKind": "ValidationFixture",
+  "campaignId": "validator-fixture",
+  "attemptId": "validator-fixture-completed",
+  "project": "TinyCalc",
+  "ironDevCommit": "0000000",
+  "startedAtUtc": "2026-07-16T00:00:00Z",
+  "completedAtUtc": "2026-07-16T00:00:40Z",
+  "outcome": "Completed",
+  "highestFindingSeverity": "None",
+  "findingCounts": {
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "p3": 0
+  },
+  "timing": {
+    "totalJourneySeconds": 40,
+    "productWorkSeconds": 30,
+    "governanceCeremonySeconds": 10,
+    "archaeologyRecoverySeconds": 0,
+    "averageTimeToNextMeaningfulActionSeconds": 3,
+    "maximumTimeToNextMeaningfulActionSeconds": 3,
+    "flowEfficiency": 1
+  },
+  "counts": {
+    "actions": 1,
+    "backtracks": 0,
+    "deadEnds": 0,
+    "refusals": 0,
+    "usefulRefusals": 0,
+    "hiddenKnowledgeEvents": 0,
+    "workarounds": 0,
+    "directApiCalls": 0,
+    "directSqlOperations": 0,
+    "manualFilesystemOperations": 0,
+    "undocumentedCommands": 0
+  },
+  "deviations": [],
+  "transitions": [
+    {
+      "timestampUtc": "2026-07-16T00:00:03Z",
+      "stage": "SignIn",
+      "currentScreen": "Sign in",
+      "operatorIntent": "Sign in through the visible product.",
+      "actionTaken": "Entered the documented account and selected Sign in.",
+      "expectedOutcome": "Open the project chooser.",
+      "actualOutcome": "The project chooser opened.",
+      "timeToNextMeaningfulActionSeconds": 3,
+      "nextActionVisible": true,
+      "nextActionKnownWithinFiveSeconds": true,
+      "backtrackRequired": false,
+      "helpKind": "None",
+      "recoveryClassification": "None",
+      "easeScore": 5
+    }
+  ],
+  "stageRatings": [
+    {
+      "stage": "SignIn",
+      "ease": 5,
+      "flowClarity": 5,
+      "helpUsefulness": null,
+      "bureaucracyFelt": 2,
+      "confidence": 5
+    }
+  ],
+  "score": {
+    "taskCompletion": 30,
+    "noUndocumentedWorkaround": 20,
+    "clearNextActions": 15,
+    "usefulRecovery": 15,
+    "efficientJourney": 10,
+    "operatorConfidence": 6.67,
+    "rawScore": 96.67,
+    "severityCapApplied": false,
+    "finalScore": 96.67,
+    "band": "Smooth"
+  },
+  "tinyCalcAcceptance": {
+    "completedWithoutWorkaround": true,
+    "noP0OrP1": true,
+    "averageEaseAtLeastFive": true,
+    "noMajorStepBelowFour": true,
+    "averageFlowClarityAtLeastFive": true,
+    "helpUsefulnessAtLeastFiveWhenUsed": true,
+    "averageBureaucracyAtMostThree": true,
+    "averageConfidenceAtLeastFive": true,
+    "flowEfficiencyAtLeast075": true,
+    "zeroHiddenActions": true,
+    "eligibleToProceed": true
+  }
+}
