@@ -40,7 +40,7 @@ public sealed class TicketsController : ControllerBase
     private readonly IChatHistoryService _chatHistory;
     private readonly IArtifactSourceReferenceService _sourceReferences;
     private readonly ICurrentTenantContext _tenant;
-    private readonly IProjectRunReadinessService? _runReadiness;
+    private readonly IProjectRunReadinessService _runReadiness;
 
     public TicketsController(
         ITicketService tickets,
@@ -62,7 +62,7 @@ public sealed class TicketsController : ControllerBase
         IChatHistoryService chatHistory,
         IArtifactSourceReferenceService sourceReferences,
         ICurrentTenantContext tenant,
-        IProjectRunReadinessService? runReadiness = null)
+        IProjectRunReadinessService runReadiness)
     {
         _tickets = tickets;
         _drafts = drafts;
@@ -750,12 +750,9 @@ public sealed class TicketsController : ControllerBase
     public async Task<BuildReadinessResult> EvaluateReadiness(int projectId, long ticketId, CancellationToken ct)
     {
         var result = await _readiness.EvaluateReadinessAsync(projectId, ticketId, ct).ConfigureAwait(false);
-        if (_runReadiness is not null)
-        {
-            ProjectWorkItemReadService.ApplyRunReadiness(
-                result,
-                await _runReadiness.EvaluateAsync(projectId, ct).ConfigureAwait(false));
-        }
+        ProjectWorkItemReadService.ApplyRunReadiness(
+            result,
+            await _runReadiness.EvaluateAsync(projectId, ct).ConfigureAwait(false));
         return result;
     }
 
