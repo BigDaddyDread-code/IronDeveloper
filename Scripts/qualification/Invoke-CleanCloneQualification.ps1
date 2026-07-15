@@ -3,6 +3,7 @@ param(
     [string]$RepositoryUrl,
     [string]$Ref = "main",
     [string]$EvidencePath,
+    [string]$ClonePath,
     [switch]$SkipFrontend,
     [switch]$KeepClone
 )
@@ -16,15 +17,31 @@ if ([string]::IsNullOrWhiteSpace($EvidencePath)) {
     $EvidencePath = Join-Path $sourceRoot "artifacts\qualification\clean-clone.json"
 }
 
-$cloneRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("irondev-clean-clone-" + [Guid]::NewGuid().ToString("N"))
+$cloneRoot = if ([string]::IsNullOrWhiteSpace($ClonePath)) {
+    Join-Path ([System.IO.Path]::GetTempPath()) ("irondev-clean-clone-" + [Guid]::NewGuid().ToString("N"))
+} else {
+    [System.IO.Path]::GetFullPath($ClonePath)
+}
+if (Test-Path -LiteralPath $cloneRoot) {
+    throw "Clean-clone target already exists: $cloneRoot"
+}
+
 $checks = [System.Collections.Generic.List[object]]::new()
 function Invoke-Check([string]$Name, [scriptblock]$Command) {
     $started = [DateTimeOffset]::UtcNow
-    & $Command
-    if ($LASTEXITCODE -ne 0) { throw "$Name failed with exit code $LASTEXITCODE." }
-    $checks.Add([ordered]@{ name = $Name; status = "PASS"; startedUtc = $started.ToString("O"); completedUtc = [DateTimeOffset]::UtcNow.ToString("O") })
+    try {
+        & $Command
+        if ($LASTEXITCODE -ne 0) { throw "$Name failed with exit code $LASTEXITCODE." }
+        $checks.Add([ordered]@{ name = $Name; status = "PASS"; startedUtc = $started.ToString("O"); completedUtc = [DateTimeOffset]::UtcNow.ToString("O") })
+    }
+    catch {
+        $checks.Add([ordered]@{ name = $Name; status = "FAIL"; startedUtc = $started.ToString("O"); completedUtc = [DateTimeOffset]::UtcNow.ToString("O"); detail = $_.Exception.Message })
+        throw
+    }
 }
 
+$result = "RepositoryQualificationFailed"
+$failure = $null
 try {
     Invoke-Check "clone" { git clone --quiet --no-tags $RepositoryUrl $cloneRoot }
     Invoke-Check "checkout" { git -C $cloneRoot checkout --quiet $Ref }
@@ -41,22 +58,34 @@ try {
         finally { Pop-Location }
     }
 
+    $result = if ($SkipFrontend) { "PartialRepositoryQualificationPassed" } else { "RepositoryQualificationPassed" }
+    Write-Host "PASS clean-clone repository qualification. Evidence: $EvidencePath"
+}
+catch {
+    $failure = $_.Exception.Message
+    throw
+}
+finally {
+    $checkedOutCommit = if (Test-Path -LiteralPath (Join-Path $cloneRoot ".git")) {
+        (& git -C $cloneRoot rev-parse HEAD 2>$null).Trim()
+    } else { $null }
     $evidence = [ordered]@{
         schemaVersion = 1
-        result = if ($SkipFrontend) { "PartialRepositoryQualificationPassed" } else { "RepositoryQualificationPassed" }
+        result = $result
         repositoryRef = $Ref
+        checkedOutCommit = $checkedOutCommit
         completedUtc = [DateTimeOffset]::UtcNow.ToString("O")
         checks = $checks
-        frontendQualification = if ($SkipFrontend) { "Skipped" } else { "Passed" }
+        frontendQualification = if ($SkipFrontend) { "Skipped" } elseif ($result -eq "RepositoryQualificationPassed") { "Passed" } else { "FailedOrIncomplete" }
         liveLocalTestJourney = "PendingManualQualification"
         boundary = "Repository qualification does not substitute for database reset, visible UI login, governed smoke, audit inspection, support export, or non-author qualification."
     }
+    if ($failure) { $evidence["failure"] = $failure }
     New-Item -ItemType Directory -Path (Split-Path -Parent $EvidencePath) -Force | Out-Null
     $evidence | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $EvidencePath -Encoding UTF8
-    Write-Host "PASS clean-clone repository qualification. Evidence: $EvidencePath"
-}
-finally {
     if (-not $KeepClone -and (Test-Path -LiteralPath $cloneRoot)) {
         Remove-Item -LiteralPath $cloneRoot -Recurse -Force -ErrorAction SilentlyContinue
+    } elseif (Test-Path -LiteralPath $cloneRoot) {
+        Write-Host "Clean clone retained at '$cloneRoot'."
     }
 }
