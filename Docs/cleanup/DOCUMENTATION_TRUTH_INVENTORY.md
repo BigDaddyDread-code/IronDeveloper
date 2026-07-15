@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **678 files** after CLN-38. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **680 files** after CLN-39. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **678 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 67 |
+| `Canonical` | 68 |
 | `Supporting` | 128 |
-| `HistoricalReceipt` | 427 |
+| `HistoricalReceipt` | 428 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **678** |
+| **Total** | **680** |
 
 ## Inventory
 
@@ -711,6 +711,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **678 f
 | `Docs/receipts/CLN_37_PACKAGE_DEPENDENCY_CLEANUP.md` | CLN-37 Package and Dependency Cleanup Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/ENVIRONMENT_CONFIGURATION_CONTRACT.md` | Environment Configuration Contract | Cleanup | `Canonical` | Startup configuration matrix by CLN-38 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Keep aligned with API startup validation | Operations and security |
 | `Docs/receipts/CLN_38_ENVIRONMENT_CONFIGURATION_CONTRACT.md` | CLN-38 Environment Configuration Contract Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/BOUNDED_OPERATIONAL_DIAGNOSTICS.md` | Bounded Operational Diagnostics | Cleanup | `Canonical` | Live health surface by CLN-39 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Keep aligned with backend health checks | Operations and support |
+| `Docs/receipts/CLN_39_BOUNDED_HEALTH_DIAGNOSTICS.md` | CLN-39 Bounded Health and Diagnostics Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 

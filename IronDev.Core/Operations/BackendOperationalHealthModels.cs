@@ -25,7 +25,14 @@ public enum BackendDependencyKind
     FailedWorkflowDiagnosisReport = 11,
     ApprovalGateDogfoodCorrelationReport = 12,
     AgentRunHealthSummary = 13,
-    ConfigurationPresence = 14
+    ConfigurationPresence = 14,
+    ModelProvider = 15,
+    VectorProvider = 16,
+    WorkspaceRoot = 17,
+    GitExecutable = 18,
+    DiskCapacity = 19,
+    MigrationState = 20,
+    BackgroundReindexState = 21
 }
 
 public enum BackendDependencyHealthStatus
@@ -166,6 +173,19 @@ public sealed record BackendOperationalHealthIssue
 
 public static class BackendOperationalHealthBoundaries
 {
+    public static IReadOnlyList<BackendDependencyKind> RequiredOperationalDiagnostics { get; } =
+    [
+        BackendDependencyKind.ApiProcess,
+        BackendDependencyKind.DatabaseConnection,
+        BackendDependencyKind.ModelProvider,
+        BackendDependencyKind.VectorProvider,
+        BackendDependencyKind.WorkspaceRoot,
+        BackendDependencyKind.GitExecutable,
+        BackendDependencyKind.DiskCapacity,
+        BackendDependencyKind.MigrationState,
+        BackendDependencyKind.BackgroundReindexState
+    ];
+
     public static IReadOnlyList<string> Warnings { get; } =
     [
         "Backend operational health report is read-only.",
@@ -179,6 +199,11 @@ public static class BackendOperationalHealthBoundaries
         "Report is not workflow execution.",
         "Report must not expose secrets or private reasoning."
     ];
+
+    public static BackendDependencyHealthStatus ClassifyUnverifiedDeclaredState(string? state) =>
+        string.IsNullOrWhiteSpace(state)
+            ? BackendDependencyHealthStatus.NotConfigured
+            : BackendDependencyHealthStatus.Degraded;
 }
 
 public sealed class BackendOperationalHealthValidator

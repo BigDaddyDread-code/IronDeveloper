@@ -37,17 +37,24 @@ public static class EnvironmentConfigurationContract
         if (ReadOptionalBoolean(settings, "Weaviate:Enabled", issues))
             Require(settings, "Weaviate:Endpoint", issues);
 
+        issues.AddRange(ValidateAiProvider(settings));
+
+        return new(profile, issues);
+    }
+
+    public static IReadOnlyList<EnvironmentConfigurationIssue> ValidateAiProvider(IReadOnlyDictionary<string, string?> settings)
+    {
+        var issues = new List<EnvironmentConfigurationIssue>();
         var aiProvider = Value(settings, "Ai:Provider");
         if (string.Equals(aiProvider, "OpenAI", StringComparison.OrdinalIgnoreCase))
             RequireEither(settings, ["Ai:ApiKey", "OPENAI_API_KEY"], "Ai:ApiKey", issues);
         else if (string.Equals(aiProvider, "LocalOpenAI", StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(aiProvider, "Custom", StringComparison.OrdinalIgnoreCase))
+                 string.Equals(aiProvider, "Ollama", StringComparison.OrdinalIgnoreCase))
             Require(settings, "Ai:BaseUrl", issues);
         else if (!string.IsNullOrWhiteSpace(aiProvider) && !string.Equals(aiProvider, "Fake", StringComparison.OrdinalIgnoreCase))
             issues.Add(new("Ai:Provider", "UnsupportedProviderConfiguration", "The configured AI provider is not supported."));
 
-        return new(profile, issues);
+        return issues;
     }
 
     public static IronDevEnvironmentProfile ResolveProfile(string? environmentName) => environmentName?.Trim().ToUpperInvariant() switch
