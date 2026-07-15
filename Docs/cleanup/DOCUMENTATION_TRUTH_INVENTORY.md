@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **670 files** after CLN-34. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **672 files** after CLN-35. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -20,14 +20,14 @@ This inventory classifies every tracked Markdown document under `Docs/`: **670 f
 
 | Status | Count |
 | --- | ---: |
-| `Canonical` | 65 |
+| `Canonical` | 66 |
 | `Supporting` | 126 |
-| `HistoricalReceipt` | 423 |
+| `HistoricalReceipt` | 424 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **670** |
+| **Total** | **672** |
 
 ## Inventory
 
@@ -703,6 +703,8 @@ This inventory classifies every tracked Markdown document under `Docs/`: **670 f
 | `Docs/ux/ACCESSIBILITY_RESILIENT_STATE_PASS.md` | Accessibility and Resilient State Pass | Product and UX | `Supporting` | Verified by CLN-33 automated shell tests | `Docs/product/IRONDEV_PRODUCT_UX_SPEC_V2_SYSTEM.md` | Re-run viewport and resilient-state coverage with UI changes | Product and client |
 | `Docs/cleanup/REFACTOR_CANDIDATE_INVENTORY.md` | Refactor Candidate Inventory | Cleanup | `Supporting` | Measured by CLN-34 | `Docs/product/IRONDEV_CLEANUP_AND_PRODUCT_COMPLETION_PLAN.md` | Re-measure before each service extraction | Architecture and maintainers |
 | `Docs/receipts/CLN_34_REFACTOR_CANDIDATE_INVENTORY.md` | CLN-34 Refactor Candidate Inventory Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
+| `Docs/cleanup/DUPLICATE_TRUTH_OWNERSHIP.md` | Duplicate Truth Ownership | Cleanup | `Canonical` | Verified by CLN-35 conformance tests | `None; current authority map` | Keep aligned with rule owners and deletion tests | Architecture and maintainers |
+| `Docs/receipts/CLN_35_DUPLICATE_TRUTH_OWNERSHIP.md` | CLN-35 Duplicate Truth Ownership Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 
 ## Review Line
 
