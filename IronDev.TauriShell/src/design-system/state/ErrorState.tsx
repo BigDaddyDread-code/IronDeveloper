@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { TruthStateRenderer } from './TruthStateRenderer';
 
 interface ErrorStateProps {
   title: string;
@@ -8,11 +9,12 @@ interface ErrorStateProps {
 
 export function ErrorState({ title, body, action }: ErrorStateProps) {
   return (
-    <div className="state-panel state-panel--error">
-      <p className="eyebrow">Needs attention</p>
-      <h3>{title}</h3>
-      <p>{body}</p>
-      {action}
-    </div>
+    <TruthStateRenderer
+      kind="error"
+      title={title}
+      body={body}
+      action={action}
+      className="state-panel state-panel--error"
+    />
   );
 }
