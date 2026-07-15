@@ -198,6 +198,7 @@ builder.Services.AddScoped<IArtifactSourceReferenceService, ArtifactSourceRefere
 builder.Services.AddScoped<IProjectProfileDetectionService, ProjectProfileDetectionService>();
 builder.Services.AddScoped<IProjectProfileService, ProjectProfileService>();
 builder.Services.AddScoped<IronDev.Core.Provisioning.IProjectProvisioningReadinessService, ProjectProvisioningReadinessService>();
+builder.Services.AddScoped<IronDev.Core.Provisioning.IProjectProvisioningActionService, ProjectProvisioningActionService>();
 builder.Services.AddScoped<ProjectDocumentService>();
 builder.Services.AddScoped<IProjectDocumentService>(services => services.GetRequiredService<ProjectDocumentService>());
 builder.Services.AddScoped<IProjectDocumentProcessingStateStore>(services => services.GetRequiredService<ProjectDocumentService>());

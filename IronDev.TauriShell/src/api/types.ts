@@ -2075,6 +2075,31 @@ export interface ProjectProvisioningReadinessUi {
   boundary: string;
 }
 
+export interface CodeIndexResultUi {
+  filesScanned: number;
+  filesAdded: number;
+  filesUpdated: number;
+  filesUnchanged: number;
+  filesSkipped: number;
+  storedFileCount: number;
+  directoryNotFound: boolean;
+  errorMessage?: string | null;
+  isEmpty: boolean;
+}
+
+export interface ProjectProvisioningActionResultUi {
+  allowed: boolean;
+  status: string;
+  reasonCode?: string | null;
+  message: string;
+  capability: string;
+  changed: boolean;
+  correlationId: string;
+  indexResult?: CodeIndexResultUi | null;
+  profile?: Record<string, unknown> | null;
+  readiness?: ProjectProvisioningReadinessUi | null;
+}
+
 // ── AFFORDANCE-1: planned surfaces refuse honestly ──
 
 /**

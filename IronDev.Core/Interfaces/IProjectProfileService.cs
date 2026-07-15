@@ -9,6 +9,10 @@ public interface IProjectProfileService
 {
     Task<ProjectProfile?> GetProjectProfileAsync(int projectId, CancellationToken ct = default);
     Task SaveProjectProfileAsync(ProjectProfile profile, CancellationToken ct = default);
+    Task<ProjectProfilePermissionUpdate?> SetBuilderApplyPermissionAsync(
+        int projectId,
+        bool enabled,
+        CancellationToken ct = default);
     
     Task<List<ProjectCommand>> GetProjectCommandsAsync(int projectId, CancellationToken ct = default);
     Task SaveProjectCommandAsync(ProjectCommand command, CancellationToken ct = default);
@@ -19,3 +23,5 @@ public interface IProjectProfileService
     
     Task<List<ProjectProfileOption>> GetOptionsByCategoryAsync(string category, CancellationToken ct = default);
 }
+
+public sealed record ProjectProfilePermissionUpdate(ProjectProfile Profile, bool Changed);

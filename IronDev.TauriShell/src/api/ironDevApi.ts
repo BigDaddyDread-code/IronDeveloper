@@ -74,6 +74,7 @@ import type {
   ProjectAuditExportFilters,
   ProjectGovernanceOverview,
   ProjectWorkItemReadModel,
+  ProjectProvisioningActionResultUi,
   ProjectProvisioningReadinessUi,
   ProjectDocument,
   ProjectDocumentProcessingResult,
@@ -1505,6 +1506,24 @@ class IronDevApiClient {
       method: 'GET',
       signal
     });
+  }
+
+  async indexProject(projectId: number, signal?: AbortSignal): Promise<ProjectProvisioningActionResultUi> {
+    return this.request<ProjectProvisioningActionResultUi>(`/api/projects/${projectId}/provisioning/code-index`, {
+      method: 'POST',
+      signal
+    });
+  }
+
+  async setBuilderWorkspacePermission(
+    projectId: number,
+    enabled: boolean,
+    signal?: AbortSignal
+  ): Promise<ProjectProvisioningActionResultUi> {
+    return this.request<ProjectProvisioningActionResultUi>(
+      `/api/projects/${projectId}/provisioning/builder-workspace-permission`,
+      { method: 'PUT', body: { enabled }, signal }
+    );
   }
 
   /** Confirming a command is a human decision entering stored truth — the wizard's pointed question answered. */

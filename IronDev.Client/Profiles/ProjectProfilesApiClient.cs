@@ -1,4 +1,6 @@
 using IronDev.Client.Http;
+using IronDev.Core.Interfaces;
+using IronDev.Core.Provisioning;
 using IronDev.Data.Models;
 
 namespace IronDev.Client.Profiles;
@@ -15,6 +17,20 @@ public sealed class ProjectProfilesApiClient : IronDevApiClientBase, IProjectPro
 
     public Task SaveProjectProfileAsync(ProjectProfile profile, CancellationToken ct = default) =>
         PostAsync<object>($"projects/{profile.ProjectId}/profile", profile, ct);
+
+    public async Task<ProjectProfilePermissionUpdate?> SetBuilderApplyPermissionAsync(
+        int projectId,
+        bool enabled,
+        CancellationToken ct = default)
+    {
+        var result = await PutAsync<ProjectProvisioningActionResult>(
+            $"projects/{projectId}/provisioning/builder-workspace-permission",
+            new { enabled },
+            ct);
+        return result.Profile is null
+            ? null
+            : new ProjectProfilePermissionUpdate(result.Profile, result.Changed);
+    }
 
     public Task<List<ProjectCommand>> GetProjectCommandsAsync(int projectId, CancellationToken ct = default) =>
         GetAsync<List<ProjectCommand>>($"projects/{projectId}/profile/commands", ct);

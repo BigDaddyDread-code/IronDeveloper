@@ -91,6 +91,37 @@ public sealed class ProjectProfileService : IProjectProfileService
         }, cancellationToken: ct));
     }
 
+    public async Task<ProjectProfilePermissionUpdate?> SetBuilderApplyPermissionAsync(
+        int projectId,
+        bool enabled,
+        CancellationToken ct = default)
+    {
+        // This is intentionally a one-field mutation. The setup corridor must never
+        // round-trip a full profile merely to grant or revoke Builder workspace writes.
+        const string sql = """
+            UPDATE dbo.ProjectProfiles
+            SET AllowBuilderApply = @Enabled,
+                UpdatedUtc = sysutcdatetime()
+            WHERE ProjectId = @ProjectId
+              AND TenantId = @TenantId
+              AND AllowBuilderApply <> @Enabled;
+
+            SELECT @@ROWCOUNT;
+
+            SELECT * FROM dbo.ProjectProfiles
+            WHERE ProjectId = @ProjectId AND TenantId = @TenantId;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        using var results = await connection.QueryMultipleAsync(new CommandDefinition(
+            sql,
+            new { ProjectId = projectId, TenantId = _tenant.TenantId, Enabled = enabled },
+            cancellationToken: ct));
+        var changed = await results.ReadSingleAsync<int>() > 0;
+        var profile = await results.ReadSingleOrDefaultAsync<ProjectProfile>();
+        return profile is null ? null : new ProjectProfilePermissionUpdate(profile, changed);
+    }
+
     public async Task<List<ProjectCommand>> GetProjectCommandsAsync(int projectId, CancellationToken ct = default)
     {
         const string sql = "SELECT * FROM dbo.ProjectCommands WHERE ProjectId = @ProjectId AND TenantId = @TenantId";

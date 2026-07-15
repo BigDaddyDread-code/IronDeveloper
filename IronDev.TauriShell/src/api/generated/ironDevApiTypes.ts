@@ -5996,7 +5996,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -7493,6 +7493,189 @@ export interface paths {
             };
         };
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/provisioning/code-index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectProvisioningActionResult"];
+                        "application/json": components["schemas"]["ProjectProvisioningActionResult"];
+                        "text/json": components["schemas"]["ProjectProvisioningActionResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedRefusalEnvelope"];
+                        "application/json": components["schemas"]["GovernedRefusalEnvelope"];
+                        "text/json": components["schemas"]["GovernedRefusalEnvelope"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedRefusalEnvelope"];
+                        "application/json": components["schemas"]["GovernedRefusalEnvelope"];
+                        "text/json": components["schemas"]["GovernedRefusalEnvelope"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedRefusalEnvelope"];
+                        "application/json": components["schemas"]["GovernedRefusalEnvelope"];
+                        "text/json": components["schemas"]["GovernedRefusalEnvelope"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedRefusalEnvelope"];
+                        "application/json": components["schemas"]["GovernedRefusalEnvelope"];
+                        "text/json": components["schemas"]["GovernedRefusalEnvelope"];
+                    };
+                };
+                /** @description Unprocessable Content */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedRefusalEnvelope"];
+                        "application/json": components["schemas"]["GovernedRefusalEnvelope"];
+                        "text/json": components["schemas"]["GovernedRefusalEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/provisioning/builder-workspace-permission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["BuilderWorkspacePermissionRequest"];
+                    "text/json": components["schemas"]["BuilderWorkspacePermissionRequest"];
+                    "application/*+json": components["schemas"]["BuilderWorkspacePermissionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectProvisioningActionResult"];
+                        "application/json": components["schemas"]["ProjectProvisioningActionResult"];
+                        "text/json": components["schemas"]["ProjectProvisioningActionResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedRefusalEnvelope"];
+                        "application/json": components["schemas"]["GovernedRefusalEnvelope"];
+                        "text/json": components["schemas"]["GovernedRefusalEnvelope"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedRefusalEnvelope"];
+                        "application/json": components["schemas"]["GovernedRefusalEnvelope"];
+                        "text/json": components["schemas"]["GovernedRefusalEnvelope"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedRefusalEnvelope"];
+                        "application/json": components["schemas"]["GovernedRefusalEnvelope"];
+                        "text/json": components["schemas"]["GovernedRefusalEnvelope"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["GovernedRefusalEnvelope"];
+                        "application/json": components["schemas"]["GovernedRefusalEnvelope"];
+                        "text/json": components["schemas"]["GovernedRefusalEnvelope"];
+                    };
+                };
+            };
+        };
         post?: never;
         delete?: never;
         options?: never;
@@ -12367,6 +12550,9 @@ export interface components {
             testDuration?: string | null;
             reconciliation?: components["schemas"]["BuildArchitectureReconciliation"];
         };
+        BuilderWorkspacePermissionRequest: {
+            enabled?: boolean | null;
+        };
         /** @enum {string} */
         ChatAuditSource: "NormalizedRows" | "TagsFallback" | "None";
         /** @enum {string} */
@@ -14690,6 +14876,18 @@ export interface components {
             /** Format: int32 */
             sortOrder?: number;
             isActive?: boolean;
+        };
+        ProjectProvisioningActionResult: {
+            allowed?: boolean;
+            status?: string | null;
+            reasonCode?: string | null;
+            message?: string | null;
+            capability?: string | null;
+            changed?: boolean;
+            correlationId?: string | null;
+            indexResult?: components["schemas"]["CodeIndexResult"];
+            profile?: components["schemas"]["ProjectProfile"];
+            readiness?: components["schemas"]["ProjectProvisioningReadiness"];
         };
         ProjectProvisioningReadiness: {
             /** Format: int32 */

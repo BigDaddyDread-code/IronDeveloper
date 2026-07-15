@@ -49,6 +49,9 @@ public static class ProvisioningActionKinds
     public const string ConfirmProjectProfile = "ConfirmProjectProfile";
     public const string RecheckSetup = "RecheckSetup";
     public const string ResolveAdditionalSetup = "ResolveAdditionalSetup";
+    public const string IndexProject = "IndexProject";
+    public const string EnableBuilderApply = "EnableBuilderApply";
+    public const string DisableBuilderApply = "DisableBuilderApply";
     public const string OpenBoard = "OpenBoard";
 
     public static string ForCheck(string code, bool blocking) => blocking
@@ -59,9 +62,65 @@ public static class ProvisioningActionKinds
             ProvisioningCheckCodes.TestCommand => ConfirmTestCommand,
             ProvisioningCheckCodes.ProjectProfile => ConfirmProjectProfile,
             ProvisioningCheckCodes.WorkTree => RecheckSetup,
+            ProvisioningCheckCodes.CodeIndex => IndexProject,
+            ProvisioningCheckCodes.BuilderApplyPermission => EnableBuilderApply,
             _ => ResolveAdditionalSetup
         }
         : None;
+}
+
+public static class ProjectSetupCapabilities
+{
+    public const string ManageProjectSafety = "project.setup.safety.manage";
+}
+
+public static class ProjectProvisioningActionStatuses
+{
+    public const string Succeeded = "Succeeded";
+    public const string ProjectNotFound = "ProjectNotFound";
+    public const string Forbidden = "Forbidden";
+    public const string MissingRepositoryPath = "MissingRepositoryPath";
+    public const string UnsafeRepositoryPath = "UnsafeRepositoryPath";
+    public const string MissingProjectProfile = "MissingProjectProfile";
+    public const string IndexFailed = "IndexFailed";
+}
+
+public static class ProjectProvisioningActionReasonCodes
+{
+    public const string ProjectNotFound = "project_setup_project_not_found";
+    public const string CapabilityRequired = "project_setup_safety_capability_required";
+    public const string RepositoryPathMissing = "project_setup_repository_path_missing";
+    public const string RepositoryPathUnsafe = "project_setup_repository_path_unsafe";
+    public const string ProjectProfileMissing = "project_setup_profile_missing";
+    public const string CodeIndexFailed = "project_setup_code_index_failed";
+}
+
+public sealed record ProjectProvisioningActionResult
+{
+    public bool Allowed { get; init; }
+    public string Status { get; init; } = string.Empty;
+    public string? ReasonCode { get; init; }
+    public string Message { get; init; } = string.Empty;
+    public string Capability { get; init; } = ProjectSetupCapabilities.ManageProjectSafety;
+    public bool Changed { get; init; }
+    public string CorrelationId { get; init; } = string.Empty;
+    public CodeIndexResult? IndexResult { get; init; }
+    public ProjectProfile? Profile { get; init; }
+    public ProjectProvisioningReadiness? Readiness { get; init; }
+}
+
+public interface IProjectProvisioningActionService
+{
+    Task<ProjectProvisioningActionResult> IndexProjectAsync(
+        int projectId,
+        int actorUserId,
+        CancellationToken cancellationToken = default);
+
+    Task<ProjectProvisioningActionResult> SetBuilderWorkspacePermissionAsync(
+        int projectId,
+        int actorUserId,
+        bool enabled,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>The spec's readiness blocker vocabulary (future-ux-product-spec §8.3).</summary>
@@ -397,7 +456,7 @@ public static class ProvisioningReadinessEvaluator
                     Name = "Code index",
                     State = ProvisioningCheckStates.Missing,
                     Evidence = "The project has never been indexed — the Builder's readiness gate will refuse to start a run.",
-                    Remedy = "Index it: POST /api/projects/{projectId}/code-index with body { \"directoryPath\": \"<the repo path>\" }.",
+                    Remedy = "Use Index project to index the configured source tree.",
                     Blocking = true
                 });
                 blocked.Add(ProvisioningBlockedStates.ProjectNotIndexed);
@@ -410,7 +469,7 @@ public static class ProvisioningReadinessEvaluator
                     Name = "Code index",
                     State = ProvisioningCheckStates.NeedsConfirmation,
                     Evidence = $"The code index is not ready: {(string.IsNullOrWhiteSpace(input.IndexingStatus) ? "no status recorded" : input.IndexingStatus)}.",
-                    Remedy = "Re-index: POST /api/projects/{projectId}/code-index with body { \"directoryPath\": \"<the repo path>\" }.",
+                    Remedy = "Use Index project to safely re-index the configured source tree.",
                     Blocking = true
                 });
                 blocked.Add(ProvisioningBlockedStates.ProjectNotIndexed);
@@ -454,7 +513,7 @@ public static class ProvisioningReadinessEvaluator
                     Name = "Builder apply permission",
                     State = ProvisioningCheckStates.NeedsConfirmation,
                     Evidence = "AllowBuilderApply is false on the stored profile — the Builder's readiness gate will refuse to start a run.",
-                    Remedy = "Deliberately enable it: GET /api/projects/{projectId}/profile, set allowBuilderApply=true, POST it back. This permits governed workspace writes only; critic review, dispositions, approval, and copy-only apply remain separate gates.",
+                    Remedy = "Deliberately enable governed Builder workspace writes. This does not approve or apply changes to the source repository.",
                     Blocking = true
                 });
                 blocked.Add(ProvisioningBlockedStates.BuilderApplyDisabled);
@@ -589,6 +648,9 @@ public static class ProvisioningReadinessEvaluator
         ProvisioningActionKinds.ConfirmTestCommand => "Confirm test command",
         ProvisioningActionKinds.ConfirmProjectProfile => "Confirm project structure",
         ProvisioningActionKinds.RecheckSetup => "Re-check setup",
+        ProvisioningActionKinds.IndexProject => "Index project",
+        ProvisioningActionKinds.EnableBuilderApply => "Enable governed Builder writes",
+        ProvisioningActionKinds.DisableBuilderApply => "Disable governed Builder writes",
         _ => "Complete required setup"
     };
 
