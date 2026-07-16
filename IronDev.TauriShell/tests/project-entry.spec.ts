@@ -108,7 +108,7 @@ test('ready project opens Board', async ({ page }) => {
 
   await expect(page.getByTestId('flow.shell')).toBeVisible();
   await expect(page.getByTestId('flow.board.columns')).toBeVisible();
-  await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Ready to run');
+  await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Ready for project work');
 });
 
 test('unready project opens Project Setup', async ({ page }) => {
@@ -259,7 +259,12 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
         seededLoginCheckResult: 'Passed',
         nextSafeAction: 'Sign in with the documented LocalTest credentials.',
         resetCommand: null,
-        detail: 'LocalTest front door is ready.'
+        detail: 'LocalTest front door is ready.',
+        sessionMode: 'SmokeSimulation',
+        sandboxApplyRequested: false,
+        sandboxApplyEnabled: false,
+        sandboxApplyRoot: null,
+        capabilities: ['SmokeSimulation']
       })
     })
   );

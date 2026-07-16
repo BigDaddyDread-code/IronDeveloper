@@ -158,7 +158,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             PrepareRestoredBookSellerSource(sampleCopy);
             GitInit(sampleCopy);
 
-            var expectedRunReadiness = new ExpectedProjectRunReadinessService();
+            var expectedApplyCapability = new ExpectedProjectApplyCapabilityService();
+            var expectedRunReadiness = new ExpectedProjectRunReadinessService(expectedApplyCapability);
 
             using var factory = Factory.WithWebHostBuilder(builder =>
             {
@@ -178,6 +179,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                     services.AddScoped<ISkeletonCriticReviewService, DeterministicCleanCriticReviewService>();
                     services.RemoveAll<IProjectRunReadinessService>();
                     services.AddSingleton<IProjectRunReadinessService>(expectedRunReadiness);
+                    services.RemoveAll<IProjectApplyCapabilityService>();
+                    services.AddSingleton<IProjectApplyCapabilityService>(expectedApplyCapability);
                 });
             });
 
@@ -185,6 +188,11 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             await AuthenticateAsync(client);
 
             var project = await CreateProjectAsync(client, sampleCopy);
+            expectedApplyCapability.ExpectProject(
+                project.Id,
+                ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(
+                    project.Id,
+                    "demo-baseline-single-project-apply-capability-v1"));
             expectedRunReadiness.ExpectProject(project.Id);
             using var reviewerClient = await CreateReviewerClientAsync(project.Id);
             var validateTicket = await CreateFixtureTicketAsync(client, project.Id, ValidateBookKey);
@@ -431,7 +439,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
             PrepareRestoredBookSellerSource(sampleCopy);
             GitInit(sampleCopy);
 
-            var expectedRunReadiness = new ExpectedProjectRunReadinessService();
+            var expectedApplyCapability = new ExpectedProjectApplyCapabilityService();
+            var expectedRunReadiness = new ExpectedProjectRunReadinessService(expectedApplyCapability);
 
             using var factory = Factory.WithWebHostBuilder(builder =>
             {
@@ -451,6 +460,8 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                     services.AddScoped<ISkeletonCriticReviewService, DemoAdvisoryCriticReviewService>();
                     services.RemoveAll<IProjectRunReadinessService>();
                     services.AddSingleton<IProjectRunReadinessService>(expectedRunReadiness);
+                    services.RemoveAll<IProjectApplyCapabilityService>();
+                    services.AddSingleton<IProjectApplyCapabilityService>(expectedApplyCapability);
                 });
             });
 
@@ -462,6 +473,11 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                 sampleCopy,
                 "BookSeller HERO-1",
                 "HERO-1 advisory finding disposition gate fixture.");
+            expectedApplyCapability.ExpectProject(
+                project.Id,
+                ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(
+                    project.Id,
+                    "hero-disposition-single-project-apply-capability-v1"));
             expectedRunReadiness.ExpectProject(project.Id);
             var ticket = await CreateFixtureTicketAsync(client, project.Id, BulkDiscountKey);
             ticketKinds[ticket.Id] = BulkDiscountKey;
