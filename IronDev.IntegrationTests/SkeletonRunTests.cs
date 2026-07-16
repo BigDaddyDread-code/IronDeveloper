@@ -254,7 +254,6 @@ public sealed class SkeletonRunTests
             "ManualCriticReviewRequest",
             "CriticReviewResult",
             "FindingDraft",
-            "RequestedVerdict",
             "RunCritic(",
             "RunCriticAsync",
             "RequestCriticReview",
