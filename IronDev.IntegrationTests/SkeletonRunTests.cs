@@ -1466,9 +1466,11 @@ public sealed class SkeletonRunTests
         // V2-FINAL-3 adds actor-aware apply and explicit recovery. Recovery can only
         // create a fresh attempt when durable stage evidence proves mutation was not
         // observed; it cannot approve, commit, push, release, or invent authority.
+        // DUX1-FIX-005B adds a second StartAsync overload carrying the explicit run
+        // purpose. It starts the same governed workflow and grants no new authority.
         CollectionAssert.AreEquivalent(new[]
         {
-            "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ContinueAsAsync", "ReviseAsync", "ApplyAsync",
+            "StartAsync", "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ContinueAsAsync", "ReviseAsync", "ApplyAsync",
             "ApplyAsAsync", "RecoverApplyAsync", "GetRunReportAsync"
         }, methods,
             "The skeleton contract exposes governed apply recovery without adding approve, promote, commit, push, release, or review-create authority.");
