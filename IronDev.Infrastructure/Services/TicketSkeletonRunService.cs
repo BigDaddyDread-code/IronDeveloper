@@ -1911,6 +1911,13 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 PackageSha256 = Payload(runEvent, "packageSha256"),
                 GroundTruthCheckCount = int.TryParse(Payload(runEvent, "groundTruthCheckCount"), out var checkCount) ? checkCount : 0,
                 GroundTruthMismatchCount = int.TryParse(Payload(runEvent, "groundTruthMismatchCount"), out var mismatchCount) ? mismatchCount : 0,
+                CriterionCount = int.TryParse(Payload(runEvent, "criterionCount"), out var criterionCount) ? criterionCount : 0,
+                CoveredCriterionCount = int.TryParse(Payload(runEvent, "coveredCriterionCount"), out var coveredCount) ? coveredCount : 0,
+                UncoveredCriterionCount = int.TryParse(Payload(runEvent, "uncoveredCriterionCount"), out var uncoveredCount) ? uncoveredCount : 0,
+                AuthoredTestCount = int.TryParse(Payload(runEvent, "authoredTestCount"), out var authoredCount) ? authoredCount : 0,
+                CoverageVerdictFloor = Payload(runEvent, "coverageVerdictFloor"),
+                ModelRequestedVerdict = Payload(runEvent, "modelRequestedVerdict"),
+                EffectiveVerdict = Payload(runEvent, "effectiveVerdict"),
                 ModelProvider = Payload(runEvent, "modelProvider"),
                 ModelName = Payload(runEvent, "modelName")
             })

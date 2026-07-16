@@ -229,6 +229,15 @@ public sealed record SkeletonRunCriticReviewTrace
     public int GroundTruthCheckCount { get; init; }
     public int GroundTruthMismatchCount { get; init; }
 
+    /// <summary>DUX1-FIX-005A: evidence-owned coverage adequacy and the verdict floor it imposed.</summary>
+    public int CriterionCount { get; init; }
+    public int CoveredCriterionCount { get; init; }
+    public int UncoveredCriterionCount { get; init; }
+    public int AuthoredTestCount { get; init; }
+    public string CoverageVerdictFloor { get; init; } = string.Empty;
+    public string ModelRequestedVerdict { get; init; } = string.Empty;
+    public string EffectiveVerdict { get; init; } = string.Empty;
+
     /// <summary>AG-2: which model reviewed — a catch-rate is meaningless without knowing which configured critic was measured.</summary>
     public string ModelProvider { get; init; } = string.Empty;
     public string ModelName { get; init; } = string.Empty;

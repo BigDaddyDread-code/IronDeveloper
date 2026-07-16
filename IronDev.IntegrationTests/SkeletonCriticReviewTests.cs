@@ -315,6 +315,151 @@ public sealed class SkeletonCriticReviewTests
     // ── P1-2: the verifier itself, against real evidence ─────────────────────
 
     [TestMethod]
+    public async Task ReviewAsync_AllCriteriaUncovered_RecommendBlockWithDeterministicFindingAndEventEvidence()
+    {
+        var criteria =
+            "- percentage 25 200 returns 50\n" +
+            "- invalid numeric input returns a clear error\n" +
+            "- negative percentages are supported\n" +
+            "- automated tests cover the behavior";
+        using var harness = CriticHarness.Create(
+            llmResponse: () => "{\"verdict\":\"NoObjection\",\"findings\":[]}",
+            packageCriteria: criteria,
+            authoredTests: []);
+
+        var outcome = await harness.Service.ReviewAsync(Request());
+
+        Assert.IsTrue(outcome!.Succeeded, outcome.FailureReason);
+        Assert.AreEqual("RecommendBlock", outcome.Verdict);
+        var coverageFinding = outcome.Findings.Single(finding => finding.Title == "Acceptance criteria have no test evidence");
+        Assert.AreEqual("High", coverageFinding.Severity);
+        Assert.IsTrue(coverageFinding.BlocksMerge);
+        StringAssert.Contains(coverageFinding.Problem, "0 of 4 acceptance criteria");
+        Assert.AreEqual(0, outcome.GroundTruth!.Mismatches.Count,
+            "An honest 0/4 matrix passes integrity while coverage inadequacy still becomes a finding.");
+
+        var recorded = harness.Events.Single("SkeletonCriticReviewRecorded");
+        Assert.AreEqual("4", recorded.Payload["criterionCount"]);
+        Assert.AreEqual("0", recorded.Payload["coveredCriterionCount"]);
+        Assert.AreEqual("4", recorded.Payload["uncoveredCriterionCount"]);
+        Assert.AreEqual("0", recorded.Payload["authoredTestCount"]);
+        Assert.AreEqual("RecommendBlock", recorded.Payload["coverageVerdictFloor"]);
+        Assert.AreEqual("NoObjection", recorded.Payload["modelRequestedVerdict"]);
+        Assert.AreEqual("RecommendBlock", recorded.Payload["effectiveVerdict"]);
+    }
+
+    [TestMethod]
+    public async Task ReviewAsync_SomeCriteriaUncovered_ForbidsCleanVerdict()
+    {
+        var criteria = "- criterion one\n- criterion two\n- criterion three\n- criterion four";
+        using var harness = CriticHarness.Create(
+            packageCriteria: criteria,
+            authoredTests:
+            [
+                AuthoredTest("tests/One.cs", "criterion one"),
+                AuthoredTest("tests/Two.cs", "criterion two")
+            ]);
+
+        var outcome = await harness.Service.ReviewAsync(Request());
+
+        Assert.AreEqual("RequestChanges", outcome!.Verdict);
+        Assert.IsTrue(outcome.Findings.Any(finding =>
+            finding.Title == "Acceptance criteria lack complete test evidence" && !finding.BlocksMerge));
+        var recorded = harness.Events.Single("SkeletonCriticReviewRecorded");
+        Assert.AreEqual("2", recorded.Payload["coveredCriterionCount"]);
+        Assert.AreEqual("2", recorded.Payload["uncoveredCriterionCount"]);
+        Assert.AreEqual("RequestChanges", recorded.Payload["coverageVerdictFloor"]);
+    }
+
+    [TestMethod]
+    public async Task ReviewAsync_AllCriteriaCovered_AllowsCleanVerdict()
+    {
+        var criteria = "- criterion one\n- criterion two\n- criterion three\n- criterion four";
+        using var harness = CriticHarness.Create(
+            packageCriteria: criteria,
+            authoredTests:
+            [
+                AuthoredTest("tests/One.cs", "criterion one"),
+                AuthoredTest("tests/Two.cs", "criterion two"),
+                AuthoredTest("tests/Three.cs", "criterion three"),
+                AuthoredTest("tests/Four.cs", "criterion four")
+            ]);
+
+        var outcome = await harness.Service.ReviewAsync(Request());
+
+        Assert.AreEqual("NoObjection", outcome!.Verdict);
+        Assert.AreEqual(0, outcome.Findings.Count);
+        var recorded = harness.Events.Single("SkeletonCriticReviewRecorded");
+        Assert.AreEqual("4", recorded.Payload["coveredCriterionCount"]);
+        Assert.AreEqual("0", recorded.Payload["uncoveredCriterionCount"]);
+        Assert.AreEqual("NoObjection", recorded.Payload["coverageVerdictFloor"]);
+    }
+
+    [TestMethod]
+    public async Task ReviewAsync_ForgedCoverageMismatch_AlsoRetainsCoverageAdequacyFinding()
+    {
+        using var harness = CriticHarness.Create(
+            packageCriteria: "A requested criterion",
+            authoredTests: [],
+            recordedCoverage:
+            [
+                new SkeletonCriterionCoverage
+                {
+                    Criterion = "A requested criterion",
+                    Covered = true,
+                    CoveringTests = ["tests/Phantom.cs"]
+                }
+            ],
+            groundTruth: () => new SkeletonGroundTruthVerification
+            {
+                Checks =
+                [
+                    new SkeletonGroundTruthCheck
+                    {
+                        CheckName = SkeletonCriticGroundTruthVerifier.CriterionCoverageCheck,
+                        Passed = false,
+                        Expected = "the recomputed coverage matrix",
+                        Actual = "a forged covered row",
+                        Detail = "The recorded matrix disagrees with recomputation.",
+                        BlocksMerge = true
+                    }
+                ]
+            });
+
+        var outcome = await harness.Service.ReviewAsync(Request());
+
+        Assert.AreEqual("RecommendBlock", outcome!.Verdict);
+        Assert.IsTrue(outcome.Findings.Any(finding => finding.Title.StartsWith("Ground truth mismatch", StringComparison.Ordinal)));
+        Assert.IsTrue(outcome.Findings.Any(finding => finding.Title == "Acceptance criteria have no test evidence"));
+    }
+
+    [TestMethod]
+    public async Task ReviewAsync_NoCriteriaParsed_ForbidsCleanVerdict()
+    {
+        using var harness = CriticHarness.Create(packageCriteria: "  ", authoredTests: []);
+
+        var outcome = await harness.Service.ReviewAsync(Request());
+
+        Assert.AreEqual("RequestChanges", outcome!.Verdict);
+        Assert.IsTrue(outcome.Findings.Any(finding => finding.Title == "Acceptance criteria could not be parsed"));
+        var recorded = harness.Events.Single("SkeletonCriticReviewRecorded");
+        Assert.AreEqual("0", recorded.Payload["criterionCount"]);
+        Assert.AreEqual("RequestChanges", recorded.Payload["coverageVerdictFloor"]);
+    }
+
+    [TestMethod]
+    public async Task ReviewAsync_ModelRecommendBlockWithoutBlockingFinding_IsRejectedByExistingValidation()
+    {
+        using var harness = CriticHarness.Create(
+            llmResponse: () => "{\"verdict\":\"RecommendBlock\",\"findings\":[]}");
+
+        var outcome = await harness.Service.ReviewAsync(Request());
+
+        Assert.IsFalse(outcome!.Succeeded);
+        StringAssert.Contains(outcome.FailureReason, "review-only validation");
+    }
+
+    [TestMethod]
     public async Task Verifier_PackageHash_ComparedToTheHaltAnnouncement()
     {
         var events = new RecordingEventStore();
@@ -700,6 +845,13 @@ public sealed class SkeletonCriticReviewTests
         RequestedByUserId = "user-9"
     };
 
+    private static SkeletonAuthoredTest AuthoredTest(string relativePath, string criterion) => new()
+    {
+        RelativePath = relativePath,
+        Content = "public class CoverageTest { }",
+        CoversCriterion = criterion
+    };
+
     private static SkeletonGroundTruthVerification AllChecksPass() => new()
     {
         Checks =
@@ -724,7 +876,9 @@ public sealed class SkeletonCriticReviewTests
             Func<string>? llmResponse = null,
             bool writePackage = true,
             Func<SkeletonGroundTruthVerification>? groundTruth = null,
-            string packageCriteria = "Catalog sorts by title ascending")
+            string packageCriteria = "Catalog sorts by title ascending",
+            IReadOnlyList<SkeletonAuthoredTest>? authoredTests = null,
+            IReadOnlyList<SkeletonCriterionCoverage>? recordedCoverage = null)
         {
             var evidenceRoot = Path.Combine(Path.GetTempPath(), $"irondev-critic-{Guid.NewGuid():N}");
             var packageHash = string.Empty;
@@ -751,20 +905,16 @@ public sealed class SkeletonCriticReviewTests
                             IsNewFile = true
                         }
                     ],
-                    AuthoredTests =
+                    AuthoredTests = authoredTests ??
                     [
-                        new SkeletonAuthoredTest
-                        {
-                            RelativePath = "tests/skeleton/SortTests.cs",
-                            Content = "public class SortTests { }",
-                            CoversCriterion = "Catalog sorts by title ascending"
-                        }
+                        AuthoredTest("tests/skeleton/SortTests.cs", "Catalog sorts by title ascending")
                     ],
                     WorkspaceRunSucceeded = true
                 };
                 package = package with
                 {
-                    CriterionCoverage = SkeletonCriterionCoverageCalculator.Compute(package.AcceptanceCriteria, package.AuthoredTests)
+                    CriterionCoverage = recordedCoverage ??
+                        SkeletonCriterionCoverageCalculator.Compute(package.AcceptanceCriteria, package.AuthoredTests)
                 };
 
                 var packageDir = Path.Combine(evidenceRoot, "runs", RunId, "evidence");

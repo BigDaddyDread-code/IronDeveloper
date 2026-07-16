@@ -16609,6 +16609,17 @@ export interface components {
             groundTruthCheckCount?: number;
             /** Format: int32 */
             groundTruthMismatchCount?: number;
+            /** Format: int32 */
+            criterionCount?: number;
+            /** Format: int32 */
+            coveredCriterionCount?: number;
+            /** Format: int32 */
+            uncoveredCriterionCount?: number;
+            /** Format: int32 */
+            authoredTestCount?: number;
+            coverageVerdictFloor?: string | null;
+            modelRequestedVerdict?: string | null;
+            effectiveVerdict?: string | null;
             modelProvider?: string | null;
             modelName?: string | null;
         };

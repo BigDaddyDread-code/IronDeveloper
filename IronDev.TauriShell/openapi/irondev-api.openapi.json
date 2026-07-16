@@ -33958,6 +33958,34 @@
             "type": "integer",
             "format": "int32"
           },
+          "criterionCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "coveredCriterionCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "uncoveredCriterionCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "authoredTestCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "coverageVerdictFloor": {
+            "type": "string",
+            "nullable": true
+          },
+          "modelRequestedVerdict": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveVerdict": {
+            "type": "string",
+            "nullable": true
+          },
           "modelProvider": {
             "type": "string",
             "nullable": true
