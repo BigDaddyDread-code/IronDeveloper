@@ -53,7 +53,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private readonly ISkeletonAgentProfileService _agentProfiles;
     private readonly SkeletonRunDriftDetector _driftDetector;
     private readonly IConfiguration _configuration;
-    private readonly IProjectRunReadinessService? _runReadiness;
+    private readonly IProjectRunReadinessService _runReadiness;
 
     public TicketSkeletonRunService(
         ITicketService tickets,
@@ -70,7 +70,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         IProjectMembershipService projectMemberships,
         ISkeletonAgentProfileService agentProfiles,
         IConfiguration configuration,
-        IProjectRunReadinessService? runReadiness = null)
+        IProjectRunReadinessService runReadiness)
     {
         _tickets = tickets;
         _projects = projects;
@@ -100,12 +100,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         if (project is null)
             return null;
 
-        if (_runReadiness is not null)
-        {
-            var readiness = await _runReadiness.EvaluateAsync(projectId, cancellationToken).ConfigureAwait(false);
-            if (!readiness.ReadyToRun)
-                throw new ProjectRunReadinessBlockedException(readiness);
-        }
+        var readiness = await _runReadiness.EvaluateAsync(projectId, cancellationToken).ConfigureAwait(false);
+        if (!readiness.ReadyToRun)
+            throw new ProjectRunReadinessBlockedException(readiness);
 
         var run = await _runs.CreateAsync(new CreateRunRequest
         {
