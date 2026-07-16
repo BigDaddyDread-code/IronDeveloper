@@ -5,6 +5,7 @@ using IronDev.Api.Services;
 using IronDev.Core.Agents;
 using IronDev.Infrastructure.Builder;
 using IronDev.Core.AiConnections;
+using IronDev.Core.RunReadiness;
 using IronDev.Infrastructure.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
@@ -37,6 +38,7 @@ public sealed class AiConnectionContractTests
         Assert.AreEqual("https://api.openai.com", connection.ControlledEndpoint);
         Assert.IsTrue(connection.CredentialConfigured);
         Assert.AreEqual("Configured", connection.CredentialStatus);
+        CollectionAssert.AreEqual(new[] { ProjectRunPurposes.ProjectFeatureWork }, connection.SupportedPurposes.ToArray());
         CollectionAssert.Contains(connection.AvailableModels.ToArray(), "gpt-4o");
         StringAssert.Contains(connection.Boundary, "never returned");
         Assert.IsFalse(json.Contains(secret, StringComparison.OrdinalIgnoreCase), "Credential values must never be returned.");
@@ -75,8 +77,11 @@ public sealed class AiConnectionContractTests
 
         Assert.AreEqual("fake", connections.Single(connection => connection.Id == "deployment-default").ProviderKind);
         var deterministic = connections.Single(connection => connection.Id == "localtest-deterministic");
+        Assert.AreEqual("LocalTest deterministic smoke", deterministic.DisplayName);
         Assert.AreEqual("alpha-smoke-deterministic", deterministic.ProviderKind);
         Assert.AreEqual("Not required", deterministic.CredentialStatus);
+        CollectionAssert.AreEqual(new[] { ProjectRunPurposes.SmokeSimulation }, deterministic.SupportedPurposes.ToArray());
+        Assert.AreEqual("Fixed fixture · does not implement project work", deterministic.PurposeDescription);
         CollectionAssert.Contains(deterministic.AvailableModels.ToArray(), "localtest-deterministic");
     }
 

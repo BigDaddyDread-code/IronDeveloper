@@ -12,6 +12,8 @@ test('settings shows tenant AI connection metadata without credential material',
         controlledEndpoint: 'https://api.openai.com',
         credentialConfigured: true,
         credentialStatus: 'Configured',
+        supportedPurposes: ['ProjectFeatureWork'],
+        purposeDescription: 'Executable provider for project feature work',
         lastSuccessfulTestUtc: null,
         lastFailedTestUtc: null,
         availableModels: ['gpt-4o'],
@@ -24,7 +26,7 @@ test('settings shows tenant AI connection metadata without credential material',
         createdUtc: null,
         updatedByUserId: 7,
         updatedUtc: null,
-        version: 'IronDev AI Connection Contract 2.5.0',
+        version: 'IronDev AI Connection Contract 2.6.0',
         boundary: 'AI connection metadata is non-secret. Credential values are write-only and never returned by this endpoint.'
       }
     ]
@@ -46,6 +48,39 @@ test('settings shows tenant AI connection metadata without credential material',
   await expect(page.locator('body')).not.toContainText('api_key');
 });
 
+test('settings separates the LocalTest smoke fixture from project-work connections', async ({ page }) => {
+  await mockWorkspace(page, {
+    connections: [
+      {
+        id: 'deployment-default', tenantId: 3, displayName: 'Deployment default', providerKind: 'openai',
+        controlledEndpointId: 'deployment-default-openai', controlledEndpoint: 'https://api.openai.com',
+        credentialConfigured: true, credentialStatus: 'Configured', supportedPurposes: ['ProjectFeatureWork'],
+        purposeDescription: 'Executable provider for project feature work', availableModels: ['gpt-4o'], enabled: true,
+        tenantAvailable: true, projectAvailable: true, createdByUserId: 0, updatedByUserId: 7,
+        version: 'IronDev AI Connection Contract 2.6.0', boundary: 'Non-secret metadata.'
+      },
+      {
+        id: 'localtest-deterministic', tenantId: 3, displayName: 'LocalTest deterministic smoke',
+        providerKind: 'alpha-smoke-deterministic', controlledEndpointId: 'localtest-deterministic',
+        controlledEndpoint: 'localtest:deterministic-model-words', credentialConfigured: true,
+        credentialStatus: 'Not required', supportedPurposes: ['SmokeSimulation'],
+        purposeDescription: 'Fixed fixture · does not implement project work', availableModels: ['localtest-deterministic'],
+        enabled: true, tenantAvailable: true, projectAvailable: true, createdByUserId: 0, updatedByUserId: 0,
+        version: 'IronDev AI Connection Contract 2.6.0', boundary: 'Non-secret metadata.'
+      }
+    ]
+  });
+
+  await page.goto('/projects/7/library/settings/ai-connections');
+
+  await expect(page.getByTestId('flow.settings.aiConnections.count')).toContainText('1 project-work · 1 smoke fixture');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.1')).toContainText('LocalTest deterministic smoke');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.1.purposeDescription')).toHaveText('Fixed fixture · does not implement project work');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.1.availability')).toHaveText('Smoke only');
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.1.credentialInput')).toHaveCount(0);
+  await expect(page.getByTestId('flow.settings.aiConnections.connection.1.test')).toHaveText('Test smoke fixture');
+});
+
 test('settings stores and revokes AI credentials without rendering the secret', async ({ page }) => {
   const secret = 'local-provider-credential-value';
   await mockWorkspace(page, {
@@ -59,6 +94,8 @@ test('settings stores and revokes AI credentials without rendering the secret', 
         controlledEndpoint: 'https://api.openai.com',
         credentialConfigured: false,
         credentialStatus: 'Missing',
+        supportedPurposes: ['ProjectFeatureWork'],
+        purposeDescription: 'Executable provider for project feature work',
         lastSuccessfulTestUtc: null,
         lastFailedTestUtc: null,
         availableModels: ['gpt-4o'],
@@ -71,7 +108,7 @@ test('settings stores and revokes AI credentials without rendering the secret', 
         createdUtc: null,
         updatedByUserId: 7,
         updatedUtc: null,
-        version: 'IronDev AI Connection Contract 2.5.0',
+        version: 'IronDev AI Connection Contract 2.6.0',
         boundary: 'Credential values are accepted only on write, stored protected, and never returned by API responses.'
       }
     ]
@@ -118,9 +155,10 @@ test('settings tests a controlled connection and renders durable health truth', 
       id: 'deployment-default', tenantId: 3, displayName: 'Deployment default', providerKind: 'openai',
       controlledEndpointId: 'deployment-default-openai', controlledEndpoint: 'https://api.openai.com',
       credentialConfigured: true, credentialStatus: 'Configured', lastSuccessfulTestUtc: null, lastFailedTestUtc: null,
+      supportedPurposes: ['ProjectFeatureWork'], purposeDescription: 'Executable provider for project feature work',
       availableModels: ['gpt-4o'], enabled: true, tenantAvailable: true, projectAvailable: true,
       credentialRotatedUtc: null, credentialRevokedUtc: null, createdByUserId: 0, createdUtc: null,
-      updatedByUserId: 7, updatedUtc: null, version: 'IronDev AI Connection Contract 2.5.0',
+      updatedByUserId: 7, updatedUtc: null, version: 'IronDev AI Connection Contract 2.6.0',
       boundary: 'Credential values are never returned.'
     }]
   });

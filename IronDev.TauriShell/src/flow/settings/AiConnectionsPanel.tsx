@@ -42,6 +42,12 @@ export function AiConnectionsPanel() {
     );
   }
 
+  const projectWorkCount = connections.filter((connection) =>
+    connection.supportedPurposes.includes('ProjectFeatureWork')).length;
+  const smokeOnlyCount = connections.filter((connection) =>
+    connection.supportedPurposes.includes('SmokeSimulation') &&
+    !connection.supportedPurposes.includes('ProjectFeatureWork')).length;
+
   return (
     <section className="fl-panel-box" data-testid="flow.settings.aiConnections" aria-labelledby="ai-connections-heading">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
@@ -57,7 +63,9 @@ export function AiConnectionsPanel() {
             data-testid="flow.settings.aiConnections.openAgents"
           >Open project agent profiles</button>
           <StatusBadge status={connections.length === 0 ? 'warning' : 'ready'} data-testid="flow.settings.aiConnections.count">
-            {connections.length === 0 ? 'None configured' : `${connections.length} available`}
+            {connections.length === 0
+              ? 'None configured'
+              : `${connections.length} available · ${projectWorkCount} project-work · ${smokeOnlyCount} smoke fixture`}
           </StatusBadge>
         </div>
       </div>
@@ -119,6 +127,8 @@ function ConnectionRow({
   onTest: () => Promise<string | null>;
 }) {
   const availability = connection.enabled && connection.tenantAvailable && connection.projectAvailable;
+  const supportsProjectWork = connection.supportedPurposes.includes('ProjectFeatureWork');
+  const smokeOnly = connection.supportedPurposes.includes('SmokeSimulation') && !supportsProjectWork;
   const models = connection.availableModels.length === 0 ? 'No models returned' : connection.availableModels.join(', ');
   const [credential, setCredential] = useState('');
   const [reason, setReason] = useState('');
@@ -205,18 +215,25 @@ function ConnectionRow({
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
         <div>
           <strong>{connection.displayName}</strong>
+          <p className="fl-empty" style={{ marginTop: 2 }} data-testid={`flow.settings.aiConnections.connection.${index}.purposeDescription`}>
+            {connection.purposeDescription}
+          </p>
           <p className="fl-empty" style={{ marginTop: 2 }} data-testid={`flow.settings.aiConnections.connection.${index}.version`}>
             {connection.version}
           </p>
         </div>
-        <StatusBadge status={availability ? 'ready' : 'warning'} data-testid={`flow.settings.aiConnections.connection.${index}.availability`}>
-          {availability ? 'Available' : 'Unavailable'}
+        <StatusBadge status={availability && supportsProjectWork ? 'ready' : 'warning'} data-testid={`flow.settings.aiConnections.connection.${index}.availability`}>
+          {smokeOnly ? 'Smoke only' : availability ? 'Project work' : 'Unavailable'}
         </StatusBadge>
       </div>
 
       <dl className="fl-kv" style={{ marginTop: 10 }}>
         <dt>Provider</dt>
         <dd style={{ margin: 0 }} data-testid={`flow.settings.aiConnections.connection.${index}.provider`}>{connection.providerKind}</dd>
+        <dt>Supported use</dt>
+        <dd style={{ margin: 0 }} data-testid={`flow.settings.aiConnections.connection.${index}.purposes`}>
+          {connection.supportedPurposes.length === 0 ? 'None' : connection.supportedPurposes.join(', ')}
+        </dd>
         <dt>Controlled endpoint</dt>
         <dd style={{ margin: 0 }} data-testid={`flow.settings.aiConnections.connection.${index}.endpoint`}>{connection.controlledEndpoint}</dd>
         <dt>Credential</dt>
@@ -234,56 +251,77 @@ function ConnectionRow({
       </dl>
 
       <div style={{ display: 'grid', gap: 8, marginTop: 10 }} data-testid={`flow.settings.aiConnections.connection.${index}.credentialActions`}>
-        <label className="fl-plabel" style={{ marginTop: 0 }} htmlFor={`ai-credential-${index}`}>
-          Credential
-        </label>
-        <input
-          id={`ai-credential-${index}`}
-          type="password"
-          value={credential}
-          onChange={(event) => setCredential(event.target.value)}
-          placeholder={connection.credentialConfigured ? 'Replace credential' : 'Enter credential'}
-          data-testid={`flow.settings.aiConnections.connection.${index}.credentialInput`}
-        />
-        <label className="fl-plabel" style={{ marginTop: 0 }} htmlFor={`ai-credential-reason-${index}`}>
-          Reason
-        </label>
-        <input
-          id={`ai-credential-reason-${index}`}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          placeholder="Optional lifecycle note"
-          data-testid={`flow.settings.aiConnections.connection.${index}.reason`}
-        />
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            className="fl-btn fl-pri"
-            type="button"
-            disabled={busy !== null || credential.trim().length === 0}
-            onClick={() => void configure()}
-            data-testid={`flow.settings.aiConnections.connection.${index}.saveCredential`}
-          >
-            {busy === 'configure' ? 'Saving...' : connection.credentialConfigured ? 'Replace credential' : 'Save credential'}
-          </button>
-          <button
-            className="fl-btn"
-            type="button"
-            disabled={busy !== null || !availability}
-            onClick={() => void testConnection()}
-            data-testid={`flow.settings.aiConnections.connection.${index}.test`}
-          >
-            {busy === 'test' ? 'Testing...' : 'Test connection'}
-          </button>
-          <button
-            className="fl-btn"
-            type="button"
-            disabled={busy !== null}
-            onClick={() => void revoke()}
-            data-testid={`flow.settings.aiConnections.connection.${index}.revokeCredential`}
-          >
-            {busy === 'revoke' ? 'Revoking...' : 'Revoke credential'}
-          </button>
-        </div>
+        {smokeOnly ? (
+          <>
+            <p className="fl-empty" style={{ marginTop: 0 }}>
+              This fixed fixture can test the governed workflow only. It cannot be configured as a project-working model.
+            </p>
+            <div>
+              <button
+                className="fl-btn"
+                type="button"
+                disabled={busy !== null || !availability}
+                onClick={() => void testConnection()}
+                data-testid={`flow.settings.aiConnections.connection.${index}.test`}
+              >
+                {busy === 'test' ? 'Testing smoke fixture...' : 'Test smoke fixture'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="fl-plabel" style={{ marginTop: 0 }} htmlFor={`ai-credential-${index}`}>
+              Credential
+            </label>
+            <input
+              id={`ai-credential-${index}`}
+              type="password"
+              value={credential}
+              onChange={(event) => setCredential(event.target.value)}
+              placeholder={connection.credentialConfigured ? 'Replace credential' : 'Enter credential'}
+              data-testid={`flow.settings.aiConnections.connection.${index}.credentialInput`}
+            />
+            <label className="fl-plabel" style={{ marginTop: 0 }} htmlFor={`ai-credential-reason-${index}`}>
+              Reason
+            </label>
+            <input
+              id={`ai-credential-reason-${index}`}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Optional lifecycle note"
+              data-testid={`flow.settings.aiConnections.connection.${index}.reason`}
+            />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="fl-btn fl-pri"
+                type="button"
+                disabled={busy !== null || credential.trim().length === 0}
+                onClick={() => void configure()}
+                data-testid={`flow.settings.aiConnections.connection.${index}.saveCredential`}
+              >
+                {busy === 'configure' ? 'Saving...' : connection.credentialConfigured ? 'Replace credential' : 'Save credential'}
+              </button>
+              <button
+                className="fl-btn"
+                type="button"
+                disabled={busy !== null || !availability}
+                onClick={() => void testConnection()}
+                data-testid={`flow.settings.aiConnections.connection.${index}.test`}
+              >
+                {busy === 'test' ? 'Testing...' : 'Test connection'}
+              </button>
+              <button
+                className="fl-btn"
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void revoke()}
+                data-testid={`flow.settings.aiConnections.connection.${index}.revokeCredential`}
+              >
+                {busy === 'revoke' ? 'Revoking...' : 'Revoke credential'}
+              </button>
+            </div>
+          </>
+        )}
         {message ? <p className="fl-empty" data-testid={`flow.settings.aiConnections.connection.${index}.message`}>{message}</p> : null}
         {error ? <div className="fl-error" data-testid={`flow.settings.aiConnections.connection.${index}.error`}>{error}</div> : null}
       </div>

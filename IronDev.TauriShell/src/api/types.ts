@@ -1944,6 +1944,8 @@ export interface AiConnectionMetadata {
   controlledEndpoint: string;
   credentialConfigured: boolean;
   credentialStatus: string;
+  supportedPurposes: string[];
+  purposeDescription: string;
   lastSuccessfulTestUtc?: string | null;
   lastFailedTestUtc?: string | null;
   availableModels: string[];

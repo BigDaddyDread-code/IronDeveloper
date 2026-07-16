@@ -90,7 +90,30 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _runReadiness = runReadiness;
     }
 
-    public async Task<TicketBuildRunDto?> StartAsync(int projectId, long ticketId, CancellationToken cancellationToken = default)
+    public Task<TicketBuildRunDto?> StartAsync(
+        int projectId,
+        long ticketId,
+        CancellationToken cancellationToken = default) =>
+        StartForPurposeAsync(projectId, ticketId, ProjectRunPurposes.ProjectFeatureWork, cancellationToken);
+
+    public Task<TicketBuildRunDto?> StartAsync(
+        int projectId,
+        long ticketId,
+        SkeletonRunStartRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!ProjectRunPurposes.IsSupported(request.Purpose))
+            throw new ArgumentOutOfRangeException(nameof(request), request.Purpose, "Unknown governed run purpose.");
+
+        return StartForPurposeAsync(projectId, ticketId, request.Purpose, cancellationToken);
+    }
+
+    private async Task<TicketBuildRunDto?> StartForPurposeAsync(
+        int projectId,
+        long ticketId,
+        string runPurpose,
+        CancellationToken cancellationToken)
     {
         var ticket = await _tickets.GetTicketByIdAsync(ticketId, cancellationToken).ConfigureAwait(false);
         if (ticket is null || ticket.ProjectId != projectId)
@@ -100,7 +123,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         if (project is null)
             return null;
 
-        var readiness = await _runReadiness.EvaluateAsync(projectId, cancellationToken).ConfigureAwait(false);
+        var readiness = await _runReadiness.EvaluateForPurposeAsync(projectId, runPurpose, cancellationToken).ConfigureAwait(false);
         if (!readiness.ReadyToRun)
             throw new ProjectRunReadinessBlockedException(readiness);
 
@@ -109,12 +132,17 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             ProjectId = projectId,
             TicketId = ticketId,
             IsDisposable = true,
-            Summary = $"Skeleton run created for ticket {ticketId}."
+            Summary = runPurpose == ProjectRunPurposes.SmokeSimulation
+                ? $"Workflow smoke simulation created for ticket {ticketId}."
+                : $"Skeleton run created for ticket {ticketId}."
         }, cancellationToken).ConfigureAwait(false);
 
-        await PublishAsync(run.RunId, "RunStarted", $"Skeleton run started for ticket {ticketId}.", projectId, ticketId, new Dictionary<string, string>
+        await PublishAsync(run.RunId, "RunStarted", runPurpose == ProjectRunPurposes.SmokeSimulation
+            ? $"Workflow smoke simulation started for ticket {ticketId}."
+            : $"Skeleton run started for ticket {ticketId}.", projectId, ticketId, new Dictionary<string, string>
         {
             ["status"] = RunLifecycleState.Created.ToString(),
+            ["runPurpose"] = runPurpose,
             ["currentNode"] = "SkeletonRun"
         }, cancellationToken).ConfigureAwait(false);
 

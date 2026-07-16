@@ -66,6 +66,51 @@ test('Work Item names numeric backend agent roles and opens the project repair c
   await expect(page).toHaveURL(/\/projects\/7\/library\/settings\/agents$/);
 });
 
+test('Work Item separates project-work configuration from an explicit workflow smoke run', async ({ page }) => {
+  await mockWorkspace(page);
+  let requestedPurpose = '';
+  await page.route('**/irondev-api/api/projects/7/tickets/42/skeleton-runs', async (route) => {
+    requestedPurpose = (route.request().postDataJSON() as { purpose?: string }).purpose ?? '';
+    return json(route, {
+      runId: 'smoke-run-42', projectId: 7, ticketId: 42, status: 'PausedForApproval',
+      currentNode: 'SkeletonRun', requiresHumanApproval: true, message: 'Workflow smoke simulation completed.'
+    });
+  });
+  await mockProjectWorkItem(page, {
+    primaryActionKind: 'ConfigureRunAgents',
+    primaryActionLabel: 'Configure project-work connection',
+    primaryActionAllowed: false,
+    runReadiness: {
+      projectId: 7,
+      requiredPurpose: 'ProjectFeatureWork',
+      projectSetupReady: true,
+      executionReady: false,
+      readyToRun: false,
+      state: 'RunConfigurationRequired',
+      blockedCount: 4,
+      blockers: [[4, 'Analyst'], [1, 'Builder'], [2, 'Tester'], [3, 'Critic']].map(([role]) => ({
+        role,
+        effectiveProvider: 'alpha-smoke-deterministic',
+        effectiveModel: 'localtest-deterministic',
+        connectionId: 'localtest-deterministic',
+        sourceLayer: 'Project',
+        reasonCode: 'RunAgentConnectionPurposeMismatch',
+        reason: 'LocalTest deterministic is a fixed smoke-test connection. It can exercise the governed workflow, but it cannot implement this Work Item. Configure an executable project-work connection to continue.',
+        nextSafeAction: 'Configure an executable project-work connection.'
+      }))
+    }
+  });
+
+  await page.goto('/projects/7/work-items/42');
+
+  await expect(page.getByTestId('flow.workItem.runReadiness')).toContainText('cannot implement this Work Item');
+  await expect(page.getByTestId('flow.workItem.configureProjectWorkConnection')).toHaveText('Configure project-work connection');
+  await expect(page.getByTestId('flow.workItem.runWorkflowSmoke')).toHaveText('Run workflow smoke test');
+  await page.getByTestId('flow.workItem.runWorkflowSmoke').click();
+  await expect.poll(() => requestedPurpose).toBe('SmokeSimulation');
+  await expect(page.getByText(/fixed LocalTest fixture/)).toBeVisible();
+});
+
 test('Work Item projection failure offers retry and never reconstructs lifecycle truth', async ({ page }) => {
   await mockWorkspace(page);
   let attempts = 0;

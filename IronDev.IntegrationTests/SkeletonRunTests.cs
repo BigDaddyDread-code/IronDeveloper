@@ -74,6 +74,36 @@ public sealed class SkeletonRunTests
     }
 
     [TestMethod]
+    public async Task StartAsync_ExplicitWorkflowSmoke_UsesSmokeReadinessAndRecordsPurpose()
+    {
+        var readiness = new RecordingPurposeRunReadinessService(ReadyRunReadiness());
+        var harness = SkeletonHarness.Create(runReadiness: readiness);
+
+        var result = await harness.Service.StartAsync(ProjectId, TicketId, new SkeletonRunStartRequest
+        {
+            Purpose = ProjectRunPurposes.SmokeSimulation
+        });
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual(ProjectRunPurposes.SmokeSimulation, readiness.LastRequiredPurpose);
+        var started = harness.Events.Single("RunStarted");
+        Assert.AreEqual(ProjectRunPurposes.SmokeSimulation, started.Payload["runPurpose"]);
+        StringAssert.Contains(started.Message, "smoke simulation");
+    }
+
+    [TestMethod]
+    public async Task StartAsync_UnknownPurpose_FailsBeforeCreatingRun()
+    {
+        var harness = SkeletonHarness.Create();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            harness.Service.StartAsync(ProjectId, TicketId, new SkeletonRunStartRequest { Purpose = "PretendWork" }));
+
+        Assert.AreEqual(0, (await harness.Runs.GetRecentAsync()).Count);
+        Assert.AreEqual(0, (await harness.Events.GetRecentRunIdsAsync()).Count);
+    }
+
+    [TestMethod]
     public async Task StartAsync_MissingProjectPath_BlocksExplicitly()
     {
         var harness = SkeletonHarness.Create(localPath: null);
@@ -1436,9 +1466,11 @@ public sealed class SkeletonRunTests
         // V2-FINAL-3 adds actor-aware apply and explicit recovery. Recovery can only
         // create a fresh attempt when durable stage evidence proves mutation was not
         // observed; it cannot approve, commit, push, release, or invent authority.
+        // DUX1-FIX-005B adds a second StartAsync overload carrying the explicit run
+        // purpose. It starts the same governed workflow and grants no new authority.
         CollectionAssert.AreEquivalent(new[]
         {
-            "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ContinueAsAsync", "ReviseAsync", "ApplyAsync",
+            "StartAsync", "StartAsync", "GetCriticPackageAsync", "ContinueAsync", "ContinueAsAsync", "ReviseAsync", "ApplyAsync",
             "ApplyAsAsync", "RecoverApplyAsync", "GetRunReportAsync"
         }, methods,
             "The skeleton contract exposes governed apply recovery without adding approve, promote, commit, push, release, or review-create authority.");
@@ -1596,6 +1628,23 @@ public sealed class SkeletonRunTests
     {
         public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
             Task.FromResult(readiness);
+    }
+
+    private sealed class RecordingPurposeRunReadinessService(ProjectRunReadiness readiness) : IProjectRunReadinessService
+    {
+        public string LastRequiredPurpose { get; private set; } = string.Empty;
+
+        public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
+            EvaluateForPurposeAsync(projectId, ProjectRunPurposes.ProjectFeatureWork, cancellationToken);
+
+        public Task<ProjectRunReadiness> EvaluateForPurposeAsync(
+            int projectId,
+            string requiredPurpose,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequiredPurpose = requiredPurpose;
+            return Task.FromResult(readiness with { RequiredPurpose = requiredPurpose });
+        }
     }
 
     private static ProjectRunReadiness ReadyRunReadiness() => new()

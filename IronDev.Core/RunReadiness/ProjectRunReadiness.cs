@@ -17,10 +17,19 @@ public static class ProjectRunReadinessReasonCodes
     public const string RunAgentConnectionDisabled = "RunAgentConnectionDisabled";
     public const string RunAgentConnectionUnavailableForTenant = "RunAgentConnectionUnavailableForTenant";
     public const string RunAgentConnectionUnavailableForProject = "RunAgentConnectionUnavailableForProject";
+    public const string RunAgentConnectionPurposeMismatch = "RunAgentConnectionPurposeMismatch";
     public const string RunAgentCredentialMissing = "RunAgentCredentialMissing";
     public const string RunAgentProviderUnsupported = "RunAgentProviderUnsupported";
     public const string RunAgentProviderNotExecutable = "RunAgentProviderNotExecutable";
     public const string RunAgentModelMissing = "RunAgentModelMissing";
+}
+
+public static class ProjectRunPurposes
+{
+    public const string SmokeSimulation = "SmokeSimulation";
+    public const string ProjectFeatureWork = "ProjectFeatureWork";
+
+    public static bool IsSupported(string purpose) => purpose is SmokeSimulation or ProjectFeatureWork;
 }
 
 public static class ProjectRunProviders
@@ -75,6 +84,7 @@ public sealed record ProjectRunReadiness
         "It starts no run, publishes no profile, changes no credential, and grants no authority.";
 
     public int ProjectId { get; init; }
+    public string RequiredPurpose { get; init; } = ProjectRunPurposes.ProjectFeatureWork;
     public bool ProjectSetupReady { get; init; }
     public bool ExecutionReady { get; init; }
     public bool ReadyToRun { get; init; }
@@ -90,6 +100,17 @@ public sealed record ProjectRunReadiness
 public interface IProjectRunReadinessService
 {
     Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default);
+
+    Task<ProjectRunReadiness> EvaluateForPurposeAsync(
+        int projectId,
+        string requiredPurpose,
+        CancellationToken cancellationToken = default)
+    {
+        if (!string.Equals(requiredPurpose, ProjectRunPurposes.ProjectFeatureWork, StringComparison.Ordinal))
+            throw new NotSupportedException($"Run purpose '{requiredPurpose}' is not supported by this readiness service.");
+
+        return EvaluateAsync(projectId, cancellationToken);
+    }
 }
 
 public sealed class ProjectRunReadinessBlockedException(ProjectRunReadiness readiness)

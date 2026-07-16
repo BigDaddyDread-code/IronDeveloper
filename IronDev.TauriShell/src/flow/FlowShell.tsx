@@ -570,6 +570,7 @@ export function FlowShell() {
             onBackToBoard={() => openProjectBoard()}
             onOpenGovernanceLibrary={() => navigateProductPath(libraryPath(activeProjectId, 'governance'))}
             onConfigureRunAgents={() => navigateProductPath(settingsPath(activeProjectId, 'agents'))}
+            onConfigureProjectWorkConnection={() => navigateProductPath(settingsPath(activeProjectId, 'aiConnections'))}
             onDiscussInChat={(sessionId) => navigateProductPath(
               sessionId ? chatSessionPath(activeProjectId, sessionId) : projectPath(activeProjectId, 'chat')
             )}

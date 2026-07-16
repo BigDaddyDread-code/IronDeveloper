@@ -29,6 +29,7 @@ interface WorkItemScreenProps {
   onOpenGovernanceLibrary: () => void;
   onDiscussInChat: (sessionId?: number | null) => void;
   onConfigureRunAgents: () => void;
+  onConfigureProjectWorkConnection: () => void;
 }
 
 interface DiscussionEntry {
@@ -137,7 +138,8 @@ export function WorkItemScreen({
   onBackToBoard,
   onOpenGovernanceLibrary,
   onDiscussInChat,
-  onConfigureRunAgents
+  onConfigureRunAgents,
+  onConfigureProjectWorkConnection
 }: WorkItemScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
@@ -574,7 +576,7 @@ export function WorkItemScreen({
     [session.client, project.selectedProjectId, ticket]
   );
 
-  const startBuildRun = useCallback(async () => {
+  const startRun = useCallback(async (purpose: 'ProjectFeatureWork' | 'SmokeSimulation') => {
     if (project.selectedProjectId === null || ticket?.id === undefined || isStartingRun) {
       return;
     }
@@ -582,9 +584,12 @@ export function WorkItemScreen({
     setErrorMessage(null);
     setGateNotice(null);
     try {
-      const started = await session.client.startSkeletonRun(project.selectedProjectId, ticket.id);
+      const started = await session.client.startSkeletonRun(project.selectedProjectId, ticket.id, purpose);
       setRun(started);
       setStage('build');
+      if (purpose === 'SmokeSimulation') {
+        setGateNotice('Workflow smoke test started with the fixed LocalTest fixture. This run exercises the governed corridor; it does not implement the Work Item.');
+      }
       await refreshRunEvidence(started);
       await refreshWorkItemProjection(undefined, false);
     } catch (error: unknown) {
@@ -593,6 +598,16 @@ export function WorkItemScreen({
       setIsStartingRun(false);
     }
   }, [project.selectedProjectId, ticket, isStartingRun, session.client, refreshRunEvidence, refreshWorkItemProjection]);
+
+  const startBuildRun = useCallback(
+    () => startRun('ProjectFeatureWork'),
+    [startRun]
+  );
+
+  const startWorkflowSmokeRun = useCallback(
+    () => startRun('SmokeSimulation'),
+    [startRun]
+  );
 
   const requestCriticReview = useCallback(async () => {
     if (project.selectedProjectId === null || ticket?.id === undefined || run === null || busyAction !== null) {
@@ -868,9 +883,31 @@ export function WorkItemScreen({
               ))}
             </ul>
           </div>
-          <button className="fl-btn fl-pri" type="button" onClick={onConfigureRunAgents} data-testid="flow.workItem.configureRunAgents">
-            Configure run agents
-          </button>
+          {workItem.runReadiness.blockers?.some((blocker) => blocker.reasonCode === 'RunAgentConnectionPurposeMismatch') ? (
+            <div className="fl-actions">
+              <button
+                className="fl-btn fl-pri"
+                type="button"
+                onClick={onConfigureProjectWorkConnection}
+                data-testid="flow.workItem.configureProjectWorkConnection"
+              >
+                Configure project-work connection
+              </button>
+              <button
+                className="fl-btn"
+                type="button"
+                disabled={isStartingRun}
+                onClick={() => void startWorkflowSmokeRun()}
+                data-testid="flow.workItem.runWorkflowSmoke"
+              >
+                {isStartingRun ? 'Starting smoke test...' : 'Run workflow smoke test'}
+              </button>
+            </div>
+          ) : (
+            <button className="fl-btn fl-pri" type="button" onClick={onConfigureRunAgents} data-testid="flow.workItem.configureRunAgents">
+              Configure run agents
+            </button>
+          )}
         </section>
       ) : null}
 

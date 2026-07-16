@@ -1,6 +1,7 @@
 using System.Text.Json;
 using IronDev.Core.Agents;
 using IronDev.Core.AiConnections;
+using IronDev.Core.RunReadiness;
 using IronDev.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -137,6 +138,8 @@ public sealed class AgentConfigurationPackContractTests : IDisposable
                     ControlledEndpoint = "provider-default:openai",
                     CredentialConfigured = true,
                     CredentialStatus = "Configured",
+                    SupportedPurposes = [ProjectRunPurposes.ProjectFeatureWork],
+                    PurposeDescription = "Executable provider for project feature work",
                     Enabled = enabled,
                     TenantAvailable = enabled,
                     ProjectAvailable = enabled,

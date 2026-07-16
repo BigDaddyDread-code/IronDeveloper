@@ -1,7 +1,13 @@
 using IronDev.Core.Builder;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Workflow;
 
 namespace IronDev.Core.Interfaces;
+
+public sealed record SkeletonRunStartRequest
+{
+    public string Purpose { get; init; } = ProjectRunPurposes.ProjectFeatureWork;
+}
 
 /// <summary>
 /// Phase 0 walking-skeleton orchestrator: chains services that already exist
@@ -21,6 +27,23 @@ public interface ITicketSkeletonRunService
 {
     /// <summary>Starts a skeleton run. Returns null when the ticket does not belong to the project.</summary>
     Task<TicketBuildRunDto?> StartAsync(int projectId, long ticketId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Starts a skeleton run for an explicit supported purpose. Implementations that do not own
+    /// purpose-aware readiness fail closed for anything other than normal project feature work.
+    /// </summary>
+    Task<TicketBuildRunDto?> StartAsync(
+        int projectId,
+        long ticketId,
+        SkeletonRunStartRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!string.Equals(request.Purpose, ProjectRunPurposes.ProjectFeatureWork, StringComparison.Ordinal))
+            throw new NotSupportedException($"Run purpose '{request.Purpose}' is not supported by this run service.");
+
+        return StartAsync(projectId, ticketId, cancellationToken);
+    }
 
     /// <summary>
     /// Reads the critic review package a completed skeleton run prepared. Read-only:

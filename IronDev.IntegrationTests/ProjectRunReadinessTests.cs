@@ -17,6 +17,7 @@ public sealed class ProjectRunReadinessTests
         AssertCode(ProjectRunReadinessReasonCodes.RunAgentConnectionDisabled, [Profile()], [Connection(enabled: false)]);
         AssertCode(ProjectRunReadinessReasonCodes.RunAgentConnectionUnavailableForTenant, [Profile()], [Connection(tenantAvailable: false)]);
         AssertCode(ProjectRunReadinessReasonCodes.RunAgentConnectionUnavailableForProject, [Profile()], [Connection(projectAvailable: false)]);
+        AssertCode(ProjectRunReadinessReasonCodes.RunAgentConnectionPurposeMismatch, [Profile()], [Connection(supportedPurposes: [ProjectRunPurposes.SmokeSimulation])]);
         AssertCode(ProjectRunReadinessReasonCodes.RunAgentCredentialMissing, [Profile(provider: "openai")], [Connection(provider: "openai", credentialConfigured: false)]);
         AssertCode(ProjectRunReadinessReasonCodes.RunAgentProviderUnsupported, [Profile(provider: "mystery")], [Connection(provider: "mystery")]);
         AssertCode(ProjectRunReadinessReasonCodes.RunAgentProviderNotExecutable, [Profile(provider: "fake")], [Connection(provider: "fake")]);
@@ -24,20 +25,36 @@ public sealed class ProjectRunReadinessTests
     }
 
     [TestMethod]
-    public void FakeConnection_IsNotExecutable_ButExplicitLocalTestDeterministicConnectionIs()
+    public void ConnectionPurpose_SeparatesWorkflowSmokeFromProjectFeatureWork()
     {
         var fake = ProjectRunReadinessService.EvaluateAgent(
             SkeletonAgentRole.Builder,
             [Profile(provider: "fake")],
             [Connection(provider: "fake")]);
-        var deterministic = ProjectRunReadinessService.EvaluateAgent(
+        var deterministicProjectWork = ProjectRunReadinessService.EvaluateAgent(
             SkeletonAgentRole.Builder,
             [Profile(provider: "custom", model: "localtest-deterministic")],
             [Connection(provider: ProjectRunProviders.LocalTestDeterministic)]);
+        var deterministicSmoke = ProjectRunReadinessService.EvaluateAgent(
+            SkeletonAgentRole.Builder,
+            [Profile(provider: "custom", model: "localtest-deterministic")],
+            [Connection(provider: ProjectRunProviders.LocalTestDeterministic)],
+            ProjectRunPurposes.SmokeSimulation);
+        var realProjectWork = ProjectRunReadinessService.EvaluateAgent(
+            SkeletonAgentRole.Builder,
+            [Profile(provider: "custom")],
+            [Connection(provider: "custom")]);
 
         Assert.IsFalse(fake.IsReady);
-        Assert.AreEqual(ProjectRunReadinessReasonCodes.RunAgentProviderNotExecutable, fake.Blockers.Single().ReasonCode);
-        Assert.IsTrue(deterministic.IsReady, string.Join("; ", deterministic.Blockers.Select(blocker => blocker.Reason)));
+        Assert.IsTrue(fake.Blockers.Any(blocker => blocker.ReasonCode == ProjectRunReadinessReasonCodes.RunAgentProviderNotExecutable));
+        Assert.IsFalse(deterministicProjectWork.IsReady, "A fixed smoke fixture must never make normal Work Item readiness green.");
+        var mismatch = deterministicProjectWork.Blockers.Single(blocker =>
+            blocker.ReasonCode == ProjectRunReadinessReasonCodes.RunAgentConnectionPurposeMismatch);
+        Assert.AreEqual(
+            "LocalTest deterministic is a fixed smoke-test connection. It can exercise the governed workflow, but it cannot implement this Work Item. Configure an executable project-work connection to continue.",
+            mismatch.Reason);
+        Assert.IsTrue(deterministicSmoke.IsReady, string.Join("; ", deterministicSmoke.Blockers.Select(blocker => blocker.Reason)));
+        Assert.IsTrue(realProjectWork.IsReady, string.Join("; ", realProjectWork.Blockers.Select(blocker => blocker.Reason)));
     }
 
     [TestMethod]
@@ -47,7 +64,8 @@ public sealed class ProjectRunReadinessTests
             SkeletonAgentRole.Critic,
             [Profile(role: SkeletonAgentRole.Critic, provider: "fake")],
             [Connection(provider: "fake")]);
-        var blocker = result.Blockers.Single();
+        var blocker = result.Blockers.Single(item =>
+            item.ReasonCode == ProjectRunReadinessReasonCodes.RunAgentProviderNotExecutable);
 
         Assert.AreEqual(SkeletonAgentRole.Critic, blocker.Role);
         Assert.AreEqual("fake", blocker.EffectiveProvider);
@@ -100,7 +118,8 @@ public sealed class ProjectRunReadinessTests
         bool enabled = true,
         bool tenantAvailable = true,
         bool projectAvailable = true,
-        bool credentialConfigured = true) => new()
+        bool credentialConfigured = true,
+        IReadOnlyList<string>? supportedPurposes = null) => new()
     {
         Id = "connection-1",
         TenantId = 1,
@@ -110,6 +129,12 @@ public sealed class ProjectRunReadinessTests
         ControlledEndpoint = "deployment-configured",
         CredentialConfigured = credentialConfigured,
         CredentialStatus = credentialConfigured ? "Configured" : "Missing",
+        SupportedPurposes = supportedPurposes ?? (provider == ProjectRunProviders.LocalTestDeterministic
+            ? [ProjectRunPurposes.SmokeSimulation]
+            : provider == "fake"
+                ? []
+                : [ProjectRunPurposes.ProjectFeatureWork]),
+        PurposeDescription = "Test-controlled connection",
         Enabled = enabled,
         TenantAvailable = tenantAvailable,
         ProjectAvailable = projectAvailable,

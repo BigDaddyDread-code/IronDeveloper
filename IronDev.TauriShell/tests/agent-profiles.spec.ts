@@ -489,8 +489,9 @@ async function mockWorkspace(page: Page) {
         id: 'deployment-default', tenantId: 3, displayName: 'Deployment default', providerKind: 'openai',
         controlledEndpointId: 'deployment-default-openai', controlledEndpoint: 'https://api.openai.com',
         credentialConfigured: true, credentialStatus: 'Configured', availableModels: ['gpt-4o'], enabled: true,
+        supportedPurposes: ['ProjectFeatureWork'], purposeDescription: 'Executable provider for project feature work',
         tenantAvailable: true, projectAvailable: true, createdByUserId: 0, updatedByUserId: 7,
-        version: 'IronDev AI Connection Contract 2.5.0', boundary: 'Non-secret metadata.'
+        version: 'IronDev AI Connection Contract 2.6.0', boundary: 'Non-secret metadata.'
       }])
     });
   });

@@ -16,6 +16,8 @@ public sealed record AiConnectionMetadata
     public required string ControlledEndpoint { get; init; }
     public required bool CredentialConfigured { get; init; }
     public required string CredentialStatus { get; init; }
+    public required IReadOnlyList<string> SupportedPurposes { get; init; }
+    public required string PurposeDescription { get; init; }
     public DateTimeOffset? LastSuccessfulTestUtc { get; init; }
     public DateTimeOffset? LastFailedTestUtc { get; init; }
     public IReadOnlyList<string> AvailableModels { get; init; } = [];
