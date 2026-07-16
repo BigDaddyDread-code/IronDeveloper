@@ -33,7 +33,7 @@ public sealed class CliWorkspaceCommandInventoryTests
     }
 
     [TestMethod]
-    public void CliWorkspaceCommandInventory_OnlyApplyCopyIsSourceMutating()
+    public void CliWorkspaceCommandInventory_NoStandaloneCommandIsSourceMutating()
     {
         var inventory = ReadWorkspaceCommandInventory(FindRepositoryRoot());
         var sourceMutatingCommands = inventory.Rows
@@ -41,7 +41,7 @@ public sealed class CliWorkspaceCommandInventoryTests
             .Select(row => row.Command)
             .ToArray();
 
-        CollectionAssert.AreEqual(new[] { "workspace apply-copy" }, sourceMutatingCommands);
+        Assert.AreEqual(0, sourceMutatingCommands.Length);
     }
 
     [TestMethod]

@@ -55,6 +55,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private readonly IConfiguration _configuration;
     private readonly IProjectRunReadinessService _runReadiness;
     private readonly IProjectApplyCapabilityService _applyCapability;
+    private readonly ISkeletonApplySpine _applySpine;
 
     public TicketSkeletonRunService(
         ITicketService tickets,
@@ -72,7 +73,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         ISkeletonAgentProfileService agentProfiles,
         IConfiguration configuration,
         IProjectRunReadinessService runReadiness,
-        IProjectApplyCapabilityService applyCapability)
+        IProjectApplyCapabilityService applyCapability,
+        ISkeletonApplySpine applySpine)
     {
         _tickets = tickets;
         _projects = projects;
@@ -91,6 +93,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _configuration = configuration;
         _runReadiness = runReadiness;
         _applyCapability = applyCapability;
+        _applySpine = applySpine;
     }
 
     public Task<TicketBuildRunDto?> StartAsync(
@@ -1340,13 +1343,28 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             SkeletonApplySpine.SpineResult spineResult;
             try
             {
-                spineResult = await new SkeletonApplySpine().RunAsync(
+                spineResult = await _applySpine.RunAsync(
                     applyRunId: applyAttemptId,
                     sourceRepo: project.LocalPath!,
                     workspaceRoot: spineWorkspaceRoot,
                     approvedPackage: package,
                     approvedByActorId: approvedByActorId,
                     approvalReason: $"Mirrors AcceptedApprovalRecord {satisfied.AcceptedApprovalId:D} bound to package hash {packageHash}. This stage records the decision; it did not make it.",
+                    mutationContext: new ControlledSourceMutationContext
+                    {
+                        ProjectId = projectId,
+                        RunId = runId,
+                        ApplyAttemptId = applyAttemptId,
+                        ExpectedReadinessEvidenceHash = startEvidenceHash,
+                        QualifiedSandboxRoot = applyCapability.SandboxRoot,
+                        QualifiedProjectRoot = applyCapability.ProjectPath,
+                        QualifiedWorkspaceRoot = attemptWorkspacePath,
+                        ExpectedLauncherSessionId = applyCapability.LauncherSessionId,
+                        ExpectedSandboxRootFingerprint = applyCapability.SandboxRootFingerprint,
+                        ExpectedProjectPathFingerprint = applyCapability.ProjectPathFingerprint,
+                        ExpectedQualificationId = applyCapability.QualificationId,
+                        ExpectedQualificationFingerprint = applyCapability.QualificationFingerprint
+                    },
                     onStageStarted: async stage =>
                     {
                         currentStage = stage;
@@ -1360,9 +1378,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                                 ["currentNode"] = "SkeletonApply"
                             }, cancellationToken).ConfigureAwait(false);
                     },
-                    onStageCompleted: stage => PublishAsync(runId, "SkeletonApplyStage",
-                        $"{stage.Stage}: {(stage.Succeeded ? "completed" : "blocked")} - {stage.Summary}",
-                        projectId, ticketId, new Dictionary<string, string>
+                    onStageCompleted: stage =>
+                    {
+                        var payload = new Dictionary<string, string>
                         {
                             ["applyAttemptId"] = applyAttemptId,
                             ["attemptNumber"] = attemptNumber.ToString(),
@@ -1370,7 +1388,21 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                             ["succeeded"] = stage.Succeeded.ToString().ToLowerInvariant(),
                             ["errors"] = string.Join(" | ", stage.Errors),
                             ["currentNode"] = "SkeletonApply"
-                        }, cancellationToken),
+                        };
+                        if (stage.MutationEvidence is not null)
+                        {
+                            payload["reasonCode"] = stage.MutationEvidence.ReasonCode;
+                            payload["previousReadinessEvidenceHash"] = stage.MutationEvidence.PreviousReadinessEvidenceHash;
+                            payload["liveReadinessEvidenceHash"] = stage.MutationEvidence.LiveReadinessEvidenceHash;
+                            payload["changedBindings"] = string.Join(",", stage.MutationEvidence.ChangedBindings);
+                            payload["nextSafeAction"] = stage.MutationEvidence.NextSafeAction;
+                            payload["sourceRepoMutated"] = stage.MutationEvidence.SourceRepoMutated.ToString().ToLowerInvariant();
+                        }
+
+                        return PublishAsync(runId, "SkeletonApplyStage",
+                            $"{stage.Stage}: {(stage.Succeeded ? "completed" : "blocked")} - {stage.Summary}",
+                            projectId, ticketId, payload, cancellationToken);
+                    },
                     cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -1389,12 +1421,14 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
 
             if (!spineResult.Succeeded)
             {
+                var mutationRefusal = spineResult.FailedMutationEvidence;
                 return await RefuseApplyAsync(run, projectId, ticketId,
-                    $"SpineBlocked:{spineResult.FailedStage}",
-                    $"The governed apply spine blocked at '{spineResult.FailedStage}'. The workspace evidence chain records why; nothing was silently applied.",
+                    mutationRefusal?.ReasonCode ?? $"SpineBlocked:{spineResult.FailedStage}",
+                    mutationRefusal?.Reason ?? $"The governed apply spine blocked at '{spineResult.FailedStage}'. The workspace evidence chain records why; nothing was silently applied.",
                     cancellationToken,
                     applyAttemptId,
-                    attemptNumber).ConfigureAwait(false);
+                    attemptNumber,
+                    nextSafeAction: mutationRefusal?.NextSafeAction).ConfigureAwait(false);
             }
 
             await _runs.TransitionAsync(new RunStateTransition

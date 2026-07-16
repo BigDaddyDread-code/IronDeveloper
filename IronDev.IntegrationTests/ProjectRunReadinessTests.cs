@@ -273,6 +273,29 @@ public sealed class ProjectRunReadinessTests
     }
 
     [TestMethod]
+    public async Task NullMarkerBindings_ReturnNamedMismatchInsteadOfThrowing()
+    {
+        RunProcess("git", "init -q", _projectPath);
+        using var session = QualificationTestSession.Start();
+        var service = CreateCapabilityService(
+            new StubProjectService(new Project { Id = 4, TenantId = 1, LocalPath = _projectPath }),
+            session.SessionId);
+        var qualified = await service.QualifyDisposableProjectAsync(4, qualifyingActorUserId: 71);
+        Assert.IsTrue(qualified.IsReady, qualified.Reason);
+
+        var markerPath = Path.Combine(_projectPath, ".git", ProjectApplyCapabilityService.DisposableMarkerFileName);
+        var marker = JsonNode.Parse(File.ReadAllText(markerPath))!.AsObject();
+        marker["qualificationId"] = null;
+        marker["recordFingerprint"] = null;
+        File.WriteAllText(markerPath, marker.ToJsonString());
+
+        var result = await service.EvaluateAsync(4);
+
+        Assert.IsFalse(result.IsReady);
+        Assert.AreEqual(ProjectApplyCapabilityReasonCodes.ProjectApplyQualificationMarkerMismatch, result.ReasonCode);
+    }
+
+    [TestMethod]
     public async Task ChangedDatabaseAndSandboxRoot_FailClosedAgainstRetainedQualification()
     {
         RunProcess("git", "init -q", _projectPath);

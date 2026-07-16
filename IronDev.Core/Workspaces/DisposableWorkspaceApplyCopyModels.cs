@@ -4,6 +4,7 @@ public sealed record DisposableWorkspaceApplyCopyRequest
 {
     public required string RunId { get; init; }
     public required string WorkspacePath { get; init; }
+    public ControlledSourceMutationContext? MutationContext { get; init; }
 }
 
 public sealed record DisposableWorkspaceAppliedCopyOperation
@@ -20,6 +21,7 @@ public sealed record DisposableWorkspaceAppliedCopyOperation
     public string? ActualSourceSha256After { get; init; }
 
     public required bool Applied { get; init; }
+    public ControlledSourceMutationEvidence? MutationEvidence { get; init; }
 }
 
 public sealed record DisposableWorkspaceApplyCopyData

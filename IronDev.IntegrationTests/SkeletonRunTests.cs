@@ -1011,6 +1011,113 @@ public sealed class SkeletonRunTests
         Assert.AreEqual("SkeletonApplied", report.Timeline.Last().EventType);
     }
 
+    [TestMethod]
+    public async Task ApplyAsync_CapabilityRevokedAfterDryRunBeforeApplyCopy_FailsAtMutationBoundary()
+    {
+        using var repo = TempGitRepo.Create();
+        var barrier = new ControllableMutationBoundaryBarrier();
+        var harness = SkeletonHarness.Create(
+            localPath: repo.Path,
+            applyEnabled: true,
+            mutationBoundaryBarrier: barrier,
+            proposalBehavior: () => AddFileProposal("src/Boundary.cs", "public sealed class Boundary {}"));
+        var run = await StartApproveAndContinueAsync(harness);
+
+        var applyTask = harness.Service.ApplyAsAsync(ProjectId, TicketId, run.RunId, BobUserId);
+        await barrier.WaitUntilEnteredAsync();
+        harness.ApplyCapability.Enabled = false;
+        barrier.Release();
+        var result = await applyTask;
+
+        Assert.IsNotNull(result);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), result!.Status);
+        Assert.IsFalse(File.Exists(Path.Combine(repo.Path, "src", "Boundary.cs")));
+        Assert.AreEqual(0, harness.Events.All("SkeletonApplied").Count);
+        var refusal = harness.Events.Single("SkeletonApplyRefused");
+        Assert.AreEqual(ControlledSourceMutationReasonCodes.CapabilityChangedBeforeMutation, refusal.Payload["refusedReason"]);
+        Assert.AreEqual(ProjectApplyCapabilityCommands.RestartInSandboxApplyMode, refusal.Payload["nextSafeAction"]);
+        var copyStage = harness.Events.All("SkeletonApplyStage").Single(stage => stage.Payload["stage"] == "apply-copy");
+        Assert.AreEqual("false", copyStage.Payload["sourceRepoMutated"]);
+        Assert.AreEqual(ControlledSourceMutationReasonCodes.CapabilityChangedBeforeMutation, copyStage.Payload["reasonCode"]);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(copyStage.Payload["previousReadinessEvidenceHash"]));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(copyStage.Payload["liveReadinessEvidenceHash"]));
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_NestedJunctionIntroducedAfterDryRun_IsRefusedWithoutOutsideWrite()
+    {
+        using var repo = TempGitRepo.Create();
+        using var outside = TempDirs.Create();
+        var barrier = new ControllableMutationBoundaryBarrier();
+        var harness = SkeletonHarness.Create(
+            localPath: repo.Path,
+            applyEnabled: true,
+            mutationBoundaryBarrier: barrier,
+            proposalBehavior: () => AddFileProposal("src/generated/Escape.cs", "public sealed class Escape {}"));
+        var run = await StartApproveAndContinueAsync(harness);
+        var junction = Path.Combine(repo.Path, "src", "generated");
+
+        var applyTask = harness.Service.ApplyAsAsync(ProjectId, TicketId, run.RunId, BobUserId);
+        await barrier.WaitUntilEnteredAsync();
+        CreateJunction(junction, outside.Source);
+        barrier.Release();
+        var result = await applyTask;
+
+        Assert.IsNotNull(result);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), result!.Status);
+        Assert.IsFalse(File.Exists(Path.Combine(outside.Source, "Escape.cs")));
+        Assert.AreEqual(0, harness.Events.All("SkeletonApplied").Count);
+        var copyStage = harness.Events.All("SkeletonApplyStage").Single(stage => stage.Payload["stage"] == "apply-copy");
+        Assert.AreEqual(ControlledSourceMutationReasonCodes.DestinationPathUnsafe, copyStage.Payload["reasonCode"]);
+        Assert.AreEqual("false", copyStage.Payload["sourceRepoMutated"]);
+    }
+
+    private static BuilderProposal AddFileProposal(string path, string content) => new()
+    {
+        TicketId = TicketId,
+        ProjectId = ProjectId,
+        Summary = "Mutation-boundary test proposal.",
+        Changes =
+        [
+            new ProposedFileChange
+            {
+                FilePath = path,
+                IsValid = true,
+                IsNewFile = true,
+                Diff = "+" + content,
+                FullContentAfter = content
+            }
+        ]
+    };
+
+    private static async Task<RunRecord> StartApproveAndContinueAsync(SkeletonHarness harness)
+    {
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        Assert.IsNotNull(run);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
+        await harness.Service.ContinueAsAsync(ProjectId, TicketId, run.RunId, BobUserId);
+        return (await harness.Runs.GetAsync(run.RunId))!;
+    }
+
+    private static void CreateJunction(string link, string target)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = $"/d /c mklink /J \"{link}\" \"{target}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        using var process = System.Diagnostics.Process.Start(start)!;
+        process.WaitForExit();
+        Assert.AreEqual(0, process.ExitCode,
+            $"Could not create test junction. stdout={process.StandardOutput.ReadToEnd()} stderr={process.StandardError.ReadToEnd()}");
+    }
+
     // ── P0-6: trace completeness — the report reconstructs the whole loop ─────
 
     [TestMethod]
@@ -1655,7 +1762,8 @@ public sealed class SkeletonRunTests
             int? leaseTimeoutMinutes = null,
             bool allowSoloApproval = false,
             IReadOnlyList<ProjectMembershipEntry>? members = null,
-            IProjectRunReadinessService? runReadiness = null)
+            IProjectRunReadinessService? runReadiness = null,
+            ISkeletonApplyMutationBoundaryBarrier? mutationBoundaryBarrier = null)
         {
             var sourceDir = Path.Combine(Path.GetTempPath(), "irondev-skel-src-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(sourceDir);
@@ -1682,7 +1790,13 @@ public sealed class SkeletonRunTests
             var approvals = new InMemoryAcceptedApprovalStore();
             var leases = new SkeletonMutationLeaseService(configuration);
             var profiles = new SkeletonAgentProfileService(configuration);
-            var applyCapability = new StubApplyCapabilityService(applyEnabled);
+            var applyCapability = new StubApplyCapabilityService(
+                applyEnabled,
+                resolvedPath ?? string.Empty,
+                string.IsNullOrWhiteSpace(resolvedPath) ? string.Empty : Path.GetDirectoryName(resolvedPath)!);
+            var applySpine = new SkeletonApplySpine(
+                new DisposableWorkspaceApplyCopyService(new ControlledSourceMutationExecutor(applyCapability)),
+                mutationBoundaryBarrier ?? new NoOpSkeletonApplyMutationBoundaryBarrier());
             var service = new TicketSkeletonRunService(
                 new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ticketProjectId ?? ProjectId, Title = "Add book sorting", AcceptanceCriteria = acceptanceCriteria }),
                 new StubProjectService(new Project { Id = ProjectId, TenantId = 1, Name = "BookSeller", LocalPath = resolvedPath }),
@@ -1704,7 +1818,8 @@ public sealed class SkeletonRunTests
                 profiles,
                 configuration,
                 runReadiness ?? new StubRunReadinessService(ReadyRunReadiness()),
-                applyCapability);
+                applyCapability,
+                applySpine);
 
             return new SkeletonHarness
             {
@@ -1750,7 +1865,27 @@ public sealed class SkeletonRunTests
         }
     }
 
-    private sealed class StubApplyCapabilityService(bool enabled) : IProjectApplyCapabilityService
+    private sealed class ControllableMutationBoundaryBarrier : ISkeletonApplyMutationBoundaryBarrier
+    {
+        private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task WaitAsync(
+            ControlledSourceMutationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            _entered.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+        }
+
+        public Task WaitUntilEnteredAsync() => _entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        public void Release() => _release.TrySetResult();
+    }
+
+    private sealed class StubApplyCapabilityService(
+        bool enabled,
+        string projectPath,
+        string sandboxRoot) : IProjectApplyCapabilityService
     {
         public bool Enabled { get; set; } = enabled;
         public string SessionId { get; set; } = "test-session";
@@ -1758,8 +1893,8 @@ public sealed class SkeletonRunTests
 
         public Task<ProjectApplyCapability> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
             Task.FromResult(Enabled
-                ? ReadyApplyCapability(projectId, SessionId, QualificationId)
-                : ReadyApplyCapability(projectId, SessionId, QualificationId) with
+                ? ReadyApplyCapability(projectId, SessionId, QualificationId, projectPath, sandboxRoot)
+                : ReadyApplyCapability(projectId, SessionId, QualificationId, projectPath, sandboxRoot) with
                 {
                     IsReady = false,
                     State = "Disabled",
@@ -1777,7 +1912,9 @@ public sealed class SkeletonRunTests
     private static ProjectApplyCapability ReadyApplyCapability(
         int projectId = ProjectId,
         string sessionId = "test-session",
-        string qualificationId = "qualification-1") => new()
+        string qualificationId = "qualification-1",
+        string projectPath = "",
+        string sandboxRoot = "") => new()
     {
         ProjectId = projectId,
         IsReady = true,
@@ -1785,6 +1922,8 @@ public sealed class SkeletonRunTests
         ReasonCode = ProjectApplyCapabilityReasonCodes.Ready,
         LauncherSessionId = sessionId,
         RepositoryCommit = "test-commit",
+        SandboxRoot = sandboxRoot,
+        ProjectPath = projectPath,
         SandboxRootFingerprint = "sandbox-fingerprint",
         ProjectPathFingerprint = "project-fingerprint",
         QualificationId = qualificationId,

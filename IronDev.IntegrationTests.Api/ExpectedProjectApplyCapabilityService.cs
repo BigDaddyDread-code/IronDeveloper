@@ -15,32 +15,52 @@ internal sealed class ExpectedProjectApplyCapabilityService : IProjectApplyCapab
     private readonly object _sync = new();
     private int _expectedProjectId;
     private string _readinessEvidenceHash = string.Empty;
+    private string _projectPath = string.Empty;
+    private string _sandboxRoot = string.Empty;
     private bool _bindingInvalid;
 
-    public void ExpectProject(int projectId, string readinessEvidenceHash)
+    public void ExpectProject(
+        int projectId,
+        string readinessEvidenceHash,
+        string projectPath,
+        string sandboxRoot)
     {
         lock (_sync)
         {
             if (_bindingInvalid)
                 throw new InvalidOperationException("This apply-capability fixture is already fail-closed after a binding change.");
 
-            if (projectId <= 0 || string.IsNullOrWhiteSpace(readinessEvidenceHash))
+            if (projectId <= 0 ||
+                string.IsNullOrWhiteSpace(readinessEvidenceHash) ||
+                string.IsNullOrWhiteSpace(projectPath) ||
+                string.IsNullOrWhiteSpace(sandboxRoot))
             {
                 _bindingInvalid = true;
                 throw new InvalidOperationException("An explicit project and readiness-evidence hash are required; missing binding truth fails closed.");
             }
 
             var evidenceHash = readinessEvidenceHash.Trim();
+            var normalizedProject = Path.TrimEndingDirectorySeparator(Path.GetFullPath(projectPath));
+            var normalizedSandbox = Path.TrimEndingDirectorySeparator(Path.GetFullPath(sandboxRoot));
+            if (!normalizedProject.StartsWith(normalizedSandbox + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                _bindingInvalid = true;
+                throw new InvalidOperationException("The expected project must be a strict child of its explicit sandbox root.");
+            }
 
             if (_expectedProjectId == 0)
             {
                 _expectedProjectId = projectId;
                 _readinessEvidenceHash = evidenceHash;
+                _projectPath = normalizedProject;
+                _sandboxRoot = normalizedSandbox;
                 return;
             }
 
             if (_expectedProjectId == projectId &&
-                _readinessEvidenceHash.Equals(evidenceHash, StringComparison.Ordinal))
+                _readinessEvidenceHash.Equals(evidenceHash, StringComparison.Ordinal) &&
+                _projectPath.Equals(normalizedProject, StringComparison.OrdinalIgnoreCase) &&
+                _sandboxRoot.Equals(normalizedSandbox, StringComparison.OrdinalIgnoreCase))
                 return;
 
             _bindingInvalid = true;
@@ -57,7 +77,7 @@ internal sealed class ExpectedProjectApplyCapabilityService : IProjectApplyCapab
         lock (_sync)
         {
             if (!_bindingInvalid && _expectedProjectId > 0 && projectId == _expectedProjectId)
-                return Task.FromResult(Ready(projectId, _readinessEvidenceHash));
+                return Task.FromResult(Ready(projectId, _readinessEvidenceHash, _projectPath, _sandboxRoot));
 
             var reason = _bindingInvalid
                 ? "The test-only project or evidence-hash binding changed and is permanently fail-closed."
@@ -85,7 +105,11 @@ internal sealed class ExpectedProjectApplyCapabilityService : IProjectApplyCapab
             $"{projectId}\n{evidenceContract.Trim()}"))).ToLowerInvariant();
     }
 
-    private static ProjectApplyCapability Ready(int projectId, string evidenceHash) => new()
+    private static ProjectApplyCapability Ready(
+        int projectId,
+        string evidenceHash,
+        string projectPath,
+        string sandboxRoot) => new()
     {
         ProjectId = projectId,
         IsReady = true,
@@ -95,6 +119,10 @@ internal sealed class ExpectedProjectApplyCapabilityService : IProjectApplyCapab
         SessionMode = ProjectRunPurposes.ProjectFeatureWork,
         LauncherSessionId = "rel3-single-project-fixture",
         RepositoryCommit = "test-fixture",
+        SandboxRoot = sandboxRoot,
+        ProjectPath = projectPath,
+        SandboxRootFingerprint = CreateReadinessEvidenceHash(projectId, sandboxRoot),
+        ProjectPathFingerprint = CreateReadinessEvidenceHash(projectId, projectPath),
         QualificationId = $"rel3-project-{projectId}",
         QualificationFingerprint = evidenceHash,
         ReadinessEvidenceHash = evidenceHash

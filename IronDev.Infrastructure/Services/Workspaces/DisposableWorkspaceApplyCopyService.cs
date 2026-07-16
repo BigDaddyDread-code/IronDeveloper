@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using IronDev.Core.Workspaces;
 
@@ -10,6 +9,13 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
     {
         WriteIndented = true
     };
+
+    private readonly IControlledSourceMutationExecutor _mutationExecutor;
+
+    public DisposableWorkspaceApplyCopyService(IControlledSourceMutationExecutor mutationExecutor)
+    {
+        _mutationExecutor = mutationExecutor;
+    }
 
     public async Task<DisposableWorkspaceApplyCopyResult> ApplyAsync(
         DisposableWorkspaceApplyCopyRequest request,
@@ -40,6 +46,16 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
         if (blockers.Count > 0)
             return Blocked(request, workspacePath, string.Empty, applied: false, sourceRepoMutated: false, operations: [], workspaceMetadataPath, applyDryRunPath, applyPreflightPath, promotionApprovalPath, promotionPackagePath, diffMetadataPath, applyCopyPath: null, blockers, warnings);
 
+        if (request.MutationContext is null)
+            blockers.Add($"{ControlledSourceMutationReasonCodes.CapabilityContextMissing}: apply-copy requires injected live capability context at the source-mutation boundary.");
+        else
+        {
+            if (!string.Equals(request.MutationContext.ApplyAttemptId, request.RunId, StringComparison.Ordinal))
+                blockers.Add($"{ControlledSourceMutationReasonCodes.CapabilityContextMissing}: apply attempt identity does not match workspace evidence.");
+            if (!PathsEqual(request.MutationContext.QualifiedWorkspaceRoot, workspacePath))
+                blockers.Add($"{ControlledSourceMutationReasonCodes.CapabilityContextMissing}: qualified workspace root does not match workspace evidence.");
+        }
+
         ApplyFacts facts;
         try
         {
@@ -69,6 +85,11 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
 
         if (!string.IsNullOrWhiteSpace(facts.SourceRepo) && !Directory.Exists(facts.SourceRepo))
             blockers.Add("Source repository does not exist.");
+        if (request.MutationContext is not null &&
+            !PathsEqual(request.MutationContext.QualifiedProjectRoot, facts.SourceRepo))
+        {
+            blockers.Add($"{ControlledSourceMutationReasonCodes.CapabilityContextMissing}: qualified project root does not match workspace evidence.");
+        }
 
         if (!string.IsNullOrWhiteSpace(facts.SourceRepo) &&
             (PathsEqual(workspacePath, facts.SourceRepo) ||
@@ -102,7 +123,7 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
         {
             try
             {
-                plannedOperations = await BuildPlannedOperationsAsync(facts, workspacePath, blockers, cancellationToken).ConfigureAwait(false);
+                plannedOperations = BuildPlannedOperations(facts, workspacePath, blockers);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -114,39 +135,81 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
         if (blockers.Count > 0)
             return Blocked(request, workspacePath, facts.SourceRepo, applied: false, sourceRepoMutated: false, plannedOperations, workspaceMetadataPath, applyDryRunPath, applyPreflightPath, promotionApprovalPath, promotionPackagePath, diffMetadataPath, applyCopyPath: null, blockers, warnings);
 
-        var appliedOperations = new List<DisposableWorkspaceAppliedCopyOperation>();
-        var sourceRepoMutated = false;
+        var context = request.MutationContext!;
+        var mutationRequests = plannedOperations.Select(operation => new ControlledSourceMutationRequest
+        {
+            ProjectId = context.ProjectId,
+            RunId = context.RunId,
+            ApplyAttemptId = context.ApplyAttemptId,
+            ExpectedReadinessEvidenceHash = context.ExpectedReadinessEvidenceHash,
+            QualifiedSandboxRoot = context.QualifiedSandboxRoot,
+            QualifiedProjectRoot = context.QualifiedProjectRoot,
+            QualifiedWorkspaceRoot = context.QualifiedWorkspaceRoot,
+            OperationKind = operation.Operation,
+            RelativePath = operation.RelativePath,
+            WorkspaceSourcePath = operation.WorkspacePath,
+            ExpectedSourceHash = operation.ExpectedSourceSha256,
+            ExpectedWorkspaceHash = operation.ExpectedWorkspaceSha256,
+            ExpectedLauncherSessionId = context.ExpectedLauncherSessionId,
+            ExpectedSandboxRootFingerprint = context.ExpectedSandboxRootFingerprint,
+            ExpectedProjectPathFingerprint = context.ExpectedProjectPathFingerprint,
+            ExpectedQualificationId = context.ExpectedQualificationId,
+            ExpectedQualificationFingerprint = context.ExpectedQualificationFingerprint
+        }).ToArray();
+
+        ControlledSourceMutationBatchResult batch;
         try
         {
-            foreach (var operation in plannedOperations)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(operation.SourcePath)!);
-                File.Copy(operation.WorkspacePath, operation.SourcePath, overwrite: operation.Operation == "modify");
-                sourceRepoMutated = true;
-                var sourceShaAfter = await ComputeSha256Async(operation.SourcePath, cancellationToken).ConfigureAwait(false);
-                if (!string.Equals(sourceShaAfter, operation.ExpectedWorkspaceSha256, StringComparison.OrdinalIgnoreCase))
-                    throw new IOException($"Source hash after copy did not match workspace hash for {operation.RelativePath}.");
-
-                appliedOperations.Add(operation with
-                {
-                    ActualSourceSha256After = sourceShaAfter,
-                    Applied = true
-                });
-            }
+            batch = await _mutationExecutor.ExecuteBatchAsync(mutationRequests, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            var failedOperations = appliedOperations
-                .Concat(plannedOperations.Skip(appliedOperations.Count))
-                .ToArray();
             var errors = new List<string>
             {
-                $"Workspace apply copy failed after mutation may have started: {exception.Message}",
-                "Source repository may be partially mutated; inspect apply-copy evidence and source files before retrying."
+                $"Workspace apply copy failed closed at the controlled mutation boundary: {exception.Message}"
             };
-            await TryWriteEvidenceAsync(request, workspacePath, facts.SourceRepo, createdUtc, applied: false, sourceRepoMutated, failedOperations, workspaceMetadataPath, applyDryRunPath, applyPreflightPath, promotionApprovalPath, promotionPackagePath, diffMetadataPath, applyCopyPath, blockers: [], warnings, errors, cancellationToken).ConfigureAwait(false);
-            return Failed(request, workspacePath, facts.SourceRepo, applied: false, sourceRepoMutated, failedOperations, workspaceMetadataPath, applyDryRunPath, applyPreflightPath, promotionApprovalPath, promotionPackagePath, diffMetadataPath, sourceRepoMutated ? applyCopyPath : null, errors, warnings);
+            return Failed(request, workspacePath, facts.SourceRepo, applied: false, sourceRepoMutated: false,
+                plannedOperations, workspaceMetadataPath, applyDryRunPath, applyPreflightPath,
+                promotionApprovalPath, promotionPackagePath, diffMetadataPath,
+                applyCopyPath: null, errors, warnings);
         }
+
+        var completedOperations = plannedOperations.ToArray();
+        for (var index = 0; index < batch.Results.Count; index++)
+        {
+            var mutation = batch.Results[index];
+            completedOperations[index] = WithMutationEvidence(
+                completedOperations[index], mutation.Evidence, mutation.Succeeded);
+        }
+
+        if (!batch.Succeeded)
+        {
+            var failureEvidence = batch.FailureEvidence!;
+            var failureIndex = batch.FailureOperationIndex!.Value;
+            if (failureIndex >= batch.Results.Count)
+            {
+                completedOperations[failureIndex] = WithMutationEvidence(
+                    completedOperations[failureIndex], failureEvidence, applied: false);
+            }
+
+            var refusalBlockers = new List<string>
+            {
+                $"{failureEvidence.ReasonCode}: {failureEvidence.Reason}"
+            };
+            await TryWriteEvidenceAsync(request, workspacePath, facts.SourceRepo, createdUtc,
+                applied: false, batch.SourceRepoMutated, completedOperations,
+                workspaceMetadataPath, applyDryRunPath, applyPreflightPath,
+                promotionApprovalPath, promotionPackagePath, diffMetadataPath,
+                applyCopyPath, refusalBlockers, warnings, refusalBlockers,
+                cancellationToken).ConfigureAwait(false);
+            return Blocked(request, workspacePath, facts.SourceRepo, applied: false,
+                batch.SourceRepoMutated, completedOperations, workspaceMetadataPath, applyDryRunPath,
+                applyPreflightPath, promotionApprovalPath, promotionPackagePath,
+                diffMetadataPath, applyCopyPath, refusalBlockers, warnings);
+        }
+
+        var appliedOperations = completedOperations;
+        var sourceRepoMutated = batch.SourceRepoMutated;
 
         var evidencePaths = new[]
         {
@@ -181,6 +244,19 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
             Warnings = warnings
         };
     }
+
+    private static DisposableWorkspaceAppliedCopyOperation WithMutationEvidence(
+        DisposableWorkspaceAppliedCopyOperation operation,
+        ControlledSourceMutationEvidence evidence,
+        bool applied) =>
+        operation with
+        {
+            ActualSourceSha256Before = evidence.ActualSourceHashBefore,
+            ActualWorkspaceSha256Before = evidence.ActualWorkspaceHashBefore,
+            ActualSourceSha256After = evidence.ActualSourceHashAfter,
+            Applied = applied,
+            MutationEvidence = evidence
+        };
 
     private static void RequireFile(string path, string label, List<string> blockers)
     {
@@ -279,24 +355,22 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
         }
     }
 
-    private static async Task<IReadOnlyList<DisposableWorkspaceAppliedCopyOperation>> BuildPlannedOperationsAsync(
+    private static IReadOnlyList<DisposableWorkspaceAppliedCopyOperation> BuildPlannedOperations(
         ApplyFacts facts,
         string workspaceRoot,
-        List<string> blockers,
-        CancellationToken cancellationToken)
+        List<string> blockers)
     {
         var operations = new List<DisposableWorkspaceAppliedCopyOperation>();
         foreach (var operation in facts.Operations)
-            operations.Add(await BuildPlannedOperationAsync(operation, facts.SourceRepo, workspaceRoot, blockers, cancellationToken).ConfigureAwait(false));
+            operations.Add(BuildPlannedOperation(operation, facts.SourceRepo, workspaceRoot, blockers));
         return operations;
     }
 
-    private static async Task<DisposableWorkspaceAppliedCopyOperation> BuildPlannedOperationAsync(
+    private static DisposableWorkspaceAppliedCopyOperation BuildPlannedOperation(
         DryRunOperation operation,
         string sourceRepo,
         string workspaceRoot,
-        List<string> blockers,
-        CancellationToken cancellationToken)
+        List<string> blockers)
     {
         var safeRelativePath = NormalizeRelativePath(operation.RelativePath, blockers);
         var sourcePath = Path.GetFullPath(Path.Combine(sourceRepo, safeRelativePath));
@@ -342,22 +416,6 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
                 blockers.Add($"Modify operation workspace path is a directory, not a file: {operation.RelativePath}");
         }
 
-        var actualSourceSha = sourceFileExists ? await ComputeSha256Async(sourcePath, cancellationToken).ConfigureAwait(false) : null;
-        var actualWorkspaceSha = workspaceFileExists ? await ComputeSha256Async(workspacePath, cancellationToken).ConfigureAwait(false) : null;
-
-        if (string.Equals(operation.Operation, "modify", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(actualSourceSha, operation.SourceSha256, StringComparison.OrdinalIgnoreCase))
-        {
-            blockers.Add($"Source hash mismatch for modify operation: {operation.RelativePath}");
-        }
-
-        if ((string.Equals(operation.Operation, "add", StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(operation.Operation, "modify", StringComparison.OrdinalIgnoreCase)) &&
-            !string.Equals(actualWorkspaceSha, operation.WorkspaceSha256, StringComparison.OrdinalIgnoreCase))
-        {
-            blockers.Add($"Workspace hash mismatch for {operation.Operation} operation: {operation.RelativePath}");
-        }
-
         return new DisposableWorkspaceAppliedCopyOperation
         {
             Operation = operation.Operation,
@@ -366,8 +424,8 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
             WorkspacePath = workspacePath,
             ExpectedSourceSha256 = operation.SourceSha256,
             ExpectedWorkspaceSha256 = operation.WorkspaceSha256,
-            ActualSourceSha256Before = actualSourceSha,
-            ActualWorkspaceSha256Before = actualWorkspaceSha,
+            ActualSourceSha256Before = null,
+            ActualWorkspaceSha256Before = null,
             ActualSourceSha256After = null,
             Applied = false
         };
@@ -425,13 +483,6 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
 
             current = next;
         }
-    }
-
-    private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
-    {
-        await using var stream = File.OpenRead(path);
-        var hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
-        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private static async Task TryWriteEvidenceAsync(
@@ -672,4 +723,5 @@ public sealed class DisposableWorkspaceApplyCopyService : IDisposableWorkspaceAp
         string WorkspacePath,
         string SourceSha256,
         string WorkspaceSha256);
+
 }
