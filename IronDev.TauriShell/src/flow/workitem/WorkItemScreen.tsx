@@ -911,6 +911,28 @@ export function WorkItemScreen({
         </section>
       ) : null}
 
+      {workItem?.runReadiness?.state === 'ProjectWorkSessionRequired' ? (
+        <section className="fl-board-blocked" data-testid="flow.workItem.projectWorkSession">
+          <div>
+            <strong>Project-work session required</strong>
+            <p>{workItem.runReadiness.nextAction?.nextSafeAction}</p>
+            <code data-testid="flow.workItem.projectWorkSession.command">{workItem.runReadiness.nextAction?.command}</code>
+            <details>
+              <summary>What this enables</summary>
+              <p>{workItem.runReadiness.completionCapability?.reason} No commit, push, release, or automatic apply is enabled.</p>
+            </details>
+          </div>
+          <button
+            className="fl-btn fl-pri"
+            type="button"
+            onClick={() => void navigator.clipboard.writeText(workItem.runReadiness?.nextAction?.command ?? '')}
+            data-testid="flow.workItem.projectWorkSession.copy"
+          >
+            Copy supported restart
+          </button>
+        </section>
+      ) : null}
+
       {workItem && !['NotRequired', 'Applied'].includes(workItem.applyRecovery.status ?? '') ? (
         <section className="fl-apply-recovery" data-testid="flow.workItem.applyRecovery">
           <div className="fl-apply-recovery-head">

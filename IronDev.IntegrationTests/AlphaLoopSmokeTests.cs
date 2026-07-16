@@ -118,7 +118,8 @@ public sealed class AlphaLoopSmokeTests
                 new StubProjectMembershipService(),
                 new SkeletonAgentProfileService(configuration),
                 configuration,
-                new ReadyRunReadinessService());
+                new ReadyRunReadinessService(),
+                new ReadyApplyCapabilityService());
 
             var run = await service.StartAsync(ProjectId, TicketId);
             Assert.IsNotNull(run, "The run must start.");
@@ -253,7 +254,8 @@ public sealed class AlphaLoopSmokeTests
                 new StubProjectMembershipService(),
                 new SkeletonAgentProfileService(configuration),
                 configuration,
-                new ReadyRunReadinessService());
+                new ReadyRunReadinessService(),
+                new ReadyApplyCapabilityService());
 
             var run = await service.StartAsync(ProjectId, TicketId);
             Assert.IsNotNull(run, "The run must start.");
@@ -595,10 +597,37 @@ public sealed class AlphaLoopSmokeTests
                 ProjectId = projectId,
                 ProjectSetupReady = true,
                 ExecutionReady = true,
+                CompletionCapabilityReady = true,
+                CompletionCapability = ReadyApplyCapabilityService.Result(projectId),
                 ReadyToRun = true,
                 State = ProjectRunReadinessStates.ReadyToRun,
                 BlockedCount = 0
             });
+    }
+
+    private sealed class ReadyApplyCapabilityService : IProjectApplyCapabilityService
+    {
+        public static ProjectApplyCapability Result(int projectId) => new()
+        {
+            ProjectId = projectId,
+            IsReady = true,
+            State = "Ready",
+            ReasonCode = ProjectApplyCapabilityReasonCodes.Ready,
+            LauncherSessionId = "alpha-test-session",
+            RepositoryCommit = "alpha-test-commit",
+            SandboxRootFingerprint = "alpha-sandbox",
+            ProjectPathFingerprint = "alpha-project",
+            ReadinessEvidenceHash = "alpha-ready-evidence"
+        };
+
+        public Task<ProjectApplyCapability> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Result(projectId));
+
+        public Task<ProjectApplyCapability> QualifyDisposableProjectAsync(
+            int projectId,
+            int qualifyingActorUserId,
+            CancellationToken cancellationToken = default) =>
+            EvaluateAsync(projectId, cancellationToken);
     }
 
     private static string ExpectedApprovalPhrase(string runId, string packageHash) =>

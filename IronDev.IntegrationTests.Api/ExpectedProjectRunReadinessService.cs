@@ -9,7 +9,14 @@ namespace IronDev.IntegrationTests.Api;
 /// </summary>
 internal sealed class ExpectedProjectRunReadinessService : IProjectRunReadinessService
 {
+    private readonly ExpectedProjectApplyCapabilityService? _applyCapability;
     private int _expectedProjectId;
+
+    public ExpectedProjectRunReadinessService(
+        ExpectedProjectApplyCapabilityService? applyCapability = null)
+    {
+        _applyCapability = applyCapability;
+    }
 
     public void ExpectProject(int projectId)
     {
@@ -21,29 +28,39 @@ internal sealed class ExpectedProjectRunReadinessService : IProjectRunReadinessS
             throw new InvalidOperationException($"This fixture already expects project {previous}; it cannot also allow project {projectId}.");
     }
 
-    public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default)
+    public async Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default)
     {
         var expected = Volatile.Read(ref _expectedProjectId);
         if (expected > 0 && projectId == expected)
         {
-            return Task.FromResult(new ProjectRunReadiness
+            var completionCapability = _applyCapability is null
+                ? null
+                : await _applyCapability.EvaluateAsync(projectId, cancellationToken).ConfigureAwait(false);
+            var completionReady = completionCapability?.IsReady ?? true;
+            return new ProjectRunReadiness
             {
                 ProjectId = projectId,
                 ProjectSetupReady = true,
                 ExecutionReady = true,
-                ReadyToRun = true,
-                State = ProjectRunReadinessStates.ReadyToRun,
+                CompletionCapabilityReady = completionReady,
+                ReadyToRun = completionReady,
+                State = completionReady
+                    ? ProjectRunReadinessStates.ReadyToRun
+                    : ProjectRunReadinessStates.ProjectWorkSessionRequired,
+                CompletionCapability = completionCapability,
                 NextAction = new ProjectRunReadinessNextAction
                 {
-                    Kind = "StartRun",
-                    Label = "Ready to run",
-                    NextSafeAction = "Continue the explicitly scoped legacy API journey."
+                    Kind = completionReady ? "StartRun" : "TestFixtureCapabilityMismatch",
+                    Label = completionReady ? "Ready to run" : "Register the expected apply capability",
+                    NextSafeAction = completionReady
+                        ? "Continue the explicitly scoped legacy API journey."
+                        : "Register the same project and stable evidence hash in the REL-3 apply-capability fixture."
                 },
                 Boundary = "Test-only prerequisite truth for one explicitly registered project. Production readiness is not replaced."
-            });
+            };
         }
 
-        return Task.FromResult(new ProjectRunReadiness
+        return new ProjectRunReadiness
         {
             ProjectId = projectId,
             ProjectSetupReady = false,
@@ -61,6 +78,6 @@ internal sealed class ExpectedProjectRunReadinessService : IProjectRunReadinessS
                 TargetProductRoute = $"/projects/{projectId}/setup"
             },
             Boundary = "Fail-closed test-only readiness: unknown and different project IDs are never ready."
-        });
+        };
     }
 }

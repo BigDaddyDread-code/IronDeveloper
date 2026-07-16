@@ -18,21 +18,24 @@ export const readyBoardReadiness = {
   boundary: 'Backend readiness truth.'
 };
 
-export interface RunReadinessFixture {
+export interface RunReadinessFixture extends Record<string, unknown> {
   projectId: number;
   projectSetupReady: boolean;
   executionReady: boolean;
+  completionCapabilityReady: boolean;
   readyToRun: boolean;
   state: string;
   blockedCount: number;
   provisioning: Record<string, unknown> | null;
   agents: Array<Record<string, unknown>>;
   blockers: Array<Record<string, unknown>>;
+  completionCapability: Record<string, unknown> | null;
   nextAction: {
     kind: string;
     label: string;
     nextSafeAction: string;
     targetProductRoute: string;
+    command?: string;
   };
   boundary: string;
 }
@@ -42,12 +45,14 @@ export function readyToRunReadiness(projectId = 7): RunReadinessFixture {
     projectId,
     projectSetupReady: true,
     executionReady: true,
+    completionCapabilityReady: true,
     readyToRun: true,
     state: 'ReadyToRun',
     blockedCount: 0,
     provisioning: null,
     agents: [],
     blockers: [],
+    completionCapability: null,
     nextAction: {
       kind: 'StartRun',
       label: 'Ready to run',
@@ -55,6 +60,30 @@ export function readyToRunReadiness(projectId = 7): RunReadinessFixture {
       targetProductRoute: ''
     },
     boundary: 'Backend run readiness truth.'
+  };
+}
+
+export function projectWorkSessionRequiredReadiness(projectId = 7): RunReadinessFixture {
+  const command = '.\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply';
+  return {
+    ...readyToRunReadiness(projectId),
+    completionCapabilityReady: false,
+    readyToRun: false,
+    state: 'ProjectWorkSessionRequired',
+    completionCapability: {
+      projectId,
+      isReady: false,
+      state: 'Disabled',
+      reasonCode: 'ProjectApplyCapabilityDisabled',
+      reason: 'Controlled sandbox apply is disabled for this API session.'
+    },
+    nextAction: {
+      kind: 'RestartProjectWorkSession',
+      label: 'Project-work session required',
+      nextSafeAction: 'This session can build, test and review work, but controlled sandbox apply is disabled. Restart IronDev in sandbox-apply mode before beginning this Work Item.',
+      targetProductRoute: '',
+      command
+    }
   };
 }
 

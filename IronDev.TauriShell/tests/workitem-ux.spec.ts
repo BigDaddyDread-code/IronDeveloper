@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { mockProjectBoard } from './helpers/mockBoard';
+import { projectWorkSessionRequiredReadiness } from './helpers/mockBoard';
 import { mockProjectWorkItem, workItemProjection } from './helpers/mockWorkItem';
 
 test('Work Item renders backend stage, gate, contract, and primary action truth', async ({ page }) => {
@@ -109,6 +110,25 @@ test('Work Item separates project-work configuration from an explicit workflow s
   await page.getByTestId('flow.workItem.runWorkflowSmoke').click();
   await expect.poll(() => requestedPurpose).toBe('SmokeSimulation');
   await expect(page.getByText(/fixed LocalTest fixture/)).toBeVisible();
+});
+
+test('Work Item blocks early on project-work capability and does not invite a run', async ({ page }) => {
+  await mockWorkspace(page);
+  await mockProjectWorkItem(page, {
+    primaryActionKind: 'None',
+    primaryActionLabel: 'Project-work session required',
+    primaryActionAllowed: false,
+    runReadiness: projectWorkSessionRequiredReadiness(7)
+  });
+
+  await page.goto('/projects/7/work-items/42');
+
+  const readiness = page.getByTestId('flow.workItem.projectWorkSession');
+  await expect(readiness).toContainText('Project-work session required');
+  await expect(readiness).toContainText('controlled sandbox apply is disabled');
+  await expect(page.getByTestId('flow.workItem.projectWorkSession.command')).toHaveText('.\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply');
+  await expect(page.getByTestId('flow.workItem.runWorkflowSmoke')).toHaveCount(0);
+  await expect(page.getByTestId('flow.workItem.startRun')).toHaveCount(0);
 });
 
 test('Work Item projection failure offers retry and never reconstructs lifecycle truth', async ({ page }) => {

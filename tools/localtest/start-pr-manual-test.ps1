@@ -5,7 +5,8 @@ param(
     [int]$UiPort = 5173,
     [switch]$Reset,
     [switch]$FreshSession,
-    [switch]$BrowserOnly
+    [switch]$BrowserOnly,
+    [switch]$EnableSandboxApply
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,6 +27,7 @@ $arguments = @(
 if ($Reset) { $arguments += "-Reset" }
 if ($FreshSession) { $arguments += "-FreshSession" }
 if ($BrowserOnly) { $arguments += "-BrowserOnly" }
+if ($EnableSandboxApply) { $arguments += "-EnableSandboxApply" }
 
 & $pwsh @arguments
 if ($LASTEXITCODE -ne 0) {

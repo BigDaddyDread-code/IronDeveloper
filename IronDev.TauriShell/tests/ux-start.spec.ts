@@ -35,7 +35,7 @@ test('signed in without a project lands on the chooser; badges are backend readi
   // Selecting a project changes context — the Board renders with the same truth.
   await page.getByTestId('flow.chooser.project.7').click();
   await expect(page.getByTestId('flow.board.columns')).toBeVisible();
-  await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Ready to run');
+  await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Ready for project work');
 });
 
 test('creating a project lands on the readiness screen, never straight into work', async ({ page }) => {

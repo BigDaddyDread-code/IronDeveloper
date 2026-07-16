@@ -13732,6 +13732,12 @@ export interface components {
             nextSafeAction?: string | null;
             resetCommand?: string | null;
             detail?: string | null;
+            sessionMode?: string | null;
+            sandboxApplyRequested?: boolean;
+            sandboxApplyEnabled?: boolean;
+            sandboxApplyRoot?: string | null;
+            capabilities?: string[] | null;
+            sandboxApplyRestartCommand?: string | null;
         };
         LoginRequest: {
             email?: string | null;
@@ -14302,6 +14308,25 @@ export interface components {
             indexingStatus?: string | null;
             /** Format: int32 */
             indexedFileCount?: number | null;
+        };
+        ProjectApplyCapability: {
+            /** Format: int32 */
+            projectId?: number;
+            isReady?: boolean;
+            state?: string | null;
+            reasonCode?: string | null;
+            reason?: string | null;
+            nextSafeAction?: string | null;
+            sessionMode?: string | null;
+            launcherSessionId?: string | null;
+            repositoryCommit?: string | null;
+            sandboxRoot?: string | null;
+            projectPath?: string | null;
+            sandboxRootFingerprint?: string | null;
+            projectPathFingerprint?: string | null;
+            qualificationId?: string | null;
+            qualificationFingerprint?: string | null;
+            readinessEvidenceHash?: string | null;
         };
         ProjectAuditExport: {
             schemaVersion?: string | null;
@@ -14996,6 +15021,7 @@ export interface components {
             requiredPurpose?: string | null;
             projectSetupReady?: boolean;
             executionReady?: boolean;
+            completionCapabilityReady?: boolean;
             readyToRun?: boolean;
             state?: string | null;
             /** Format: int32 */
@@ -15003,6 +15029,7 @@ export interface components {
             provisioning?: components["schemas"]["ProjectProvisioningReadiness"];
             agents?: components["schemas"]["ProjectRunAgentReadiness"][] | null;
             blockers?: components["schemas"]["ProjectRunReadinessBlocker"][] | null;
+            completionCapability?: components["schemas"]["ProjectApplyCapability"];
             nextAction?: components["schemas"]["ProjectRunReadinessNextAction"];
             boundary?: string | null;
         };
@@ -15021,6 +15048,7 @@ export interface components {
             label?: string | null;
             nextSafeAction?: string | null;
             targetProductRoute?: string | null;
+            command?: string | null;
         };
         ProjectServicesStatusDto: {
             /** Format: int32 */

@@ -203,6 +203,24 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
               <dd data-testid="auth.localtestSessionId">{preflight?.sessionId ?? 'Not reported yet'}</dd>
             </div>
             <div>
+              <dt>Session mode</dt>
+              <dd data-testid="auth.localtestSessionMode">{preflight?.sessionMode || 'Not reported yet'}</dd>
+            </div>
+            <div>
+              <dt>Controlled sandbox apply</dt>
+              <dd data-testid="auth.localtestSandboxApply">
+                {preflight ? (preflight.sandboxApplyEnabled ? 'Enabled' : 'Disabled') : 'Not reported yet'}
+              </dd>
+            </div>
+            <div>
+              <dt>Sandbox root</dt>
+              <dd data-testid="auth.localtestSandboxRoot">{preflight?.sandboxApplyRoot || 'Not enabled'}</dd>
+            </div>
+            <div>
+              <dt>Capabilities</dt>
+              <dd data-testid="auth.localtestCapabilities">{preflight?.capabilities?.join(', ') || 'None declared'}</dd>
+            </div>
+            <div>
               <dt>Next action</dt>
               <dd data-testid="auth.localtestNextAction">
                 {preflight?.nextSafeAction ?? session.apiStatus.message}

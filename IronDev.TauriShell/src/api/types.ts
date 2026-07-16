@@ -40,6 +40,7 @@ export type LocalTestPreflightState =
   | 'SeedCredentialInvalid'
   | 'SeedMembershipMissing'
   | 'ApiIdentityMismatch'
+  | 'SessionCapabilityMismatch'
   | 'DatabaseUnavailable'
   | 'LocalTestReady';
 
@@ -58,6 +59,12 @@ export interface LocalTestPreflightInfo {
   nextSafeAction: string;
   resetCommand: string | null;
   detail: string;
+  sessionMode: string;
+  sandboxApplyRequested: boolean;
+  sandboxApplyEnabled: boolean;
+  sandboxApplyRoot: string | null;
+  capabilities: string[];
+  sandboxApplyRestartCommand: string;
 }
 
 export type ProjectTicket = components['schemas']['ProjectTicket'] & { revision?: number };

@@ -223,6 +223,11 @@ public sealed class BlockC12LocalTestSafetyRegressionTests
             "uiUrl",
             "databaseName",
             "environment",
+            "sessionMode",
+            "sandboxApplyRequested",
+            "sandboxApplyEnabled",
+            "sandboxApplyRoot",
+            "capabilities",
             "seedContractVersion",
             "seededLoginCheckResult",
             "startupTimestampUtc"
@@ -234,6 +239,47 @@ public sealed class BlockC12LocalTestSafetyRegressionTests
         StringAssert.Contains(launcher, "IRONDEV_LOCALTEST_SESSION_ID");
         StringAssert.Contains(launcher, "VITE_IRONDEV_LOCALTEST_SESSION_ID");
         StringAssert.Contains(launcher, "IRONDEV_LOCALTEST_API_LOG_PATH");
+    }
+
+    [TestMethod]
+    public void Dux1_ProjectWorkLauncher_EnablesControlledApplyOnlyForSafeExplicitSession()
+    {
+        var wrapper = ReadRepositoryFile("tools", "localtest", "start-pr-manual-test.ps1");
+        var launcher = ReadRepositoryFile("tools", "localtest", "start-alpha-localtest.ps1");
+        const string restart = @".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply";
+
+        StringAssert.Contains(wrapper, "[switch]$EnableSandboxApply");
+        StringAssert.Contains(wrapper, "$arguments += \"-EnableSandboxApply\"");
+        StringAssert.Contains(launcher, "[switch]$EnableSandboxApply");
+        StringAssert.Contains(launcher, restart);
+        StringAssert.Contains(launcher, "Assert-SafeSandboxApplyRoot");
+        StringAssert.Contains(launcher, "SkeletonApply__Enabled");
+        StringAssert.Contains(launcher, "SkeletonApply__LauncherSessionId");
+        StringAssert.Contains(launcher, "IRONDEV_LOCALTEST_QUALIFICATION_KEY = New-LocalTestJwtKey");
+        StringAssert.Contains(ReadRepositoryFile("IronDev.Infrastructure", "Services", "ProjectApplyQualificationStore.cs"),
+            ".irondev-disposable-sandbox");
+        StringAssert.Contains(launcher, "ProjectFeatureWork");
+        StringAssert.Contains(launcher, "ControlledSandboxApply");
+        AssertDoesNotContain(launcher, "git commit", "LocalTest project-work launcher");
+        AssertDoesNotContain(launcher, "git push", "LocalTest project-work launcher");
+    }
+
+    [TestMethod]
+    public void Dux1_ProjectConnect_UsesTheCapabilityOwnerForDisposableQualification()
+    {
+        var controller = ReadRepositoryFile("IronDev.Api", "Controllers", "ProjectsController.cs");
+
+        Assert.AreEqual(
+            1,
+            Regex.Matches(controller, @"_applyCapability\s*\.QualifyDisposableProjectAsync\(").Count,
+            "The controller must have one qualification authority call, behind its post-mutation retry-safe wrapper.");
+        Assert.AreEqual(
+            3,
+            Regex.Matches(controller, @"await TryQualifyDisposableProjectAsync\(").Count,
+            "Initial connection, a new-session selection, and a later path change must use the same retry-safe qualification wrapper.");
+        StringAssert.Contains(controller, "await TryQualifyDisposableProjectAsync(id, user.UserId, ct);");
+        StringAssert.Contains(controller, "await TryQualifyDisposableProjectAsync(projectId, user.UserId, ct);");
+        StringAssert.Contains(controller, "instead of creating a duplicate project");
     }
 
     [TestMethod]
@@ -305,13 +351,21 @@ public sealed class BlockC12LocalTestSafetyRegressionTests
 
     private static string RepositoryRoot()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
+        foreach (var start in new[]
+                 {
+                     Environment.GetEnvironmentVariable("IRONDEV_REPOSITORY_ROOT"),
+                     Environment.CurrentDirectory,
+                     AppContext.BaseDirectory
+                 }.Where(value => !string.IsNullOrWhiteSpace(value)))
         {
-            if (File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
-                return directory.FullName;
+            var directory = new DirectoryInfo(start!);
+            while (directory is not null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
+                    return directory.FullName;
 
-            directory = directory.Parent;
+                directory = directory.Parent;
+            }
         }
 
         throw new DirectoryNotFoundException("Could not find repository root.");

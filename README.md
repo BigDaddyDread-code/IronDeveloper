@@ -79,6 +79,14 @@ Start the complete LocalTest stack used for product and PR checks with:
 
 Use `-Reset` only when disposable LocalTest data should be rebuilt. The launcher starts the API, verifies the seeded login and environment contract, then starts the browser or Tauri shell. The UI reports the actual `LocalTest` environment and deterministic model mode.
 
+Normal LocalTest sessions prove workflow behavior but do not claim they can finish project feature work. For a deliberately destructive disposable-sandbox journey, use the explicit project-work mode:
+
+```powershell
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply
+```
+
+That switch is LocalTest-only. It binds the API, browser, test database, contracted sandbox root, disposable project marker, and launcher session identity. It enables no automatic apply, commit, push, pull request, release, or browser-side authority.
+
 LocalTest credentials are seeded for local use only:
 
 ```text

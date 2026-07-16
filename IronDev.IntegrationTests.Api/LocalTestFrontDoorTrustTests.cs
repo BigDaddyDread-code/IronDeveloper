@@ -32,6 +32,9 @@ public sealed class LocalTestFrontDoorTrustTests : ApiTestBase
         Assert.AreEqual("IronDeveloper_Test", preflight.Database);
         Assert.AreEqual("Passed", preflight.SeededLoginCheckResult);
         Assert.IsNull(preflight.ResetCommand);
+        Assert.AreEqual("SmokeSimulation", preflight.SessionMode);
+        Assert.IsFalse(preflight.SandboxApplyEnabled);
+        CollectionAssert.DoesNotContain(preflight.Capabilities.ToArray(), "ControlledSandboxApply");
 
         var response = await Client.PostAsJsonAsync("/api/auth/login", new
         {
@@ -93,6 +96,34 @@ public sealed class LocalTestFrontDoorTrustTests : ApiTestBase
     }
 
     [TestMethod]
+    public async Task LauncherCapabilityDisagreement_ReturnsNamedStateAndSupportedRestart()
+    {
+        await SeedValidContractUserAsync();
+
+        var preflight = await CheckPreflightAsync(capabilityMismatch: true);
+
+        Assert.AreEqual(LocalTestPreflightStates.SessionCapabilityMismatch, preflight.State);
+        Assert.AreEqual(LocalTestPreflightService.SandboxApplyRestartCommand, preflight.ResetCommand);
+        Assert.AreEqual(LocalTestPreflightService.SandboxApplyRestartCommand, preflight.SandboxApplyRestartCommand);
+        StringAssert.Contains(preflight.NextSafeAction, "Session capability mismatch");
+    }
+
+    [TestMethod]
+    public async Task ProjectWorkCapabilityAgreement_IsVisibleInReadyPreflight()
+    {
+        await SeedValidContractUserAsync();
+
+        var preflight = await CheckPreflightAsync(sandboxApplyEnabled: true);
+
+        Assert.AreEqual(LocalTestPreflightStates.LocalTestReady, preflight.State);
+        Assert.AreEqual("ProjectFeatureWork", preflight.SessionMode);
+        Assert.IsTrue(preflight.SandboxApplyRequested);
+        Assert.IsTrue(preflight.SandboxApplyEnabled);
+        Assert.AreEqual(@"C:\IronDevTestWorkspaces", preflight.SandboxApplyRoot);
+        CollectionAssert.Contains(preflight.Capabilities.ToArray(), "ControlledSandboxApply");
+    }
+
+    [TestMethod]
     public async Task NonLocalTestApi_ExposesNoResetGuidance()
     {
         var response = await Client.GetAsync("/api/localtest/preflight");
@@ -108,12 +139,23 @@ public sealed class LocalTestFrontDoorTrustTests : ApiTestBase
     }
 
     private static async Task<LocalTestPreflightResponse> CheckPreflightAsync(
-        string databaseName = "IronDeveloper_Test")
+        string databaseName = "IronDeveloper_Test",
+        bool capabilityMismatch = false,
+        bool sandboxApplyEnabled = false)
     {
         var commit = ResolveApiBuildCommit();
         using var session = TemporaryEnvironmentVariable.Set("IRONDEV_LOCALTEST_SESSION_ID", "integration-test-session");
         using var repositoryCommit = TemporaryEnvironmentVariable.Set("IRONDEV_LOCALTEST_REPOSITORY_COMMIT", commit);
         using var apiUrl = TemporaryEnvironmentVariable.Set("IRONDEV_LOCALTEST_API_BASE_URL", "http://127.0.0.1:5000");
+        var sessionModeValue = sandboxApplyEnabled ? "ProjectFeatureWork" : "SmokeSimulation";
+        var rootValue = sandboxApplyEnabled ? @"C:\IronDevTestWorkspaces" : string.Empty;
+        using var sessionMode = TemporaryEnvironmentVariable.Set("IRONDEV_LOCALTEST_SESSION_MODE", sessionModeValue);
+        using var requested = TemporaryEnvironmentVariable.Set("IRONDEV_LOCALTEST_SANDBOX_APPLY_REQUESTED", sandboxApplyEnabled ? "true" : "false");
+        using var enabled = TemporaryEnvironmentVariable.Set("IRONDEV_LOCALTEST_SANDBOX_APPLY_ENABLED", capabilityMismatch ? "true" : sandboxApplyEnabled ? "true" : "false");
+        using var sandboxRoot = TemporaryEnvironmentVariable.Set("IRONDEV_LOCALTEST_SANDBOX_APPLY_ROOT", rootValue);
+        using var capabilities = TemporaryEnvironmentVariable.Set("IRONDEV_LOCALTEST_CAPABILITIES", sandboxApplyEnabled
+            ? "ProjectFeatureWork;ControlledSandboxApply"
+            : "WorkflowSmokeSimulation");
 
         var connectionString = new SqlConnectionStringBuilder(ConnectionString)
         {
@@ -122,7 +164,11 @@ public sealed class LocalTestFrontDoorTrustTests : ApiTestBase
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:IronDeveloperDb"] = connectionString
+                ["ConnectionStrings:IronDeveloperDb"] = connectionString,
+                ["SkeletonApply:Enabled"] = sandboxApplyEnabled ? "true" : "false",
+                ["SkeletonApply:LauncherCapabilityDeclared"] = sandboxApplyEnabled ? "true" : "false",
+                ["SkeletonApply:LauncherSessionId"] = "integration-test-session",
+                ["SkeletonApply:SandboxRoot"] = rootValue
             })
             .Build();
         var service = new LocalTestPreflightService(
