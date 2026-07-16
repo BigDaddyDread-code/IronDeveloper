@@ -496,13 +496,21 @@ public abstract class ApiTestBase
 
     private static string RepositoryRoot()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
+        foreach (var start in new[]
+                 {
+                     Environment.GetEnvironmentVariable("IRONDEV_REPOSITORY_ROOT"),
+                     Environment.CurrentDirectory,
+                     AppContext.BaseDirectory
+                 }.Where(value => !string.IsNullOrWhiteSpace(value)))
         {
-            if (File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
-                return directory.FullName;
+            var directory = new DirectoryInfo(start!);
+            while (directory is not null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "IronDev.slnx")))
+                    return directory.FullName;
 
-            directory = directory.Parent;
+                directory = directory.Parent;
+            }
         }
 
         throw new DirectoryNotFoundException("Could not find repository root.");

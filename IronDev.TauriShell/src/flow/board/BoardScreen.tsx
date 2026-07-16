@@ -112,6 +112,12 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning, onConfigureRun
           testid: 'flow.cockpit.primary.configureRunAgents',
           run: onConfigureRunAgents
         }
+    : runReadiness?.completionCapabilityReady === false
+      ? {
+          label: 'Copy supported restart',
+          testid: 'flow.cockpit.primary.copyProjectWorkRestart',
+          run: () => void navigator.clipboard.writeText(runReadiness.nextAction?.command ?? '')
+        }
     : firstAttentionId !== undefined
     ? {
         label: 'Review waiting item',
@@ -161,7 +167,9 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning, onConfigureRun
                 ? `Setup incomplete · ${readiness?.blockedCount ?? 0} blocker(s)`
                 : runReadiness.state === 'RunConfigurationRequired'
                   ? `Run configuration required · ${runReadiness.blockedCount ?? 0} agent blockers`
-                  : 'Ready to run'}
+                  : runReadiness.state === 'ProjectWorkSessionRequired'
+                    ? 'Project-work session required'
+                    : 'Ready for project work'}
             </span>
           ) : null}
           <button
@@ -219,6 +227,28 @@ export function BoardScreen({ onOpenWorkItem, onOpenProvisioning, onConfigureRun
           </div>
           <button className="fl-btn fl-pri" type="button" onClick={onConfigureRunAgents} data-testid="flow.cockpit.runReadiness.configure">
             Configure run agents
+          </button>
+        </section>
+      ) : null}
+
+      {runReadiness?.state === 'ProjectWorkSessionRequired' ? (
+        <section className="fl-board-blocked" data-testid="flow.cockpit.projectWorkSession">
+          <div>
+            <strong>Project-work session required</strong>
+            <p>{runReadiness.nextAction?.nextSafeAction}</p>
+            <code data-testid="flow.cockpit.projectWorkSession.command">{runReadiness.nextAction?.command}</code>
+            <details>
+              <summary>What this enables</summary>
+              <p>{runReadiness.completionCapability?.reason} Controlled apply remains constrained to the displayed disposable sandbox identity.</p>
+            </details>
+          </div>
+          <button
+            className="fl-btn fl-pri"
+            type="button"
+            onClick={() => void navigator.clipboard.writeText(runReadiness.nextAction?.command ?? '')}
+            data-testid="flow.cockpit.projectWorkSession.copy"
+          >
+            Copy supported restart
           </button>
         </section>
       ) : null}

@@ -54,6 +54,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
     private readonly SkeletonRunDriftDetector _driftDetector;
     private readonly IConfiguration _configuration;
     private readonly IProjectRunReadinessService _runReadiness;
+    private readonly IProjectApplyCapabilityService _applyCapability;
 
     public TicketSkeletonRunService(
         ITicketService tickets,
@@ -70,7 +71,8 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         IProjectMembershipService projectMemberships,
         ISkeletonAgentProfileService agentProfiles,
         IConfiguration configuration,
-        IProjectRunReadinessService runReadiness)
+        IProjectRunReadinessService runReadiness,
+        IProjectApplyCapabilityService applyCapability)
     {
         _tickets = tickets;
         _projects = projects;
@@ -88,6 +90,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         _driftDetector = new SkeletonRunDriftDetector(events);
         _configuration = configuration;
         _runReadiness = runReadiness;
+        _applyCapability = applyCapability;
     }
 
     public Task<TicketBuildRunDto?> StartAsync(
@@ -143,7 +146,15 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         {
             ["status"] = RunLifecycleState.Created.ToString(),
             ["runPurpose"] = runPurpose,
-            ["currentNode"] = "SkeletonRun"
+            ["currentNode"] = "SkeletonRun",
+            ["launcherSessionId"] = readiness.CompletionCapability?.LauncherSessionId ?? string.Empty,
+            ["repositoryCommit"] = readiness.CompletionCapability?.RepositoryCommit ?? string.Empty,
+            ["applyCapabilityState"] = readiness.CompletionCapability?.ReasonCode ?? ProjectApplyCapabilityReasonCodes.NotRequired,
+            ["sandboxRootFingerprint"] = readiness.CompletionCapability?.SandboxRootFingerprint ?? string.Empty,
+            ["projectPathFingerprint"] = readiness.CompletionCapability?.ProjectPathFingerprint ?? string.Empty,
+            ["qualificationId"] = readiness.CompletionCapability?.QualificationId ?? string.Empty,
+            ["qualificationFingerprint"] = readiness.CompletionCapability?.QualificationFingerprint ?? string.Empty,
+            ["readinessEvidenceHash"] = readiness.CompletionCapability?.ReadinessEvidenceHash ?? string.Empty
         }, cancellationToken).ConfigureAwait(false);
 
         try
@@ -155,8 +166,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return await BlockAsync(run.RunId, projectId, ticketId,
                 "AgentConfigurationSnapshotFailed",
                 exception.Message,
-                "Resolve agent configuration and start a new run. No model-driven work was started.",
-                cancellationToken).ConfigureAwait(false);
+                "Resolve agent configuration and start a new run. No model-driven work was started.").ConfigureAwait(false);
         }
 
         if (string.IsNullOrWhiteSpace(project.LocalPath) || !Directory.Exists(project.LocalPath))
@@ -164,8 +174,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return await BlockAsync(run.RunId, projectId, ticketId,
                 "ProjectPathMissing",
                 "Project local path is not configured or does not exist.",
-                "Configure the project's local path, then start a new skeleton run.",
-                cancellationToken).ConfigureAwait(false);
+                "Configure the project's local path, then start a new skeleton run.").ConfigureAwait(false);
         }
 
         // Gate stays at its owning step: readiness is evaluated (and enforced) inside
@@ -182,16 +191,14 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return await BlockAsync(run.RunId, projectId, ticketId,
                 "ReadinessBlocked",
                 exception.Message,
-                "Resolve the blocking issues on the ticket, then start a new skeleton run.",
-                cancellationToken).ConfigureAwait(false);
+                "Resolve the blocking issues on the ticket, then start a new skeleton run.").ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             return await BlockAsync(run.RunId, projectId, ticketId,
                 "ProposalGenerationFailed",
                 exception.Message,
-                "This is a service failure, not a ticket problem. Check the proposal service and model provider, then start a new skeleton run.",
-                cancellationToken).ConfigureAwait(false);
+                "This is a service failure, not a ticket problem. Check the proposal service and model provider, then start a new skeleton run.").ConfigureAwait(false);
         }
 
         var fileWrites = MapFileWrites(proposal);
@@ -200,8 +207,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return await BlockAsync(run.RunId, projectId, ticketId,
                 "ProposalEmpty",
                 "The proposal produced no valid file changes to exercise.",
-                "Refine the ticket so the builder can propose concrete file changes, then start a new skeleton run.",
-                cancellationToken).ConfigureAwait(false);
+                "Refine the ticket so the builder can propose concrete file changes, then start a new skeleton run.").ConfigureAwait(false);
         }
 
         var evidenceRoot = ResolveEvidenceRoot();
@@ -334,8 +340,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                     maxRepairAttempts == 0 ? classification.Kind.ToString() : "RepairBudgetExhausted",
                     $"{classification.Kind} on '{classification.FailedCommand}' after {attemptNumber} attempt(s) " +
                     $"(repair budget: {maxRepairAttempts}). The failed attempt's workspace and evidence are preserved.",
-                    "Read the preserved failure evidence, refine the ticket or the repair budget, then start a new skeleton run.",
-                    cancellationToken).ConfigureAwait(false);
+                    "Read the preserved failure evidence, refine the ticket or the repair budget, then start a new skeleton run.").ConfigureAwait(false);
             }
 
             attemptNumber++;
@@ -366,8 +371,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 return await BlockAsync(run.RunId, projectId, ticketId,
                     "RepairProposalGenerationFailed",
                     exception.Message,
-                    "This is a service failure, not a ticket problem. Check the proposal service and model provider, then start a new skeleton run.",
-                    cancellationToken).ConfigureAwait(false);
+                    "This is a service failure, not a ticket problem. Check the proposal service and model provider, then start a new skeleton run.").ConfigureAwait(false);
             }
 
             fileWrites = MapFileWrites(proposal);
@@ -376,8 +380,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
                 return await BlockAsync(run.RunId, projectId, ticketId,
                     "RepairProposalEmpty",
                     "The repair proposal produced no valid file changes to exercise.",
-                    "Read the preserved failure evidence and refine the ticket, then start a new skeleton run.",
-                    cancellationToken).ConfigureAwait(false);
+                    "Read the preserved failure evidence and refine the ticket, then start a new skeleton run.").ConfigureAwait(false);
             }
 
             proposalId = await PersistProposalEvidenceAsync(run.RunId, evidenceRoot, proposal, cancellationToken, $"repair-{attemptNumber}").ConfigureAwait(false);
@@ -1131,17 +1134,47 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             return null;
 
         // Explicit sandbox opt-in: applying to a source repository is off by default.
-        if (!string.Equals(_configuration["SkeletonApply:Enabled"], "true", StringComparison.OrdinalIgnoreCase))
+        var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        var applyCapability = await _applyCapability.EvaluateAsync(projectId, cancellationToken).ConfigureAwait(false);
+        await PublishAsync(runId, "ProjectApplyCapabilityEvaluated",
+            applyCapability.IsReady
+                ? "Controlled sandbox apply capability was re-verified at the mutation boundary."
+                : "Controlled sandbox apply capability was refused at the mutation boundary.",
+            projectId, ticketId, new Dictionary<string, string>
+            {
+                ["reasonCode"] = applyCapability.ReasonCode,
+                ["launcherSessionId"] = applyCapability.LauncherSessionId,
+                ["repositoryCommit"] = applyCapability.RepositoryCommit,
+                ["sandboxRootFingerprint"] = applyCapability.SandboxRootFingerprint,
+                ["projectPathFingerprint"] = applyCapability.ProjectPathFingerprint,
+                ["qualificationId"] = applyCapability.QualificationId,
+                ["qualificationFingerprint"] = applyCapability.QualificationFingerprint,
+                ["readinessEvidenceHash"] = applyCapability.ReadinessEvidenceHash,
+                ["nextSafeAction"] = applyCapability.NextSafeAction,
+                ["currentNode"] = "SkeletonApply"
+            }, cancellationToken).ConfigureAwait(false);
+        if (!applyCapability.IsReady)
         {
             return await RefuseApplyAsync(run, projectId, ticketId,
-                "ApplyDisabled",
-                "Skeleton apply is disabled. Set SkeletonApply:Enabled=true for sandbox projects only — the spine is copy-only and must never point at a repository you cannot discard.",
-                cancellationToken).ConfigureAwait(false);
+                applyCapability.ReasonCode,
+                applyCapability.Reason,
+                cancellationToken,
+                nextSafeAction: applyCapability.NextSafeAction).ConfigureAwait(false);
         }
 
         // Continuation must have been unblocked, proven from durable events —
         // never from the request or a cached flag.
-        var events = await _events.GetEventsAsync(runId, cancellationToken).ConfigureAwait(false);
+        var startEvidence = events.FirstOrDefault(runEvent => runEvent.EventType == "RunStarted");
+        if (startEvidence is null ||
+            !startEvidence.Payload.TryGetValue("readinessEvidenceHash", out var startEvidenceHash) ||
+            !startEvidenceHash.Equals(applyCapability.ReadinessEvidenceHash, StringComparison.Ordinal))
+        {
+            return await RefuseApplyAsync(run, projectId, ticketId,
+                ProjectApplyCapabilityReasonCodes.ProjectApplyQualificationBindingMismatch,
+                "The server-owned project qualification or another bound apply capability changed after this run started. Start a new run in a fresh project-work session.",
+                cancellationToken,
+                nextSafeAction: ProjectApplyCapabilityCommands.RestartInSandboxApplyMode).ConfigureAwait(false);
+        }
         if (!isRecovery && SkeletonApplyAttemptProjector.Build(events).Count > 0)
         {
             return await RefuseApplyAsync(run, projectId, ticketId,
@@ -1426,13 +1459,16 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         string message,
         CancellationToken cancellationToken,
         string? applyAttemptId = null,
-        int? attemptNumber = null)
+        int? attemptNumber = null,
+        string? nextSafeAction = null)
     {
         var payload = new Dictionary<string, string>
         {
             ["refusedReason"] = refusedReason,
             ["currentNode"] = "SkeletonApply"
         };
+        if (!string.IsNullOrWhiteSpace(nextSafeAction))
+            payload["nextSafeAction"] = nextSafeAction;
         if (!string.IsNullOrWhiteSpace(applyAttemptId))
         {
             payload["applyAttemptId"] = applyAttemptId;
@@ -1440,7 +1476,7 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         }
 
         await PublishAsync(run.RunId, "SkeletonApplyRefused",
-            $"Apply refused: {message}",
+            $"Apply refused: {message}{(string.IsNullOrWhiteSpace(nextSafeAction) ? string.Empty : $" Next safe action: {nextSafeAction}")}",
             projectId, ticketId, payload, cancellationToken).ConfigureAwait(false);
 
         var current = await _runs.GetAsync(run.RunId, cancellationToken).ConfigureAwait(false) ?? run;
@@ -2190,18 +2226,19 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
         long ticketId,
         string blockedReason,
         string message,
-        string nextSafeAction,
-        CancellationToken cancellationToken)
+        string nextSafeAction)
     {
         var summary = $"Blocked: {blockedReason} — {message}";
 
+        // RunStarted is already durable. A disconnected caller must not cancel
+        // these bounded terminal writes and strand the run in Created.
         await _runs.TransitionAsync(new RunStateTransition
         {
             RunId = runId,
             State = RunLifecycleState.Failed,
             Summary = summary,
             FailureReason = summary
-        }, cancellationToken).ConfigureAwait(false);
+        }, CancellationToken.None).ConfigureAwait(false);
 
         await PublishAsync(runId, "SkeletonRunBlocked", summary, projectId, ticketId, new Dictionary<string, string>
         {
@@ -2209,9 +2246,9 @@ public sealed class TicketSkeletonRunService : ITicketSkeletonRunService
             ["blockedReason"] = blockedReason,
             ["nextSafeAction"] = nextSafeAction,
             ["currentNode"] = "SkeletonRun"
-        }, cancellationToken).ConfigureAwait(false);
+        }, CancellationToken.None).ConfigureAwait(false);
 
-        var updated = await _runs.GetAsync(runId, cancellationToken).ConfigureAwait(false);
+        var updated = await _runs.GetAsync(runId, CancellationToken.None).ConfigureAwait(false);
         return ToDto(updated ?? new RunRecord { RunId = runId, State = RunLifecycleState.Failed, FailureReason = summary }, projectId, ticketId);
     }
 

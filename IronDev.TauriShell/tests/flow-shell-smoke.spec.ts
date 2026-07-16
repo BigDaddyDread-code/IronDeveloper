@@ -60,6 +60,24 @@ test('browser and launcher API URL mismatch is visible and blocks LocalTest read
   );
 });
 
+test('browser detects an internally mismatched project-work capability identity', async ({ page }) => {
+  await mockHealthyApi(page, {
+    sessionMode: 'ProjectFeatureWork',
+    sandboxApplyRequested: true,
+    sandboxApplyEnabled: true,
+    sandboxApplyRoot: 'C:\\IronDevTestWorkspaces',
+    capabilities: ['ProjectFeatureWork']
+  });
+  await page.goto('/');
+
+  await expect(page.getByTestId('auth.localtestSeedStatus')).toHaveText('SessionCapabilityMismatch');
+  await expect(page.getByTestId('auth.localtestNextAction')).toContainText('Session capability mismatch');
+  await expect(page.getByTestId('auth.submit')).toBeDisabled();
+  await expect(page.getByTestId('auth.localtestResetCommand')).toHaveText(
+    '.\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply'
+  );
+});
+
 test('production sign-in exposes no LocalTest reset guidance', async ({ page }) => {
   await page.route('**/irondev-api/health', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) });
@@ -399,6 +417,12 @@ function localTestPreflight(overrides: Record<string, unknown> = {}) {
     nextSafeAction: 'Sign in with the documented LocalTest credentials.',
     resetCommand: null,
     detail: 'LocalTest front door is ready.',
+    sessionMode: 'SmokeSimulation',
+    sandboxApplyRequested: false,
+    sandboxApplyEnabled: false,
+    sandboxApplyRoot: null,
+    capabilities: ['WorkflowSmokeSimulation'],
+    sandboxApplyRestartCommand: '.\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply',
     ...overrides
   };
 }

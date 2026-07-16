@@ -4,7 +4,8 @@ param(
     [int]$UiPort = 5173,
     [switch]$Reset,
     [switch]$FreshSession,
-    [switch]$BrowserOnly
+    [switch]$BrowserOnly,
+    [switch]$EnableSandboxApply
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +29,18 @@ $uiOut = Join-Path $sessionRoot "ui.stdout.log"
 $uiErr = Join-Path $sessionRoot "ui.stderr.log"
 $sessionManifestPath = Join-Path $sessionRoot "session-manifest.json"
 $resetCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset"
+$sandboxApplyRestartCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply"
+$sessionMode = if ($EnableSandboxApply) { "ProjectFeatureWork" } else { "SmokeSimulation" }
+$sandboxApplyRequested = [bool]$EnableSandboxApply
+$sandboxApplyEnabled = $false
+$sandboxApplyRoot = if ($EnableSandboxApply) {
+    [System.IO.Path]::GetFullPath([string]$seedContract.paths.workspaceRoot).TrimEnd('\')
+} else { $null }
+$sessionCapabilities = if ($EnableSandboxApply) {
+    @("ProjectFeatureWork", "ControlledSandboxApply")
+} else {
+    @("WorkflowSmokeSimulation")
+}
 $configuredDatabaseName = [string]$seedContract.database.name
 $apiBuildIdentity = $null
 $apiBuildCommit = $null
@@ -205,7 +218,7 @@ function Write-LocalTestSessionManifest {
     )
 
     [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
         sessionId = $sessionId
         status = $Status
         repositoryCommit = $repositoryCommit
@@ -215,6 +228,11 @@ function Write-LocalTestSessionManifest {
         uiUrl = $UiUrl
         databaseName = $configuredDatabaseName
         environment = $seedContract.environment
+        sessionMode = $sessionMode
+        sandboxApplyRequested = $sandboxApplyRequested
+        sandboxApplyEnabled = $sandboxApplyEnabled
+        sandboxApplyRoot = $sandboxApplyRoot
+        capabilities = $sessionCapabilities
         seedContractVersion = $seedContract.schemaVersion
         apiBuildIdentity = $apiBuildIdentity
         apiBuildCommit = $apiBuildCommit
@@ -231,7 +249,43 @@ function Write-LocalTestSessionManifest {
         }
         failure = if ([string]::IsNullOrWhiteSpace($Failure)) { $null } else { $Failure }
         resetCommand = $resetCommand
+        sandboxApplyRestartCommand = $sandboxApplyRestartCommand
     } | ConvertTo-Json -Depth 5 | Set-Content -Path $sessionManifestPath -Encoding UTF8
+}
+
+function Assert-SafeSandboxApplyRoot {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+        throw "Controlled sandbox apply root '$Path' is missing. Use -Reset to recreate the contracted LocalTest sandbox."
+    }
+
+    $resolved = [System.IO.Path]::GetFullPath((Resolve-Path -LiteralPath $Path).Path).TrimEnd('\')
+    $contracted = [System.IO.Path]::GetFullPath([string]$seedContract.paths.workspaceRoot).TrimEnd('\')
+    if (-not $resolved.Equals($contracted, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing sandbox apply root '$resolved'; expected contracted LocalTest root '$contracted'."
+    }
+
+    $driveRoot = [System.IO.Path]::GetPathRoot($resolved).TrimEnd('\')
+    $protectedRoots = @(
+        $driveRoot,
+        [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile),
+        [Environment]::GetFolderPath([Environment+SpecialFolder]::Windows),
+        [Environment]::GetFolderPath([Environment+SpecialFolder]::System),
+        [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles),
+        [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object {
+        [System.IO.Path]::GetFullPath($_).TrimEnd('\')
+    }
+    if ($protectedRoots -contains $resolved) {
+        throw "Refusing protected sandbox apply root '$resolved'."
+    }
+
+    if (((Get-Item -LiteralPath $resolved -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing sandbox apply root '$resolved' because it is a reparse point."
+    }
+
+    return $resolved
 }
 
 function Get-LocalTestEnvironment {
@@ -355,15 +409,30 @@ try {
         & (Join-Path $PSScriptRoot "reset-localtest-data.ps1")
     }
 
+    if ($EnableSandboxApply) {
+        $sandboxApplyRoot = Assert-SafeSandboxApplyRoot -Path $sandboxApplyRoot
+        $sandboxApplyEnabled = $true
+    }
+
     $apiConnectionString = Get-ResolvedLocalTestConnectionString
     $configuredDatabaseName = ([System.Data.SqlClient.SqlConnectionStringBuilder]::new($apiConnectionString)).InitialCatalog
     $apiEnvironmentVariables = [ordered]@{
         IRONDEV_JWT_KEY = New-LocalTestJwtKey
+        IRONDEV_LOCALTEST_QUALIFICATION_KEY = New-LocalTestJwtKey
         ConnectionStrings__IronDeveloperDb = $apiConnectionString
         IRONDEV_LOCALTEST_SESSION_ID = $sessionId
         IRONDEV_LOCALTEST_REPOSITORY_COMMIT = $repositoryCommit
         IRONDEV_LOCALTEST_API_BASE_URL = $ApiBaseUrl.TrimEnd('/')
         IRONDEV_LOCALTEST_API_LOG_PATH = $apiApplicationLog
+        IRONDEV_LOCALTEST_SESSION_MODE = $sessionMode
+        IRONDEV_LOCALTEST_SANDBOX_APPLY_REQUESTED = $sandboxApplyRequested.ToString().ToLowerInvariant()
+        IRONDEV_LOCALTEST_SANDBOX_APPLY_ENABLED = $sandboxApplyEnabled.ToString().ToLowerInvariant()
+        IRONDEV_LOCALTEST_SANDBOX_APPLY_ROOT = if ($sandboxApplyRoot) { $sandboxApplyRoot } else { "" }
+        IRONDEV_LOCALTEST_CAPABILITIES = ($sessionCapabilities -join ";")
+        SkeletonApply__Enabled = $sandboxApplyEnabled.ToString().ToLowerInvariant()
+        SkeletonApply__SandboxRoot = if ($sandboxApplyRoot) { $sandboxApplyRoot } else { "" }
+        SkeletonApply__LauncherCapabilityDeclared = $sandboxApplyRequested.ToString().ToLowerInvariant()
+        SkeletonApply__LauncherSessionId = $sessionId
     }
     $previousApiEnvironment = @{}
     foreach ($entry in $apiEnvironmentVariables.GetEnumerator()) {
@@ -428,6 +497,11 @@ try {
     $env:VITE_IRONDEV_LOCALTEST_SESSION_ID = $sessionId
     $env:VITE_IRONDEV_LOCALTEST_REPOSITORY_COMMIT = $repositoryCommit
     $env:VITE_IRONDEV_LOCALTEST_API_BASE_URL = $ApiBaseUrl.TrimEnd('/')
+    $env:VITE_IRONDEV_LOCALTEST_SESSION_MODE = $sessionMode
+    $env:VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_REQUESTED = $sandboxApplyRequested.ToString().ToLowerInvariant()
+    $env:VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_ENABLED = $sandboxApplyEnabled.ToString().ToLowerInvariant()
+    $env:VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_ROOT = if ($sandboxApplyRoot) { $sandboxApplyRoot } else { "" }
+    $env:VITE_IRONDEV_LOCALTEST_CAPABILITIES = ($sessionCapabilities -join ";")
 
     Write-Host ""
     Write-Host "PASS LocalTest API started"

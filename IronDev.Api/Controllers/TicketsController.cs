@@ -443,7 +443,7 @@ public sealed class TicketsController : ControllerBase
     /// <summary>
     /// POST skeleton-runs/{runId}/apply — applies an approved, continued run through
     /// the governed workspace spine. Copy-only, evidence-chained, sandbox-only
-    /// (SkeletonApply:Enabled, off by default); the approval is re-verified live.
+    /// (the authoritative project apply capability, off by default); the approval is re-verified live.
     /// </summary>
     [HttpPost("api/projects/{projectId:int}/tickets/{ticketId:long}/skeleton-runs/{runId}/apply")]
     public async Task<ActionResult<TicketBuildRunDto>> ApplySkeletonRun(

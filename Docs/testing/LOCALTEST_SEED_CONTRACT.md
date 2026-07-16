@@ -32,6 +32,22 @@ The supported command is:
 
 The reset recreates the bounded database world and all three disposable fixture repositories. Running it repeatedly produces the same stable identities and replaces mutable LocalTest journey state. It is destructive only inside the configured LocalTest database and fixture root.
 
+## Project-work completion capability
+
+The default launcher is intentionally unable to complete project feature work. It reports `Project-work session required` before any project-feature run is created.
+
+The only supported project-work restart is:
+
+```powershell
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply
+```
+
+The launcher refuses a missing, protected, or reparse-point sandbox root. The API then computes one apply-capability decision for both early readiness and the final mutation boundary. That decision binds `LocalTest`, `IronDeveloper_Test`, launcher/API session identity, tenant, project, the exact sandbox root, canonical project path, strict child containment, and reparse safety.
+
+Disposable qualification authority is a signed, server-owned record retained beneath the unique launcher session directory. It binds tenant ID, project ID, canonical project-path hash, sandbox-root hash, database identity, launcher session ID, qualifying actor, qualification timestamp, and contract version. A non-secret `.git/.irondev-disposable-sandbox` file contains only the qualification ID and record fingerprint; it is a correlation aid and grants no authority by itself. Readiness and apply require the server record, its integrity signature, its current binding, and the matching Git correlation marker. Qualification is idempotent for an unchanged binding. Deliberately selecting an existing project in a new launcher session or deliberately changing its path explicitly requalifies it; otherwise session or path changes fail closed. Reset's fixed root marker remains fixture correlation evidence only and is never accepted as apply authority.
+
+The marker alone grants nothing. Controlled apply remains off unless the supported launcher declares the matching session capability. Apply is never automatic, and commit, push, pull request, release, and deployment remain separate governed operations.
+
 ## Credentials And Tenant
 
 | Identity | ID | Value |

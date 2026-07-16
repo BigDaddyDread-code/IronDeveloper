@@ -84,7 +84,7 @@ public interface ITicketSkeletonRunService
     /// <summary>
     /// Applies an approved, continued run through the governed workspace apply spine —
     /// copy-only, evidence-chained, sandbox repositories only (off by default via
-    /// SkeletonApply:Enabled). The approval is re-verified live at this step; the
+    /// the authoritative project apply capability). The approval is re-verified live at this step; the
     /// spine's workspace evidence chain is the receipt. Commit, push, and release
     /// remain separate governed steps this service does not have.
     /// </summary>

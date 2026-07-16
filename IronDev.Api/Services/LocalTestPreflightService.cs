@@ -16,6 +16,7 @@ public static class LocalTestPreflightStates
     public const string SeedCredentialInvalid = "SeedCredentialInvalid";
     public const string SeedMembershipMissing = "SeedMembershipMissing";
     public const string ApiIdentityMismatch = "ApiIdentityMismatch";
+    public const string SessionCapabilityMismatch = "SessionCapabilityMismatch";
     public const string DatabaseUnavailable = "DatabaseUnavailable";
     public const string LocalTestReady = "LocalTestReady";
 }
@@ -34,7 +35,15 @@ public sealed record LocalTestPreflightResponse(
     string SeededLoginCheckResult,
     string NextSafeAction,
     string? ResetCommand,
-    string Detail);
+    string Detail)
+{
+    public string SessionMode { get; init; } = string.Empty;
+    public bool SandboxApplyRequested { get; init; }
+    public bool SandboxApplyEnabled { get; init; }
+    public string? SandboxApplyRoot { get; init; }
+    public IReadOnlyList<string> Capabilities { get; init; } = [];
+    public string SandboxApplyRestartCommand { get; init; } = LocalTestPreflightService.SandboxApplyRestartCommand;
+}
 
 public interface ILocalTestPreflightService
 {
@@ -45,6 +54,8 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
 {
     public const string ResetCommand =
         ".\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset";
+    public const string SandboxApplyRestartCommand =
+        ".\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply";
 
     private const string ContractFileName = "localtest-seed-contract.json";
     private readonly IHostEnvironment _hostEnvironment;
@@ -115,6 +126,19 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
                 "Stop. Restart LocalTest through the supported launcher so the API and browser share one session identity.",
                 ResetCommand,
                 "The API build commit, launcher repository commit, or LocalTest session identifier is missing or mismatched.");
+        }
+
+        if (!identity.HasConsistentCapabilities)
+        {
+            return CreateResponse(
+                LocalTestPreflightStates.SessionCapabilityMismatch,
+                configuredDatabase,
+                identity,
+                contract.SchemaVersion,
+                "NotChecked",
+                "Session capability mismatch. Restart through the supported project-work launcher.",
+                SandboxApplyRestartCommand,
+                "The API session mode, sandbox-apply request, enabled state, root, or declared capabilities do not agree.");
         }
 
         try
@@ -233,7 +257,14 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
             seededLoginCheckResult,
             nextSafeAction,
             resetCommand,
-            detail);
+        detail)
+        {
+            SessionMode = identity.SessionMode,
+            SandboxApplyRequested = identity.SandboxApplyRequested,
+            SandboxApplyEnabled = identity.SandboxApplyEnabled,
+            SandboxApplyRoot = identity.SandboxApplyRoot,
+            Capabilities = identity.Capabilities
+        };
 
     private static bool HasValidPassword(string password, string? passwordHash)
     {
@@ -283,7 +314,7 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
         return new SqlConnectionStringBuilder(connectionString).InitialCatalog;
     }
 
-    private static LocalTestIdentity BuildIdentity()
+    private LocalTestIdentity BuildIdentity()
     {
         var informationalVersion = typeof(LocalTestPreflightService).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
@@ -298,15 +329,64 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
             buildCommit,
             Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_REPOSITORY_COMMIT"),
             Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_SESSION_ID"),
-            Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_API_BASE_URL"));
+            Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_API_BASE_URL"),
+            Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_SESSION_MODE") ?? string.Empty,
+            IsTrue(Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_SANDBOX_APPLY_REQUESTED")),
+            IsTrue(Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_SANDBOX_APPLY_ENABLED")),
+            Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_SANDBOX_APPLY_ROOT"),
+            (Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_CAPABILITIES") ?? string.Empty)
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            IsTrue(_configuration["SkeletonApply:Enabled"]),
+            _configuration["SkeletonApply:SandboxRoot"],
+            IsTrue(_configuration["SkeletonApply:LauncherCapabilityDeclared"]),
+            _configuration["SkeletonApply:LauncherSessionId"]);
     }
+
+    private static bool IsTrue(string? value) =>
+        value?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
 
     private sealed record LocalTestIdentity(
         string ApiBuildIdentity,
         string ApiBuildCommit,
         string? LauncherRepositoryCommit,
         string? SessionId,
-        string? ApiBaseUrl);
+        string? ApiBaseUrl,
+        string SessionMode,
+        bool SandboxApplyRequested,
+        bool SandboxApplyEnabled,
+        string? SandboxApplyRoot,
+        IReadOnlyList<string> Capabilities,
+        bool ApiApplyEnabled,
+        string? ApiSandboxRoot,
+        bool ApiLauncherCapabilityDeclared,
+        string? ApiLauncherSessionId)
+    {
+        public bool HasConsistentCapabilities
+        {
+            get
+            {
+                if (SandboxApplyRequested)
+                {
+                    return SandboxApplyEnabled &&
+                           ApiApplyEnabled &&
+                           ApiLauncherCapabilityDeclared &&
+                           SessionMode == "ProjectFeatureWork" &&
+                           !string.IsNullOrWhiteSpace(SandboxApplyRoot) &&
+                           string.Equals(SandboxApplyRoot, ApiSandboxRoot, StringComparison.OrdinalIgnoreCase) &&
+                           string.Equals(SessionId, ApiLauncherSessionId, StringComparison.Ordinal) &&
+                           Capabilities.Contains("ProjectFeatureWork", StringComparer.Ordinal) &&
+                           Capabilities.Contains("ControlledSandboxApply", StringComparer.Ordinal);
+                }
+
+                return !SandboxApplyEnabled && !ApiApplyEnabled && !ApiLauncherCapabilityDeclared &&
+                       string.IsNullOrWhiteSpace(SandboxApplyRoot) &&
+                       string.IsNullOrWhiteSpace(ApiSandboxRoot) &&
+                       string.Equals(SessionId, ApiLauncherSessionId, StringComparison.Ordinal) &&
+                       SessionMode == "SmokeSimulation" &&
+                       !Capabilities.Contains("ControlledSandboxApply", StringComparer.Ordinal);
+            }
+        }
+    }
 
     private sealed class SeedUserProbe
     {

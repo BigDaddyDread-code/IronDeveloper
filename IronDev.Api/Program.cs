@@ -230,6 +230,8 @@ builder.Services.AddScoped<ICodebaseTicketGeneratorService, CodebaseTicketGenera
 builder.Services.AddScoped<IBuildErrorClassifierService, BuildErrorClassifierService>();
 builder.Services.AddScoped<IBuilderReadinessService, BuilderReadinessService>();
 builder.Services.AddScoped<IProjectRunReadinessService, ProjectRunReadinessService>();
+builder.Services.AddScoped<IProjectApplyQualificationStore, ProjectApplyQualificationStore>();
+builder.Services.AddScoped<IProjectApplyCapabilityService, ProjectApplyCapabilityService>();
 builder.Services.AddScoped<ITicketEvidenceSummaryService, TicketEvidenceSummaryService>();
 builder.Services.AddScoped<ITicketRunReviewService, TicketRunReviewService>();
 builder.Services.AddScoped<ITicketBuildRunService, TicketBuildRunService>();

@@ -23526,6 +23526,31 @@
           "detail": {
             "type": "string",
             "nullable": true
+          },
+          "sessionMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "sandboxApplyRequested": {
+            "type": "boolean"
+          },
+          "sandboxApplyEnabled": {
+            "type": "boolean"
+          },
+          "sandboxApplyRoot": {
+            "type": "string",
+            "nullable": true
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "sandboxApplyRestartCommand": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -25715,6 +25740,75 @@
           "indexedFileCount": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectApplyCapability": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isReady": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSafeAction": {
+            "type": "string",
+            "nullable": true
+          },
+          "sessionMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "launcherSessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "repositoryCommit": {
+            "type": "string",
+            "nullable": true
+          },
+          "sandboxRoot": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "sandboxRootFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectPathFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "qualificationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "qualificationFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "readinessEvidenceHash": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -27926,6 +28020,9 @@
           "executionReady": {
             "type": "boolean"
           },
+          "completionCapabilityReady": {
+            "type": "boolean"
+          },
           "readyToRun": {
             "type": "boolean"
           },
@@ -27953,6 +28050,9 @@
               "$ref": "#/components/schemas/ProjectRunReadinessBlocker"
             },
             "nullable": true
+          },
+          "completionCapability": {
+            "$ref": "#/components/schemas/ProjectApplyCapability"
           },
           "nextAction": {
             "$ref": "#/components/schemas/ProjectRunReadinessNextAction"
@@ -28023,6 +28123,10 @@
             "nullable": true
           },
           "targetProductRoute": {
+            "type": "string",
+            "nullable": true
+          },
+          "command": {
             "type": "string",
             "nullable": true
           }

@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
-import { readyToRunReadiness, runConfigurationRequiredReadiness, setupIncompleteRunReadiness } from './helpers/mockBoard';
+import { projectWorkSessionRequiredReadiness, readyToRunReadiness, runConfigurationRequiredReadiness, setupIncompleteRunReadiness } from './helpers/mockBoard';
 
 test('Board renders backend-owned attention, waiting, assignment, state, and event truth', async ({ page }) => {
   await mockBoardEntry(page, boardResponse());
@@ -60,6 +60,20 @@ test('provisioning green with Fake agents shows four execution blockers and open
   await page.getByTestId('flow.cockpit.primary.configureRunAgents').click();
   await expect(page).toHaveURL(/\/projects\/7\/library\/settings\/agents$/);
   await expect(page.getByTestId('flow.settings.section.agents')).toHaveAttribute('aria-selected', 'true');
+});
+
+test('project-work capability block dominates the Board and exposes one copyable supported restart', async ({ page }) => {
+  const board = boardResponse();
+  board.items = [];
+  board.runReadiness = projectWorkSessionRequiredReadiness(7);
+  await mockBoardEntry(page, board);
+  await page.goto('/projects/7/board');
+
+  await expect(page.getByTestId('flow.cockpit.badge')).toHaveText('Project-work session required');
+  await expect(page.getByTestId('flow.cockpit.projectWorkSession')).toContainText('This session can build, test and review work');
+  await expect(page.getByTestId('flow.cockpit.projectWorkSession.command')).toHaveText('.\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply');
+  await expect(page.getByTestId('flow.cockpit.primary.copyProjectWorkRestart')).toHaveText('Copy supported restart');
+  await expect(page.getByTestId('flow.board.new')).toHaveCount(0);
 });
 
 test('Board failure refuses to infer pipeline state from the legacy ticket list', async ({ page }) => {

@@ -43,6 +43,7 @@ const initialApiStatusStatus: ApiConnectionStatus = 'loading';
 const localTestEmail = 'bob@irondev.local';
 const localTestPassword = 'change-me-local-only';
 const localTestResetCommand = '.\\tools\\localtest\\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset';
+const sandboxApplyRestartCommand = `${localTestResetCommand} -EnableSandboxApply`;
 
 function createInitialStatus(config: IronDevApiConfig): ApiStatus {
   return {
@@ -74,7 +75,13 @@ function clientPreflight(
       ? 'Start the supported LocalTest launcher and retry the connection.'
       : 'Wait for the LocalTest identity and seed checks to complete.',
     resetCommand,
-    detail
+    detail,
+    sessionMode: import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_MODE ?? '',
+    sandboxApplyRequested: import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_REQUESTED === 'true',
+    sandboxApplyEnabled: import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_ENABLED === 'true',
+    sandboxApplyRoot: import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_ROOT ?? null,
+    capabilities: (import.meta.env.VITE_IRONDEV_LOCALTEST_CAPABILITIES ?? '').split(';').filter(Boolean),
+    sandboxApplyRestartCommand
   };
 }
 
@@ -86,11 +93,27 @@ function verifyBrowserIdentity(info: LocalTestPreflightInfo, config: IronDevApiC
   const expectedSessionId = import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_ID;
   const expectedCommit = import.meta.env.VITE_IRONDEV_LOCALTEST_REPOSITORY_COMMIT;
   const expectedApiBaseUrl = import.meta.env.VITE_IRONDEV_LOCALTEST_API_BASE_URL;
+  const expectedSessionMode = import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_MODE;
+  const expectedApplyRequested = import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_REQUESTED;
+  const expectedApplyEnabled = import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_ENABLED;
+  const expectedSandboxRoot = import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_ROOT;
+  const expectedCapabilities = (import.meta.env.VITE_IRONDEV_LOCALTEST_CAPABILITIES ?? '').split(';').filter(Boolean).sort();
   const reportedApiMismatch =
     info.environment === 'LocalTest' &&
     Boolean(info.apiBaseUrl) &&
     normalizeUrl(info.apiBaseUrl) !== normalizeUrl(config.apiBaseUrl);
-  if (!expectedSessionId && !expectedCommit && !expectedApiBaseUrl && !reportedApiMismatch) {
+  const reportedCapabilities = info.capabilities ?? [];
+  const reportedCapabilityConsistent = info.sandboxApplyRequested
+    ? info.sandboxApplyEnabled &&
+      info.sessionMode === 'ProjectFeatureWork' &&
+      Boolean(info.sandboxApplyRoot) &&
+      reportedCapabilities.includes('ProjectFeatureWork') &&
+      reportedCapabilities.includes('ControlledSandboxApply')
+    : !info.sandboxApplyEnabled &&
+      !info.sandboxApplyRoot &&
+      info.sessionMode === 'SmokeSimulation' &&
+      !reportedCapabilities.includes('ControlledSandboxApply');
+  if (!expectedSessionId && !expectedCommit && !expectedApiBaseUrl && !reportedApiMismatch && reportedCapabilityConsistent) {
     return info;
   }
 
@@ -101,7 +124,25 @@ function verifyBrowserIdentity(info: LocalTestPreflightInfo, config: IronDevApiC
     (!expectedApiBaseUrl || normalizeUrl(config.apiBaseUrl) === normalizeUrl(expectedApiBaseUrl));
 
   if (identityMatches) {
-    return info;
+    const capabilityMatches =
+      reportedCapabilityConsistent &&
+      (!expectedSessionMode || info.sessionMode === expectedSessionMode) &&
+      (expectedApplyRequested === undefined || info.sandboxApplyRequested === (expectedApplyRequested === 'true')) &&
+      (expectedApplyEnabled === undefined || info.sandboxApplyEnabled === (expectedApplyEnabled === 'true')) &&
+      (expectedSandboxRoot === undefined || (info.sandboxApplyRoot ?? '').toLowerCase() === expectedSandboxRoot.toLowerCase()) &&
+      (expectedCapabilities.length === 0 || JSON.stringify([...(info.capabilities ?? [])].sort()) === JSON.stringify(expectedCapabilities));
+
+    if (capabilityMatches) return info;
+
+    return {
+      ...info,
+      state: 'SessionCapabilityMismatch',
+      seededLoginCheckResult: 'NotChecked',
+      nextSafeAction: 'Session capability mismatch. Restart through the supported project-work launcher.',
+      resetCommand: sandboxApplyRestartCommand,
+      sandboxApplyRestartCommand,
+      detail: 'The browser and API disagree about the project-work or controlled sandbox-apply capability.'
+    };
   }
 
   return {

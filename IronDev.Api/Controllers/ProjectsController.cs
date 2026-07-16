@@ -5,6 +5,7 @@ using IronDev.Core.Auth;
 using IronDev.Core.Governance;
 using IronDev.Core.Models;
 using IronDev.Services;
+using IronDev.Core.RunReadiness;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,17 +20,23 @@ public sealed class ProjectsController : ControllerBase
     private readonly IProjectContextExportService _export;
     private readonly IProjectMembershipService _memberships;
     private readonly ICurrentTenantContext _tenant;
+    private readonly IProjectApplyCapabilityService _applyCapability;
+    private readonly ILogger<ProjectsController> _logger;
 
     public ProjectsController(
         IProjectService projects,
         IProjectContextExportService export,
         IProjectMembershipService memberships,
-        ICurrentTenantContext tenant)
+        ICurrentTenantContext tenant,
+        IProjectApplyCapabilityService applyCapability,
+        ILogger<ProjectsController> logger)
     {
         _projects = projects;
         _export = export;
         _memberships = memberships;
         _tenant = tenant;
+        _applyCapability = applyCapability;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -68,6 +75,10 @@ public sealed class ProjectsController : ControllerBase
         if (membership != ProjectMembershipMutationStatus.Succeeded)
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Project was created, but its owner membership could not be established." });
         project.Id = id;
+        // Connect project is the browser's deliberate repository-selection action.
+        // In an explicit project-work session the authority owner qualifies only a
+        // safe disposable child; in every other session this is a no-op decision.
+        await TryQualifyDisposableProjectAsync(id, user.UserId, ct);
         return CreatedAtAction(nameof(GetProject), new { projectId = id }, project);
     }
 
@@ -82,12 +93,25 @@ public sealed class ProjectsController : ControllerBase
     }
 
     [HttpPost("{projectId:int}/select")]
-    public IActionResult SelectProject(int projectId) => Ok(new { projectId });
+    public async Task<IActionResult> SelectProject(int projectId, CancellationToken ct)
+    {
+        var user = CurrentUser();
+        // Selecting an existing project is the explicit, authenticated requalification
+        // point for a new launcher session. The apply boundary still rechecks the
+        // signed server record and its matching non-secret Git correlation marker.
+        await TryQualifyDisposableProjectAsync(projectId, user.UserId, ct);
+        return Ok(new { projectId });
+    }
 
     [HttpPut("{projectId:int}/local-path")]
     public async Task<IActionResult> UpdateLocalPath(int projectId, [FromBody] UpdateLocalPathRequest request, CancellationToken ct)
     {
         await _projects.UpdateLocalPathAsync(projectId, request.LocalPath, ct);
+        // A deliberate path change invalidates the old path binding and explicitly
+        // creates a new authenticated, session-bound server qualification when safe.
+        // Apply still requires a live record/marker agreement at the mutation boundary.
+        var user = CurrentUser();
+        await TryQualifyDisposableProjectAsync(projectId, user.UserId, ct);
         return NoContent();
     }
 
@@ -103,6 +127,34 @@ public sealed class ProjectsController : ControllerBase
 
     private CurrentUserContext CurrentUser() => new(
         HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
+
+    private async Task TryQualifyDisposableProjectAsync(int projectId, int qualifyingActorUserId, CancellationToken ct)
+    {
+        try
+        {
+            var capability = await _applyCapability
+                .QualifyDisposableProjectAsync(projectId, qualifyingActorUserId, ct);
+            if (!capability.IsReady && capability.ReasonCode != ProjectApplyCapabilityReasonCodes.ProjectApplyCapabilityDisabled)
+            {
+                _logger.LogWarning(
+                    "Project {ProjectId} was retained but disposable qualification is not ready: {ReasonCode}",
+                    projectId,
+                    capability.ReasonCode);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // The project/path mutation is already durable. Preserve its identity so a
+            // retry can select and requalify it instead of creating a duplicate project.
+            _logger.LogError(exception,
+                "Project {ProjectId} was retained after disposable qualification failed unexpectedly.",
+                projectId);
+        }
+    }
 
     [HttpGet("{projectId:int}/context-pack")]
     public Task<string> ExportContextPack(int projectId) =>

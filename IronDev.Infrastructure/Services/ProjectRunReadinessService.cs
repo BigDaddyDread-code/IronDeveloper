@@ -20,17 +20,20 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
     private readonly ISkeletonAgentProfileService _profiles;
     private readonly IAiConnectionCatalogService _connections;
     private readonly ICurrentTenantContext _tenant;
+    private readonly IProjectApplyCapabilityService _applyCapability;
 
     public ProjectRunReadinessService(
         IProjectProvisioningReadinessService provisioning,
         ISkeletonAgentProfileService profiles,
         IAiConnectionCatalogService connections,
-        ICurrentTenantContext tenant)
+        ICurrentTenantContext tenant,
+        IProjectApplyCapabilityService applyCapability)
     {
         _provisioning = provisioning;
         _profiles = profiles;
         _connections = connections;
         _tenant = tenant;
+        _applyCapability = applyCapability;
     }
 
     public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
@@ -47,21 +50,28 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
         var provisioningTask = _provisioning.EvaluateAsync(projectId, cancellationToken);
         var profilesTask = _profiles.ListEffectiveAsync(_tenant.TenantId, projectId, cancellationToken);
         var connectionsTask = _connections.ListAsync(_tenant.TenantId, userId: 0, cancellationToken);
-        await Task.WhenAll(provisioningTask, profilesTask, connectionsTask).ConfigureAwait(false);
+        var completionTask = requiredPurpose == ProjectRunPurposes.ProjectFeatureWork
+            ? _applyCapability.EvaluateAsync(projectId, cancellationToken)
+            : Task.FromResult(new ProjectApplyCapability
+            {
+                ProjectId = projectId,
+                IsReady = true,
+                State = "NotRequired",
+                ReasonCode = ProjectApplyCapabilityReasonCodes.NotRequired,
+                Reason = "Workflow smoke simulation does not claim project completion capability."
+            });
+        await Task.WhenAll(provisioningTask, profilesTask, connectionsTask, completionTask).ConfigureAwait(false);
 
         var provisioning = await provisioningTask.ConfigureAwait(false);
         var profiles = await profilesTask.ConfigureAwait(false);
         var connections = await connectionsTask.ConfigureAwait(false);
+        var completion = await completionTask.ConfigureAwait(false);
         var agents = RequiredExecutionRoles.Select(role => EvaluateAgent(role, profiles, connections, requiredPurpose)).ToArray();
         var blockers = agents.SelectMany(agent => agent.Blockers).ToArray();
         var setupReady = provisioning?.IsReady == true;
         var executionReady = blockers.Length == 0;
-        var ready = setupReady && executionReady;
-        var state = !setupReady
-            ? ProjectRunReadinessStates.SetupIncomplete
-            : executionReady
-                ? ProjectRunReadinessStates.ReadyToRun
-                : ProjectRunReadinessStates.RunConfigurationRequired;
+        var ready = IsReadyForPurpose(setupReady, executionReady, completion.IsReady);
+        var state = StateFor(setupReady, executionReady, completion.IsReady);
 
         return new ProjectRunReadiness
         {
@@ -69,15 +79,29 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
             RequiredPurpose = requiredPurpose,
             ProjectSetupReady = setupReady,
             ExecutionReady = executionReady,
+            CompletionCapabilityReady = completion.IsReady,
             ReadyToRun = ready,
             State = state,
             BlockedCount = agents.Count(agent => !agent.IsReady),
             Provisioning = provisioning,
             Agents = agents,
             Blockers = blockers,
+            CompletionCapability = completion,
             NextAction = NextAction(projectId, state, provisioning, blockers)
         };
     }
+
+    public static bool IsReadyForPurpose(bool projectSetupReady, bool executionReady, bool completionCapabilityReady) =>
+        projectSetupReady && executionReady && completionCapabilityReady;
+
+    public static string StateFor(bool projectSetupReady, bool executionReady, bool completionCapabilityReady) =>
+        !projectSetupReady
+            ? ProjectRunReadinessStates.SetupIncomplete
+            : !executionReady
+                ? ProjectRunReadinessStates.RunConfigurationRequired
+                : !completionCapabilityReady
+                    ? ProjectRunReadinessStates.ProjectWorkSessionRequired
+                    : ProjectRunReadinessStates.ReadyToRun;
 
     public static ProjectRunAgentReadiness EvaluateAgent(
         SkeletonAgentRole role,
@@ -235,6 +259,13 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
             TargetProductRoute = blockers.Any(blocker => blocker.ReasonCode == ProjectRunReadinessReasonCodes.RunAgentConnectionPurposeMismatch)
                 ? $"/projects/{projectId}/library/settings/ai-connections"
                 : $"/projects/{projectId}/library/settings/agents"
+        },
+        ProjectRunReadinessStates.ProjectWorkSessionRequired => new ProjectRunReadinessNextAction
+        {
+            Kind = "RestartProjectWorkSession",
+            Label = "Project-work session required",
+            NextSafeAction = "This session can build, test and review work, but controlled sandbox apply is disabled. Restart IronDev in sandbox-apply mode before beginning this Work Item.",
+            Command = ProjectApplyCapabilityCommands.RestartInSandboxApplyMode
         },
         _ => new ProjectRunReadinessNextAction
         {

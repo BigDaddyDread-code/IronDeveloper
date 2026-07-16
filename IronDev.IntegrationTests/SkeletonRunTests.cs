@@ -51,18 +51,32 @@ public sealed class SkeletonRunTests
     }
 
     [TestMethod]
-    public async Task StartAsync_RunReadinessBlocked_CreatesNoRunWorkspaceOrEvent()
+    public async Task StartAsync_ProjectWorkCapabilityBlocked_CreatesNoRunWorkspaceOrEvent()
     {
         var blocked = new ProjectRunReadiness
         {
             ProjectId = ProjectId,
             ProjectSetupReady = true,
-            ExecutionReady = false,
+            ExecutionReady = true,
+            CompletionCapabilityReady = false,
             ReadyToRun = false,
-            State = ProjectRunReadinessStates.RunConfigurationRequired,
-            BlockedCount = 4
+            State = ProjectRunReadinessStates.ProjectWorkSessionRequired,
+            CompletionCapability = new ProjectApplyCapability
+            {
+                ProjectId = ProjectId,
+                ReasonCode = ProjectApplyCapabilityReasonCodes.ProjectApplyCapabilityDisabled,
+                Reason = "Controlled sandbox apply is disabled."
+            },
+            BlockedCount = 0
         };
-        var harness = SkeletonHarness.Create(runReadiness: new StubRunReadinessService(blocked));
+        var proposalCalls = 0;
+        var harness = SkeletonHarness.Create(
+            proposalBehavior: () =>
+            {
+                proposalCalls++;
+                return new BuilderProposal { TicketId = TicketId, ProjectId = ProjectId };
+            },
+            runReadiness: new StubRunReadinessService(blocked));
 
         var exception = await Assert.ThrowsAsync<ProjectRunReadinessBlockedException>(
             () => harness.Service.StartAsync(ProjectId, TicketId));
@@ -71,6 +85,7 @@ public sealed class SkeletonRunTests
         Assert.AreEqual(0, (await harness.Runs.GetRecentAsync()).Count, "The readiness refusal must precede run creation.");
         Assert.AreEqual(0, (await harness.Events.GetRecentRunIdsAsync()).Count, "The readiness refusal must precede RunStarted and every other event.");
         Assert.AreEqual(0, harness.Workspaces.Requests.Count, "The readiness refusal must precede workspace creation.");
+        Assert.AreEqual(0, proposalCalls, "The readiness refusal must precede every proposal or model call.");
     }
 
     [TestMethod]
@@ -147,6 +162,26 @@ public sealed class SkeletonRunTests
         var blocked = harness.Events.Single("SkeletonRunBlocked");
         Assert.AreEqual("ProposalGenerationFailed", blocked.Payload["blockedReason"]);
         StringAssert.Contains(blocked.Payload["nextSafeAction"], "service failure");
+        Assert.AreEqual(0, harness.Workspaces.Requests.Count);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_CallerDisconnectDuringWrappedProviderFailure_StillPersistsTerminalRunState()
+    {
+        using var caller = new CancellationTokenSource();
+        var harness = SkeletonHarness.Create(proposalBehavior: () =>
+        {
+            caller.Cancel();
+            throw new InvalidOperationException("OpenAI call failed: The operation was canceled.");
+        });
+
+        var result = await harness.Service.StartAsync(ProjectId, TicketId, caller.Token);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual(RunLifecycleState.Failed.ToString(), result!.Status,
+            "Once RunStarted is durable, request cancellation must not strand the run in Created.");
+        Assert.AreEqual("ProposalGenerationFailed", harness.Events.Single("SkeletonRunBlocked").Payload["blockedReason"]);
+        Assert.AreEqual(RunLifecycleState.Failed, (await harness.Runs.GetAsync(result.RunId))!.State);
         Assert.AreEqual(0, harness.Workspaces.Requests.Count);
     }
 
@@ -767,8 +802,72 @@ public sealed class SkeletonRunTests
         var result = await harness.Service.ApplyAsync(ProjectId, TicketId, run!.RunId);
 
         Assert.IsNotNull(result);
-        Assert.AreEqual("ApplyDisabled", harness.Events.Single("SkeletonApplyRefused").Payload["refusedReason"]);
+        Assert.AreEqual(ProjectApplyCapabilityReasonCodes.ProjectApplyCapabilityDisabled,
+            harness.Events.Single("SkeletonApplyRefused").Payload["refusedReason"]);
         Assert.AreEqual(RunLifecycleState.PausedForApproval.ToString(), result!.Status, "A refused apply changes nothing.");
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_CapabilityDisabledAfterContinuation_RefusesWithExactRecovery()
+    {
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
+        await harness.Service.ContinueAsAsync(ProjectId, TicketId, run.RunId, BobUserId);
+
+        harness.ApplyCapability.Enabled = false;
+        var result = await harness.Service.ApplyAsAsync(ProjectId, TicketId, run.RunId, BobUserId);
+
+        var refusal = harness.Events.Single("SkeletonApplyRefused");
+        Assert.AreEqual(ProjectApplyCapabilityReasonCodes.ProjectApplyCapabilityDisabled, refusal.Payload["refusedReason"]);
+        Assert.AreEqual(ProjectApplyCapabilityCommands.RestartInSandboxApplyMode, refusal.Payload["nextSafeAction"]);
+        Assert.AreEqual(ProjectApplyCapabilityReasonCodes.ProjectApplyCapabilityDisabled,
+            harness.Events.Single("ProjectApplyCapabilityEvaluated").Payload["reasonCode"]);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), result!.Status);
+        Assert.AreEqual(0, harness.Events.All("SkeletonApplied").Count);
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_SessionIdentityChangesAfterContinuation_RefusesClosed()
+    {
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
+        await harness.Service.ContinueAsAsync(ProjectId, TicketId, run.RunId, BobUserId);
+
+        harness.ApplyCapability.SessionId = "different-session";
+        var result = await harness.Service.ApplyAsAsync(ProjectId, TicketId, run.RunId, BobUserId);
+
+        var refusal = harness.Events.Single("SkeletonApplyRefused");
+        Assert.AreEqual(ProjectApplyCapabilityReasonCodes.ProjectApplyQualificationBindingMismatch, refusal.Payload["refusedReason"]);
+        Assert.AreEqual(ProjectApplyCapabilityCommands.RestartInSandboxApplyMode, refusal.Payload["nextSafeAction"]);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), result!.Status);
+    }
+
+    [TestMethod]
+    public async Task ApplyAsync_ServerQualificationChangesAfterContinuation_RefusesClosed()
+    {
+        var harness = SkeletonHarness.Create(applyEnabled: true);
+        var run = await harness.Service.StartAsync(ProjectId, TicketId);
+        var packageHash = harness.Events.Single("CriticReviewPackageReady").Payload["packageSha256"];
+        harness.Approvals.Seed(ApprovalFor(run!.RunId, packageHash));
+        await PublishCleanCriticReview(harness, run.RunId);
+        await harness.Service.ContinueAsAsync(ProjectId, TicketId, run.RunId, BobUserId);
+
+        harness.ApplyCapability.QualificationId = "replacement-qualification";
+        var result = await harness.Service.ApplyAsAsync(ProjectId, TicketId, run.RunId, BobUserId);
+
+        var refusal = harness.Events.Single("SkeletonApplyRefused");
+        Assert.AreEqual(ProjectApplyCapabilityReasonCodes.ProjectApplyQualificationBindingMismatch, refusal.Payload["refusedReason"]);
+        Assert.AreEqual(ProjectApplyCapabilityCommands.RestartInSandboxApplyMode, refusal.Payload["nextSafeAction"]);
+        Assert.AreEqual("replacement-qualification",
+            harness.Events.Single("ProjectApplyCapabilityEvaluated").Payload["qualificationId"]);
+        Assert.AreNotEqual(RunLifecycleState.Applied.ToString(), result!.Status);
+        Assert.AreEqual(0, harness.Events.All("SkeletonApplied").Count);
     }
 
     [TestMethod]
@@ -1543,6 +1642,7 @@ public sealed class SkeletonRunTests
         public required InMemoryAcceptedApprovalStore Approvals { get; init; }
         public required SkeletonMutationLeaseService Leases { get; init; }
         public required SkeletonAgentProfileService Profiles { get; init; }
+        public required StubApplyCapabilityService ApplyCapability { get; init; }
         public required string EvidenceRoot { get; init; }
 
         public static SkeletonHarness Create(
@@ -1582,6 +1682,7 @@ public sealed class SkeletonRunTests
             var approvals = new InMemoryAcceptedApprovalStore();
             var leases = new SkeletonMutationLeaseService(configuration);
             var profiles = new SkeletonAgentProfileService(configuration);
+            var applyCapability = new StubApplyCapabilityService(applyEnabled);
             var service = new TicketSkeletonRunService(
                 new StubTicketService(new ProjectTicket { Id = TicketId, ProjectId = ticketProjectId ?? ProjectId, Title = "Add book sorting", AcceptanceCriteria = acceptanceCriteria }),
                 new StubProjectService(new Project { Id = ProjectId, TenantId = 1, Name = "BookSeller", LocalPath = resolvedPath }),
@@ -1602,7 +1703,8 @@ public sealed class SkeletonRunTests
                 new StubProjectMembershipService(members ?? DefaultMembers()),
                 profiles,
                 configuration,
-                runReadiness ?? new StubRunReadinessService(ReadyRunReadiness()));
+                runReadiness ?? new StubRunReadinessService(ReadyRunReadiness()),
+                applyCapability);
 
             return new SkeletonHarness
             {
@@ -1613,6 +1715,7 @@ public sealed class SkeletonRunTests
                 Approvals = approvals,
                 Leases = leases,
                 Profiles = profiles,
+                ApplyCapability = applyCapability,
                 EvidenceRoot = evidenceRoot
             };
         }
@@ -1647,11 +1750,55 @@ public sealed class SkeletonRunTests
         }
     }
 
+    private sealed class StubApplyCapabilityService(bool enabled) : IProjectApplyCapabilityService
+    {
+        public bool Enabled { get; set; } = enabled;
+        public string SessionId { get; set; } = "test-session";
+        public string QualificationId { get; set; } = "qualification-1";
+
+        public Task<ProjectApplyCapability> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Enabled
+                ? ReadyApplyCapability(projectId, SessionId, QualificationId)
+                : ReadyApplyCapability(projectId, SessionId, QualificationId) with
+                {
+                    IsReady = false,
+                    State = "Disabled",
+                    ReasonCode = ProjectApplyCapabilityReasonCodes.ProjectApplyCapabilityDisabled,
+                    Reason = "Controlled sandbox apply is disabled for this test session."
+                });
+
+        public Task<ProjectApplyCapability> QualifyDisposableProjectAsync(
+            int projectId,
+            int qualifyingActorUserId,
+            CancellationToken cancellationToken = default) =>
+            EvaluateAsync(projectId, cancellationToken);
+    }
+
+    private static ProjectApplyCapability ReadyApplyCapability(
+        int projectId = ProjectId,
+        string sessionId = "test-session",
+        string qualificationId = "qualification-1") => new()
+    {
+        ProjectId = projectId,
+        IsReady = true,
+        State = "Ready",
+        ReasonCode = ProjectApplyCapabilityReasonCodes.Ready,
+        LauncherSessionId = sessionId,
+        RepositoryCommit = "test-commit",
+        SandboxRootFingerprint = "sandbox-fingerprint",
+        ProjectPathFingerprint = "project-fingerprint",
+        QualificationId = qualificationId,
+        QualificationFingerprint = $"fingerprint-{qualificationId}",
+        ReadinessEvidenceHash = $"test-evidence-{sessionId}-{qualificationId}"
+    };
+
     private static ProjectRunReadiness ReadyRunReadiness() => new()
     {
         ProjectId = ProjectId,
         ProjectSetupReady = true,
         ExecutionReady = true,
+        CompletionCapabilityReady = true,
+        CompletionCapability = ReadyApplyCapability(),
         ReadyToRun = true,
         State = ProjectRunReadinessStates.ReadyToRun,
         BlockedCount = 0

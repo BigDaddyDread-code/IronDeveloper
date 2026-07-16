@@ -169,6 +169,13 @@ function Initialize-FixtureGitRepository {
     }
 }
 
+function Add-DisposableSandboxMarker {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    "IRONDEV_LOCALTEST_DISPOSABLE_SANDBOX_V1" |
+        Set-Content -LiteralPath (Join-Path $Path ".irondev-disposable-sandbox") -Encoding UTF8
+}
+
 $baselineProject = $seedContract.projects | Where-Object key -eq "baseline" | Select-Object -First 1
 $setupProject = $seedContract.projects | Where-Object key -eq "setup" | Select-Object -First 1
 $bookSellerProject = $seedContract.projects | Where-Object key -eq "bookseller" | Select-Object -First 1
@@ -178,6 +185,7 @@ if ($null -eq $baselineProject -or $null -eq $setupProject -or $null -eq $bookSe
 
 $localTestProjectPath = Join-Path $workspaceRoot $baselineProject.fixtureDirectory
 Reset-FixtureDirectory -Root $workspaceRoot -Path $localTestProjectPath
+Add-DisposableSandboxMarker -Path $localTestProjectPath
 @"
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -200,6 +208,7 @@ Initialize-FixtureGitRepository -Path $localTestProjectPath
 
 $setupProjectPath = Join-Path $workspaceRoot $setupProject.fixtureDirectory
 Reset-FixtureDirectory -Root $workspaceRoot -Path $setupProjectPath
+Add-DisposableSandboxMarker -Path $setupProjectPath
 @"
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -222,6 +231,7 @@ Initialize-FixtureGitRepository -Path $setupProjectPath
 
 $bookSellerPath = Join-Path $workspaceRoot $bookSellerProject.fixtureDirectory
 Reset-FixtureDirectory -Root $workspaceRoot -Path $bookSellerPath
+Add-DisposableSandboxMarker -Path $bookSellerPath
 @"
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>

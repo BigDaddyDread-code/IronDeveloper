@@ -1,0 +1,23 @@
+[
+  {
+    "findingId": "DUX1-TC-009",
+    "project": "TinyCalc",
+    "screenStep": "Publish governed agent profile",
+    "severity": "P2",
+    "observedBehavior": "The Builder profile publish completed successfully, but the Agents panel's automatic follow-up refresh received HTTP 429 and replaced the successful mutation state with uncertainty about whether publication succeeded.",
+    "expectedBehavior": "A successful governed mutation must retain a clear success result even when a non-authoritative follow-up refresh is rate-limited; refresh failure should be shown separately and remain retryable.",
+    "evidence": [
+      "LocalTest session d74426bde523406f84a94994c7cb3fd5: POST /api/v1/agent-profiles/Builder/draft/publish responded 200 at 2026-07-16T16:29:02.016+12:00.",
+      "The same session's automatic GET /api/v1/ai-connections responded 429 at 2026-07-16T16:29:02.026+12:00, ten milliseconds after the successful publish.",
+      "Visible pre-merge TinyCalc observation: the success notice was lost after the automatic refresh failure, leaving the operator unsure whether the governed mutation had completed."
+    ],
+    "reasonCodes": [
+      "FollowUpRefreshRateLimitedAfterMutationSucceeded"
+    ],
+    "visibleRemedy": "Preserve the mutation success notice and present the rate-limited refresh as a separate retryable status.",
+    "actualWorkaround": null,
+    "authorityImpact": "The backend mutation authority remained correct, but the UI collapsed a successful governed result and a failed read refresh into one apparent failure state.",
+    "repeatability": "Observed during real-provider Analyst and Builder profile publication in the FIX-008 pre-merge TinyCalc validation; the retained API sequence proves the Builder case.",
+    "proposedOwningSlice": "Agents panel mutation-result state and automatic refresh error handling; keep separate from DUX1-FIX-008 unless an existing mutation-result state can be reused without expanding the fix."
+  }
+]
