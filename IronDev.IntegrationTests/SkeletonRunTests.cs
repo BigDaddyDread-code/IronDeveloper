@@ -1557,7 +1557,7 @@ public sealed class SkeletonRunTests
                 new StubProjectMembershipService(members ?? DefaultMembers()),
                 profiles,
                 configuration,
-                runReadiness);
+                runReadiness ?? new StubRunReadinessService(ReadyRunReadiness()));
 
             return new SkeletonHarness
             {
@@ -1584,6 +1584,16 @@ public sealed class SkeletonRunTests
         public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
             Task.FromResult(readiness);
     }
+
+    private static ProjectRunReadiness ReadyRunReadiness() => new()
+    {
+        ProjectId = ProjectId,
+        ProjectSetupReady = true,
+        ExecutionReady = true,
+        ReadyToRun = true,
+        State = ProjectRunReadinessStates.ReadyToRun,
+        BlockedCount = 0
+    };
 
     private static ProjectMembershipEntry Member(int userId, string displayName, string role) =>
         new(userId, displayName, $"{displayName.Split(' ')[0].ToLowerInvariant()}@irondev.local", role, userId.ToString() == BobUserId, DateTimeOffset.UtcNow);

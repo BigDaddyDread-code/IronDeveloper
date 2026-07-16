@@ -7,6 +7,7 @@ using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Core.RunReports;
 using IronDev.Core.Runs;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Workflow;
 using IronDev.Core.Workspaces;
 using IronDev.Data.Models;
@@ -116,7 +117,8 @@ public sealed class AlphaLoopSmokeTests
                 new SkeletonMutationLeaseService(configuration),
                 new StubProjectMembershipService(),
                 new SkeletonAgentProfileService(configuration),
-                configuration);
+                configuration,
+                new ReadyRunReadinessService());
 
             var run = await service.StartAsync(ProjectId, TicketId);
             Assert.IsNotNull(run, "The run must start.");
@@ -250,7 +252,8 @@ public sealed class AlphaLoopSmokeTests
                 new SkeletonMutationLeaseService(configuration),
                 new StubProjectMembershipService(),
                 new SkeletonAgentProfileService(configuration),
-                configuration);
+                configuration,
+                new ReadyRunReadinessService());
 
             var run = await service.StartAsync(ProjectId, TicketId);
             Assert.IsNotNull(run, "The run must start.");
@@ -582,6 +585,20 @@ public sealed class AlphaLoopSmokeTests
 
         public Task<ProjectMembershipMutationStatus> RemoveMemberAsync(int tenantId, int projectId, int userId, int actorUserId, CancellationToken cancellationToken = default) =>
             Task.FromResult(ProjectMembershipMutationStatus.Succeeded);
+    }
+
+    private sealed class ReadyRunReadinessService : IProjectRunReadinessService
+    {
+        public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ProjectRunReadiness
+            {
+                ProjectId = projectId,
+                ProjectSetupReady = true,
+                ExecutionReady = true,
+                ReadyToRun = true,
+                State = ProjectRunReadinessStates.ReadyToRun,
+                BlockedCount = 0
+            });
     }
 
     private static string ExpectedApprovalPhrase(string runId, string packageHash) =>
