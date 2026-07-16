@@ -1058,7 +1058,14 @@ public sealed class SkeletonRunTests
                 ["verdict"] = "RequestChanges",
                 ["findingCount"] = "2",
                 ["blockingFindingCount"] = "1",
-                ["packageSha256"] = "deadbeef"
+                ["packageSha256"] = "deadbeef",
+                ["criterionCount"] = "4",
+                ["coveredCriterionCount"] = "0",
+                ["uncoveredCriterionCount"] = "4",
+                ["authoredTestCount"] = "0",
+                ["coverageVerdictFloor"] = "RecommendBlock",
+                ["modelRequestedVerdict"] = "NoObjection",
+                ["effectiveVerdict"] = "RecommendBlock"
             }
         });
 
@@ -1071,6 +1078,13 @@ public sealed class SkeletonRunTests
         Assert.AreEqual(1, report.CriticReviews[0].BlockingFindingCount);
         Assert.AreEqual("deadbeef", report.CriticReviews[0].PackageSha256,
             "The report shows which package hash the critic reviewed — comparable to what approval binds to.");
+        Assert.AreEqual(4, report.CriticReviews[0].CriterionCount);
+        Assert.AreEqual(0, report.CriticReviews[0].CoveredCriterionCount);
+        Assert.AreEqual(4, report.CriticReviews[0].UncoveredCriterionCount);
+        Assert.AreEqual(0, report.CriticReviews[0].AuthoredTestCount);
+        Assert.AreEqual("RecommendBlock", report.CriticReviews[0].CoverageVerdictFloor);
+        Assert.AreEqual("NoObjection", report.CriticReviews[0].ModelRequestedVerdict);
+        Assert.AreEqual("RecommendBlock", report.CriticReviews[0].EffectiveVerdict);
     }
 
     [TestMethod]

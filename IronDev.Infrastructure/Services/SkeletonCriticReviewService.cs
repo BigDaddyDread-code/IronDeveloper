@@ -142,6 +142,13 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
         var packageEvidenceRefs = new[] { packagePath, $"critic-package-sha256:{packageHash}" };
         var reviewRequestId = $"skeleton-critic-{request.RunId}-{Guid.NewGuid():N}";
 
+        var recomputedCoverage = SkeletonCriterionCoverageCalculator.Compute(package.AcceptanceCriteria, package.AuthoredTests);
+        var criterionCount = recomputedCoverage.Count;
+        var coveredCriterionCount = recomputedCoverage.Count(coverage => coverage.Covered);
+        var uncoveredCriterionCount = criterionCount - coveredCriterionCount;
+        var authoredTestCount = package.AuthoredTests.Count;
+        var coverageVerdictFloor = CoverageVerdictFloor(criterionCount, uncoveredCriterionCount);
+
         // Mismatches between claim and evidence become findings automatically —
         // by construction, not by the model's judgment or anyone's mood.
         var groundTruthDrafts = verification.Mismatches
@@ -158,14 +165,26 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
             })
             .ToList();
 
+        // Coverage adequacy is evidence-owned, not model-owned. An honest 0/4
+        // matrix can pass the integrity check while still proving that none of
+        // the requested behavior has executable test evidence. That inadequacy
+        // becomes a deterministic finding even when the model asks for a clean
+        // verdict.
+        var coverageDrafts = BuildCoverageAdequacyDrafts(
+            recomputedCoverage,
+            criterionCount,
+            coveredCriterionCount,
+            uncoveredCriterionCount,
+            packageEvidenceRefs);
+
         // The verdict floor is set by evidence: a blocking mismatch forces
         // RecommendBlock and any mismatch forbids a clean verdict, regardless of
         // how agreeable the model chose to be.
-        var verdict = parsed.Verdict;
+        var verdict = StrongerVerdict(parsed.Verdict, coverageVerdictFloor);
         if (groundTruthDrafts.Any(draft => draft.BlocksMerge))
-            verdict = CriticReviewVerdict.RecommendBlock;
-        else if (groundTruthDrafts.Count > 0 && verdict is CriticReviewVerdict.NoObjection or CriticReviewVerdict.CommentOnly)
-            verdict = CriticReviewVerdict.RequestChanges;
+            verdict = StrongerVerdict(verdict, CriticReviewVerdict.RecommendBlock);
+        else if (groundTruthDrafts.Count > 0)
+            verdict = StrongerVerdict(verdict, CriticReviewVerdict.RequestChanges);
         var stored = _storedCritic.ExecuteAndStore(
             new ManualCriticReviewRequest
             {
@@ -199,6 +218,7 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
                     }
                 ],
                 FindingDrafts = groundTruthDrafts
+                    .Concat(coverageDrafts)
                     .Concat(parsed.Findings
                         .Select(finding => new ManualCriticFindingDraft
                         {
@@ -250,6 +270,13 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
                 ["packageSha256"] = packageHash,
                 ["groundTruthCheckCount"] = verification.Checks.Count.ToString(),
                 ["groundTruthMismatchCount"] = verification.Mismatches.Count.ToString(),
+                ["criterionCount"] = criterionCount.ToString(),
+                ["coveredCriterionCount"] = coveredCriterionCount.ToString(),
+                ["uncoveredCriterionCount"] = uncoveredCriterionCount.ToString(),
+                ["authoredTestCount"] = authoredTestCount.ToString(),
+                ["coverageVerdictFloor"] = coverageVerdictFloor.ToString(),
+                ["modelRequestedVerdict"] = parsed.Verdict.ToString(),
+                ["effectiveVerdict"] = output.Verdict.ToString(),
                 // AG-2: which model reviewed — a catch-rate is meaningless without
                 // knowing which configured critic was measured.
                 ["modelProvider"] = agent.Provider,
@@ -277,6 +304,74 @@ public sealed class SkeletonCriticReviewService : ISkeletonCriticReviewService
                 })
                 .ToList()
         };
+    }
+
+    private static CriticReviewVerdict CoverageVerdictFloor(int criterionCount, int uncoveredCriterionCount)
+    {
+        if (criterionCount == 0)
+            return CriticReviewVerdict.RequestChanges;
+        if (uncoveredCriterionCount == criterionCount)
+            return CriticReviewVerdict.RecommendBlock;
+        if (uncoveredCriterionCount > 0)
+            return CriticReviewVerdict.RequestChanges;
+        return CriticReviewVerdict.NoObjection;
+    }
+
+    private static CriticReviewVerdict StrongerVerdict(CriticReviewVerdict requested, CriticReviewVerdict floor) =>
+        (CriticReviewVerdict)Math.Max((int)requested, (int)floor);
+
+    private static IReadOnlyList<ManualCriticFindingDraft> BuildCoverageAdequacyDrafts(
+        IReadOnlyList<SkeletonCriterionCoverage> coverage,
+        int criterionCount,
+        int coveredCriterionCount,
+        int uncoveredCriterionCount,
+        IReadOnlyList<string> evidenceRefs)
+    {
+        if (criterionCount == 0)
+        {
+            return
+            [
+                new ManualCriticFindingDraft
+                {
+                    Severity = CriticSeverity.High,
+                    Title = "Acceptance criteria could not be parsed",
+                    Problem = "The work package contains no parsed acceptance criteria, so test coverage adequacy cannot be established.",
+                    WhyItMatters = "A clean critic verdict would claim confidence without any checkable statement of the requested behavior.",
+                    RequiredFix = "Define checkable acceptance criteria, implement the requested behavior, add executable tests for each criterion, and produce a fresh package.",
+                    EvidenceRefs = evidenceRefs,
+                    BlocksMerge = false,
+                    RequiresHumanReview = true
+                }
+            ];
+        }
+
+        if (uncoveredCriterionCount == 0)
+            return [];
+
+        var uncovered = coverage
+            .Where(row => !row.Covered)
+            .Select(row => row.Criterion)
+            .ToList();
+        var allUncovered = uncoveredCriterionCount == criterionCount;
+
+        return
+        [
+            new ManualCriticFindingDraft
+            {
+                Severity = CriticSeverity.High,
+                Title = allUncovered
+                    ? "Acceptance criteria have no test evidence"
+                    : "Acceptance criteria lack complete test evidence",
+                Problem =
+                    $"{coveredCriterionCount} of {criterionCount} acceptance criteria are covered by authored tests; " +
+                    $"{uncoveredCriterionCount} remain uncovered: {string.Join(" | ", uncovered)}.",
+                WhyItMatters = "A green build or an internally honest coverage matrix does not prove that the requested behavior was implemented or tested.",
+                RequiredFix = "Implement the requested behavior and add executable tests covering each acceptance criterion, then produce a fresh package.",
+                EvidenceRefs = evidenceRefs,
+                BlocksMerge = allUncovered,
+                RequiresHumanReview = true
+            }
+        ];
     }
 
     /// <summary>
