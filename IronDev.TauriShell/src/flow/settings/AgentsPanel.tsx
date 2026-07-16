@@ -248,6 +248,12 @@ export function AgentsPanel() {
         const displayName = profile.displayName || displayAgentRole(profile.role);
         const effective = effectiveProfiles[profile.role];
         const connectionAvailable = connections.some((connection) => connection.id === draft.aiConnectionId);
+        const selectedConnection = connections.find((connection) => connection.id === draft.aiConnectionId);
+        const projectWorkConnections = connections.filter((connection) => connection.supportedPurposes.includes('ProjectFeatureWork'));
+        const smokeConnections = connections.filter((connection) =>
+          connection.supportedPurposes.includes('SmokeSimulation') &&
+          !connection.supportedPurposes.includes('ProjectFeatureWork'));
+        const unavailableConnections = connections.filter((connection) => connection.supportedPurposes.length === 0);
         return (
           <div className="fl-panel-box" key={profile.role} style={{ marginTop: 10 }} data-testid={`flow.settings.agent.${profile.role.toLowerCase()}`}>
             <p className="fl-plabel" style={{ marginTop: 0 }}>
@@ -282,10 +288,33 @@ export function AgentsPanel() {
               {!connectionAvailable ? (
                 <option value={draft.aiConnectionId} disabled>{draft.aiConnectionId || 'No connection'} (unavailable)</option>
               ) : null}
-              {connections.map((connection) => (
-                <option key={connection.id} value={connection.id}>{connection.displayName}</option>
-              ))}
+              {projectWorkConnections.length > 0 ? (
+                <optgroup label="Project-work connections">
+                  {projectWorkConnections.map((connection) => (
+                    <option key={connection.id} value={connection.id}>{connection.displayName}</option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {smokeConnections.length > 0 ? (
+                <optgroup label="Workflow smoke fixtures · not project work">
+                  {smokeConnections.map((connection) => (
+                    <option key={connection.id} value={connection.id}>{connection.displayName}</option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {unavailableConnections.length > 0 ? (
+                <optgroup label="Unavailable for governed work">
+                  {unavailableConnections.map((connection) => (
+                    <option key={connection.id} value={connection.id}>{connection.displayName}</option>
+                  ))}
+                </optgroup>
+              ) : null}
             </select>
+            {selectedConnection ? (
+              <p className="fl-empty" data-testid={`flow.settings.agent.${profile.role.toLowerCase()}.connectionPurpose`}>
+                {selectedConnection.purposeDescription}
+              </p>
+            ) : null}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <select
                 className="fl-select"

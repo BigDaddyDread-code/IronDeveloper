@@ -9739,7 +9739,13 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SkeletonRunStartRequest"];
+                    "text/json": components["schemas"]["SkeletonRunStartRequest"];
+                    "application/*+json": components["schemas"]["SkeletonRunStartRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -12268,6 +12274,8 @@ export interface components {
             controlledEndpoint: string | null;
             credentialConfigured: boolean;
             credentialStatus: string | null;
+            supportedPurposes: string[] | null;
+            purposeDescription: string | null;
             /** Format: date-time */
             lastSuccessfulTestUtc?: string | null;
             /** Format: date-time */
@@ -14985,6 +14993,7 @@ export interface components {
         ProjectRunReadiness: {
             /** Format: int32 */
             projectId?: number;
+            requiredPurpose?: string | null;
             projectSetupReady?: boolean;
             executionReady?: boolean;
             readyToRun?: boolean;
@@ -16690,6 +16699,9 @@ export interface components {
             failed?: boolean;
             failureKind?: string | null;
             failedCommand?: string | null;
+        };
+        SkeletonRunStartRequest: {
+            purpose?: string | null;
         };
         SkeletonRunTestAuthoringTrace: {
             authored?: boolean;

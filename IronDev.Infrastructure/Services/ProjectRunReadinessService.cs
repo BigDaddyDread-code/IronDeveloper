@@ -33,8 +33,17 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
         _tenant = tenant;
     }
 
-    public async Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default)
+    public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
+        EvaluateForPurposeAsync(projectId, ProjectRunPurposes.ProjectFeatureWork, cancellationToken);
+
+    public async Task<ProjectRunReadiness> EvaluateForPurposeAsync(
+        int projectId,
+        string requiredPurpose,
+        CancellationToken cancellationToken = default)
     {
+        if (!ProjectRunPurposes.IsSupported(requiredPurpose))
+            throw new ArgumentOutOfRangeException(nameof(requiredPurpose), requiredPurpose, "Unknown governed run purpose.");
+
         var provisioningTask = _provisioning.EvaluateAsync(projectId, cancellationToken);
         var profilesTask = _profiles.ListEffectiveAsync(_tenant.TenantId, projectId, cancellationToken);
         var connectionsTask = _connections.ListAsync(_tenant.TenantId, userId: 0, cancellationToken);
@@ -43,7 +52,7 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
         var provisioning = await provisioningTask.ConfigureAwait(false);
         var profiles = await profilesTask.ConfigureAwait(false);
         var connections = await connectionsTask.ConfigureAwait(false);
-        var agents = RequiredExecutionRoles.Select(role => EvaluateAgent(role, profiles, connections)).ToArray();
+        var agents = RequiredExecutionRoles.Select(role => EvaluateAgent(role, profiles, connections, requiredPurpose)).ToArray();
         var blockers = agents.SelectMany(agent => agent.Blockers).ToArray();
         var setupReady = provisioning?.IsReady == true;
         var executionReady = blockers.Length == 0;
@@ -57,6 +66,7 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
         return new ProjectRunReadiness
         {
             ProjectId = projectId,
+            RequiredPurpose = requiredPurpose,
             ProjectSetupReady = setupReady,
             ExecutionReady = executionReady,
             ReadyToRun = ready,
@@ -65,14 +75,15 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
             Provisioning = provisioning,
             Agents = agents,
             Blockers = blockers,
-            NextAction = NextAction(projectId, state, provisioning)
+            NextAction = NextAction(projectId, state, provisioning, blockers)
         };
     }
 
     public static ProjectRunAgentReadiness EvaluateAgent(
         SkeletonAgentRole role,
         IReadOnlyList<EffectiveSkeletonAgentProfile> profiles,
-        IReadOnlyList<AiConnectionMetadata> connections)
+        IReadOnlyList<AiConnectionMetadata> connections,
+        string requiredPurpose = ProjectRunPurposes.ProjectFeatureWork)
     {
         var profile = profiles.FirstOrDefault(item => item.Role == role);
         if (profile is null)
@@ -112,6 +123,16 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
                     ProjectRunReadinessReasonCodes.RunAgentConnectionUnavailableForProject,
                     $"AI connection '{connection.DisplayName}' is unavailable to this project.",
                     "Open AI Connections and select a project-available connection."));
+            if (ProjectRunProviders.IsExecutable(provider) &&
+                !connection.SupportedPurposes.Contains(requiredPurpose, StringComparer.Ordinal))
+                common.Add(Blocker(role, provider, profile.Model, connection.Id, source,
+                    ProjectRunReadinessReasonCodes.RunAgentConnectionPurposeMismatch,
+                    connection.ProviderKind.Equals(ProjectRunProviders.LocalTestDeterministic, StringComparison.OrdinalIgnoreCase)
+                        ? "LocalTest deterministic is a fixed smoke-test connection. It can exercise the governed workflow, but it cannot implement this Work Item. Configure an executable project-work connection to continue."
+                        : $"AI connection '{connection.DisplayName}' does not support governed run purpose '{requiredPurpose}'.",
+                    requiredPurpose == ProjectRunPurposes.ProjectFeatureWork
+                        ? "Configure an executable project-work connection, then deliberately publish it on the project agent profile."
+                        : "Select a connection that explicitly supports workflow smoke simulation."));
             if (!ProjectRunProviders.IsRecognized(provider))
                 common.Add(Blocker(role, provider, profile.Model, connection.Id, source,
                     ProjectRunReadinessReasonCodes.RunAgentProviderUnsupported,
@@ -190,7 +211,8 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
     private static ProjectRunReadinessNextAction NextAction(
         int projectId,
         string state,
-        ProjectProvisioningReadiness? provisioning) => state switch
+        ProjectProvisioningReadiness? provisioning,
+        IReadOnlyList<ProjectRunReadinessBlocker> blockers) => state switch
     {
         ProjectRunReadinessStates.SetupIncomplete => new ProjectRunReadinessNextAction
         {
@@ -201,10 +223,18 @@ public sealed class ProjectRunReadinessService : IProjectRunReadinessService
         },
         ProjectRunReadinessStates.RunConfigurationRequired => new ProjectRunReadinessNextAction
         {
-            Kind = "ConfigureRunAgents",
-            Label = "Configure run agents",
-            NextSafeAction = "Open AI Connections, test an executable connection, then save, test, and publish each project agent profile before re-checking.",
-            TargetProductRoute = $"/projects/{projectId}/library/settings/agents"
+            Kind = blockers.Any(blocker => blocker.ReasonCode == ProjectRunReadinessReasonCodes.RunAgentConnectionPurposeMismatch)
+                ? "ConfigureProjectWorkConnection"
+                : "ConfigureRunAgents",
+            Label = blockers.Any(blocker => blocker.ReasonCode == ProjectRunReadinessReasonCodes.RunAgentConnectionPurposeMismatch)
+                ? "Configure project-work connection"
+                : "Configure run agents",
+            NextSafeAction = blockers.Any(blocker => blocker.ReasonCode == ProjectRunReadinessReasonCodes.RunAgentConnectionPurposeMismatch)
+                ? "Configure and test an executable project-work connection. Publishing project profiles remains a separate deliberate action."
+                : "Open AI Connections, test an executable connection, then save, test, and publish each project agent profile before re-checking.",
+            TargetProductRoute = blockers.Any(blocker => blocker.ReasonCode == ProjectRunReadinessReasonCodes.RunAgentConnectionPurposeMismatch)
+                ? $"/projects/{projectId}/library/settings/ai-connections"
+                : $"/projects/{projectId}/library/settings/agents"
         },
         _ => new ProjectRunReadinessNextAction
         {

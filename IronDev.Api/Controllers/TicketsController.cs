@@ -374,16 +374,23 @@ public sealed class TicketsController : ControllerBase
     public async Task<ActionResult<TicketBuildRunDto>> StartSkeletonRun(
         int projectId,
         long ticketId,
+        [FromBody] SkeletonRunStartRequest? request,
         CancellationToken ct)
     {
         try
         {
-            var result = await _skeletonRuns.StartAsync(projectId, ticketId, ct);
+            var result = request is null
+                ? await _skeletonRuns.StartAsync(projectId, ticketId, ct)
+                : await _skeletonRuns.StartAsync(projectId, ticketId, request, ct);
             return result is null ? NotFound() : Ok(result);
         }
         catch (ProjectRunReadinessBlockedException exception)
         {
             return Conflict(ReadinessRefusal(exception.Readiness));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { reasonCode = "UnknownRunPurpose", message = exception.Message });
         }
     }
 

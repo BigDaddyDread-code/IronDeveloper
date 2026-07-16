@@ -1140,9 +1140,15 @@ class IronDevApiClient {
   // endpoint that enforces its own gate. The UI records and requests; the
   // backend verifies and refuses. UI visibility is not backend authority.
 
-  async startSkeletonRun(projectId: number, ticketId: number, signal?: AbortSignal): Promise<TicketBuildRunDto> {
+  async startSkeletonRun(
+    projectId: number,
+    ticketId: number,
+    purpose: 'ProjectFeatureWork' | 'SmokeSimulation' = 'ProjectFeatureWork',
+    signal?: AbortSignal
+  ): Promise<TicketBuildRunDto> {
     return this.request<TicketBuildRunDto>(`/api/projects/${projectId}/tickets/${ticketId}/skeleton-runs`, {
       method: 'POST',
+      body: { purpose },
       signal
     });
   }

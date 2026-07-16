@@ -74,6 +74,36 @@ public sealed class SkeletonRunTests
     }
 
     [TestMethod]
+    public async Task StartAsync_ExplicitWorkflowSmoke_UsesSmokeReadinessAndRecordsPurpose()
+    {
+        var readiness = new RecordingPurposeRunReadinessService(ReadyRunReadiness());
+        var harness = SkeletonHarness.Create(runReadiness: readiness);
+
+        var result = await harness.Service.StartAsync(ProjectId, TicketId, new SkeletonRunStartRequest
+        {
+            Purpose = ProjectRunPurposes.SmokeSimulation
+        });
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual(ProjectRunPurposes.SmokeSimulation, readiness.LastRequiredPurpose);
+        var started = harness.Events.Single("RunStarted");
+        Assert.AreEqual(ProjectRunPurposes.SmokeSimulation, started.Payload["runPurpose"]);
+        StringAssert.Contains(started.Message, "smoke simulation");
+    }
+
+    [TestMethod]
+    public async Task StartAsync_UnknownPurpose_FailsBeforeCreatingRun()
+    {
+        var harness = SkeletonHarness.Create();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            harness.Service.StartAsync(ProjectId, TicketId, new SkeletonRunStartRequest { Purpose = "PretendWork" }));
+
+        Assert.AreEqual(0, (await harness.Runs.GetRecentAsync()).Count);
+        Assert.AreEqual(0, (await harness.Events.GetRecentRunIdsAsync()).Count);
+    }
+
+    [TestMethod]
     public async Task StartAsync_MissingProjectPath_BlocksExplicitly()
     {
         var harness = SkeletonHarness.Create(localPath: null);
@@ -1596,6 +1626,23 @@ public sealed class SkeletonRunTests
     {
         public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
             Task.FromResult(readiness);
+    }
+
+    private sealed class RecordingPurposeRunReadinessService(ProjectRunReadiness readiness) : IProjectRunReadinessService
+    {
+        public string LastRequiredPurpose { get; private set; } = string.Empty;
+
+        public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
+            EvaluateForPurposeAsync(projectId, ProjectRunPurposes.ProjectFeatureWork, cancellationToken);
+
+        public Task<ProjectRunReadiness> EvaluateForPurposeAsync(
+            int projectId,
+            string requiredPurpose,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequiredPurpose = requiredPurpose;
+            return Task.FromResult(readiness with { RequiredPurpose = requiredPurpose });
+        }
     }
 
     private static ProjectRunReadiness ReadyRunReadiness() => new()

@@ -135,6 +135,10 @@ public sealed class AgentRunConfigurationBindingTests : IDisposable
                     ControlledEndpoint = "provider-default:fake",
                     CredentialConfigured = true,
                     CredentialStatus = "Configured",
+                    SupportedPurposes = provider == ProjectRunProviders.LocalTestDeterministic
+                        ? [ProjectRunPurposes.SmokeSimulation]
+                        : [ProjectRunPurposes.ProjectFeatureWork],
+                    PurposeDescription = "Test-controlled connection",
                     Enabled = true,
                     TenantAvailable = true,
                     ProjectAvailable = true,

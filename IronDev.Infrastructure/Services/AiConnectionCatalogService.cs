@@ -7,9 +7,9 @@ namespace IronDev.Infrastructure.Services;
 public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
 {
     public const string Boundary =
-        "AI connection metadata is non-secret. Credential values are write-only and never returned by this endpoint.";
+        "AI connection metadata, including supported run purposes, is non-secret. Credential values are write-only and never returned by this endpoint.";
 
-    public const string ContractVersion = "IronDev AI Connection Contract 2.5.0";
+    public const string ContractVersion = "IronDev AI Connection Contract 2.6.0";
 
     private readonly IConfiguration _configuration;
     private readonly Func<string, string?> _environmentVariableReader;
@@ -80,6 +80,8 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
         var credentialConfigured = storedCredential?.CredentialConfigured ?? deploymentCredentialConfigured;
         var credentialStatus = storedCredential?.CredentialStatus ?? CredentialStatus(provider, deploymentCredentialConfigured);
         var enabled = !string.IsNullOrWhiteSpace(provider);
+        var supportsProjectWork = ProjectRunProviders.IsExecutable(provider) &&
+            !provider.Equals(ProjectRunProviders.LocalTestDeterministic, StringComparison.OrdinalIgnoreCase);
 
         var connections = new List<AiConnectionMetadata>
         {
@@ -93,6 +95,10 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
                 ControlledEndpoint = endpoint,
                 CredentialConfigured = credentialConfigured,
                 CredentialStatus = credentialStatus,
+                SupportedPurposes = supportsProjectWork ? [ProjectRunPurposes.ProjectFeatureWork] : [],
+                PurposeDescription = supportsProjectWork
+                    ? "Executable provider for project feature work"
+                    : "Not executable for project feature work",
                 LastSuccessfulTestUtc = health?.LastSuccessfulTestUtc,
                 LastFailedTestUtc = health?.LastFailedTestUtc,
                 AvailableModels = string.IsNullOrWhiteSpace(model) ? [] : [model],
@@ -124,12 +130,14 @@ public sealed class AiConnectionCatalogService : IAiConnectionCatalogService
             {
                 Id = deterministicConnectionId,
                 TenantId = tenantId,
-                DisplayName = "LocalTest deterministic",
+                DisplayName = "LocalTest deterministic smoke",
                 ProviderKind = ProjectRunProviders.LocalTestDeterministic,
                 ControlledEndpointId = deterministicConnectionId,
                 ControlledEndpoint = "localtest:deterministic-model-words",
                 CredentialConfigured = true,
                 CredentialStatus = "Not required",
+                SupportedPurposes = [ProjectRunPurposes.SmokeSimulation],
+                PurposeDescription = "Fixed fixture · does not implement project work",
                 LastSuccessfulTestUtc = deterministicHealth?.LastSuccessfulTestUtc,
                 LastFailedTestUtc = deterministicHealth?.LastFailedTestUtc,
                 AvailableModels = ["localtest-deterministic"],

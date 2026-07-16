@@ -12988,6 +12988,25 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonRunStartRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonRunStartRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkeletonRunStartRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -17819,6 +17838,8 @@
           "id",
           "projectAvailable",
           "providerKind",
+          "purposeDescription",
+          "supportedPurposes",
           "tenantAvailable",
           "tenantId",
           "updatedByUserId",
@@ -17854,6 +17875,17 @@
             "type": "boolean"
           },
           "credentialStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "supportedPurposes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "purposeDescription": {
             "type": "string",
             "nullable": true
           },
@@ -27884,6 +27916,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "requiredPurpose": {
+            "type": "string",
+            "nullable": true
+          },
           "projectSetupReady": {
             "type": "boolean"
           },
@@ -34248,6 +34284,16 @@
             "nullable": true
           },
           "failedCommand": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SkeletonRunStartRequest": {
+        "type": "object",
+        "properties": {
+          "purpose": {
             "type": "string",
             "nullable": true
           }
