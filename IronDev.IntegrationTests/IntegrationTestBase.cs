@@ -294,9 +294,10 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectContextDocuments;
             IF OBJECT_ID('dbo.ProjectObservableStates', 'U') IS NOT NULL DELETE FROM dbo.ProjectObservableStates;
             IF COL_LENGTH('dbo.ProjectTickets', 'SourceChatMessageId') IS NOT NULL
-                UPDATE dbo.ProjectTickets SET SourceChatMessageId=NULL, SourceChatSessionId=NULL;
+               AND COL_LENGTH('dbo.ProjectTickets', 'SourceChatSessionId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ProjectTickets SET SourceChatMessageId=NULL, SourceChatSessionId=NULL;';
             IF COL_LENGTH('dbo.ProjectTickets', 'SourceDocumentVersionId') IS NOT NULL
-                UPDATE dbo.ProjectTickets SET SourceDocumentVersionId=NULL;
+                EXEC sys.sp_executesql N'UPDATE dbo.ProjectTickets SET SourceDocumentVersionId=NULL;';
             DELETE FROM dbo.ChatMessages;
             IF OBJECT_ID('dbo.ProjectChannelPins', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelPins;
             IF OBJECT_ID('dbo.ProjectChannelMessageReads', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessageReads;
