@@ -17,6 +17,11 @@ export function StatusFooter({ apiStatus, environmentInfo }: StatusFooterProps) 
         <ApiStatusBadge status={apiStatus.status} />
       </span>
       <span data-testid="app.version.environment">{environment}</span>
+      <span data-testid="app.version.workbench">
+        {environmentInfo?.workbench
+          ? `${environmentInfo.workbench.mode} ${environmentInfo.workbench.version} / ${environmentInfo.workbench.previewId}`
+          : 'Workbench unknown'}
+      </span>
       <span data-testid="app.version.ui">UI {uiBuildInfo.version}</span>
       <span data-testid="app.version.branch">{uiBuildInfo.branch}</span>
       <span data-testid="app.version.commit">commit {uiBuildInfo.commitShort}</span>

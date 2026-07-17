@@ -76,6 +76,9 @@ function clientPreflight(
       : 'Wait for the LocalTest identity and seed checks to complete.',
     resetCommand,
     detail,
+    workbenchVersion: import.meta.env.VITE_IRONDEV_WORKBENCH_VERSION ?? '0.1.0-preview.1',
+    workbenchMode: import.meta.env.VITE_IRONDEV_WORKBENCH_MODE === 'V2' ? 'V2' : 'V1',
+    previewId: import.meta.env.VITE_IRONDEV_PREVIEW_ID ?? 'default',
     sessionMode: import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_MODE ?? '',
     sandboxApplyRequested: import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_REQUESTED === 'true',
     sandboxApplyEnabled: import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_ENABLED === 'true',
@@ -93,6 +96,9 @@ function verifyBrowserIdentity(info: LocalTestPreflightInfo, config: IronDevApiC
   const expectedSessionId = import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_ID;
   const expectedCommit = import.meta.env.VITE_IRONDEV_LOCALTEST_REPOSITORY_COMMIT;
   const expectedApiBaseUrl = import.meta.env.VITE_IRONDEV_LOCALTEST_API_BASE_URL;
+  const expectedPreviewId = import.meta.env.VITE_IRONDEV_PREVIEW_ID;
+  const expectedWorkbenchVersion = import.meta.env.VITE_IRONDEV_WORKBENCH_VERSION;
+  const expectedWorkbenchMode = import.meta.env.VITE_IRONDEV_WORKBENCH_MODE;
   const expectedSessionMode = import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_MODE;
   const expectedApplyRequested = import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_REQUESTED;
   const expectedApplyEnabled = import.meta.env.VITE_IRONDEV_LOCALTEST_SANDBOX_APPLY_ENABLED;
@@ -120,6 +126,9 @@ function verifyBrowserIdentity(info: LocalTestPreflightInfo, config: IronDevApiC
   const identityMatches =
     (!expectedSessionId || info.sessionId === expectedSessionId) &&
     (!expectedCommit || (info.launcherRepositoryCommit === expectedCommit && info.apiBuildCommit === expectedCommit)) &&
+    (!expectedPreviewId || info.previewId === expectedPreviewId) &&
+    (!expectedWorkbenchVersion || info.workbenchVersion === expectedWorkbenchVersion) &&
+    (!expectedWorkbenchMode || info.workbenchMode === expectedWorkbenchMode) &&
     normalizeUrl(info.apiBaseUrl) === normalizeUrl(expectedApiBaseUrl || config.apiBaseUrl) &&
     (!expectedApiBaseUrl || normalizeUrl(config.apiBaseUrl) === normalizeUrl(expectedApiBaseUrl));
 

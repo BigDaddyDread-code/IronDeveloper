@@ -69,6 +69,17 @@ test('explicit login lands on the project screen and ignores any prior selected 
   await expect(page.getByTestId('flow.shell')).toHaveCount(0);
 });
 
+test('versioned preview identity remains visible after login', async ({ page }) => {
+  await mockProjectEntryApi(page);
+  await page.goto('/');
+
+  await expect(page.getByTestId('auth.workbenchIdentity')).toContainText('V2 0.1.0-preview.1 / workbench-pr00a');
+  await page.getByTestId('auth.submit').click();
+
+  await expect(page.getByTestId('flow.projectEntry.health')).toContainText('V2 0.1.0-preview.1 / workbench-pr00a');
+  await expect(page.getByTestId('flow.projectEntry.workbenchIdentity')).toContainText('V2 0.1.0-preview.1 / workbench-pr00a');
+});
+
 test('configured fallback does not auto-open a project', async ({ page }) => {
   await mockProjectEntryApi(page, { signedIn: true, fallbackProjectId: 7 });
   await page.goto('/');
@@ -260,6 +271,9 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
         nextSafeAction: 'Sign in with the documented LocalTest credentials.',
         resetCommand: null,
         detail: 'LocalTest front door is ready.',
+        workbenchVersion: '0.1.0-preview.1',
+        workbenchMode: 'V2',
+        previewId: 'workbench-pr00a',
         sessionMode: 'SmokeSimulation',
         sandboxApplyRequested: false,
         sandboxApplyEnabled: false,
@@ -272,7 +286,21 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ environment: 'LocalTest', database: 'IronDeveloper_Test', isTestEnvironment: true })
+      body: JSON.stringify({
+        environment: 'LocalTest',
+        database: 'IronDeveloper_Test_workbench_pr00a',
+        isTestEnvironment: true,
+        workbench: {
+          version: '0.1.0-preview.1',
+          mode: 'V2',
+          v2Enabled: true,
+          v1FallbackEnabled: true,
+          previewId: 'workbench-pr00a',
+          apiBuildIdentity: '1.0.0+test-commit',
+          apiCommit: 'test-commit',
+          resetSupported: true
+        }
+      })
     })
   );
   await page.route('**/irondev-api/api/auth/login', (route) =>

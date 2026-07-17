@@ -3,10 +3,12 @@ param(
     [string]$ApiBaseUrl = "http://localhost:5000",
     [int]$ProjectId = 0,
     [int]$UiPort = 5173,
+    [string]$PreviewId = "default",
     [switch]$Reset,
     [switch]$FreshSession,
     [switch]$BrowserOnly,
-    [switch]$EnableSandboxApply
+    [switch]$EnableSandboxApply,
+    [switch]$UseV1
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,13 +23,15 @@ $arguments = @(
     "-File", $implementation,
     "-ApiBaseUrl", $ApiBaseUrl,
     "-ProjectId", "$ProjectId",
-    "-UiPort", "$UiPort"
+    "-UiPort", "$UiPort",
+    "-PreviewId", $PreviewId
 )
 
 if ($Reset) { $arguments += "-Reset" }
 if ($FreshSession) { $arguments += "-FreshSession" }
 if ($BrowserOnly) { $arguments += "-BrowserOnly" }
 if ($EnableSandboxApply) { $arguments += "-EnableSandboxApply" }
+if ($UseV1) { $arguments += "-UseV1" }
 
 & $pwsh @arguments
 if ($LASTEXITCODE -ne 0) {

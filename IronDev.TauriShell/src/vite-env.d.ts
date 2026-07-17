@@ -9,6 +9,9 @@ interface ImportMetaEnv {
   readonly VITE_IRONDEV_COMMIT?: string;
   readonly VITE_IRONDEV_BUILD_TIME?: string;
   readonly VITE_IRONDEV_LOCALTEST_SESSION_ID?: string;
+  readonly VITE_IRONDEV_PREVIEW_ID?: string;
+  readonly VITE_IRONDEV_WORKBENCH_VERSION?: string;
+  readonly VITE_IRONDEV_WORKBENCH_MODE?: 'V1' | 'V2';
   readonly VITE_IRONDEV_LOCALTEST_REPOSITORY_COMMIT?: string;
   readonly VITE_IRONDEV_LOCALTEST_API_BASE_URL?: string;
   readonly VITE_IRONDEV_LOCALTEST_SESSION_MODE?: string;

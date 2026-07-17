@@ -405,6 +405,7 @@ export function FlowShell() {
   const modelMode = session.environmentInfo?.isTestEnvironment
     ? 'Model mode: Deterministic LocalTest; not a live model run'
     : 'Model mode: Backend-reported per run; deterministic fallback is never silent';
+  const workbench = session.environmentInfo?.workbench;
 
   const openWorkItem = (ticket: ProjectTicket | null) => {
     setActiveTicket(ticket);
@@ -489,9 +490,14 @@ export function FlowShell() {
             onOpenChannel={(slug) => navigateProductPath(chatChannelPath(activeProjectId, slug))}
           />
           <details ref={healthMenuRef} className="fl-header-menu fl-project-health">
-            <summary data-testid="flow.health">Health</summary>
+            <summary data-testid="flow.health">
+              Health{workbench ? ` / ${workbench.mode} ${workbench.version} / ${workbench.previewId}` : ''}
+            </summary>
             <dl>
               <div><dt>Status</dt><dd>{session.apiStatus.status}</dd></div>
+              <div><dt>Workbench</dt><dd data-testid="flow.workbenchIdentity">{workbench ? `${workbench.mode} ${workbench.version}` : 'Unknown'}</dd></div>
+              <div><dt>Preview</dt><dd>{workbench?.previewId ?? 'Unknown'}</dd></div>
+              <div><dt>Commit</dt><dd>{workbench?.apiCommit ?? 'Unknown'}</dd></div>
               <div><dt>Environment</dt><dd>{session.environmentInfo?.environment ?? 'Unknown'}</dd></div>
               <div><dt>API</dt><dd>{session.config.apiBaseUrl}</dd></div>
               <div><dt>Execution</dt><dd data-testid="flow.modelMode">{modelMode}</dd></div>

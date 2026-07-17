@@ -143,7 +143,10 @@ export function ProjectEntryScreen({
   };
 
   const displayName = project.userProfile?.displayName ?? 'Signed in';
-  const healthLabel = session.apiStatus.status === 'connected' ? 'API connected' : `API ${session.apiStatus.status}`;
+  const workbench = session.environmentInfo?.workbench;
+  const healthLabel = session.apiStatus.status === 'connected'
+    ? `API connected${workbench ? ` / ${workbench.mode} ${workbench.version} / ${workbench.previewId}` : ''}`
+    : `API ${session.apiStatus.status}`;
 
   return (
     <main className="fl-root fl-project-entry" data-testid="flow.chooser">
@@ -153,6 +156,16 @@ export function ProjectEntryScreen({
           <details className="fl-project-health">
             <summary data-testid="flow.projectEntry.health">{healthLabel}</summary>
             <dl>
+              <div>
+                <dt>Workbench</dt>
+                <dd data-testid="flow.projectEntry.workbenchIdentity">
+                  {workbench ? `${workbench.mode} ${workbench.version} / ${workbench.previewId}` : 'Unknown'}
+                </dd>
+              </div>
+              <div>
+                <dt>Commit</dt>
+                <dd>{workbench?.apiCommit ?? 'Unknown'}</dd>
+              </div>
               <div>
                 <dt>Environment</dt>
                 <dd>{session.environmentInfo?.environment ?? 'Unknown'}</dd>

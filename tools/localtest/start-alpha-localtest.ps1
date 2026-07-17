@@ -2,17 +2,29 @@ param(
     [string]$ApiBaseUrl = "http://localhost:5000",
     [int]$ProjectId = 0,
     [int]$UiPort = 5173,
+    [string]$PreviewId = "default",
     [switch]$Reset,
     [switch]$FreshSession,
     [switch]$BrowserOnly,
-    [switch]$EnableSandboxApply
+    [switch]$EnableSandboxApply,
+    [switch]$UseV1
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+$versionManifestPath = Join-Path $repoRoot "workbench-version.json"
+if (-not (Test-Path -LiteralPath $versionManifestPath -PathType Leaf)) {
+    throw "Workbench version manifest was not found at '$versionManifestPath'."
+}
+$versionManifest = Get-Content -LiteralPath $versionManifestPath -Raw | ConvertFrom-Json
+$workbenchVersion = [string]$versionManifest.version
+if ($versionManifest.schemaVersion -ne 1 -or $workbenchVersion -notmatch '^\d+\.\d+\.\d+-preview\.\d+$') {
+    throw "Workbench version manifest is invalid."
+}
 . (Join-Path $PSScriptRoot "localtest-seed-contract.ps1")
-$seedContract = Get-LocalTestSeedContract
+$seedContract = Get-LocalTestSeedContract -PreviewId $PreviewId
+$PreviewId = [string]$seedContract.previewId
 $baselineProject = $seedContract.projects | Where-Object key -eq "baseline" | Select-Object -First 1
 if ($ProjectId -le 0) {
     $ProjectId = [int]$baselineProject.id
@@ -28,8 +40,10 @@ $apiApplicationLog = Join-Path $sessionRoot "api.application.log"
 $uiOut = Join-Path $sessionRoot "ui.stdout.log"
 $uiErr = Join-Path $sessionRoot "ui.stderr.log"
 $sessionManifestPath = Join-Path $sessionRoot "session-manifest.json"
-$resetCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset"
-$sandboxApplyRestartCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply"
+$previewArgument = if ($PreviewId -eq "default") { "" } else { " -PreviewId $PreviewId" }
+$v1Argument = if ($UseV1) { " -UseV1" } else { "" }
+$resetCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset$previewArgument$v1Argument"
+$sandboxApplyRestartCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply$previewArgument$v1Argument"
 $sessionMode = if ($EnableSandboxApply) { "ProjectFeatureWork" } else { "SmokeSimulation" }
 $sandboxApplyRequested = [bool]$EnableSandboxApply
 $sandboxApplyEnabled = $false
@@ -129,6 +143,8 @@ function Get-ResolvedLocalTestConnectionString {
         throw "LocalTest must use a stable LocalDB instance alias, not '$($builder.DataSource)'."
     }
 
+    $builder["Initial Catalog"] = [string]$seedContract.database.name
+
     # Never replace the stable LocalDB alias with its ephemeral named pipe. The
     # pipe changes whenever LocalDB restarts while the API process is alive.
     return $builder.ConnectionString
@@ -227,6 +243,10 @@ function Write-LocalTestSessionManifest {
         apiBaseUrl = $ApiBaseUrl
         uiUrl = $UiUrl
         databaseName = $configuredDatabaseName
+        previewId = $PreviewId
+        workbenchVersion = $workbenchVersion
+        programmePr = [string]$versionManifest.programmePr
+        workbenchMode = if ($UseV1) { "V1" } else { "V2" }
         environment = $seedContract.environment
         sessionMode = $sessionMode
         sandboxApplyRequested = $sandboxApplyRequested
@@ -310,40 +330,6 @@ function Get-LocalTestUiUrl {
     return "http://127.0.0.1:$Port/"
 }
 
-function Stop-RepoLocalTestProcesses {
-    $normalizedShellRoot = [System.IO.Path]::GetFullPath($shellRoot)
-    $processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-        $name = $_.Name
-        $command = $_.CommandLine
-        if ([string]::IsNullOrWhiteSpace($name)) {
-            return $false
-        }
-        if ([string]::IsNullOrWhiteSpace($command)) {
-            $command = ""
-        }
-
-        $isApiDotnet = $name -eq "dotnet.exe" -and
-            $command.IndexOf("IronDev.Api\IronDev.Api.csproj", [StringComparison]::OrdinalIgnoreCase) -ge 0
-        $isViteNode = $name -eq "node.exe" -and
-            $command.IndexOf("node_modules/vite/bin/vite.js", [StringComparison]::OrdinalIgnoreCase) -ge 0 -and
-            $command.IndexOf($normalizedShellRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0
-        $isTauriNode = $name -eq "node.exe" -and
-            $command.IndexOf("@tauri-apps\cli\tauri.js", [StringComparison]::OrdinalIgnoreCase) -ge 0 -and
-            $command.IndexOf($normalizedShellRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0
-        $isCargo = $name -eq "cargo.exe" -and
-            $command.IndexOf((Join-Path $normalizedShellRoot "src-tauri"), [StringComparison]::OrdinalIgnoreCase) -ge 0
-        $isDesktop = $name -eq "irondev-tauri-shell.exe"
-
-        return $isApiDotnet -or $isViteNode -or $isTauriNode -or $isCargo -or $isDesktop
-    })
-
-    foreach ($process in $processes) {
-        if ($process.ProcessId -and $process.ProcessId -ne $PID) {
-            Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
-
 function Start-BrowserShell {
     param([int]$Port)
 
@@ -401,12 +387,11 @@ $seededLoginCheckResult = "NotChecked"
 Write-LocalTestSessionManifest -Status "Starting" -UiUrl $uiUrl
 
 try {
-    Stop-RepoLocalTestProcesses
     Stop-Listener -Port $apiPort
     Stop-Listener -Port $UiPort
 
     if ($Reset) {
-        & (Join-Path $PSScriptRoot "reset-localtest-data.ps1")
+        & (Join-Path $PSScriptRoot "reset-localtest-data.ps1") -PreviewId $PreviewId
     }
 
     if ($EnableSandboxApply) {
@@ -417,10 +402,15 @@ try {
     $apiConnectionString = Get-ResolvedLocalTestConnectionString
     $configuredDatabaseName = ([System.Data.SqlClient.SqlConnectionStringBuilder]::new($apiConnectionString)).InitialCatalog
     $apiEnvironmentVariables = [ordered]@{
+        ASPNETCORE_ENVIRONMENT = "LocalTest"
+        ASPNETCORE_URLS = $ApiBaseUrl.TrimEnd('/')
+        Cors__AllowedOrigins__0 = "http://127.0.0.1:$UiPort"
+        Cors__AllowedOrigins__1 = "http://localhost:$UiPort"
         IRONDEV_JWT_KEY = New-LocalTestJwtKey
         IRONDEV_LOCALTEST_QUALIFICATION_KEY = New-LocalTestJwtKey
         ConnectionStrings__IronDeveloperDb = $apiConnectionString
         IRONDEV_LOCALTEST_SESSION_ID = $sessionId
+        IRONDEV_LOCALTEST_PREVIEW_ID = $PreviewId
         IRONDEV_LOCALTEST_REPOSITORY_COMMIT = $repositoryCommit
         IRONDEV_LOCALTEST_API_BASE_URL = $ApiBaseUrl.TrimEnd('/')
         IRONDEV_LOCALTEST_API_LOG_PATH = $apiApplicationLog
@@ -429,6 +419,13 @@ try {
         IRONDEV_LOCALTEST_SANDBOX_APPLY_ENABLED = $sandboxApplyEnabled.ToString().ToLowerInvariant()
         IRONDEV_LOCALTEST_SANDBOX_APPLY_ROOT = if ($sandboxApplyRoot) { $sandboxApplyRoot } else { "" }
         IRONDEV_LOCALTEST_CAPABILITIES = ($sessionCapabilities -join ";")
+        LocalTest__WorkspaceRoot = [string]$seedContract.paths.workspaceRoot
+        LocalTest__LogsRoot = [string]$seedContract.paths.logsRoot
+        LocalTest__WeaviatePrefix = if ($PreviewId -eq "default") { "irondev_test" } else { "irondev_test_$($PreviewId.Replace('-', '_'))" }
+        WorkbenchV2__Version = $workbenchVersion
+        WorkbenchV2__Enabled = (-not [bool]$UseV1).ToString().ToLowerInvariant()
+        WorkbenchV2__V1FallbackEnabled = "true"
+        WorkbenchV2__PreviewId = $PreviewId
         SkeletonApply__Enabled = $sandboxApplyEnabled.ToString().ToLowerInvariant()
         SkeletonApply__SandboxRoot = if ($sandboxApplyRoot) { $sandboxApplyRoot } else { "" }
         SkeletonApply__LauncherCapabilityDeclared = $sandboxApplyRequested.ToString().ToLowerInvariant()
@@ -442,7 +439,7 @@ try {
 
     try {
         $apiLauncherProcess = Start-Process -FilePath dotnet `
-            -ArgumentList @("run", "--launch-profile", "LocalTest", "--project", "IronDev.Api\IronDev.Api.csproj") `
+            -ArgumentList @("run", "--no-launch-profile", "--project", "IronDev.Api\IronDev.Api.csproj") `
             -WorkingDirectory $repoRoot `
             -PassThru `
             -WindowStyle Hidden `
@@ -495,6 +492,9 @@ try {
     $env:VITE_IRONDEV_PROJECT_ID = if ($FreshSession) { "none" } else { "$ProjectId" }
     $env:IRONDEV_API_PROXY_TARGET = $ApiBaseUrl.TrimEnd('/')
     $env:VITE_IRONDEV_LOCALTEST_SESSION_ID = $sessionId
+    $env:VITE_IRONDEV_PREVIEW_ID = $PreviewId
+    $env:VITE_IRONDEV_WORKBENCH_VERSION = $workbenchVersion
+    $env:VITE_IRONDEV_WORKBENCH_MODE = if ($UseV1) { "V1" } else { "V2" }
     $env:VITE_IRONDEV_LOCALTEST_REPOSITORY_COMMIT = $repositoryCommit
     $env:VITE_IRONDEV_LOCALTEST_API_BASE_URL = $ApiBaseUrl.TrimEnd('/')
     $env:VITE_IRONDEV_LOCALTEST_SESSION_MODE = $sessionMode
@@ -508,6 +508,8 @@ try {
     Write-Host "  API: $ApiBaseUrl"
     Write-Host "  API PID: $apiRuntimeProcessId"
     Write-Host "  API build: $($preflight.apiBuildIdentity)"
+    Write-Host "  Workbench: $($preflight.workbenchVersion) $($preflight.workbenchMode)"
+    Write-Host "  Preview: $($preflight.previewId)"
     Write-Host "  Environment: $($environment.environment)"
     Write-Host "  Database: $($environment.database)"
     Write-Host "  Workspace: $($environment.workspaceRoot)"

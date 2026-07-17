@@ -37,6 +37,9 @@ public sealed record LocalTestPreflightResponse(
     string? ResetCommand,
     string Detail)
 {
+    public string WorkbenchVersion { get; init; } = WorkbenchReleaseInfoFactory.DefaultVersion;
+    public string WorkbenchMode { get; init; } = "V1";
+    public string PreviewId { get; init; } = WorkbenchReleaseInfoFactory.DefaultPreviewId;
     public string SessionMode { get; init; } = string.Empty;
     public bool SandboxApplyRequested { get; init; }
     public bool SandboxApplyEnabled { get; init; }
@@ -97,7 +100,7 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
         }
 
         var identity = BuildIdentity();
-        var contract = LoadContract();
+        var contract = LoadContract(identity.PreviewId);
         var configuredDatabase = ResolveDatabaseName(_configuration.GetConnectionString("IronDeveloperDb"));
 
         if (!string.Equals(configuredDatabase, contract.Database.Name, StringComparison.Ordinal))
@@ -242,8 +245,11 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
         string seededLoginCheckResult,
         string nextSafeAction,
         string? resetCommand,
-        string detail) =>
-        new(
+        string detail)
+    {
+        var scopedResetCommand = ScopeCommand(resetCommand, identity);
+
+        return new LocalTestPreflightResponse(
             state,
             _hostEnvironment.EnvironmentName,
             database,
@@ -256,15 +262,20 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
             contractVersion,
             seededLoginCheckResult,
             nextSafeAction,
-            resetCommand,
-        detail)
+            scopedResetCommand,
+            detail)
         {
+            WorkbenchVersion = identity.WorkbenchVersion,
+            WorkbenchMode = identity.WorkbenchV2Enabled ? "V2" : "V1",
+            PreviewId = identity.PreviewId,
             SessionMode = identity.SessionMode,
             SandboxApplyRequested = identity.SandboxApplyRequested,
             SandboxApplyEnabled = identity.SandboxApplyEnabled,
             SandboxApplyRoot = identity.SandboxApplyRoot,
-            Capabilities = identity.Capabilities
+            Capabilities = identity.Capabilities,
+            SandboxApplyRestartCommand = ScopeCommand(SandboxApplyRestartCommand, identity)!
         };
+    }
 
     private static bool HasValidPassword(string password, string? passwordHash)
     {
@@ -283,7 +294,7 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
         }
     }
 
-    private static LocalTestSeedContract LoadContract()
+    private static LocalTestSeedContract LoadContract(string previewId)
     {
         var path = Path.Combine(AppContext.BaseDirectory, ContractFileName);
         if (!File.Exists(path))
@@ -301,7 +312,32 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
             throw new InvalidOperationException("LocalTest seed contract is missing or invalid.");
         }
 
+        if (!string.Equals(previewId, WorkbenchReleaseInfoFactory.DefaultPreviewId, StringComparison.Ordinal))
+        {
+            contract.Database.Name = $"IronDeveloper_Test_{previewId.Replace('-', '_')}";
+        }
+
         return contract;
+    }
+
+    private static string? ScopeCommand(string? command, LocalTestIdentity identity)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return command;
+        }
+
+        if (!string.Equals(identity.PreviewId, WorkbenchReleaseInfoFactory.DefaultPreviewId, StringComparison.Ordinal))
+        {
+            command += $" -PreviewId {identity.PreviewId}";
+        }
+
+        if (!identity.WorkbenchV2Enabled)
+        {
+            command += " -UseV1";
+        }
+
+        return command;
     }
 
     private static string ResolveDatabaseName(string? connectionString)
@@ -324,9 +360,17 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
             ? informationalVersion[(separator + 1)..]
             : informationalVersion;
 
+        var workbench = WorkbenchReleaseInfoFactory.Create(
+            _configuration,
+            _hostEnvironment,
+            typeof(LocalTestPreflightService).Assembly);
+
         return new LocalTestIdentity(
             informationalVersion,
             buildCommit,
+            workbench.Version,
+            workbench.V2Enabled,
+            workbench.PreviewId,
             Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_REPOSITORY_COMMIT"),
             Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_SESSION_ID"),
             Environment.GetEnvironmentVariable("IRONDEV_LOCALTEST_API_BASE_URL"),
@@ -348,6 +392,9 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
     private sealed record LocalTestIdentity(
         string ApiBuildIdentity,
         string ApiBuildCommit,
+        string WorkbenchVersion,
+        bool WorkbenchV2Enabled,
+        string PreviewId,
         string? LauncherRepositoryCommit,
         string? SessionId,
         string? ApiBaseUrl,
@@ -408,7 +455,7 @@ public sealed class LocalTestPreflightService : ILocalTestPreflightService
 
     private sealed class LocalTestDatabaseContract
     {
-        public string Name { get; init; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
     }
 
     private sealed class LocalTestCredentialContract

@@ -1,6 +1,7 @@
 param(
     [string]$ConfigPath,
     [string]$SqlServer,
+    [string]$PreviewId = "default",
     [switch]$SkipSchema
 )
 
@@ -8,7 +9,9 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 . (Join-Path $PSScriptRoot "localtest-seed-contract.ps1")
-$seedContract = Get-LocalTestSeedContract
+$baseSeedContract = Get-LocalTestSeedContract
+$seedContract = Get-LocalTestSeedContract -PreviewId $PreviewId
+$PreviewId = [string]$seedContract.previewId
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
     $ConfigPath = Join-Path $repoRoot "IronDev.Api\appsettings.LocalTest.json"
 }
@@ -24,6 +27,8 @@ if ([string]::IsNullOrWhiteSpace($connectionString)) {
 }
 
 $builder = [System.Data.SqlClient.SqlConnectionStringBuilder]::new($connectionString)
+$builder["Initial Catalog"] = [string]$seedContract.database.name
+$connectionString = $builder.ConnectionString
 $database = $builder.InitialCatalog
 
 if ([string]::IsNullOrWhiteSpace($SqlServer)) {
@@ -116,8 +121,8 @@ function Resolve-SqlCmdDataSource {
     throw "Could not resolve LocalDB instance '$instance' to a sqlcmd named pipe."
 }
 
-$workspaceRoot = $config.LocalTest.WorkspaceRoot
-$logsRoot = $config.LocalTest.LogsRoot
+$workspaceRoot = [string]$seedContract.paths.workspaceRoot
+$logsRoot = [string]$seedContract.paths.logsRoot
 Assert-LocalTestSeedTarget `
     -Contract $seedContract `
     -DatabaseName $database `
@@ -431,7 +436,25 @@ GO
     }
 }
 
-Invoke-SqlFile -DatabaseName $database -Path (Join-Path $PSScriptRoot "localtest-seed.sql")
+$seedSqlSourcePath = Join-Path $PSScriptRoot "localtest-seed.sql"
+$seedSqlPath = $seedSqlSourcePath
+$scopedSeedPath = $null
+if ($PreviewId -ne "default") {
+    $scopedSeedPath = Join-Path ([System.IO.Path]::GetTempPath()) ("irondev-localtest-seed-" + [Guid]::NewGuid().ToString("N") + ".sql")
+    (Get-Content -LiteralPath $seedSqlSourcePath -Raw).
+        Replace([string]$baseSeedContract.paths.workspaceRoot, $workspaceRoot) |
+        Set-Content -LiteralPath $scopedSeedPath -Encoding UTF8
+    $seedSqlPath = $scopedSeedPath
+}
+
+try {
+    Invoke-SqlFile -DatabaseName $database -Path $seedSqlPath
+}
+finally {
+    if ($null -ne $scopedSeedPath) {
+        Remove-Item -LiteralPath $scopedSeedPath -Force -ErrorAction SilentlyContinue
+    }
+}
 Invoke-SqlFile -DatabaseName $database -Path (Join-Path $repoRoot "Database\migrate_work_item_identity.sql")
 
 $validationPath = Join-Path ([System.IO.Path]::GetTempPath()) ("irondev-localtest-seed-contract-" + [Guid]::NewGuid().ToString("N") + ".sql")
@@ -445,6 +468,7 @@ finally {
 }
 
 Write-Host "LocalTest reset complete."
+Write-Host "Preview: $PreviewId"
 Write-Host "Database: $database"
 Write-Host "Workspace root: $workspaceRoot"
 Write-Host "Logs root: $logsRoot"
