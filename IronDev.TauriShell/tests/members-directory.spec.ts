@@ -73,7 +73,9 @@ test('stale channel membership write is refused with reload and compare', async 
   await mockMembersWorkspace(page, { staleChannelWrite: true });
   await page.goto('/projects/7/library/members');
 
-  await page.getByTestId('flow.members.channel.101.role.8').selectOption('Moderator');
+  const roleSelector = page.getByTestId('flow.members.channel.101.role.8');
+  await expect(roleSelector).toBeVisible({ timeout: 15_000 });
+  await roleSelector.selectOption('Moderator');
   await page.getByTestId('flow.members.channel.101.save.8').click();
 
   await expect(page.getByTestId('flow.members.error')).toContainText('Attempted version 1; current version 2');

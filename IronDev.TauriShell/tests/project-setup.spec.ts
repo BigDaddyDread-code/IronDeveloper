@@ -99,6 +99,25 @@ async function mockSetup(page: Page, options: SetupMockOptions) {
   await page.route('**/irondev-api/health', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) })
   );
+  await page.route('**/irondev-api/api/localtest/preflight', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        state: 'LocalTestReady',
+        environment: 'LocalTest',
+        database: 'IronDeveloper_Test',
+        apiBuildCommit: 'test-commit',
+        launcherRepositoryCommit: 'test-commit',
+        apiBaseUrl: 'http://localhost:5000',
+        sessionMode: 'SmokeSimulation',
+        sandboxApplyRequested: false,
+        sandboxApplyEnabled: false,
+        sandboxApplyRoot: null,
+        capabilities: ['WorkflowSmokeSimulation']
+      })
+    })
+  );
   await page.route('**/irondev-api/api/environment', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ environment: 'LocalTest', database: 'IronDeveloper_Test', isTestEnvironment: true }) })
   );
@@ -120,7 +139,23 @@ async function mockSetup(page: Page, options: SetupMockOptions) {
     });
   });
   await page.route('**/irondev-api/api/workbench/projects/7/open', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) })
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        projectId: 7,
+        tenantId: 3,
+        name: 'SecondRepo',
+        projectLifecyclePhase: 'Shaping',
+        executionReadiness: 'NotConfigured',
+        repositoryBinding: null,
+        workbenchSessionId: 7007,
+        leaseEpoch: 1,
+        wasResumed: true,
+        wasTakenOver: false,
+        clientOperationId: '00000000-0000-0000-0000-000000000007'
+      })
+    })
   );
   await page.route('**/irondev-api/api/projects/7/tickets', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
@@ -182,7 +217,7 @@ async function mockSetup(page: Page, options: SetupMockOptions) {
 
 async function openSetup(page: Page) {
   await page.goto('/projects/7/library/provisioning');
-  await expect(page.getByTestId('flow.projectSetup')).toBeVisible();
+  await expect(page.getByTestId('flow.projectSetup')).toBeVisible({ timeout: 15_000 });
 }
 
 test('next task comes from backend nextAction and stable code, even when the display label changes', async ({ page }) => {

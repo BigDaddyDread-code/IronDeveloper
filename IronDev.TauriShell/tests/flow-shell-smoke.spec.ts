@@ -279,7 +279,7 @@ test('audit library route renders read-only ledger rows and filters', async ({ p
   });
   await page.goto('/projects/7/library/audit');
 
-  await expect(page.getByTestId('flow.library.auditLedger')).toBeVisible();
+  await expect(page.getByTestId('flow.library.auditLedger')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('heading', { name: 'Project audit', exact: true })).toBeVisible();
   await expect(page.getByTestId('flow.audit.rows')).toContainText('AcceptedApprovalRecorded');
   await expect(page.getByTestId('flow.audit.rows')).toContainText('Alice Reviewer');

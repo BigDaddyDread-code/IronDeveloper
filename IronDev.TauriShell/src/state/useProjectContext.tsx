@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { IronDevApiError } from '../api/ironDevApi';
 import { useSessionContext } from './useSessionContext';
 import type {
@@ -58,6 +58,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [projectSelectionMode, setProjectSelectionMode] = useState<'api' | 'fallback-config' | 'missing'>('missing');
   const [accessStatus, setAccessStatus] = useState<ProductAccessStatus>('loading');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshRequestEpoch = useRef(0);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId),
@@ -80,11 +81,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [config.selectedTenantId]);
 
   const refreshProjectContext = useCallback(async () => {
+    const requestEpoch = ++refreshRequestEpoch.current;
+    const isCurrentRequest = () => requestEpoch === refreshRequestEpoch.current;
     setIsRefreshing(true);
     setAccessStatus('loading');
 
     try {
       const health = await checkApiConnection();
+      if (!isCurrentRequest()) return;
 
       if (health.status === 'disconnected' || health.status === 'error') {
         clearWorkspace();
@@ -99,9 +103,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       }
 
       const profile = await client.getCurrentUser();
+      if (!isCurrentRequest()) return;
       setUserProfile(profile);
 
       const tenantList = await client.getTenants();
+      if (!isCurrentRequest()) return;
       setTenants(tenantList);
 
       const tenantId = profile.selectedTenantId ?? config.selectedTenantId ?? (tenantList.length === 1 ? tenantList[0].id ?? null : null);
@@ -118,6 +124,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
       if (profile.selectedTenantId !== tenantId) {
         const response = await client.selectTenant(tenantId);
+        if (!isCurrentRequest()) return;
         window.sessionStorage.setItem('irondev.token', response.token);
         window.localStorage.removeItem('irondev.token');
         window.localStorage.setItem('irondev.tenantId', `${tenantId}`);
@@ -127,6 +134,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       }
 
       const projectList = await client.getProjects();
+      if (!isCurrentRequest()) return;
       setProjects(projectList);
 
       setSelectedProjectId(null);
@@ -135,6 +143,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setProjectSelectionMode('missing');
       setAccessStatus('projectRequired');
     } catch (error) {
+      if (!isCurrentRequest()) return;
       clearWorkspace();
       if (error instanceof IronDevApiError) {
         if (error.isAuthFailure) {
@@ -147,8 +156,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setAccessStatus('apiOffline');
       }
     } finally {
-      setIsRefreshing(false);
-      setTokenEditorOpen(false);
+      if (isCurrentRequest()) {
+        setIsRefreshing(false);
+        setTokenEditorOpen(false);
+      }
     }
   }, [checkApiConnection, clearRejectedSession, clearWorkspace, client, config.selectedTenantId, refreshConfig, setTokenEditorOpen, tokenConfigured]);
 
