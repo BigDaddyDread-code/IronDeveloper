@@ -192,7 +192,9 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                 project.Id,
                 ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(
                     project.Id,
-                    "demo-baseline-single-project-apply-capability-v1"));
+                    "demo-baseline-single-project-apply-capability-v1"),
+                sampleCopy,
+                Path.GetDirectoryName(sampleCopy)!);
             expectedRunReadiness.ExpectProject(project.Id);
             using var reviewerClient = await CreateReviewerClientAsync(project.Id);
             var validateTicket = await CreateFixtureTicketAsync(client, project.Id, ValidateBookKey);
@@ -477,7 +479,9 @@ public sealed class DemoSeedApiDrivenTests : ApiTestBase
                 project.Id,
                 ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(
                     project.Id,
-                    "hero-disposition-single-project-apply-capability-v1"));
+                    "hero-disposition-single-project-apply-capability-v1"),
+                sampleCopy,
+                Path.GetDirectoryName(sampleCopy)!);
             expectedRunReadiness.ExpectProject(project.Id);
             var ticket = await CreateFixtureTicketAsync(client, project.Id, BulkDiscountKey);
             ticketKinds[ticket.Id] = BulkDiscountKey;

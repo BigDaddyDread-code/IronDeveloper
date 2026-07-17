@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using IronDev.Cli;
+using IronDev.Core.RunReadiness;
 using IronDev.Core.Workspaces;
 using IronDev.Infrastructure.Services.Workspaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -2639,7 +2640,42 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_MissingApplyDryRun_Blocks()
+    public async Task WorkspaceApplyCopy_StandaloneCliAlwaysFailsClosed()
+    {
+        var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-cli-authority");
+        try
+        {
+            var sourceRepo = await CreateTemporaryGitRepositoryAsync(testRoot);
+            var workspacePath = await CreatePreparedWorkspaceAsync(testRoot, "run-1", sourceRepo);
+            await File.WriteAllTextAsync(Path.Combine(workspacePath, "new.txt"), "new workspace file");
+            await WriteApplyCopyRequiredEvidenceAsync("run-1", workspacePath, sourceRepo, [("add", "new.txt")]);
+            var output = new StringWriter();
+            var error = new StringWriter();
+
+            var exitCode = await IronDevCli.RunAsync(
+                ["workspace", "apply-copy", "--run-id", "run-1", "--workspace-path", workspacePath, "--json"],
+                output,
+                error,
+                handler: null,
+                CancellationToken.None);
+
+            Assert.AreEqual(1, exitCode, error.ToString());
+            using var doc = JsonDocument.Parse(output.ToString());
+            Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
+            AssertStringArrayContains(
+                doc.RootElement.GetProperty("errors"),
+                ControlledSourceMutationReasonCodes.CapabilityContextMissing);
+            Assert.IsFalse(File.Exists(Path.Combine(sourceRepo, "new.txt")));
+            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+        }
+        finally
+        {
+            TryDeleteDirectory(testRoot);
+        }
+    }
+
+    [TestMethod]
+    public async Task ControlledApplyCopy_MissingApplyDryRun_Blocks()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-missing-dry-run");
         try
@@ -2666,7 +2702,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_DryRunNotReady_Blocks()
+    public async Task ControlledApplyCopy_DryRunNotReady_Blocks()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-not-ready");
         try
@@ -2689,7 +2725,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_DeleteOperation_Blocks()
+    public async Task ControlledApplyCopy_DeleteOperation_Blocks()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-delete");
         try
@@ -2714,7 +2750,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_SourceHashDrift_Blocks()
+    public async Task ControlledApplyCopy_SourceHashDrift_Blocks()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-source-drift");
         try
@@ -2729,9 +2765,11 @@ public sealed partial class IronDevCliTests
             using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
 
             Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
-            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "Source hash mismatch");
+            AssertStringArrayContains(
+                doc.RootElement.GetProperty("errors"),
+                ControlledSourceMutationReasonCodes.SourceHashMismatch);
             Assert.AreEqual("drift", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
-            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+            Assert.IsTrue(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
         }
         finally
         {
@@ -2740,7 +2778,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_WorkspaceHashDrift_Blocks()
+    public async Task ControlledApplyCopy_WorkspaceHashDrift_Blocks()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-workspace-drift");
         try
@@ -2755,9 +2793,11 @@ public sealed partial class IronDevCliTests
             using var doc = await RunWorkspaceApplyCopyAsync("run-1", workspacePath, expectedExitCode: 1);
 
             Assert.AreEqual("blocked", doc.RootElement.GetProperty("status").GetString());
-            AssertStringArrayContains(doc.RootElement.GetProperty("errors"), "Workspace hash mismatch");
+            AssertStringArrayContains(
+                doc.RootElement.GetProperty("errors"),
+                ControlledSourceMutationReasonCodes.WorkspaceHashMismatch);
             Assert.AreEqual("source", await File.ReadAllTextAsync(Path.Combine(sourceRepo, "tracked.txt")));
-            Assert.IsFalse(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
+            Assert.IsTrue(File.Exists(Path.Combine(workspacePath, ".irondev", "runs", "run-1", "apply-copy.json")));
         }
         finally
         {
@@ -2766,7 +2806,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_AddOperation_AppliesFile()
+    public async Task ControlledApplyCopy_AddOperation_AppliesFile()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-add");
         try
@@ -2792,7 +2832,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_NestedAddOperation_CreatesParentDirectoryAndAppliesFile()
+    public async Task ControlledApplyCopy_NestedAddOperation_CreatesParentDirectoryAndAppliesFile()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-nested-add");
         try
@@ -2818,7 +2858,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_ModifyOperation_AppliesFile()
+    public async Task ControlledApplyCopy_ModifyOperation_AppliesFile()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-modify");
         try
@@ -2847,7 +2887,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_AddAndModify_AppliesBoth()
+    public async Task ControlledApplyCopy_AddAndModify_AppliesBoth()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-add-modify");
         try
@@ -2882,7 +2922,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_ValidationIsAllOrNothingBeforeCopy()
+    public async Task ControlledApplyCopy_ValidationIsAllOrNothingBeforeCopy()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-all-or-nothing");
         try
@@ -2908,7 +2948,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_ParentPathBlockedByFile_BlocksBeforeCopy()
+    public async Task ControlledApplyCopy_ParentPathBlockedByFile_BlocksBeforeCopy()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-parent-file");
         try
@@ -2939,7 +2979,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_UnsafePath_Blocks()
+    public async Task ControlledApplyCopy_UnsafePath_Blocks()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-unsafe-path");
         try
@@ -2962,7 +3002,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_SourceDirectoryConflict_Blocks()
+    public async Task ControlledApplyCopy_SourceDirectoryConflict_Blocks()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-source-directory");
         try
@@ -2989,7 +3029,7 @@ public sealed partial class IronDevCliTests
     }
 
     [TestMethod]
-    public async Task WorkspaceApplyCopy_NormalizedDuplicateOperation_BlocksBeforeCopy()
+    public async Task ControlledApplyCopy_NormalizedDuplicateOperation_BlocksBeforeCopy()
     {
         var testRoot = CreateTemporaryDirectory("irondev-workspace-apply-copy-normalized-duplicate");
         try
@@ -4364,23 +4404,88 @@ public sealed partial class IronDevCliTests
         string workspacePath,
         int expectedExitCode)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var result = await IronDevCli.RunAsync(
-            [
-                "workspace", "apply-copy",
-                "--run-id", runId,
-                "--workspace-path", workspacePath,
-                "--json"
-            ],
-            output,
-            error,
-            handler: null,
-            CancellationToken.None);
+        using var metadata = JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(workspacePath, ".irondev", "workspace.json")));
+        var sourceRepo = metadata.RootElement.GetProperty("sourceRepo").GetString()!;
+        var sandboxRoot = Directory.GetParent(sourceRepo)!.FullName;
+        const int projectId = 71;
+        const string evidenceHash = "cli-contract-controlled-apply-evidence-v1";
+        var capability = new FixedControlledApplyCapabilityService(new ProjectApplyCapability
+        {
+            ProjectId = projectId,
+            IsReady = true,
+            State = "Ready",
+            ReasonCode = ProjectApplyCapabilityReasonCodes.Ready,
+            Reason = "Explicit single-project test capability.",
+            NextSafeAction = ProjectApplyCapabilityCommands.RestartInSandboxApplyMode,
+            SessionMode = ProjectRunPurposes.ProjectFeatureWork,
+            LauncherSessionId = "cli-contract-session",
+            SandboxRoot = sandboxRoot,
+            ProjectPath = sourceRepo,
+            SandboxRootFingerprint = "cli-contract-sandbox",
+            ProjectPathFingerprint = "cli-contract-project",
+            QualificationId = "cli-contract-qualification",
+            QualificationFingerprint = "cli-contract-qualification-fingerprint",
+            ReadinessEvidenceHash = evidenceHash
+        });
+        var service = new DisposableWorkspaceApplyCopyService(new ControlledSourceMutationExecutor(capability));
+        var result = await service.ApplyAsync(new DisposableWorkspaceApplyCopyRequest
+        {
+            RunId = runId,
+            WorkspacePath = workspacePath,
+            MutationContext = new ControlledSourceMutationContext
+            {
+                ProjectId = projectId,
+                RunId = runId,
+                ApplyAttemptId = runId,
+                ExpectedReadinessEvidenceHash = evidenceHash,
+                QualifiedSandboxRoot = sandboxRoot,
+                QualifiedProjectRoot = sourceRepo,
+                QualifiedWorkspaceRoot = workspacePath,
+                ExpectedLauncherSessionId = "cli-contract-session",
+                ExpectedSandboxRootFingerprint = "cli-contract-sandbox",
+                ExpectedProjectPathFingerprint = "cli-contract-project",
+                ExpectedQualificationId = "cli-contract-qualification",
+                ExpectedQualificationFingerprint = "cli-contract-qualification-fingerprint"
+            }
+        });
 
-        Assert.AreEqual(expectedExitCode, result, error.ToString());
-        AssertJsonWasWritten(output);
-        return JsonDocument.Parse(output.ToString());
+        Assert.AreEqual(expectedExitCode, result.ExitCode, string.Join(Environment.NewLine, result.Errors));
+        var envelope = new DisposableWorkspaceApplyCopyEnvelope
+        {
+            Status = result.Status,
+            Command = "workspace apply-copy",
+            TraceId = null,
+            Summary = result.Summary,
+            Data = result.Data,
+            Errors = result.Errors,
+            Warnings = result.Warnings
+        };
+        return JsonDocument.Parse(JsonSerializer.Serialize(envelope, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+    }
+
+    private sealed class FixedControlledApplyCapabilityService(ProjectApplyCapability capability)
+        : IProjectApplyCapabilityService
+    {
+        public Task<ProjectApplyCapability> EvaluateAsync(
+            int projectId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(projectId == capability.ProjectId
+                ? capability
+                : capability with
+                {
+                    ProjectId = projectId,
+                    IsReady = false,
+                    ReasonCode = ProjectApplyCapabilityReasonCodes.ProjectApplyQualificationBindingMismatch,
+                    Reason = "The test capability is bound to one explicit project.",
+                    ReadinessEvidenceHash = string.Empty
+                });
+
+        public Task<ProjectApplyCapability> QualifyDisposableProjectAsync(
+            int projectId,
+            int qualifyingActorUserId,
+            CancellationToken cancellationToken = default) =>
+            EvaluateAsync(projectId, cancellationToken);
     }
 
     private static async Task<JsonDocument> RunWorkspaceApplyVerifyAsync(

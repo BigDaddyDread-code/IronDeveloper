@@ -18,7 +18,7 @@ public sealed class ExpectedProjectApplyCapabilityServiceTests
             beforeRegistration.ReasonCode);
 
         var registeredHash = ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(41, "fixture-contract-a");
-        fixture.ExpectProject(41, registeredHash);
+        fixture.ExpectProject(41, registeredHash, @"C:\fixture-sandbox\project", @"C:\fixture-sandbox");
         var first = await fixture.EvaluateAsync(41);
         var second = await fixture.EvaluateAsync(41);
         var anotherProject = await fixture.EvaluateAsync(42);
@@ -37,12 +37,14 @@ public sealed class ExpectedProjectApplyCapabilityServiceTests
     {
         var fixture = new ExpectedProjectApplyCapabilityService();
         fixture.ExpectProject(41,
-            ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(41, "fixture-contract-a"));
+            ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(41, "fixture-contract-a"),
+            @"C:\fixture-sandbox\project", @"C:\fixture-sandbox");
         Assert.IsTrue((await fixture.EvaluateAsync(41)).IsReady);
 
         Assert.ThrowsException<InvalidOperationException>(() =>
             fixture.ExpectProject(41,
-                ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(41, "fixture-contract-b")));
+                ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(41, "fixture-contract-b"),
+                @"C:\fixture-sandbox\project", @"C:\fixture-sandbox"));
 
         var afterHashChange = await fixture.EvaluateAsync(41);
         Assert.IsFalse(afterHashChange.IsReady);
@@ -55,15 +57,18 @@ public sealed class ExpectedProjectApplyCapabilityServiceTests
     public async Task MissingHashOrConflictingSecondProject_PoisonsFixtureFailClosed()
     {
         var missingHash = new ExpectedProjectApplyCapabilityService();
-        Assert.ThrowsException<InvalidOperationException>(() => missingHash.ExpectProject(41, string.Empty));
+        Assert.ThrowsException<InvalidOperationException>(() => missingHash.ExpectProject(
+            41, string.Empty, @"C:\fixture-sandbox\project", @"C:\fixture-sandbox"));
         Assert.IsFalse((await missingHash.EvaluateAsync(41)).IsReady);
 
         var conflictingProject = new ExpectedProjectApplyCapabilityService();
         conflictingProject.ExpectProject(41,
-            ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(41, "fixture-contract-a"));
+            ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(41, "fixture-contract-a"),
+            @"C:\fixture-sandbox\project", @"C:\fixture-sandbox");
         Assert.ThrowsException<InvalidOperationException>(() =>
             conflictingProject.ExpectProject(42,
-                ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(42, "fixture-contract-a")));
+                ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(42, "fixture-contract-a"),
+                @"C:\fixture-sandbox\other", @"C:\fixture-sandbox"));
 
         Assert.IsFalse((await conflictingProject.EvaluateAsync(41)).IsReady);
         Assert.IsFalse((await conflictingProject.EvaluateAsync(42)).IsReady);

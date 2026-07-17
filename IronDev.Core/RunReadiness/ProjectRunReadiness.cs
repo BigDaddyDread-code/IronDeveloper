@@ -30,6 +30,8 @@ public static class ProjectApplyCapabilityReasonCodes
     public const string ProjectApplyQualificationBindingMismatch = "ProjectApplyQualificationBindingMismatch";
     public const string ProjectApplyQualificationMarkerMissing = "ProjectApplyQualificationMarkerMissing";
     public const string ProjectApplyQualificationMarkerMismatch = "ProjectApplyQualificationMarkerMismatch";
+    public const string ProjectApplyCapabilityChangedBeforeMutation = "ProjectApplyCapabilityChangedBeforeMutation";
+    public const string ProjectApplyMutationPlatformUnsupported = "ProjectApplyMutationPlatformUnsupported";
 }
 
 public static class ProjectApplyCapabilityCommands

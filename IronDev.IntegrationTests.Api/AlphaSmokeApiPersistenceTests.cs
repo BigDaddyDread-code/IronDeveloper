@@ -115,7 +115,9 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
                 project.Id,
                 ExpectedProjectApplyCapabilityService.CreateReadinessEvidenceHash(
                     project.Id,
-                    "rel3-single-project-apply-capability-v1"));
+                    "rel3-single-project-apply-capability-v1"),
+                sampleCopy,
+                Path.GetDirectoryName(sampleCopy)!);
             expectedRunReadiness.ExpectProject(project.Id);
             using var reviewerClient = await CreateReviewerClientAsync(project.Id);
             var ticket = await CreateTicketAsync(client, project.Id);

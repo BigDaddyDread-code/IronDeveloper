@@ -96,6 +96,7 @@ public sealed class AlphaLoopSmokeTests
                 ["AgentProfiles:AllowFakeProvider"] = "true"
             }).Build();
 
+            var applyCapability = new ReadyApplyCapabilityService(sampleCopy, Path.GetDirectoryName(sampleCopy)!);
             var service = new TicketSkeletonRunService(
                 new StubTicketService(new ProjectTicket
                 {
@@ -118,8 +119,11 @@ public sealed class AlphaLoopSmokeTests
                 new StubProjectMembershipService(),
                 new SkeletonAgentProfileService(configuration),
                 configuration,
-                new ReadyRunReadinessService(),
-                new ReadyApplyCapabilityService());
+                new ReadyRunReadinessService(applyCapability),
+                applyCapability,
+                new SkeletonApplySpine(
+                    new DisposableWorkspaceApplyCopyService(new ControlledSourceMutationExecutor(applyCapability)),
+                    new NoOpSkeletonApplyMutationBoundaryBarrier()));
 
             var run = await service.StartAsync(ProjectId, TicketId);
             Assert.IsNotNull(run, "The run must start.");
@@ -232,6 +236,7 @@ public sealed class AlphaLoopSmokeTests
                 ["AgentProfiles:AllowFakeProvider"] = "true"
             }).Build();
 
+            var applyCapability = new ReadyApplyCapabilityService(sampleCopy, Path.GetDirectoryName(sampleCopy)!);
             var service = new TicketSkeletonRunService(
                 new StubTicketService(new ProjectTicket
                 {
@@ -254,8 +259,11 @@ public sealed class AlphaLoopSmokeTests
                 new StubProjectMembershipService(),
                 new SkeletonAgentProfileService(configuration),
                 configuration,
-                new ReadyRunReadinessService(),
-                new ReadyApplyCapabilityService());
+                new ReadyRunReadinessService(applyCapability),
+                applyCapability,
+                new SkeletonApplySpine(
+                    new DisposableWorkspaceApplyCopyService(new ControlledSourceMutationExecutor(applyCapability)),
+                    new NoOpSkeletonApplyMutationBoundaryBarrier()));
 
             var run = await service.StartAsync(ProjectId, TicketId);
             Assert.IsNotNull(run, "The run must start.");
@@ -589,7 +597,7 @@ public sealed class AlphaLoopSmokeTests
             Task.FromResult(ProjectMembershipMutationStatus.Succeeded);
     }
 
-    private sealed class ReadyRunReadinessService : IProjectRunReadinessService
+    private sealed class ReadyRunReadinessService(ReadyApplyCapabilityService applyCapability) : IProjectRunReadinessService
     {
         public Task<ProjectRunReadiness> EvaluateAsync(int projectId, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ProjectRunReadiness
@@ -598,16 +606,16 @@ public sealed class AlphaLoopSmokeTests
                 ProjectSetupReady = true,
                 ExecutionReady = true,
                 CompletionCapabilityReady = true,
-                CompletionCapability = ReadyApplyCapabilityService.Result(projectId),
+                CompletionCapability = applyCapability.Result(projectId),
                 ReadyToRun = true,
                 State = ProjectRunReadinessStates.ReadyToRun,
                 BlockedCount = 0
             });
     }
 
-    private sealed class ReadyApplyCapabilityService : IProjectApplyCapabilityService
+    private sealed class ReadyApplyCapabilityService(string projectPath, string sandboxRoot) : IProjectApplyCapabilityService
     {
-        public static ProjectApplyCapability Result(int projectId) => new()
+        public ProjectApplyCapability Result(int projectId) => new()
         {
             ProjectId = projectId,
             IsReady = true,
@@ -615,6 +623,8 @@ public sealed class AlphaLoopSmokeTests
             ReasonCode = ProjectApplyCapabilityReasonCodes.Ready,
             LauncherSessionId = "alpha-test-session",
             RepositoryCommit = "alpha-test-commit",
+            SandboxRoot = sandboxRoot,
+            ProjectPath = projectPath,
             SandboxRootFingerprint = "alpha-sandbox",
             ProjectPathFingerprint = "alpha-project",
             ReadinessEvidenceHash = "alpha-ready-evidence"

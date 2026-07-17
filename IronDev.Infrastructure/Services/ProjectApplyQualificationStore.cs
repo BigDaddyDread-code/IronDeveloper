@@ -55,8 +55,10 @@ public sealed class ProjectApplyQualificationStore : IProjectApplyQualificationS
             MarkerPresent = markerPresent,
             MarkerMatches = marker is not null &&
                             marker.ContractVersion == QualificationContractVersion &&
-                            marker.QualificationId.Equals(record.QualificationId, StringComparison.Ordinal) &&
-                            marker.RecordFingerprint.Equals(record.RecordFingerprint, StringComparison.Ordinal),
+                            !string.IsNullOrWhiteSpace(marker.QualificationId) &&
+                            !string.IsNullOrWhiteSpace(marker.RecordFingerprint) &&
+                            string.Equals(marker.QualificationId, record.QualificationId, StringComparison.Ordinal) &&
+                            string.Equals(marker.RecordFingerprint, record.RecordFingerprint, StringComparison.Ordinal),
             QualificationId = record.QualificationId,
             QualificationFingerprint = record.RecordFingerprint
         };

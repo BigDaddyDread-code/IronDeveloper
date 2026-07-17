@@ -36,7 +36,7 @@ The release principle is simple: every mutation must be traceable to prior evide
 | `workspace promotion-approval` | Record immutable human approval or rejection evidence. | Workspace metadata, promotion package. | `.irondev/runs/<run-id>/promotion-approval.json` | No | No | No, human approval input is required. | Workspace metadata, promotion package |
 | `workspace apply-preflight` | Verify approval and evidence are complete before any apply planning. | Workspace metadata, promotion package, approval evidence, diff evidence. | `.irondev/runs/<run-id>/apply-preflight.json` | No | No | Yes, as a gate check only. | Workspace metadata, promotion package, approval evidence, diff evidence |
 | `workspace apply-dry-run` | Produce the exact add/modify/delete plan that apply would use. | Workspace metadata, diff evidence, promotion package, approval evidence, apply preflight. | `.irondev/runs/<run-id>/apply-dry-run.json` | No | No | Yes, as a plan inspection step only. | Full pre-apply evidence chain |
-| `workspace apply-copy` | Copy approved add/modify files from workspace to source repo. | Workspace metadata, dry-run plan, preflight, approval, promotion package, diff. | `.irondev/runs/<run-id>/apply-copy.json` inside the workspace. | Yes, copy-only add/modify. | No | No direct autonomous use; agents must request the spine and consume reports. | Full approved dry-run evidence chain |
+| `workspace apply-copy` | Retired standalone mutation entry point; fails closed without live project capability context. | Command arguments only. | None. | No | No | No. | Governed project-work apply must call the injected mutation executor instead. |
 | `workspace apply-verify` | Recompute hashes after apply-copy and prove source files match workspace files. | Full apply evidence chain. | `.irondev/runs/<run-id>/apply-verify.json` | No | No | Yes, for verification only. | apply-copy evidence plus prior chain |
 | `workspace post-apply-validate` | Validate the mutated source state from a fresh disposable workspace. | Full apply and verification evidence chain. | `.irondev/runs/<run-id>/post-apply-validation.json` | No | Yes, indirectly in a fresh validation workspace. | Yes, for validation only. | apply-copy and apply-verify evidence |
 | `workspace source-report` | Produce the final human and machine-readable source mutation report. | Full apply, verify, and post-apply validation evidence chain. | `.irondev/runs/<run-id>/source-report.json` | No | No | Yes, as final source truth output. | apply-copy, apply-verify, post-apply validation evidence |
@@ -49,16 +49,16 @@ It requires workspace metadata. Later evidence is optional because the failed st
 
 ## Evidence Artifacts
 
-| Artifact | Producer command | Purpose | Required by |
+| Artifact | Producer | Purpose | Required by |
 | --- | --- | --- | --- |
 | `workspace.json` | `workspace prepare` | Binds run ID, source repo, workspace path, creation time, and preparation method. | All later workspace commands |
 | `validation.json` | `workspace validate` | Records controlled validation profile status and command evidence. | `workspace promotion-package` |
 | `diff.json` | `workspace diff` | Records added, modified, deleted, and unchanged file evidence. | `workspace promotion-package`, `workspace apply-preflight`, `workspace apply-dry-run` |
-| `promotion-package.json` | `workspace promotion-package` | Packages validation and diff evidence for human review. | `workspace promotion-approval`, `workspace apply-preflight`, `workspace apply-dry-run`, `workspace apply-copy` |
-| `promotion-approval.json` | `workspace promotion-approval` | Immutable approval or rejection evidence bound to the promotion package hash. | `workspace apply-preflight`, `workspace apply-dry-run`, `workspace apply-copy` |
-| `apply-preflight.json` | `workspace apply-preflight` | Confirms evidence completeness and readiness for a separate apply command. | `workspace apply-dry-run`, `workspace apply-copy` |
-| `apply-dry-run.json` | `workspace apply-dry-run` | Records the planned apply operations without mutating source. | `workspace apply-copy`, `workspace apply-verify` |
-| `apply-copy.json` | `workspace apply-copy` | Records copy-only add/modify source mutation results. | `workspace apply-verify`, `workspace post-apply-validate`, `workspace source-report` |
+| `promotion-package.json` | `workspace promotion-package` | Packages validation and diff evidence for human review. | `workspace promotion-approval`, `workspace apply-preflight`, `workspace apply-dry-run`, governed apply-copy stage |
+| `promotion-approval.json` | `workspace promotion-approval` | Immutable approval or rejection evidence bound to the promotion package hash. | `workspace apply-preflight`, `workspace apply-dry-run`, governed apply-copy stage |
+| `apply-preflight.json` | `workspace apply-preflight` | Confirms evidence completeness and readiness for a separate apply stage. | `workspace apply-dry-run`, governed apply-copy stage |
+| `apply-dry-run.json` | `workspace apply-dry-run` | Records the planned apply operations without mutating source. | Governed apply-copy stage, `workspace apply-verify` |
+| `apply-copy.json` | Governed project-work apply-copy stage | Records structured authority, path, hash, and copy-only add/modify mutation results. | `workspace apply-verify`, `workspace post-apply-validate`, `workspace source-report` |
 | `apply-verify.json` | `workspace apply-verify` | Verifies source files match approved workspace files after apply-copy. | `workspace post-apply-validate`, `workspace source-report` |
 | `post-apply-validation.json` | `workspace post-apply-validate` | Records fresh-workspace validation of the mutated source repo. | `workspace source-report` |
 | `source-report.json` | `workspace source-report` | Final report for the controlled copy-only apply path. | Human review and downstream reporting |
@@ -66,7 +66,7 @@ It requires workspace metadata. Later evidence is optional because the failed st
 
 ## Mutation Boundary
 
-Only `workspace apply-copy` may mutate the source repository.
+No standalone CLI command may mutate the source repository. The injected governed project-work spine is the sole mutation corridor: it carries run-start capability evidence into apply-copy, and `IControlledSourceMutationExecutor` re-evaluates live authority, resolves both workspace and destination paths without following links, performs the write through verified handles, and verifies the result hash. The public authority check and the write are not separable operations.
 
 It may only copy planned add/modify files. It must not delete files. It must not run git. It must not run build or test commands. It must not call agents.
 

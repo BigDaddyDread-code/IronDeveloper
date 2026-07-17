@@ -1139,30 +1139,35 @@ public static class IronDevCli
             return 2;
         }
 
-        var service = new DisposableWorkspaceApplyCopyService();
-        var result = await service.ApplyAsync(
-            new DisposableWorkspaceApplyCopyRequest
-            {
-                RunId = runId!,
-                WorkspacePath = workspacePath!
-            },
-            cancellationToken);
-
+        cancellationToken.ThrowIfCancellationRequested();
+        var authorityError =
+            $"{ControlledSourceMutationReasonCodes.CapabilityContextMissing}: " +
+            "workspace apply-copy cannot obtain live project capability authority. " +
+            "Use the governed project-work apply corridor.";
         var resultEnvelope = new DisposableWorkspaceApplyCopyEnvelope
         {
-            Status = result.Status,
+            Status = "blocked",
             Command = WorkspaceApplyCopyCommand,
             TraceId = null,
-            Summary = result.Summary,
-            Data = result.Data,
-            Errors = result.Errors,
-            Warnings = result.Warnings
+            Summary = "Workspace apply copy is unavailable outside the governed project-work apply corridor.",
+            Data = new DisposableWorkspaceApplyCopyData
+            {
+                RunId = runId!,
+                WorkspacePath = workspacePath!,
+                SourceRepo = string.Empty,
+                Applied = false,
+                SourceRepoMutated = false,
+                Blockers = [authorityError],
+                Errors = [authorityError]
+            },
+            Errors = [authorityError],
+            Warnings = []
         };
 
         if (json)
         {
             await output.WriteLineAsync(JsonSerializer.Serialize(resultEnvelope, JsonOptions));
-            return result.ExitCode;
+            return 1;
         }
 
         await output.WriteLineAsync(resultEnvelope.Summary);
@@ -1171,7 +1176,7 @@ public static class IronDevCli
         foreach (var warning in resultEnvelope.Warnings)
             error.WriteLine($"Warning: {warning}");
 
-        return result.ExitCode;
+        return 1;
     }
 
     private static async Task<int> HandleWorkspaceApplyVerifyAsync(

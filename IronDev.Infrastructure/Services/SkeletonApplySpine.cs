@@ -4,6 +4,37 @@ using IronDev.Infrastructure.Services.Workspaces;
 
 namespace IronDev.Infrastructure.Services;
 
+public interface ISkeletonApplySpine
+{
+    Task<SkeletonApplySpine.SpineResult> RunAsync(
+        string applyRunId,
+        string sourceRepo,
+        string workspaceRoot,
+        SkeletonCriticPackage approvedPackage,
+        string approvedByActorId,
+        string approvalReason,
+        ControlledSourceMutationContext mutationContext,
+        Func<string, Task>? onStageStarted = null,
+        Func<SkeletonApplySpine.StageOutcome, Task>? onStageCompleted = null,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Deterministic stage-boundary instrumentation. The production implementation
+/// is a no-op and grants no authority; tests can pause after dry-run to introduce
+/// drift before the mutation executor performs its live check.
+/// </summary>
+public interface ISkeletonApplyMutationBoundaryBarrier
+{
+    Task WaitAsync(ControlledSourceMutationContext context, CancellationToken cancellationToken = default);
+}
+
+public sealed class NoOpSkeletonApplyMutationBoundaryBarrier : ISkeletonApplyMutationBoundaryBarrier
+{
+    public Task WaitAsync(ControlledSourceMutationContext context, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+}
+
 /// <summary>
 /// Drives the proven governed workspace apply spine, in-process, in the exact stage
 /// order the CLI and its E2E proof use: prepare → materialize approved changes →
@@ -16,9 +47,15 @@ namespace IronDev.Infrastructure.Services;
 /// accepted-approvals surface; it does not decide. This spine is copy-only: no commit,
 /// no push, no release.
 /// </summary>
-public sealed class SkeletonApplySpine
+public sealed class SkeletonApplySpine(
+    IDisposableWorkspaceApplyCopyService applyCopy,
+    ISkeletonApplyMutationBoundaryBarrier mutationBoundaryBarrier) : ISkeletonApplySpine
 {
-    public sealed record StageOutcome(string Stage, bool Succeeded, string Summary, IReadOnlyList<string> Errors);
+    public sealed record StageOutcome(string Stage, bool Succeeded, string Summary, IReadOnlyList<string> Errors)
+    {
+        public string ReasonCode { get; init; } = string.Empty;
+        public ControlledSourceMutationEvidence? MutationEvidence { get; init; }
+    }
 
     public sealed record SpineResult
     {
@@ -26,6 +63,9 @@ public sealed class SkeletonApplySpine
         public required string WorkspacePath { get; init; }
         public required IReadOnlyList<StageOutcome> Stages { get; init; }
         public string? FailedStage => Stages.LastOrDefault(stage => !stage.Succeeded)?.Stage;
+        public string? FailedReasonCode => Stages.LastOrDefault(stage => !stage.Succeeded)?.ReasonCode;
+        public ControlledSourceMutationEvidence? FailedMutationEvidence =>
+            Stages.LastOrDefault(stage => !stage.Succeeded)?.MutationEvidence;
     }
 
     public async Task<SpineResult> RunAsync(
@@ -35,6 +75,7 @@ public sealed class SkeletonApplySpine
         SkeletonCriticPackage approvedPackage,
         string approvedByActorId,
         string approvalReason,
+        ControlledSourceMutationContext mutationContext,
         Func<string, Task>? onStageStarted = null,
         Func<StageOutcome, Task>? onStageCompleted = null,
         CancellationToken cancellationToken = default)
@@ -133,13 +174,23 @@ public sealed class SkeletonApplySpine
         if (!await CompleteStageAsync(new StageOutcome("apply-dry-run", dryRun.ExitCode == 0, dryRun.Summary, dryRun.Errors)).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
+        await mutationBoundaryBarrier.WaitAsync(mutationContext, cancellationToken).ConfigureAwait(false);
+
         await StartStageAsync("apply-copy").ConfigureAwait(false);
-        var copy = await new DisposableWorkspaceApplyCopyService().ApplyAsync(new DisposableWorkspaceApplyCopyRequest
+        var copy = await applyCopy.ApplyAsync(new DisposableWorkspaceApplyCopyRequest
         {
             RunId = applyRunId,
-            WorkspacePath = workspacePath
+            WorkspacePath = workspacePath,
+            MutationContext = mutationContext
         }, cancellationToken).ConfigureAwait(false);
-        if (!await CompleteStageAsync(new StageOutcome("apply-copy", copy.ExitCode == 0, copy.Summary, copy.Errors)).ConfigureAwait(false))
+        var mutationEvidence = copy.Data.Operations
+            .Select(operation => operation.MutationEvidence)
+            .LastOrDefault(evidence => evidence is not null && !evidence.Applied);
+        if (!await CompleteStageAsync(new StageOutcome("apply-copy", copy.ExitCode == 0, copy.Summary, copy.Errors)
+            {
+                ReasonCode = mutationEvidence?.ReasonCode ?? string.Empty,
+                MutationEvidence = mutationEvidence
+            }).ConfigureAwait(false))
             return Result(false, workspacePath, stages);
 
         await StartStageAsync("apply-verify").ConfigureAwait(false);
