@@ -8,7 +8,7 @@
 
 ## Scope and Rules
 
-This inventory classifies every tracked Markdown document under `Docs/`: **689 files** after the DOGFOOD-UX Flow Ease protocol was added. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
+This inventory classifies every tracked Markdown document under `Docs/`: **690 files** after the Workbench preview history was added. It records document authority, not runtime capability. Runtime truth, accepted ADR boundaries, and the canonical architecture index still win when prose conflicts.
 
 - Receipts are `HistoricalReceipt` and are never deleted or rewritten.
 - `ArchiveCandidate` means relocate only after references are proven and updated; it does not mean delete.
@@ -21,13 +21,13 @@ This inventory classifies every tracked Markdown document under `Docs/`: **689 f
 | Status | Count |
 | --- | ---: |
 | `Canonical` | 73 |
-| `Supporting` | 128 |
+| `Supporting` | 129 |
 | `HistoricalReceipt` | 432 |
 | `Superseded` | 5 |
 | `ParkingLot` | 4 |
 | `ArchiveCandidate` | 47 |
 | `DeleteCandidate` | 0 |
-| **Total** | **689** |
+| **Total** | **690** |
 
 ## Inventory
 
@@ -722,6 +722,7 @@ This inventory classifies every tracked Markdown document under `Docs/`: **689 f
 | `Docs/receipts/CLN_42_CLEAN_CLONE_QUALIFICATION.md` | CLN-42 Clean-Clone Qualification Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; index externally only | Evidence and audit |
 | `Docs/cleanup/NON_AUTHOR_OPERATOR_WALK.md` | Non-Author Operator Walk | Cleanup | `Canonical` | Human qualification gate by CLN-43 | `Docs/product/V2_NON_AUTHOR_QUALIFICATION.md` | Complete through a non-author tester | Release and operations |
 | `Docs/receipts/CLN_43_NON_AUTHOR_OPERATOR_WALK.md` | CLN-43 Non-Author Operator Walk Receipt | Evidence | `HistoricalReceipt` | Not applicable; historical evidence | `None; preserve record` | Preserve unchanged; append future evidence separately | Evidence and audit |
+| `Docs/workbench/PREVIEW_HISTORY.md` | IronDev Workbench preview history | Release and operations | `Supporting` | 2026-07-18 preview manifest and LocalTest launcher | `-` | Keep preview identity and manual-test command aligned with the version manifest | Release and operations |
 
 ## Review Line
 
