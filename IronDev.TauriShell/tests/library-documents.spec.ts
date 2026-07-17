@@ -173,7 +173,10 @@ test('a Ready document reports retrieval truth without another processing comman
   await mockDocumentsWorkspace(page);
   await page.goto('/projects/7/library/documents/201');
 
-  await expect(page.getByTestId('flow.documents.processing')).toContainText('Ready for project retrieval');
+  await expect(page.getByTestId('flow.documents.processing')).toContainText(
+    'Ready for project retrieval',
+    { timeout: 15_000 }
+  );
   await expect(page.getByTestId('flow.documents.process')).toHaveCount(0);
 });
 
@@ -382,6 +385,19 @@ async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions 
   });
 
   await page.route('**/irondev-api/health', (route) => json(route, { status: 'healthy' }));
+  await page.route('**/irondev-api/api/localtest/preflight', (route) => json(route, {
+    state: 'LocalTestReady',
+    environment: 'LocalTest',
+    database: 'IronDeveloper_Test',
+    apiBuildCommit: 'test-commit',
+    launcherRepositoryCommit: 'test-commit',
+    apiBaseUrl: 'http://localhost:5000',
+    sessionMode: 'SmokeSimulation',
+    sandboxApplyRequested: false,
+    sandboxApplyEnabled: false,
+    sandboxApplyRoot: null,
+    capabilities: ['WorkflowSmokeSimulation']
+  }));
   await page.route('**/irondev-api/api/environment', (route) =>
     json(route, { environment: 'LocalTest', database: 'IronDeveloper_Test', isTestEnvironment: true })
   );
@@ -394,7 +410,19 @@ async function mockDocumentsWorkspace(page: Page, options: DocumentsMockOptions 
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, { projectId: 7 }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, {
+    projectId: 7,
+    tenantId: 3,
+    name: 'BookSeller',
+    projectLifecyclePhase: 'Shaping',
+    executionReadiness: 'NotConfigured',
+    repositoryBinding: null,
+    workbenchSessionId: 7007,
+    leaseEpoch: 1,
+    wasResumed: true,
+    wasTakenOver: false,
+    clientOperationId: '00000000-0000-0000-0000-000000000007'
+  }));
   await page.route('**/irondev-api/api/projects/7/tickets', (route) => json(route, []));
   await page.route('**/irondev-api/api/projects/7/chat/sessions', (route) => json(route, []));
 

@@ -32,7 +32,7 @@ test('settings shows tenant AI connection metadata without credential material',
     ]
   });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.aiConnections').click();
@@ -114,7 +114,7 @@ test('settings stores and revokes AI credentials without rendering the secret', 
     ]
   });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.aiConnections').click();
@@ -140,7 +140,7 @@ test('settings stores and revokes AI credentials without rendering the secret', 
 test('settings shows an honest empty state when no AI connections are returned', async ({ page }) => {
   await mockWorkspace(page, { connections: [] });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.aiConnections').click();
@@ -163,7 +163,7 @@ test('settings tests a controlled connection and renders durable health truth', 
     }]
   });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.aiConnections').click();

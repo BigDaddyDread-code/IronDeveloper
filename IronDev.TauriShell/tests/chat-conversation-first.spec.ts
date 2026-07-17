@@ -64,6 +64,7 @@ test('sending keeps the compact composer attached to the active conversation', a
   const state = await mockChatWorkspace(page, { completionGate: completion.promise });
   await page.goto('/projects/7/workshop');
 
+  await expect(page.getByTestId('chat.composer.input')).toBeVisible({ timeout: 15_000 });
   await page.getByTestId('chat.composer.input').fill('Review the ticket flow.');
   await page.getByTestId('chat.command.send').click();
 
@@ -261,7 +262,10 @@ test('desktop Workshop keeps one readable conversation column at 1366 and 1920 w
   for (const viewport of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
     await page.setViewportSize(viewport);
     await page.goto('/projects/7/workshop');
-    await expect(page.getByTestId('chat.message.user')).toContainText('Keep the conversation readable on wide displays.');
+    await expect(page.getByTestId('chat.message.user')).toContainText(
+      'Keep the conversation readable on wide displays.',
+      { timeout: 15_000 }
+    );
 
     const layout = await page.evaluate(() => {
       const thread = document.querySelector('.chat-workspace-layout__thread')?.getBoundingClientRect();

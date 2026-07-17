@@ -8,7 +8,7 @@ test('agents panel edits a model and voice as a versioned draft', async ({ page 
   await mockWorkspace(page);
   const state = await mockAgentProfiles(page);
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.agents').click();
@@ -39,7 +39,7 @@ test('agents panel switches explicitly between project overrides and tenant defa
   await mockWorkspace(page);
   await mockAgentProfiles(page);
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.agents').click();
@@ -54,7 +54,7 @@ test('the orchestrator card is honest — deterministic, no model to configure',
   await mockWorkspace(page);
   await mockAgentProfiles(page);
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.agents').click();
@@ -73,7 +73,7 @@ test('agents panel shows effective profile provenance', async ({ page }) => {
   await mockWorkspace(page);
   await mockAgentProfiles(page);
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.agents').click();
@@ -91,7 +91,7 @@ test('agents panel accepts numeric backend role values from LocalTest', async ({
   await mockWorkspace(page);
   await mockAgentProfiles(page, { numericRoles: true });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.agents').click();
@@ -106,7 +106,7 @@ test('a secret in a profile is refused and shown honestly', async ({ page }) => 
   await mockWorkspace(page);
   await mockAgentProfiles(page, { refuseSecret: true });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.agents').click();
@@ -121,7 +121,7 @@ test('agents panel resets fields and restores immutable published versions', asy
   await mockWorkspace(page);
   await mockAgentProfiles(page);
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.agents').click();
@@ -149,7 +149,7 @@ test('settings advanced shows honest product and runtime identity', async ({ pag
   await mockWorkspace(page);
   await mockAgentProfiles(page);
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.advanced').click();
@@ -216,7 +216,7 @@ test('configuration pack import previews differences and creates drafts without 
     return route.fulfill({ status: 404, json: { error: 'not mocked' } });
   });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.advanced').click();

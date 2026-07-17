@@ -181,9 +181,7 @@ async function mockSetup(page: Page, options: SetupMockOptions) {
 }
 
 async function openSetup(page: Page) {
-  await page.goto('/');
-  await page.getByTestId('flow.nav.library').click();
-  await page.getByTestId('flow.library.nav.provisioning').click();
+  await page.goto('/projects/7/library/provisioning');
   await expect(page.getByTestId('flow.projectSetup')).toBeVisible();
 }
 

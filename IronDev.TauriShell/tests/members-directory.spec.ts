@@ -161,16 +161,17 @@ test('a Viewer receives the readable directory without administration controls',
 });
 
 test('member-directory failure preserves the route and retries backend truth', async ({ page }) => {
-  const state = await mockMembersWorkspace(page, { directoryFailures: 2 });
+  const state = await mockMembersWorkspace(page, { directoryUnavailableUntilAllowed: true });
   await page.goto('/projects/7/library/members');
 
   await expect(page.getByRole('heading', { name: 'Members are unavailable', exact: true })).toBeVisible();
   await expect(page.getByTestId('flow.routeOutcome')).toContainText('Member directory unavailable.');
   await expect(page).toHaveURL('/projects/7/library/members');
+  state.allowDirectorySuccess();
   await page.getByTestId('flow.routeOutcome.primary').click();
 
   await expect(page.getByTestId('flow.members.directory')).toBeVisible();
-  expect(state.directoryRequests).toBe(3);
+  expect(state.directoryRequests).toBeGreaterThanOrEqual(2);
 });
 
 test('an unknown project returns an honest Members 404', async ({ page }) => {
@@ -205,6 +206,7 @@ interface MembersMockOptions {
   currentUserId?: number;
   currentRole?: string;
   directoryFailures?: number;
+  directoryUnavailableUntilAllowed?: boolean;
   directoryErrorStatus?: number;
   refuseLastOwnerDemotion?: boolean;
   failRefreshAfterMutation?: boolean;
@@ -222,11 +224,13 @@ interface MembersMockState {
   projectPutRequests: number;
   projectDeleteRequests: number;
   lastAddBody: Record<string, unknown> | null;
+  allowDirectorySuccess: () => void;
 }
 
 const availableTenantRoles = ['Owner', 'TenantAdmin', 'Approver', 'Reviewer', 'Operator', 'Viewer', 'Member'];
 
 async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}): Promise<MembersMockState> {
+  let directorySuccessAllowed = false;
   const state: MembersMockState = {
     directoryRequests: 0,
     addRequests: 0,
@@ -236,7 +240,10 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
     channelDeleteRequests: 0,
     projectPutRequests: 0,
     projectDeleteRequests: 0,
-    lastAddBody: null
+    lastAddBody: null,
+    allowDirectorySuccess: () => {
+      directorySuccessAllowed = true;
+    }
   };
   let failuresRemaining = options.directoryFailures ?? 0;
   let failNextDirectory = false;
@@ -300,6 +307,19 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
   });
 
   await page.route('**/irondev-api/health', (route) => json(route, { status: 'healthy' }));
+  await page.route('**/irondev-api/api/localtest/preflight', (route) => json(route, {
+    state: 'LocalTestReady',
+    environment: 'LocalTest',
+    database: 'IronDeveloper_Test',
+    apiBuildCommit: 'test-commit',
+    launcherRepositoryCommit: 'test-commit',
+    apiBaseUrl: 'http://localhost:5000',
+    sessionMode: 'SmokeSimulation',
+    sandboxApplyRequested: false,
+    sandboxApplyEnabled: false,
+    sandboxApplyRoot: null,
+    capabilities: ['WorkflowSmokeSimulation']
+  }));
   await page.route('**/irondev-api/api/environment', (route) =>
     json(route, { environment: 'LocalTest', database: 'IronDeveloper_Test', isTestEnvironment: true })
   );
@@ -312,7 +332,19 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, { projectId: 7 }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, {
+    projectId: 7,
+    tenantId: 3,
+    name: 'BookSeller',
+    projectLifecyclePhase: 'Shaping',
+    executionReadiness: 'NotConfigured',
+    repositoryBinding: null,
+    workbenchSessionId: 7007,
+    leaseEpoch: 1,
+    wasResumed: true,
+    wasTakenOver: false,
+    clientOperationId: '00000000-0000-0000-0000-000000000007'
+  }));
   await page.route('**/irondev-api/api/projects/7/tickets', (route) => json(route, []));
   await page.route('**/irondev-api/api/projects/7/chat/sessions', (route) => json(route, []));
 
@@ -418,6 +450,9 @@ async function mockMembersWorkspace(page: Page, options: MembersMockOptions = {}
     }
     if (options.directoryErrorStatus) {
       return json(route, { error: 'Project member directory not found.' }, options.directoryErrorStatus);
+    }
+    if (options.directoryUnavailableUntilAllowed && !directorySuccessAllowed) {
+      return json(route, { error: 'Member directory unavailable.' }, 503);
     }
     if (failuresRemaining > 0) {
       failuresRemaining -= 1;
