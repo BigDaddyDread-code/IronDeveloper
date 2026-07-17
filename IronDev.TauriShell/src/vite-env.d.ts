@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_IRONDEV_API_BASE_URL?: string;
+  readonly VITE_IRONDEV_USE_PROXY?: string;
   readonly VITE_IRONDEV_PROJECT_ID?: string;
   readonly VITE_IRONDEV_DEV_TOKEN?: string;
   readonly VITE_IRONDEV_VERSION?: string;

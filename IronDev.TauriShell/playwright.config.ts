@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.IRONDEV_TAURI_SHELL_BASE_URL ?? 'http://127.0.0.1:5173';
+const webServerCommand = process.env.CI
+  ? 'npm run preview:playwright'
+  : 'npm run dev';
 
 export default defineConfig({
   testDir: './tests',
@@ -26,7 +29,7 @@ export default defineConfig({
   webServer: process.env.IRONDEV_TAURI_SHELL_BASE_URL
     ? undefined
     : {
-        command: 'npm run dev',
+        command: webServerCommand,
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 60_000

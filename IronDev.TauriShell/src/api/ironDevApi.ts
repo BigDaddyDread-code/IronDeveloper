@@ -156,7 +156,9 @@ export function getIronDevApiConfig(): IronDevApiConfig {
   const configuredBaseUrl =
     import.meta.env.VITE_IRONDEV_API_BASE_URL ?? window.localStorage.getItem('irondev.apiBaseUrl');
   const apiBaseUrl = (configuredBaseUrl?.trim() || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
-  const shouldUseViteProxy = import.meta.env.DEV && isDefaultLocalApi(apiBaseUrl);
+  const shouldUseViteProxy =
+    (import.meta.env.DEV || import.meta.env.VITE_IRONDEV_USE_PROXY === 'true') &&
+    isDefaultLocalApi(apiBaseUrl);
 
   const rawFallbackProjectId =
     import.meta.env.VITE_IRONDEV_PROJECT_ID ??
