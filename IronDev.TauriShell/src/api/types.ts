@@ -85,7 +85,21 @@ export interface LocalTestPreflightInfo {
 export type ProjectTicket = components['schemas']['ProjectTicket'] & { revision?: number };
 export type ProjectSummary = components['schemas']['Project'] & {
   lifecyclePhase?: string | null;
+  executionReadiness?: string | null;
 };
+export interface WorkbenchProjectEntryContext {
+  projectId: number;
+  tenantId: number;
+  name: string;
+  projectLifecyclePhase: 'Shaping' | 'Delivery' | 'Archived' | string;
+  executionReadiness: 'NotConfigured' | 'ValidationRequired' | 'Ready' | string;
+  repositoryBinding: null;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  wasResumed: boolean;
+  wasTakenOver: boolean;
+  clientOperationId: string;
+}
 export interface StartProjectResponse {
   projectId: number;
   tenantId: number;
@@ -93,7 +107,7 @@ export interface StartProjectResponse {
   projectLifecyclePhase: 'Shaping' | string;
   executionReadiness: 'NotConfigured' | string;
   repositoryBinding: null;
-  workbenchSessionId: string;
+  workbenchSessionId: number;
   leaseEpoch: number;
   clientOperationId: string;
   createdAtUtc: string;
@@ -180,6 +194,9 @@ export type CreateProjectTicketRequest = components['schemas']['CreateProjectTic
 export type ProjectImplementationPlan = components['schemas']['ProjectImplementationPlan'];
 export type ChatCompletionRequest = components['schemas']['ChatCompletionRequest'] & {
   sourceMessageId?: number | null;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
 };
 export type ChatClarificationKind =
   | 'None'
@@ -296,6 +313,9 @@ export type SaveProjectChatSessionRequest = Omit<
 > & {
   id?: number;
   projectId: number;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
 };
 
 export type SaveProjectChatMessageRequest = Omit<
@@ -306,6 +326,9 @@ export type SaveProjectChatMessageRequest = Omit<
   chatSessionId: number;
   role: 'user' | 'assistant';
   message: string;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
 };
 
 export type TicketDetailLoadStatus = 'idle' | 'loading' | 'loaded' | 'error';

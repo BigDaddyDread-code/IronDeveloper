@@ -50,16 +50,16 @@ function setupCheck(code: string, label: string, detectedValue: string) {
 }
 
 const DEFAULT_PROJECTS = [
-  { id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' },
-  { id: 8, tenantId: 3, name: 'ParcelTracker', localPath: 'C:\\repos\\ParcelTracker' },
-  { id: 10, tenantId: 3, name: 'StatusDown', localPath: 'C:\\repos\\StatusDown' }
+  { id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller', lifecyclePhase: 'Shaping', executionReadiness: 'Ready' },
+  { id: 8, tenantId: 3, name: 'ParcelTracker', localPath: 'C:\\repos\\ParcelTracker', lifecyclePhase: 'Shaping', executionReadiness: 'NotConfigured' },
+  { id: 10, tenantId: 3, name: 'StatusDown', localPath: 'C:\\repos\\StatusDown', lifecyclePhase: 'Delivery', executionReadiness: 'ValidationRequired' }
 ];
 
 test('explicit login lands on the project screen and ignores any prior selected project', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.selectedProjectId', '7');
   });
-  await mockProjectEntryApi(page);
+  const state = await mockProjectEntryApi(page);
   await page.goto('/');
 
   await page.getByTestId('auth.submit').click();
@@ -67,17 +67,19 @@ test('explicit login lands on the project screen and ignores any prior selected 
   await expect(page.getByTestId('flow.chooser')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Choose a project' })).toBeVisible();
   await expect(page.getByTestId('flow.shell')).toHaveCount(0);
+  expect(state.legacySelectionRequests).toBe(0);
+  expect(state.workbenchOpenRequests).toBe(0);
 });
 
 test('versioned preview identity remains visible after login', async ({ page }) => {
   await mockProjectEntryApi(page);
   await page.goto('/');
 
-  await expect(page.getByTestId('auth.workbenchIdentity')).toContainText('V2 0.1.0-preview.2 / workbench-pr01');
+  await expect(page.getByTestId('auth.workbenchIdentity')).toContainText('V2 0.1.0-preview.3 / workbench-pr01');
   await page.getByTestId('auth.submit').click();
 
-  await expect(page.getByTestId('flow.projectEntry.health')).toContainText('V2 0.1.0-preview.2 / workbench-pr01');
-  await expect(page.getByTestId('flow.projectEntry.workbenchIdentity')).toContainText('V2 0.1.0-preview.2 / workbench-pr01');
+  await expect(page.getByTestId('flow.projectEntry.health')).toContainText('V2 0.1.0-preview.3 / workbench-pr01');
+  await expect(page.getByTestId('flow.projectEntry.workbenchIdentity')).toContainText('V2 0.1.0-preview.3 / workbench-pr01');
 });
 
 test('configured fallback does not auto-open a project', async ({ page }) => {
@@ -176,6 +178,42 @@ test('project start preserves its idempotency key on retry and opens Workbench',
   await page.getByTestId('flow.startProject.submit').click();
   await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('flow.projectSetup')).toHaveCount(0);
+  expect(state.startOperationIds).toHaveLength(2);
+  expect(state.startOperationIds[1]).toBe(state.startOperationIds[0]);
+});
+
+test('project start uses a new operation id when the failed payload changes', async ({ page }) => {
+  const state = await mockProjectEntryApi(page, { signedIn: true, createFailure: true });
+  await page.goto('/');
+
+  await page.getByTestId('flow.projectEntry.start').click();
+  await page.getByTestId('flow.startProject.name').fill('First idea');
+  await page.getByTestId('flow.startProject.submit').click();
+  await expect(page.getByTestId('flow.startProject.error')).toBeVisible();
+
+  await mockCreateSuccess(page, state);
+  await page.getByTestId('flow.startProject.name').fill('Changed idea');
+  await page.getByTestId('flow.startProject.submit').click();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
+
+  expect(state.startOperationIds).toHaveLength(2);
+  expect(state.startOperationIds[1]).not.toBe(state.startOperationIds[0]);
+});
+
+test('Workshop mutations carry the current Workbench session and lease epoch', async ({ page }) => {
+  const state = await mockProjectEntryApi(page, { signedIn: true });
+  await page.goto('/');
+
+  await page.getByTestId('flow.chooser.project.7').click();
+  await page.getByTestId('chat.composer.input').fill('Shape this project');
+  await page.getByTestId('chat.command.send').click();
+  await expect.poll(() => state.chatMutationBodies.length).toBe(4);
+
+  for (const body of state.chatMutationBodies) {
+    expect(body.workbenchSessionId).toBe(7007);
+    expect(body.leaseEpoch).toBe(1);
+    expect(body.clientOperationId).toMatch(/^[0-9a-f-]{36}$/i);
+  }
 });
 
 test('keyboard activates a project tile', async ({ page }) => {
@@ -217,7 +255,14 @@ test('changing projects clears the active work item', async ({ page }) => {
 });
 
 async function mockProjectEntryApi(page: Page, options: MockOptions = {}) {
-  const state: MockState = { projectListRequests: 0, startedProject: null };
+  const state: MockState = {
+    projectListRequests: 0,
+    legacySelectionRequests: 0,
+    workbenchOpenRequests: 0,
+    startOperationIds: [],
+    chatMutationBodies: [],
+    startedProject: null
+  };
   if (options.signedIn) {
     await page.addInitScript(({ selectedProjectId, fallbackProjectId }) => {
       window.localStorage.setItem('irondev.token', 'tenant-token');
@@ -264,7 +309,7 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
         nextSafeAction: 'Sign in with the documented LocalTest credentials.',
         resetCommand: null,
         detail: 'LocalTest front door is ready.',
-        workbenchVersion: '0.1.0-preview.2',
+        workbenchVersion: '0.1.0-preview.3',
         workbenchMode: 'V2',
         previewId: 'workbench-pr01',
         sessionMode: 'SmokeSimulation',
@@ -284,7 +329,7 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
         database: 'IronDeveloper_Test_workbench_pr01',
         isTestEnvironment: true,
         workbench: {
-          version: '0.1.0-preview.2',
+          version: '0.1.0-preview.3',
           mode: 'V2',
           v2Enabled: true,
           v1FallbackEnabled: true,
@@ -349,10 +394,32 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
   for (const candidate of [...projects, { id: 9, tenantId: 3, name: 'Fresh idea / no tech selected', localPath: null, lifecyclePhase: 'Shaping' }]) {
     const projectId = candidate.id;
     await page.route(`**/irondev-api/api/projects/${projectId}/select`, (route) => {
+      state.legacySelectionRequests += 1;
+      return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Legacy selection must not be called.' }) });
+    });
+    await page.route(`**/irondev-api/api/workbench/projects/${projectId}/open`, (route) => {
+      state.workbenchOpenRequests += 1;
       if (options.selectionFailures?.includes(projectId)) {
         return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Project unavailable' }) });
       }
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId }) });
+      const request = route.request().postDataJSON() as { clientOperationId?: string; takeOverExistingLease?: boolean };
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          projectId,
+          tenantId: 3,
+          name: candidate.name,
+          projectLifecyclePhase: candidate.lifecyclePhase ?? 'Shaping',
+          executionReadiness: 'NotConfigured',
+          repositoryBinding: candidate.localPath ?? null,
+          workbenchSessionId: 7000 + projectId,
+          leaseEpoch: 1,
+          wasResumed: false,
+          wasTakenOver: request.takeOverExistingLease === true,
+          clientOperationId: request.clientOperationId
+        })
+      });
     });
     await page.route(`**/irondev-api/api/projects/${projectId}/tickets`, async (route) => {
       if (route.request().method() !== 'GET') {
@@ -397,6 +464,28 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
       tickets: ticketsByProject[projectId] ?? [],
       readiness: boardReadiness
     });
+    await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions`, (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      }
+      state.chatMutationBodies.push(route.request().postDataJSON() as Record<string, unknown>);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(9007) });
+    });
+    await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions/9007/messages`, (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      }
+      state.chatMutationBodies.push(route.request().postDataJSON() as Record<string, unknown>);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state.chatMutationBodies.length) });
+    });
+    await page.route(`**/irondev-api/api/projects/${projectId}/chat/complete`, (route) => {
+      state.chatMutationBodies.push(route.request().postDataJSON() as Record<string, unknown>);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ response: 'Let us shape the idea.', mode: 'Exploration', reasoningTrace: [] })
+      });
+    });
   }
 
   await page.route('**/irondev-api/api/projects/**/tickets/**/build-readiness', (route) =>
@@ -429,6 +518,8 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
 
 async function mockCreateRoute(page: Page, options: MockOptions, state: MockState) {
   await page.route('**/irondev-api/api/projects/start', async (route) => {
+    const request = route.request().postDataJSON() as { clientOperationId: string };
+    state.startOperationIds.push(request.clientOperationId);
     if (options.createFailure) {
       await route.fulfill({
         status: 503,
@@ -450,9 +541,11 @@ async function mockCreateRoute(page: Page, options: MockOptions, state: MockStat
 async function mockCreateSuccess(page: Page, state: MockState) {
   state.startedProject = { id: 9, tenantId: 3, name: 'Fresh idea / no tech selected', localPath: null, lifecyclePhase: 'Shaping' };
   await page.unroute('**/irondev-api/api/projects/start');
-  await page.route('**/irondev-api/api/projects/start', (route) =>
-    route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(startProjectResponse()) })
-  );
+  await page.route('**/irondev-api/api/projects/start', (route) => {
+    const request = route.request().postDataJSON() as { clientOperationId: string };
+    state.startOperationIds.push(request.clientOperationId);
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(startProjectResponse()) });
+  });
 }
 
 function startProjectResponse() {
@@ -463,7 +556,7 @@ function startProjectResponse() {
     projectLifecyclePhase: 'Shaping',
     executionReadiness: 'NotConfigured',
     repositoryBinding: null,
-    workbenchSessionId: '11111111-1111-1111-1111-111111111111',
+    workbenchSessionId: 9009,
     leaseEpoch: 1,
     clientOperationId: '22222222-2222-2222-2222-222222222222',
     createdAtUtc: '2026-07-18T00:00:00Z',
@@ -476,7 +569,14 @@ interface MockOptions {
   selectedProjectId?: number | null;
   fallbackProjectId?: number;
   createFailure?: boolean;
-  projects?: Array<{ id: number; tenantId: number; name: string; localPath: string }>;
+  projects?: Array<{
+    id: number;
+    tenantId: number;
+    name: string;
+    localPath: string | null;
+    lifecyclePhase?: string;
+    executionReadiness?: string;
+  }>;
   readinessByProject?: Record<number, Record<string, unknown>>;
   readinessFailures?: number[];
   selectionFailures?: number[];
@@ -486,5 +586,9 @@ interface MockOptions {
 
 interface MockState {
   projectListRequests: number;
+  legacySelectionRequests: number;
+  workbenchOpenRequests: number;
+  startOperationIds: string[];
+  chatMutationBodies: Array<Record<string, unknown>>;
   startedProject: { id: number; tenantId: number; name: string; localPath: null; lifecyclePhase: string } | null;
 }

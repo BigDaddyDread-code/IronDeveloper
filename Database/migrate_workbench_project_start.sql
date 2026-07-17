@@ -13,7 +13,7 @@ BEGIN
         ChangedAtUtc DATETIME2(7) NOT NULL CONSTRAINT DF_ProjectLifecyclePhases_ChangedAtUtc DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_ProjectLifecyclePhases_Project FOREIGN KEY (ProjectId, TenantId) REFERENCES dbo.Projects(Id, TenantId),
         CONSTRAINT FK_ProjectLifecyclePhases_Actor FOREIGN KEY (ChangedByActorUserId) REFERENCES dbo.Users(Id),
-        CONSTRAINT CK_ProjectLifecyclePhases_Phase CHECK (Phase IN (N'Shaping', N'Planning', N'Executing', N'Closed')),
+        CONSTRAINT CK_ProjectLifecyclePhases_Phase CHECK (Phase IN (N'Shaping', N'Delivery', N'Archived')),
         CONSTRAINT UQ_ProjectLifecyclePhases_Revision UNIQUE (TenantId, ProjectId, Revision)
     );
 END;
@@ -55,7 +55,7 @@ BEGIN
         AssessedAtUtc DATETIME2(7) NOT NULL CONSTRAINT DF_ProjectReadinessAssessments_AssessedAtUtc DEFAULT SYSUTCDATETIME(),
         CONSTRAINT FK_ProjectReadinessAssessments_Project FOREIGN KEY (ProjectId, TenantId) REFERENCES dbo.Projects(Id, TenantId),
         CONSTRAINT FK_ProjectReadinessAssessments_Actor FOREIGN KEY (AssessedByActorUserId) REFERENCES dbo.Users(Id),
-        CONSTRAINT CK_ProjectReadinessAssessments_State CHECK (ExecutionReadiness IN (N'NotConfigured', N'Blocked', N'Ready', N'Stale')),
+        CONSTRAINT CK_ProjectReadinessAssessments_State CHECK (ExecutionReadiness IN (N'NotConfigured', N'ValidationRequired', N'Ready')),
         CONSTRAINT UQ_ProjectReadinessAssessments_Revision UNIQUE (TenantId, ProjectId, Revision)
     );
 END;
@@ -65,7 +65,7 @@ IF OBJECT_ID(N'dbo.WorkbenchSessions', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.WorkbenchSessions
     (
-        Id UNIQUEIDENTIFIER NOT NULL CONSTRAINT PK_WorkbenchSessions PRIMARY KEY,
+        Id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_WorkbenchSessions PRIMARY KEY,
         TenantId INT NOT NULL,
         ProjectId INT NOT NULL,
         Status NVARCHAR(50) NOT NULL,
@@ -74,7 +74,8 @@ BEGIN
         ClosedAtUtc DATETIME2(7) NULL,
         CONSTRAINT FK_WorkbenchSessions_Project FOREIGN KEY (ProjectId, TenantId) REFERENCES dbo.Projects(Id, TenantId),
         CONSTRAINT FK_WorkbenchSessions_Actor FOREIGN KEY (CreatedByActorUserId) REFERENCES dbo.Users(Id),
-        CONSTRAINT CK_WorkbenchSessions_Status CHECK (Status IN (N'Active', N'Historical'))
+        CONSTRAINT CK_WorkbenchSessions_Status CHECK (Status IN (N'Active', N'Historical')),
+        CONSTRAINT UQ_WorkbenchSessions_ProjectSession UNIQUE (TenantId, ProjectId, Id)
     );
     CREATE INDEX IX_WorkbenchSessions_Project ON dbo.WorkbenchSessions(TenantId, ProjectId, CreatedAtUtc DESC);
 END;
@@ -87,7 +88,7 @@ BEGIN
         Id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_WorkbenchWriteLeases PRIMARY KEY,
         TenantId INT NOT NULL,
         ProjectId INT NOT NULL,
-        WorkbenchSessionId UNIQUEIDENTIFIER NOT NULL,
+        WorkbenchSessionId BIGINT NOT NULL,
         HolderActorUserId INT NOT NULL,
         LeaseEpoch BIGINT NOT NULL,
         LeaseTokenHash CHAR(64) NOT NULL,
@@ -96,7 +97,7 @@ BEGIN
         ExpiresAtUtc DATETIME2(7) NOT NULL,
         RevokedAtUtc DATETIME2(7) NULL,
         CONSTRAINT FK_WorkbenchWriteLeases_Project FOREIGN KEY (ProjectId, TenantId) REFERENCES dbo.Projects(Id, TenantId),
-        CONSTRAINT FK_WorkbenchWriteLeases_Session FOREIGN KEY (WorkbenchSessionId) REFERENCES dbo.WorkbenchSessions(Id),
+        CONSTRAINT FK_WorkbenchWriteLeases_Session FOREIGN KEY (TenantId, ProjectId, WorkbenchSessionId) REFERENCES dbo.WorkbenchSessions(TenantId, ProjectId, Id),
         CONSTRAINT FK_WorkbenchWriteLeases_Holder FOREIGN KEY (HolderActorUserId) REFERENCES dbo.Users(Id),
         CONSTRAINT CK_WorkbenchWriteLeases_Epoch CHECK (LeaseEpoch > 0),
         CONSTRAINT UQ_WorkbenchWriteLeases_ProjectEpoch UNIQUE (TenantId, ProjectId, LeaseEpoch)
@@ -120,7 +121,9 @@ BEGIN
         PayloadHash CHAR(64) NOT NULL,
         Status NVARCHAR(30) NOT NULL,
         ResultProjectId INT NULL,
-        ResultWorkbenchSessionId UNIQUEIDENTIFIER NULL,
+        ResultWorkbenchSessionId BIGINT NULL,
+        CanonicalResultJson NVARCHAR(MAX) NULL,
+        ResultHash CHAR(64) NULL,
         CreatedAtUtc DATETIME2(7) NOT NULL CONSTRAINT DF_ClientOperations_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
         CompletedAtUtc DATETIME2(7) NULL,
         CONSTRAINT FK_ClientOperations_Tenant FOREIGN KEY (TenantId) REFERENCES dbo.Tenants(Id),
@@ -129,6 +132,8 @@ BEGIN
         CONSTRAINT FK_ClientOperations_ResultSession FOREIGN KEY (ResultWorkbenchSessionId) REFERENCES dbo.WorkbenchSessions(Id),
         CONSTRAINT CK_ClientOperations_Status CHECK (Status IN (N'Pending', N'Completed', N'Failed')),
         CONSTRAINT CK_ClientOperations_PayloadHash CHECK (LEN(PayloadHash) = 64),
+        CONSTRAINT CK_ClientOperations_ResultJson CHECK (CanonicalResultJson IS NULL OR ISJSON(CanonicalResultJson) = 1),
+        CONSTRAINT CK_ClientOperations_ResultHash CHECK (ResultHash IS NULL OR LEN(ResultHash) = 64),
         CONSTRAINT UQ_ClientOperations_Scope UNIQUE
             (TenantId, ActorUserId, OperationKind, ResourceScopeId, ClientOperationId)
     );
@@ -143,14 +148,14 @@ BEGIN
         EventId UNIQUEIDENTIFIER NOT NULL,
         TenantId INT NOT NULL,
         ProjectId INT NOT NULL,
-        WorkbenchSessionId UNIQUEIDENTIFIER NULL,
+        WorkbenchSessionId BIGINT NULL,
         EventKind NVARCHAR(100) NOT NULL,
         PayloadJson NVARCHAR(MAX) NOT NULL,
         ClientOperationId UNIQUEIDENTIFIER NOT NULL,
         OccurredAtUtc DATETIME2(7) NOT NULL CONSTRAINT DF_WorkbenchOutboxEvents_OccurredAtUtc DEFAULT SYSUTCDATETIME(),
         PublishedAtUtc DATETIME2(7) NULL,
         CONSTRAINT FK_WorkbenchOutboxEvents_Project FOREIGN KEY (ProjectId, TenantId) REFERENCES dbo.Projects(Id, TenantId),
-        CONSTRAINT FK_WorkbenchOutboxEvents_Session FOREIGN KEY (WorkbenchSessionId) REFERENCES dbo.WorkbenchSessions(Id),
+        CONSTRAINT FK_WorkbenchOutboxEvents_Session FOREIGN KEY (TenantId, ProjectId, WorkbenchSessionId) REFERENCES dbo.WorkbenchSessions(TenantId, ProjectId, Id),
         CONSTRAINT CK_WorkbenchOutboxEvents_Payload CHECK (ISJSON(PayloadJson) = 1),
         CONSTRAINT UQ_WorkbenchOutboxEvents_Event UNIQUE (EventId)
     );

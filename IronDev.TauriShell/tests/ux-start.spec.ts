@@ -29,8 +29,11 @@ test('signed in without a project lands on the chooser and entry is not readines
   await page.goto('/');
 
   await expect(page.getByTestId('flow.chooser')).toBeVisible();
-  await expect(page.getByTestId('flow.chooser.phase.7')).toContainText('Open Workbench');
-  await expect(page.getByTestId('flow.chooser.phase.8')).toContainText('Open Workbench');
+  await expect(page.getByTestId('flow.chooser.phase.7')).toContainText('Lifecycle: Shaping');
+  await expect(page.getByTestId('flow.chooser.phase.8')).toContainText('Lifecycle: Shaping');
+  await expect(page.getByTestId('flow.chooser.executionReadiness.7')).toContainText('Execution: ready');
+  await expect(page.getByTestId('flow.chooser.executionReadiness.8')).toContainText('Execution: not configured');
+  await expect(page.getByTestId('flow.chooser.open.7')).toContainText('Open Workbench');
 
   // Selecting a project changes context — the Board renders with the same truth.
   await page.getByTestId('flow.chooser.project.7').click();
@@ -52,7 +55,7 @@ test('starting a project lands directly in Workbench without repository input', 
       projectLifecyclePhase: 'Shaping',
       executionReadiness: 'NotConfigured',
       repositoryBinding: null,
-      workbenchSessionId: '11111111-1111-1111-1111-111111111111',
+      workbenchSessionId: 9009,
       leaseEpoch: 1,
       clientOperationId: '22222222-2222-2222-2222-222222222222',
       createdAtUtc: '2026-07-18T00:00:00Z',
@@ -65,9 +68,9 @@ test('starting a project lands directly in Workbench without repository input', 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify([
-        { id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' },
-        { id: 8, tenantId: 3, name: 'ParcelTracker', localPath: null },
-        { id: 9, tenantId: 3, name: 'Fresh idea', localPath: null }
+        { id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller', lifecyclePhase: 'Shaping', executionReadiness: 'Ready' },
+        { id: 8, tenantId: 3, name: 'ParcelTracker', localPath: null, lifecyclePhase: 'Shaping', executionReadiness: 'NotConfigured' },
+        { id: 9, tenantId: 3, name: 'Fresh idea', localPath: null, lifecyclePhase: 'Shaping', executionReadiness: 'NotConfigured' }
       ])
     });
   });
@@ -228,15 +231,32 @@ async function mockStart(
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify([
-        { id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' },
-        { id: 8, tenantId: 3, name: 'ParcelTracker', localPath: 'C:\\repos\\ParcelTracker' }
+        { id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller', lifecyclePhase: 'Shaping', executionReadiness: 'Ready' },
+        { id: 8, tenantId: 3, name: 'ParcelTracker', localPath: 'C:\\repos\\ParcelTracker', lifecyclePhase: 'Shaping', executionReadiness: 'NotConfigured' }
       ])
     });
   });
   for (const projectId of [7, 8, 9]) {
-    await page.route(`**/irondev-api/api/projects/${projectId}/select`, (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId }) })
-    );
+    await page.route(`**/irondev-api/api/workbench/projects/${projectId}/open`, (route) => {
+      const request = route.request().postDataJSON() as { clientOperationId?: string; takeOverExistingLease?: boolean };
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          projectId,
+          tenantId: 3,
+          name: projectId === 7 ? 'BookSeller' : projectId === 8 ? 'ParcelTracker' : 'Fresh idea',
+          projectLifecyclePhase: 'Shaping',
+          executionReadiness: projectId === 7 ? 'Ready' : 'NotConfigured',
+          repositoryBinding: projectId === 7 ? 'C:\\repos\\BookSeller' : null,
+          workbenchSessionId: 7000 + projectId,
+          leaseEpoch: 1,
+          wasResumed: false,
+          wasTakenOver: request.takeOverExistingLease === true,
+          clientOperationId: request.clientOperationId
+        })
+      });
+    });
     await page.route(`**/irondev-api/api/projects/${projectId}/tickets`, async (route) => {
       if (route.request().method() !== 'GET') {
         await route.fallback();

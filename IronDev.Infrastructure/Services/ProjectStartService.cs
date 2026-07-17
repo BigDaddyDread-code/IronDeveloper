@@ -39,28 +39,6 @@ public sealed class ProjectStartService : IProjectStartService
 
         try
         {
-            var existing = await connection.QuerySingleOrDefaultAsync<ClientOperationRow>(new CommandDefinition(
-                ExistingOperationSql,
-                Scope(command),
-                transaction,
-                cancellationToken: cancellationToken));
-
-            if (existing is not null)
-            {
-                if (!string.Equals(existing.PayloadHash, payloadHash, StringComparison.OrdinalIgnoreCase))
-                    throw new ProjectStartOperationMismatchException();
-
-                var replay = await LoadResultAsync(
-                    connection,
-                    transaction,
-                    existing.ResultProjectId,
-                    command,
-                    isReplay: true,
-                    cancellationToken);
-                transaction.Commit();
-                return replay;
-            }
-
             var isTenantMember = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
                 """
                 SELECT COUNT(1)
@@ -74,6 +52,22 @@ public sealed class ProjectStartService : IProjectStartService
 
             if (!isTenantMember)
                 throw new UnauthorizedAccessException("The actor is not an active member of the selected tenant.");
+
+            var existing = await connection.QuerySingleOrDefaultAsync<ClientOperationRow>(new CommandDefinition(
+                ExistingOperationSql,
+                Scope(command),
+                transaction,
+                cancellationToken: cancellationToken));
+
+            if (existing is not null)
+            {
+                if (!string.Equals(existing.PayloadHash, payloadHash, StringComparison.OrdinalIgnoreCase))
+                    throw new ProjectStartOperationMismatchException();
+
+                var replay = ReadStoredResult(existing, command.ClientOperationId) with { IsReplay = true };
+                transaction.Commit();
+                return replay;
+            }
 
             await connection.ExecuteAsync(new CommandDefinition(
                 """
@@ -159,17 +153,16 @@ public sealed class ProjectStartService : IProjectStartService
                 cancellationToken: cancellationToken));
             _failureInjector.ThrowIfRequested(ProjectStartFailurePoint.ReadinessCreated);
 
-            var workbenchSessionId = Guid.NewGuid();
-            await connection.ExecuteAsync(new CommandDefinition(
+            var workbenchSessionId = await connection.QuerySingleAsync<long>(new CommandDefinition(
                 """
                 INSERT dbo.WorkbenchSessions
-                    (Id, TenantId, ProjectId, Status, CreatedByActorUserId)
+                    (TenantId, ProjectId, Status, CreatedByActorUserId)
+                OUTPUT inserted.Id
                 VALUES
-                    (@WorkbenchSessionId, @TenantId, @ProjectId, N'Active', @ActorUserId);
+                    (@TenantId, @ProjectId, N'Active', @ActorUserId);
                 """,
                 new
                 {
-                    WorkbenchSessionId = workbenchSessionId,
                     command.TenantId,
                     ProjectId = projectId,
                     command.ActorUserId
@@ -237,11 +230,32 @@ public sealed class ProjectStartService : IProjectStartService
                 cancellationToken: cancellationToken));
             _failureInjector.ThrowIfRequested(ProjectStartFailurePoint.OutboxEventsCreated);
 
+            var createdAtUtc = await connection.QuerySingleAsync<DateTime>(new CommandDefinition(
+                "SELECT CreatedDate FROM dbo.Projects WHERE TenantId=@TenantId AND Id=@ProjectId;",
+                new { command.TenantId, ProjectId = projectId },
+                transaction,
+                cancellationToken: cancellationToken));
+            var result = new StartProjectResult(
+                projectId,
+                command.TenantId,
+                name,
+                ProjectLifecyclePhases.Shaping,
+                ProjectExecutionReadinessStates.NotConfigured,
+                workbenchSessionId,
+                1,
+                command.ClientOperationId,
+                createdAtUtc,
+                false);
+            var canonicalResultJson = JsonSerializer.Serialize(result);
+            var resultHash = ComputeHash(canonicalResultJson);
+
             await connection.ExecuteAsync(new CommandDefinition(
                 """
                 UPDATE dbo.ClientOperations
                 SET Status = N'Completed', ResultProjectId = @ProjectId,
-                    ResultWorkbenchSessionId = @WorkbenchSessionId, CompletedAtUtc = SYSUTCDATETIME()
+                    ResultWorkbenchSessionId = @WorkbenchSessionId,
+                    CanonicalResultJson = @CanonicalResultJson, ResultHash = @ResultHash,
+                    CompletedAtUtc = SYSUTCDATETIME()
                 WHERE TenantId = @TenantId
                   AND ActorUserId = @ActorUserId
                   AND OperationKind = @OperationKind
@@ -256,18 +270,13 @@ public sealed class ProjectStartService : IProjectStartService
                     ResourceScopeId = ResourceScope,
                     command.ClientOperationId,
                     ProjectId = projectId,
-                    WorkbenchSessionId = workbenchSessionId
+                    WorkbenchSessionId = workbenchSessionId,
+                    CanonicalResultJson = canonicalResultJson,
+                    ResultHash = resultHash
                 },
                 transaction,
                 cancellationToken: cancellationToken));
 
-            var result = await LoadResultAsync(
-                connection,
-                transaction,
-                projectId,
-                command,
-                isReplay: false,
-                cancellationToken);
             transaction.Commit();
             return result;
         }
@@ -287,47 +296,18 @@ public sealed class ProjectStartService : IProjectStartService
         command.ClientOperationId
     };
 
-    private static async Task<StartProjectResult> LoadResultAsync(
-        IDbConnection connection,
-        IDbTransaction transaction,
-        int projectId,
-        StartProjectCommand command,
-        bool isReplay,
-        CancellationToken cancellationToken)
+    private static StartProjectResult ReadStoredResult(ClientOperationRow existing, Guid clientOperationId)
     {
-        var row = await connection.QuerySingleAsync<ProjectStartRow>(new CommandDefinition(
-            """
-            SELECT p.Id AS ProjectId, p.TenantId, p.Name, p.CreatedDate AS CreatedAtUtc,
-                   phase.Phase AS ProjectLifecyclePhase,
-                   readiness.ExecutionReadiness,
-                   session.Id AS WorkbenchSessionId,
-                   lease.LeaseEpoch
-            FROM dbo.Projects p
-            INNER JOIN dbo.ProjectLifecyclePhases phase
-                ON phase.TenantId = p.TenantId AND phase.ProjectId = p.Id AND phase.Revision = 1
-            INNER JOIN dbo.ProjectReadinessAssessments readiness
-                ON readiness.TenantId = p.TenantId AND readiness.ProjectId = p.Id AND readiness.Revision = 1
-            INNER JOIN dbo.WorkbenchSessions session
-                ON session.TenantId = p.TenantId AND session.ProjectId = p.Id
-            INNER JOIN dbo.WorkbenchWriteLeases lease
-                ON lease.TenantId = p.TenantId AND lease.ProjectId = p.Id AND lease.WorkbenchSessionId = session.Id
-            WHERE p.TenantId = @TenantId AND p.Id = @ProjectId;
-            """,
-            new { command.TenantId, ProjectId = projectId },
-            transaction,
-            cancellationToken: cancellationToken));
+        if (string.IsNullOrWhiteSpace(existing.CanonicalResultJson) || string.IsNullOrWhiteSpace(existing.ResultHash))
+            throw new InvalidOperationException("The completed project-start operation has no canonical result.");
+        if (!string.Equals(ComputeHash(existing.CanonicalResultJson), existing.ResultHash, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("The stored project-start result failed its integrity check.");
 
-        return new StartProjectResult(
-            row.ProjectId,
-            row.TenantId,
-            row.Name,
-            row.ProjectLifecyclePhase,
-            row.ExecutionReadiness,
-            row.WorkbenchSessionId,
-            row.LeaseEpoch,
-            command.ClientOperationId,
-            row.CreatedAtUtc,
-            isReplay);
+        var result = JsonSerializer.Deserialize<StartProjectResult>(existing.CanonicalResultJson)
+            ?? throw new InvalidOperationException("The stored project-start result could not be read.");
+        if (result.ClientOperationId != clientOperationId)
+            throw new InvalidOperationException("The stored project-start result belongs to another operation.");
+        return result;
     }
 
     private static string NormalizeName(string? value)
@@ -341,10 +321,13 @@ public sealed class ProjectStartService : IProjectStartService
     }
 
     private static string ComputePayloadHash(string name) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"project-start-v1\n{name}"))).ToLowerInvariant();
+        ComputeHash($"project-start-v1\n{name}");
+
+    private static string ComputeHash(string value) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private const string ExistingOperationSql = """
-        SELECT PayloadHash, ResultProjectId
+        SELECT PayloadHash, CanonicalResultJson, ResultHash
         FROM dbo.ClientOperations WITH (UPDLOCK, HOLDLOCK)
         WHERE TenantId = @TenantId
           AND ActorUserId = @ActorUserId
@@ -356,18 +339,7 @@ public sealed class ProjectStartService : IProjectStartService
     private sealed class ClientOperationRow
     {
         public string PayloadHash { get; init; } = string.Empty;
-        public int ResultProjectId { get; init; }
-    }
-
-    private sealed class ProjectStartRow
-    {
-        public int ProjectId { get; init; }
-        public int TenantId { get; init; }
-        public string Name { get; init; } = string.Empty;
-        public string ProjectLifecyclePhase { get; init; } = string.Empty;
-        public string ExecutionReadiness { get; init; } = string.Empty;
-        public Guid WorkbenchSessionId { get; init; }
-        public long LeaseEpoch { get; init; }
-        public DateTime CreatedAtUtc { get; init; }
+        public string? CanonicalResultJson { get; init; }
+        public string? ResultHash { get; init; }
     }
 }

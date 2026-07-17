@@ -143,6 +143,11 @@ export function FlowShell() {
       return;
     }
 
+    if (currentRoute.pathname === '/chat' && project.accessStatus === 'projectRequired') {
+      navigateProductPath('/projects', true);
+      return;
+    }
+
     if (!currentRoute.compatibility || selectedProjectId === null || !hasProjectAccess) return;
     const canonicalPath = legacyCanonicalPath(currentRoute, selectedProjectId);
     if (canonicalPath === null) return;
@@ -154,7 +159,7 @@ export function FlowShell() {
     navigateProductPath(canonicalPath, true);
   }, [currentRoute, hasProjectAccess, project.accessStatus, selectedProjectId]);
 
-  // A project-scoped deep link selects that project through the existing API.
+  // A project-scoped deep link explicitly opens that project through Workbench V2.
   // Missing IDs become an honest route outcome rather than silently opening a
   // different project's Board.
   useEffect(() => {

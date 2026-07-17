@@ -1,7 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { IronDevApiError } from '../api/ironDevApi';
 import { useSessionContext } from './useSessionContext';
-import type { ProductAccessStatus, ProjectSummary, TenantSummary, UserProfile } from '../api/types';
+import type {
+  ProductAccessStatus,
+  ProjectSummary,
+  StartProjectResponse,
+  TenantSummary,
+  UserProfile,
+  WorkbenchProjectEntryContext
+} from '../api/types';
 
 interface ProjectContextState {
   userProfile: UserProfile | null;
@@ -10,14 +17,22 @@ interface ProjectContextState {
   selectedTenantId: number | null;
   selectedProjectId: number | null;
   selectedProjectName: string | null;
+  workbenchSession: ActiveWorkbenchSession | null;
   projectSelectionMode: 'api' | 'fallback-config' | 'missing';
   accessStatus: ProductAccessStatus;
   isRefreshing: boolean;
   refreshProjectContext: () => Promise<void>;
   refreshTicketsContext: () => void;
   selectTenantContext: (tenantId: number) => Promise<void>;
-  selectProjectContext: (projectId: number) => Promise<void>;
+  selectProjectContext: (projectId: number, takeOver?: boolean) => Promise<void>;
+  activateStartedProject: (started: StartProjectResponse) => void;
   setProjectAccessStatus: (status: ProductAccessStatus) => void;
+}
+
+export interface ActiveWorkbenchSession {
+  projectId: number;
+  workbenchSessionId: number;
+  leaseEpoch: number;
 }
 
 const ProjectContext = createContext<ProjectContextState | null>(null);
@@ -37,8 +52,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<number | null>(config.selectedTenantId ?? null);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(config.selectedProjectId ?? null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
+  const [workbenchSession, setWorkbenchSession] = useState<ActiveWorkbenchSession | null>(null);
   const [projectSelectionMode, setProjectSelectionMode] = useState<'api' | 'fallback-config' | 'missing'>('missing');
   const [accessStatus, setAccessStatus] = useState<ProductAccessStatus>('loading');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -57,10 +73,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setTenants([]);
     setProjects([]);
     setSelectedTenantId(config.selectedTenantId ?? null);
-    setSelectedProjectId(config.selectedProjectId ?? null);
+    setSelectedProjectId(null);
     setSelectedProjectName(null);
+    setWorkbenchSession(null);
     setProjectSelectionMode('missing');
-  }, [config.selectedProjectId, config.selectedTenantId]);
+  }, [config.selectedTenantId]);
 
   const refreshProjectContext = useCallback(async () => {
     setIsRefreshing(true);
@@ -112,22 +129,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const projectList = await client.getProjects();
       setProjects(projectList);
 
-      const configuredProject = getSelectedProject(projectList, config.selectedProjectId);
-      const resolvedProjectId = configuredProject?.id ?? null;
-      setSelectedProjectId(resolvedProjectId);
-      setProjectSelectionMode(configuredProject?.mode ?? 'missing');
-      setSelectedProjectName(configuredProject?.name ?? null);
-
-      if (!resolvedProjectId) {
-        setAccessStatus('projectRequired');
-        return;
-      }
-
-      if (configuredProject?.mode === 'api') {
-        await client.selectProject(resolvedProjectId);
-      }
-
-      setAccessStatus('loadingTickets');
+      setSelectedProjectId(null);
+      setSelectedProjectName(null);
+      setWorkbenchSession(null);
+      setProjectSelectionMode('missing');
+      setAccessStatus('projectRequired');
     } catch (error) {
       clearWorkspace();
       if (error instanceof IronDevApiError) {
@@ -144,7 +150,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setIsRefreshing(false);
       setTokenEditorOpen(false);
     }
-  }, [checkApiConnection, clearRejectedSession, clearWorkspace, client, config.selectedProjectId, config.selectedTenantId, refreshConfig, setTokenEditorOpen, tokenConfigured]);
+  }, [checkApiConnection, clearRejectedSession, clearWorkspace, client, config.selectedTenantId, refreshConfig, setTokenEditorOpen, tokenConfigured]);
 
   const refreshTicketsContext = useCallback(() => {
     if (accessStatus === 'ready' || accessStatus === 'emptyTickets') {
@@ -174,6 +180,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setSelectedTenantId(tenantId);
         setSelectedProjectId(null);
         setSelectedProjectName(null);
+        setWorkbenchSession(null);
         setProjectSelectionMode('missing');
         setAccessStatus('loading');
         refreshConfig();
@@ -191,27 +198,57 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   );
 
   const selectProjectContext = useCallback(
-    async (projectId: number) => {
+    async (projectId: number, takeOver = false) => {
       if (!Number.isFinite(projectId)) {
         return;
       }
 
-      await client.selectProject(projectId);
-      window.localStorage.setItem('irondev.selectedProjectId', `${projectId}`);
+      const opened: WorkbenchProjectEntryContext = await client.openWorkbenchProject(
+        projectId,
+        crypto.randomUUID(),
+        takeOver
+      );
       setSelectedProjectId(projectId);
       setProjectSelectionMode('api');
-      setSelectedProjectName(projects.find((project) => project.id === projectId)?.name ?? `Project ${projectId}`);
+      setSelectedProjectName(opened.name);
+      setWorkbenchSession({
+        projectId: opened.projectId,
+        workbenchSessionId: opened.workbenchSessionId,
+        leaseEpoch: opened.leaseEpoch
+      });
       setAccessStatus('loadingTickets');
-      refreshConfig();
     },
-    [client, projects, refreshConfig]
+    [client]
   );
+
+  const activateStartedProject = useCallback((started: StartProjectResponse) => {
+    setSelectedProjectId(started.projectId);
+    setSelectedProjectName(started.name);
+    setProjectSelectionMode('api');
+    setWorkbenchSession({
+      projectId: started.projectId,
+      workbenchSessionId: started.workbenchSessionId,
+      leaseEpoch: started.leaseEpoch
+    });
+    setAccessStatus('loadingTickets');
+    setProjects((current) => current.some((candidate) => candidate.id === started.projectId)
+      ? current
+      : [{
+          id: started.projectId,
+          tenantId: started.tenantId,
+          name: started.name,
+          localPath: null,
+          lifecyclePhase: started.projectLifecyclePhase,
+          executionReadiness: started.executionReadiness
+        }, ...current]);
+  }, []);
 
   useEffect(() => {
     setSelectedTenantId(config.selectedTenantId ?? null);
-    setSelectedProjectId(config.selectedProjectId ?? null);
+    setSelectedProjectId(null);
+    setWorkbenchSession(null);
     void refreshProjectContext();
-  }, [config.selectedTenantId, config.selectedProjectId, refreshProjectContext, tokenConfigured]);
+  }, [config.selectedTenantId, refreshProjectContext, tokenConfigured]);
 
   const value: ProjectContextState = useMemo(
     () => ({
@@ -221,6 +258,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       selectedTenantId,
       selectedProjectId,
       selectedProjectName,
+      workbenchSession,
       projectSelectionMode,
       accessStatus,
       isRefreshing,
@@ -228,10 +266,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       refreshTicketsContext,
       selectTenantContext,
       selectProjectContext,
+      activateStartedProject,
       setProjectAccessStatus: setAccessStatus
     }),
     [
       accessStatus,
+      activateStartedProject,
       isRefreshing,
       projectSelectionMode,
       projects,
@@ -243,7 +283,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       selectedProjectName,
       selectedTenantId,
       tenants,
-      userProfile
+      userProfile,
+      workbenchSession
     ]
   );
 
@@ -258,17 +299,4 @@ export function useProjectContext() {
   }
 
   return context;
-}
-
-function getSelectedProject(
-  projects: ProjectSummary[],
-  selectedProjectId?: number
-): (ProjectSummary & { mode: 'api' }) | null {
-  const configuredProject = projects.find((project) => project.id === selectedProjectId);
-
-  if (configuredProject) {
-    return { ...configuredProject, mode: 'api' };
-  }
-
-  return null;
 }

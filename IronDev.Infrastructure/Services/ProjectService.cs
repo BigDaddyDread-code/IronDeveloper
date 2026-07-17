@@ -47,11 +47,20 @@ public sealed class ProjectService : IProjectService
     public async Task<IReadOnlyList<Project>> GetProjectsAsync(CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT Id, TenantId, Name, Description, LocalPath, CreatedDate, UpdatedDate,
-                   LastIndexedUtc, IndexingStatus, IndexedFileCount
-            FROM dbo.Projects
-            WHERE TenantId = @TenantId
-            ORDER BY CreatedDate DESC;
+            SELECT p.Id, p.TenantId, p.Name, p.Description, p.LocalPath, p.CreatedDate, p.UpdatedDate,
+                   p.LastIndexedUtc, p.IndexingStatus, p.IndexedFileCount,
+                   phase.Phase AS LifecyclePhase, readiness.ExecutionReadiness
+            FROM dbo.Projects p
+            OUTER APPLY (
+                SELECT TOP (1) value.Phase FROM dbo.ProjectLifecyclePhases value
+                WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id ORDER BY value.Revision DESC
+            ) phase
+            OUTER APPLY (
+                SELECT TOP (1) value.ExecutionReadiness FROM dbo.ProjectReadinessAssessments value
+                WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id ORDER BY value.Revision DESC
+            ) readiness
+            WHERE p.TenantId = @TenantId
+            ORDER BY p.CreatedDate DESC;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -66,11 +75,20 @@ public sealed class ProjectService : IProjectService
     public async Task<Project?> GetByIdAsync(int projectId, CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT Id, TenantId, Name, Description, LocalPath, CreatedDate, UpdatedDate,
-                   LastIndexedUtc, IndexingStatus, IndexedFileCount
-            FROM dbo.Projects
-            WHERE Id = @ProjectId
-              AND TenantId = @TenantId;
+            SELECT p.Id, p.TenantId, p.Name, p.Description, p.LocalPath, p.CreatedDate, p.UpdatedDate,
+                   p.LastIndexedUtc, p.IndexingStatus, p.IndexedFileCount,
+                   phase.Phase AS LifecyclePhase, readiness.ExecutionReadiness
+            FROM dbo.Projects p
+            OUTER APPLY (
+                SELECT TOP (1) value.Phase FROM dbo.ProjectLifecyclePhases value
+                WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id ORDER BY value.Revision DESC
+            ) phase
+            OUTER APPLY (
+                SELECT TOP (1) value.ExecutionReadiness FROM dbo.ProjectReadinessAssessments value
+                WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id ORDER BY value.Revision DESC
+            ) readiness
+            WHERE p.Id = @ProjectId
+              AND p.TenantId = @TenantId;
             """;
 
         using var connection = _connectionFactory.CreateConnection();

@@ -173,6 +173,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddSingleton<IProjectStartFailureInjector, NoOpProjectStartFailureInjector>();
 builder.Services.AddScoped<IProjectStartService, ProjectStartService>();
+builder.Services.AddScoped<IWorkbenchProjectEntryService, WorkbenchProjectEntryService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IProjectChatDocumentSourceService, ProjectChatDocumentSourceService>();
 builder.Services.AddScoped<IProjectToolCatalogueService, ProjectToolCatalogueService>();

@@ -91,11 +91,12 @@ test('Documents and its upload child are functional project routes', async ({ pa
   await expect(page.getByRole('heading', { name: 'Upload a document' })).toBeVisible();
 });
 
-test('legacy root Chat links are replaced with the selected project Workshop route', async ({ page }) => {
+test('legacy root Chat links require an explicit project choice on clean startup', async ({ page }) => {
   await page.goto('/chat');
 
-  await expect(page).toHaveURL('/projects/7/workshop');
-  await expect(page.getByTestId('chat.route')).toBeVisible();
+  await expect(page).toHaveURL('/projects');
+  await expect(page.getByTestId('flow.chooser')).toBeVisible();
+  await expect(page.getByTestId('chat.route')).toHaveCount(0);
 });
 
 test('legacy project Chat session links redirect to Workshop session routes', async ({ page }) => {
@@ -152,8 +153,24 @@ async function mockRoutedProject(page: Page) {
       body: JSON.stringify([{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
     })
   );
-  await page.route('**/irondev-api/api/projects/7/select', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) })
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        projectId: 7,
+        tenantId: 3,
+        name: 'BookSeller',
+        projectLifecyclePhase: 'Shaping',
+        executionReadiness: 'Ready',
+        repositoryBinding: 'C:\\repos\\BookSeller',
+        workbenchSessionId: 7007,
+        leaseEpoch: 1,
+        wasResumed: false,
+        wasTakenOver: false,
+        clientOperationId: route.request().postDataJSON().clientOperationId
+      })
+    })
   );
   await page.route('**/irondev-api/api/projects/7/provisioning/readiness', (route) =>
     route.fulfill({

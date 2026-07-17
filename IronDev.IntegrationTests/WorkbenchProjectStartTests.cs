@@ -16,6 +16,7 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
     {
         await base.TestInitialize();
         await ApplyMigrationAsync("migrate_user_mutation_attribution.sql");
+        await DropWorkbenchMigrationObjectsAsync();
         await ApplyMigrationAsync("migrate_workbench_project_start.sql");
     }
 
@@ -86,6 +87,131 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task Start_ReplayReturnsTheStoredResultAfterRenameAndSessionTakeover()
+    {
+        var actorUserId = await SeedActorAsync();
+        var operationId = Guid.NewGuid();
+        var service = CreateService(new NoOpProjectStartFailureInjector());
+        var command = new StartProjectCommand(1, actorUserId, operationId, "Original project name");
+        var first = await service.StartAsync(command);
+
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            await connection.OpenAsync();
+            await connection.ExecuteAsync("""
+                UPDATE dbo.Projects SET Name=N'Renamed later' WHERE TenantId=1 AND Id=@ProjectId;
+                UPDATE dbo.WorkbenchWriteLeases SET RevokedAtUtc=SYSUTCDATETIME()
+                WHERE TenantId=1 AND ProjectId=@ProjectId AND RevokedAtUtc IS NULL;
+                UPDATE dbo.WorkbenchSessions SET Status=N'Historical', ClosedAtUtc=SYSUTCDATETIME()
+                WHERE TenantId=1 AND ProjectId=@ProjectId AND Id=@OriginalSessionId;
+                DECLARE @NewSession TABLE (Id BIGINT);
+                INSERT dbo.WorkbenchSessions(TenantId, ProjectId, Status, CreatedByActorUserId)
+                OUTPUT inserted.Id INTO @NewSession
+                VALUES (1, @ProjectId, N'Active', @ActorUserId);
+                INSERT dbo.WorkbenchWriteLeases
+                    (TenantId, ProjectId, WorkbenchSessionId, HolderActorUserId, LeaseEpoch, LeaseTokenHash,
+                     AcquiredAtUtc, HeartbeatAtUtc, ExpiresAtUtc)
+                SELECT 1, @ProjectId, Id, @ActorUserId, 2, REPLICATE('a', 64),
+                       SYSUTCDATETIME(), SYSUTCDATETIME(), DATEADD(MINUTE, 30, SYSUTCDATETIME())
+                FROM @NewSession;
+                """, new { first.ProjectId, OriginalSessionId = first.WorkbenchSessionId, ActorUserId = actorUserId });
+        }
+
+        var replay = await service.StartAsync(command);
+
+        Assert.IsTrue(replay.IsReplay);
+        Assert.AreEqual(first.ProjectId, replay.ProjectId);
+        Assert.AreEqual("Original project name", replay.Name);
+        Assert.AreEqual(first.WorkbenchSessionId, replay.WorkbenchSessionId);
+        Assert.AreEqual(first.LeaseEpoch, replay.LeaseEpoch);
+        Assert.AreEqual(first.CreatedAtUtc, replay.CreatedAtUtc);
+    }
+
+    [TestMethod]
+    public async Task Open_ResumesForTheHolderAndTakeoverFencesTheOldEpoch()
+    {
+        var ownerUserId = await SeedActorAsync();
+        var start = await CreateService(new NoOpProjectStartFailureInjector()).StartAsync(
+            new StartProjectCommand(1, ownerUserId, Guid.NewGuid(), "Lease proof"));
+        var entry = new WorkbenchProjectEntryService(ServiceProvider.GetRequiredService<IDbConnectionFactory>());
+
+        var resumed = await entry.OpenAsync(new OpenWorkbenchProjectCommand(
+            1, ownerUserId, start.ProjectId, Guid.NewGuid(), TakeOver: false));
+        Assert.IsTrue(resumed.WasResumed);
+        Assert.AreEqual(start.WorkbenchSessionId, resumed.WorkbenchSessionId);
+        Assert.AreEqual(1L, resumed.LeaseEpoch);
+
+        var secondUserId = await SeedAdditionalActorAsync("takeover");
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            await connection.ExecuteAsync("""
+                INSERT dbo.ProjectMembers(TenantId, ProjectId, UserId, ProjectRole, Status, AddedByUserId)
+                VALUES (1, @ProjectId, @UserId, N'Contributor', N'Active', @OwnerUserId);
+                """, new { start.ProjectId, UserId = secondUserId, OwnerUserId = ownerUserId });
+        }
+
+        await Assert.ThrowsExactlyAsync<WorkbenchLeaseTakeoverRequiredException>(() =>
+            entry.OpenAsync(new OpenWorkbenchProjectCommand(1, secondUserId, start.ProjectId, Guid.NewGuid(), TakeOver: false)));
+
+        var takenOver = await entry.OpenAsync(new OpenWorkbenchProjectCommand(
+            1, secondUserId, start.ProjectId, Guid.NewGuid(), TakeOver: true));
+        Assert.IsTrue(takenOver.WasTakenOver);
+        Assert.AreEqual(2L, takenOver.LeaseEpoch);
+        Assert.AreNotEqual(start.WorkbenchSessionId, takenOver.WorkbenchSessionId);
+        Assert.IsFalse(await entry.HasCurrentWriteLeaseAsync(
+            1, ownerUserId, start.ProjectId, start.WorkbenchSessionId, start.LeaseEpoch));
+        Assert.IsTrue(await entry.HasCurrentWriteLeaseAsync(
+            1, secondUserId, start.ProjectId, takenOver.WorkbenchSessionId, takenOver.LeaseEpoch));
+    }
+
+    [TestMethod]
+    public async Task Open_ConcealsAProjectFromASameTenantNonMember()
+    {
+        var ownerUserId = await SeedActorAsync();
+        var start = await CreateService(new NoOpProjectStartFailureInjector()).StartAsync(
+            new StartProjectCommand(1, ownerUserId, Guid.NewGuid(), "Membership proof"));
+        var nonMemberUserId = await SeedAdditionalActorAsync("nonmember");
+        var entry = new WorkbenchProjectEntryService(ServiceProvider.GetRequiredService<IDbConnectionFactory>());
+
+        await Assert.ThrowsExactlyAsync<WorkbenchProjectNotAccessibleException>(() =>
+            entry.OpenAsync(new OpenWorkbenchProjectCommand(
+                1, nonMemberUserId, start.ProjectId, Guid.NewGuid(), TakeOver: true)));
+
+        await using var connection = new SqlConnection(ConnectionString);
+        Assert.AreEqual(0, await connection.ExecuteScalarAsync<int>("""
+            SELECT COUNT(1) FROM dbo.ClientOperations
+            WHERE TenantId=1 AND ActorUserId=@ActorUserId AND OperationKind=N'OpenWorkbenchProject';
+            """, new { ActorUserId = nonMemberUserId }));
+    }
+
+    [TestMethod]
+    public async Task Migration_UsesOnlyTheNormativeLifecycleAndReadinessVocabulary()
+    {
+        var actorUserId = await SeedActorAsync();
+        var start = await CreateService(new NoOpProjectStartFailureInjector()).StartAsync(
+            new StartProjectCommand(1, actorUserId, Guid.NewGuid(), "Vocabulary proof"));
+        await using var connection = new SqlConnection(ConnectionString);
+
+        await connection.ExecuteAsync("""
+            INSERT dbo.ProjectLifecyclePhases(TenantId, ProjectId, Revision, Phase, ChangedByActorUserId)
+            VALUES (1, @ProjectId, 2, N'Delivery', @ActorUserId);
+            INSERT dbo.ProjectReadinessAssessments
+                (TenantId, ProjectId, Revision, ExecutionReadiness, ReasonCode, Summary, AssessedByActorUserId)
+            VALUES (1, @ProjectId, 2, N'ValidationRequired', N'ValidationRequired', N'Validation is required.', @ActorUserId);
+            """, new { start.ProjectId, ActorUserId = actorUserId });
+
+        await Assert.ThrowsExactlyAsync<SqlException>(() => connection.ExecuteAsync("""
+            INSERT dbo.ProjectLifecyclePhases(TenantId, ProjectId, Revision, Phase, ChangedByActorUserId)
+            VALUES (1, @ProjectId, 3, N'Planning', @ActorUserId);
+            """, new { start.ProjectId, ActorUserId = actorUserId }));
+        await Assert.ThrowsExactlyAsync<SqlException>(() => connection.ExecuteAsync("""
+            INSERT dbo.ProjectReadinessAssessments
+                (TenantId, ProjectId, Revision, ExecutionReadiness, ReasonCode, Summary, AssessedByActorUserId)
+            VALUES (1, @ProjectId, 3, N'Blocked', N'Blocked', N'Invalid vocabulary.', @ActorUserId);
+            """, new { start.ProjectId, ActorUserId = actorUserId }));
+    }
+
+    [TestMethod]
     public async Task Start_RollsBackEveryRecordWhenARequiredWriteFails()
     {
         var actorUserId = await SeedActorAsync();
@@ -129,6 +255,20 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
         return actorUserId;
     }
 
+    private async Task<int> SeedAdditionalActorAsync(string suffix)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        var actorUserId = await connection.ExecuteScalarAsync<int>("""
+            INSERT dbo.Users(Email, DisplayName, IsActive)
+            OUTPUT inserted.Id
+            VALUES (@Email, @DisplayName, 1);
+            """, new { Email = $"workbench-{suffix}@irondev.local", DisplayName = $"Workbench {suffix}" });
+        await connection.ExecuteAsync(
+            "INSERT dbo.TenantUsers(TenantId, UserId, Role) VALUES (1, @ActorUserId, N'Member');",
+            new { ActorUserId = actorUserId });
+        return actorUserId;
+    }
+
     private async Task ApplyMigrationAsync(string fileName)
     {
         var sql = await File.ReadAllTextAsync(Path.Combine(RepositoryRoot(), "Database", fileName));
@@ -138,6 +278,20 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
         {
             if (!string.IsNullOrWhiteSpace(batch)) await connection.ExecuteAsync(batch);
         }
+    }
+
+    private async Task DropWorkbenchMigrationObjectsAsync()
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.ExecuteAsync("""
+            DROP TABLE IF EXISTS dbo.WorkbenchOutboxEvents;
+            DROP TABLE IF EXISTS dbo.ClientOperations;
+            DROP TABLE IF EXISTS dbo.WorkbenchWriteLeases;
+            DROP TABLE IF EXISTS dbo.WorkbenchSessions;
+            DROP TABLE IF EXISTS dbo.ProjectReadinessAssessments;
+            DROP TABLE IF EXISTS dbo.ProjectUnderstandings;
+            DROP TABLE IF EXISTS dbo.ProjectLifecyclePhases;
+            """);
     }
 
     private static string RepositoryRoot()

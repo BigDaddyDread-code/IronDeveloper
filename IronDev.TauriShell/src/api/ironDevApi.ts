@@ -99,6 +99,7 @@ import type {
   ProjectFileSummary,
   ProjectSummary,
   StartProjectResponse,
+  WorkbenchProjectEntryContext,
   ProjectTicket,
   RunReviewPackage,
   RunTicketReviewRequest,
@@ -362,6 +363,19 @@ class IronDevApiClient {
     return this.request<StartProjectResponse>('/api/projects/start', {
       method: 'POST',
       body: { name, clientOperationId },
+      signal
+    });
+  }
+
+  async openWorkbenchProject(
+    projectId: number,
+    clientOperationId: string,
+    takeOver = false,
+    signal?: AbortSignal
+  ): Promise<WorkbenchProjectEntryContext> {
+    return this.request<WorkbenchProjectEntryContext>(`/api/workbench/projects/${projectId}/open`, {
+      method: 'POST',
+      body: { clientOperationId, takeOver },
       signal
     });
   }

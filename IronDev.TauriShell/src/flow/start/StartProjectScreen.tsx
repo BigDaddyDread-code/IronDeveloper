@@ -23,6 +23,7 @@ export function StartProjectScreen({ onBack, onProjectStarted }: StartProjectScr
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const errorRef = useRef<HTMLDivElement | null>(null);
   const operationIdRef = useRef<string>(crypto.randomUUID());
+  const submittedPayloadRef = useRef<string | null>(null);
   const [name, setName] = useState('');
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -45,8 +46,12 @@ export function StartProjectScreen({ onBack, onProjectStarted }: StartProjectScr
     setIsStarting(true);
     setStartError(null);
     try {
+      if (submittedPayloadRef.current !== null && submittedPayloadRef.current !== trimmedName) {
+        operationIdRef.current = crypto.randomUUID();
+      }
+      submittedPayloadRef.current = trimmedName;
       const started = await session.client.startProject(trimmedName, operationIdRef.current);
-      await project.selectProjectContext(started.projectId);
+      project.activateStartedProject(started);
       onProjectStarted(started.projectId);
     } catch (error: unknown) {
       setStartError(describeStartError(error));

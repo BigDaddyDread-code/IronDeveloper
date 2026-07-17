@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { IronDevApiError } from '../../api/ironDevApi';
 import type { ProjectSummary } from '../../api/types';
 import { IronDevBrand } from '../../components/IronDevBrand';
 import { useProjectContext } from '../../state/useProjectContext';
@@ -38,10 +39,11 @@ export function ProjectEntryScreen({
   const [screen, setScreen] = useState<'grid' | 'new'>(initialScreen);
   const [openingProjectId, setOpeningProjectId] = useState<number | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [takeoverProject, setTakeoverProject] = useState<ProjectSummary | null>(null);
 
   useEffect(() => setScreen(initialScreen), [initialScreen]);
 
-  const openProject = async (candidate: ProjectSummary) => {
+  const openProject = async (candidate: ProjectSummary, takeOver = false) => {
     const projectId = candidate.id;
     if (projectId === undefined || projectId === null || !Number.isFinite(projectId)) {
       setPageError(`${candidate.name ?? 'Project'} could not be opened. Retry or check the connection.`);
@@ -50,11 +52,17 @@ export function ProjectEntryScreen({
 
     setOpeningProjectId(projectId);
     setPageError(null);
+    setTakeoverProject(null);
     try {
-      await project.selectProjectContext(projectId);
+      await project.selectProjectContext(projectId, takeOver);
       onOpenWorkbench(projectId);
-    } catch {
-      setPageError(`${candidate.name ?? 'Project'} could not be opened. Retry or check the connection.`);
+    } catch (error) {
+      if (isTakeoverRequired(error)) {
+        setTakeoverProject(candidate);
+        setPageError(`${candidate.name ?? 'Project'} is open in another writable session. Confirm takeover to continue.`);
+      } else {
+        setPageError(`${candidate.name ?? 'Project'} could not be opened. Retry or check the connection.`);
+      }
     } finally {
       setOpeningProjectId(null);
     }
@@ -118,7 +126,21 @@ export function ProjectEntryScreen({
               </p>
             </div>
 
-            {pageError ? <div className="fl-error" data-testid="flow.projectEntry.error" role="alert">{pageError}</div> : null}
+            {pageError ? (
+              <div className="fl-error" data-testid="flow.projectEntry.error" role="alert">
+                {pageError}
+                {takeoverProject ? (
+                  <button
+                    className="fl-btn fl-mini"
+                    data-testid="flow.projectEntry.takeover"
+                    type="button"
+                    onClick={() => void openProject(takeoverProject, true)}
+                  >
+                    Take over writable session
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
 
             {project.isRefreshing && project.projects.length === 0 ? (
               <div className="fl-project-grid" data-testid="flow.projectEntry.skeletons" aria-label="Loading projects">
@@ -158,4 +180,9 @@ export function ProjectEntryScreen({
       </section>
     </main>
   );
+}
+
+function isTakeoverRequired(error: unknown) {
+  if (!(error instanceof IronDevApiError) || !error.body || typeof error.body !== 'object') return false;
+  return (error.body as { error?: unknown }).error === 'workbench_lease_takeover_required';
 }

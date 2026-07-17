@@ -102,7 +102,7 @@ public sealed class LocalTestFrontDoorTrustTests : ApiTestBase
 
         Assert.AreEqual(LocalTestPreflightStates.WrongDatabase, preflight.State);
         Assert.AreEqual("workbench-pr00a", preflight.PreviewId);
-        Assert.AreEqual("0.1.0-preview.2", preflight.WorkbenchVersion);
+        Assert.AreEqual("0.1.0-preview.3", preflight.WorkbenchVersion);
         Assert.AreEqual("V2", preflight.WorkbenchMode);
         Assert.AreEqual(
             LocalTestPreflightService.ResetCommand + " -PreviewId workbench-pr00a",
@@ -181,7 +181,7 @@ public sealed class LocalTestFrontDoorTrustTests : ApiTestBase
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:IronDeveloperDb"] = connectionString,
-                ["WorkbenchV2:Version"] = "0.1.0-preview.2",
+                ["WorkbenchV2:Version"] = "0.1.0-preview.3",
                 ["WorkbenchV2:Enabled"] = "true",
                 ["WorkbenchV2:V1FallbackEnabled"] = "true",
                 ["WorkbenchV2:PreviewId"] = previewId,

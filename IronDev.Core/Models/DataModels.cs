@@ -15,6 +15,8 @@ public sealed class Project
     public DateTime? UpdatedDate { get; set; }
     public DateTime? LastIndexedUtc { get; set; }
     public string? IndexingStatus { get; set; }
+    public string? LifecyclePhase { get; set; }
+    public string? ExecutionReadiness { get; set; }
     /// <summary>Actual count of indexed files stored in dbo.ProjectFiles. Updated by IndexDirectoryAsync.</summary>
     public int? IndexedFileCount { get; set; }
 }

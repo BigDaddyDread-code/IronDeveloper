@@ -2,6 +2,8 @@ using IronDev.Data.Models;
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
+using IronDev.Core.Auth;
+using IronDev.Core.Workbench;
 using IronDev.Infrastructure.Services;
 using IronDev.Services;
 using System.Linq;
@@ -25,6 +27,9 @@ public sealed class ChatController : ControllerBase
     private readonly IProjectChatResponseService _projectChat;
     private readonly IProjectStateReviewService _projectStateReview;
     private readonly IProjectChatDocumentSourceService _documentSources;
+    private readonly IWorkbenchProjectEntryService? _workbenchEntry;
+    private readonly ICurrentTenantContext? _tenant;
+    private readonly bool _enforceWorkbenchFence;
 
     public ChatController(
         IChatHistoryService chat,
@@ -32,7 +37,10 @@ public sealed class ChatController : ControllerBase
         IChatTurnPersistenceService turnPersistence,
         IProjectChatResponseService projectChat,
         IProjectStateReviewService projectStateReview,
-        IProjectChatDocumentSourceService documentSources)
+        IProjectChatDocumentSourceService documentSources,
+        IWorkbenchProjectEntryService? workbenchEntry = null,
+        ICurrentTenantContext? tenant = null,
+        IConfiguration? configuration = null)
     {
         _chat = chat;
         _feedback = feedback;
@@ -40,6 +48,9 @@ public sealed class ChatController : ControllerBase
         _projectChat = projectChat;
         _projectStateReview = projectStateReview;
         _documentSources = documentSources;
+        _workbenchEntry = workbenchEntry;
+        _tenant = tenant;
+        _enforceWorkbenchFence = configuration?.GetValue<bool>("WorkbenchV2:Enabled") ?? false;
     }
 
     [HttpGet("api/projects/{projectId:int}/chat/sessions")]
@@ -53,6 +64,9 @@ public sealed class ChatController : ControllerBase
     [HttpPost("api/projects/{projectId:int}/chat/sessions")]
     public async Task<ActionResult<long>> SaveSession(int projectId, SaveProjectChatSessionRequest request, CancellationToken ct)
     {
+        var fenceRejection = await ValidateFenceAsync(projectId, request.WorkbenchSessionId, request.LeaseEpoch, request.ClientOperationId, ct);
+        if (fenceRejection is not null) return fenceRejection;
+
         if (request.ProjectId != 0 && request.ProjectId != projectId)
             return BadRequest(new { message = "Session projectId must match route project id." });
 
@@ -138,6 +152,9 @@ public sealed class ChatController : ControllerBase
     [HttpPost("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
     public async Task<ActionResult<long>> SaveMessage(int projectId, long sessionId, SaveProjectChatMessageRequest request, CancellationToken ct)
     {
+        var fenceRejection = await ValidateFenceAsync(projectId, request.WorkbenchSessionId, request.LeaseEpoch, request.ClientOperationId, ct);
+        if (fenceRejection is not null) return fenceRejection;
+
         if (request.ProjectId != 0 && request.ProjectId != projectId)
             return BadRequest(new { message = "Message projectId must match route project id." });
 
@@ -181,6 +198,9 @@ public sealed class ChatController : ControllerBase
         ChatCompletionRequest request,
         CancellationToken ct)
     {
+        var fenceRejection = await ValidateFenceAsync(projectId, request.WorkbenchSessionId, request.LeaseEpoch, request.ClientOperationId, ct);
+        if (fenceRejection is not null) return fenceRejection;
+
         if (request.ProjectId != 0 && request.ProjectId != projectId)
             return BadRequest(new { message = "Request project id must match the route project id." });
 
@@ -287,7 +307,10 @@ public sealed class ChatController : ControllerBase
         string Prompt,
         string? ActiveModel,
         string? Mode,
-        long? SourceMessageId = null);
+        long? SourceMessageId = null,
+        long WorkbenchSessionId = 0,
+        long LeaseEpoch = 0,
+        Guid ClientOperationId = default);
     public sealed record ChatCompletionResponse(
         string Response,
         string? ContextSummary,
@@ -313,7 +336,10 @@ public sealed class ChatController : ControllerBase
         long? Id,
         int ProjectId,
         string? Title,
-        string? Summary);
+        string? Summary,
+        long WorkbenchSessionId = 0,
+        long LeaseEpoch = 0,
+        Guid ClientOperationId = default);
 
     public sealed record SaveProjectChatMessageRequest(
         int ProjectId,
@@ -325,10 +351,50 @@ public sealed class ChatController : ControllerBase
         string? LinkedFilePaths,
         string? LinkedSymbols,
         long? ReplyToMessageId,
-        IReadOnlyList<long>? DocumentVersionIds);
+        IReadOnlyList<long>? DocumentVersionIds,
+        long WorkbenchSessionId = 0,
+        long LeaseEpoch = 0,
+        Guid ClientOperationId = default);
 
     [HttpPost("api/projects/{projectId:int}/chat/feedback")]
     public Task<long> SaveFeedback(ChatMessageFeedback feedback, CancellationToken ct) =>
         _feedback.SaveFeedbackAsync(feedback, ct);
+
+    private async Task<ActionResult?> ValidateFenceAsync(
+        int projectId,
+        long workbenchSessionId,
+        long leaseEpoch,
+        Guid clientOperationId,
+        CancellationToken cancellationToken)
+    {
+        if (!_enforceWorkbenchFence) return null;
+
+        var actorUserId = int.TryParse(
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value,
+            out var parsedActorUserId)
+            ? parsedActorUserId
+            : 0;
+        if (clientOperationId == Guid.Empty ||
+            workbenchSessionId <= 0 ||
+            leaseEpoch <= 0 ||
+            _workbenchEntry is null ||
+            _tenant is null ||
+            !await _workbenchEntry.HasCurrentWriteLeaseAsync(
+                _tenant.TenantId,
+                actorUserId,
+                projectId,
+                workbenchSessionId,
+                leaseEpoch,
+                cancellationToken))
+        {
+            return Conflict(new
+            {
+                error = WorkbenchLeaseFenceException.ErrorCode,
+                message = new WorkbenchLeaseFenceException().Message
+            });
+        }
+
+        return null;
+    }
 
 }
