@@ -96,6 +96,21 @@ public sealed class LocalTestFrontDoorTrustTests : ApiTestBase
     }
 
     [TestMethod]
+    public async Task PreviewScopedDatabase_ReportsIdentityAndOnlyItsResetCommand()
+    {
+        var preflight = await CheckPreflightAsync(previewId: "workbench-pr00a");
+
+        Assert.AreEqual(LocalTestPreflightStates.WrongDatabase, preflight.State);
+        Assert.AreEqual("workbench-pr00a", preflight.PreviewId);
+        Assert.AreEqual("0.1.0-preview.1", preflight.WorkbenchVersion);
+        Assert.AreEqual("V2", preflight.WorkbenchMode);
+        Assert.AreEqual(
+            LocalTestPreflightService.ResetCommand + " -PreviewId workbench-pr00a",
+            preflight.ResetCommand);
+        StringAssert.Contains(preflight.Detail, "IronDeveloper_Test_workbench_pr00a");
+    }
+
+    [TestMethod]
     public async Task LauncherCapabilityDisagreement_ReturnsNamedStateAndSupportedRestart()
     {
         await SeedValidContractUserAsync();
@@ -141,7 +156,8 @@ public sealed class LocalTestFrontDoorTrustTests : ApiTestBase
     private static async Task<LocalTestPreflightResponse> CheckPreflightAsync(
         string databaseName = "IronDeveloper_Test",
         bool capabilityMismatch = false,
-        bool sandboxApplyEnabled = false)
+        bool sandboxApplyEnabled = false,
+        string previewId = "default")
     {
         var commit = ResolveApiBuildCommit();
         using var session = TemporaryEnvironmentVariable.Set("IRONDEV_LOCALTEST_SESSION_ID", "integration-test-session");
@@ -165,6 +181,10 @@ public sealed class LocalTestFrontDoorTrustTests : ApiTestBase
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:IronDeveloperDb"] = connectionString,
+                ["WorkbenchV2:Version"] = "0.1.0-preview.1",
+                ["WorkbenchV2:Enabled"] = "true",
+                ["WorkbenchV2:V1FallbackEnabled"] = "true",
+                ["WorkbenchV2:PreviewId"] = previewId,
                 ["SkeletonApply:Enabled"] = sandboxApplyEnabled ? "true" : "false",
                 ["SkeletonApply:LauncherCapabilityDeclared"] = sandboxApplyEnabled ? "true" : "false",
                 ["SkeletonApply:LauncherSessionId"] = "integration-test-session",

@@ -439,7 +439,11 @@ app.UseMiddleware<ProjectArtifactAccessMiddleware>();
 app.UseMiddleware<ProjectMembershipMiddleware>();
 
 // Health check endpoint (anonymous)
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+app.MapGet("/health", () => Results.Ok(new
+   {
+       status = "healthy",
+       workbench = environmentInfo.Workbench
+   }))
    .WithName("Health")
    .AllowAnonymous();
 
@@ -476,7 +480,8 @@ static EnvironmentInfoDto CreateEnvironmentInfo(WebApplicationBuilder builder)
             IsNonLocalTestTestEnvironment(environmentName),
         WorkspaceRoot = localTest["WorkspaceRoot"] ?? string.Empty,
         LogsRoot = localTest["LogsRoot"] ?? string.Empty,
-        DangerRealRepoWritesEnabled = bool.TryParse(localTest["DangerRealRepoWritesEnabled"], out var enabled) && enabled
+        DangerRealRepoWritesEnabled = bool.TryParse(localTest["DangerRealRepoWritesEnabled"], out var enabled) && enabled,
+        Workbench = WorkbenchReleaseInfoFactory.Create(builder.Configuration, builder.Environment)
     };
 }
 

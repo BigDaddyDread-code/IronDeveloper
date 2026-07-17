@@ -9,4 +9,5 @@ public sealed record EnvironmentInfoDto
     public string WorkspaceRoot { get; init; } = string.Empty;
     public string LogsRoot { get; init; } = string.Empty;
     public bool DangerRealRepoWritesEnabled { get; init; }
+    public WorkbenchReleaseInfoDto Workbench { get; init; } = new();
 }

@@ -1,7 +1,20 @@
+function ConvertTo-LocalTestPreviewId {
+    [CmdletBinding()]
+    param([string]$PreviewId = "default")
+
+    $normalized = if ([string]::IsNullOrWhiteSpace($PreviewId)) { "default" } else { $PreviewId.Trim().ToLowerInvariant() }
+    if ($normalized -notmatch '^[a-z0-9][a-z0-9-]{0,31}$') {
+        throw "PreviewId must contain 1-32 lowercase letters, numbers, or hyphens and must start with a letter or number."
+    }
+
+    return $normalized
+}
+
 function Get-LocalTestSeedContract {
     [CmdletBinding()]
     param(
-        [string]$Path = (Join-Path $PSScriptRoot "localtest-seed-contract.json")
+        [string]$Path = (Join-Path $PSScriptRoot "localtest-seed-contract.json"),
+        [string]$PreviewId = "default"
     )
 
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
@@ -64,6 +77,16 @@ function Get-LocalTestSeedContract {
     $artifactKeys = @($contract.knownArtifacts | ForEach-Object { "$($_.kind):$($_.id)" })
     if (($artifactKeys | Sort-Object -Unique).Count -ne $artifactKeys.Count) {
         throw "LocalTest artifact kind/ID pairs must be unique."
+    }
+
+    $normalizedPreviewId = ConvertTo-LocalTestPreviewId -PreviewId $PreviewId
+    $contract | Add-Member -NotePropertyName previewId -NotePropertyValue $normalizedPreviewId
+    if ($normalizedPreviewId -ne "default") {
+        $databaseSuffix = $normalizedPreviewId.Replace('-', '_')
+        $contract.database.name = "IronDeveloper_Test_$databaseSuffix"
+        $contract.database.requiredNamePattern = '^IronDeveloper_Test_[a-z0-9_]+$'
+        $contract.paths.workspaceRoot = Join-Path ([string]$contract.paths.workspaceRoot) $normalizedPreviewId
+        $contract.paths.logsRoot = Join-Path ([string]$contract.paths.logsRoot) $normalizedPreviewId
     }
 
     return $contract

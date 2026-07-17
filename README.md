@@ -77,6 +77,20 @@ Start the complete LocalTest stack used for product and PR checks with:
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly
 ```
 
+Workbench previews carry a programme version from `workbench-version.json`, the exact Git commit, and a short preview ID. Give each PR its own ID so its database, workspace, and logs are isolated:
+
+```powershell
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -PreviewId workbench-pr00a
+```
+
+The example owns `IronDeveloper_Test_workbench_pr00a`, `C:\IronDevTestWorkspaces\workbench-pr00a`, and `C:\IronDevTestLogs\workbench-pr00a`. Reusing the command resets only those targets. Use different `-ApiBaseUrl` and `-UiPort` values when running two previews at the same time.
+
+The V1 fallback uses the same isolated preview data and is selected explicitly:
+
+```powershell
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -PreviewId workbench-pr00a -UseV1
+```
+
 Use `-Reset` only when disposable LocalTest data should be rebuilt. The launcher starts the API, verifies the seeded login and environment contract, then starts the browser or Tauri shell. The UI reports the actual `LocalTest` environment and deterministic model mode.
 
 Normal LocalTest sessions prove workflow behavior but do not claim they can finish project feature work. For a deliberately destructive disposable-sandbox journey, use the explicit project-work mode:

@@ -51,6 +51,9 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
       <header className="fl-auth-header">
         <IronDevBrand descriptor />
         <span className="fl-auth-environment" data-testid="auth.apiStatusChip">
+          {preflight?.workbenchVersion
+            ? `${preflight.workbenchMode} ${preflight.workbenchVersion} / ${preflight.previewId} / `
+            : ''}
           {preflight?.environment && preflight.environment !== 'Unknown'
             ? `${preflight.environment} · `
             : session.environmentInfo?.environment
@@ -186,6 +189,14 @@ export function SignInRoute({ onOpenSettings }: SignInRouteProps) {
               <dt>Front door</dt>
               <dd data-testid="auth.localtestSeedStatus">
                 {preflightStatusLabel(session.apiStatus.status, preflight?.state, preflight?.environment)}
+              </dd>
+            </div>
+            <div>
+              <dt>Workbench</dt>
+              <dd data-testid="auth.workbenchIdentity">
+                {preflight?.workbenchVersion
+                  ? `${preflight.workbenchMode} ${preflight.workbenchVersion} / ${preflight.previewId}`
+                  : 'Not reported yet'}
               </dd>
             </div>
             <div>

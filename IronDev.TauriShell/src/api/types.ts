@@ -29,6 +29,18 @@ export interface EnvironmentInfo {
   workspaceRoot: string;
   logsRoot: string;
   dangerRealRepoWritesEnabled: boolean;
+  workbench: WorkbenchReleaseInfo;
+}
+
+export interface WorkbenchReleaseInfo {
+  version: string;
+  mode: 'V1' | 'V2';
+  v2Enabled: boolean;
+  v1FallbackEnabled: boolean;
+  previewId: string;
+  apiBuildIdentity: string;
+  apiCommit: string;
+  resetSupported: boolean;
 }
 
 export type LocalTestPreflightState =
@@ -59,6 +71,9 @@ export interface LocalTestPreflightInfo {
   nextSafeAction: string;
   resetCommand: string | null;
   detail: string;
+  workbenchVersion: string;
+  workbenchMode: 'V1' | 'V2';
+  previewId: string;
   sessionMode: string;
   sandboxApplyRequested: boolean;
   sandboxApplyEnabled: boolean;
