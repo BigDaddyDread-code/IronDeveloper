@@ -6,9 +6,13 @@ test.beforeEach(async ({ page }) => {
   await mockRoutedProject(page);
 });
 
-test('entry resolves to a project-scoped Board with only the four product destinations', async ({ page }) => {
+test('entry opens the project chooser before resolving to a project-scoped Board', async ({ page }) => {
   await page.goto('/');
 
+  await expect(page).toHaveURL('/projects');
+  await page.getByTestId('flow.chooser.project.7').click();
+  await expect(page).toHaveURL('/projects/7/workshop');
+  await page.getByTestId('flow.nav.board').click();
   await expect(page).toHaveURL('/projects/7/board');
   const navigation = page.getByRole('navigation', { name: 'Project' });
   await expect(navigation.getByRole('button')).toHaveCount(4);
@@ -101,11 +105,11 @@ test('legacy project Chat session links redirect to Workshop session routes', as
   await expect(page.getByTestId('chat.route')).toBeVisible();
 });
 
-test('project connect has a direct entry URL and a history-aware return path', async ({ page }) => {
+test('legacy project-connect URL opens project-first entry and returns to projects', async ({ page }) => {
   await page.goto('/projects/connect');
 
-  await expect(page.getByTestId('flow.connectProject')).toBeVisible();
-  await page.getByTestId('flow.connectProject.back').click();
+  await expect(page.getByTestId('flow.startProject')).toBeVisible();
+  await page.getByTestId('flow.startProject.back').click();
   await expect(page).toHaveURL('/projects');
   await expect(page.getByTestId('flow.chooser')).toBeVisible();
 });

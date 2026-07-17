@@ -98,6 +98,7 @@ import type {
   ProjectImplementationPlan,
   ProjectFileSummary,
   ProjectSummary,
+  StartProjectResponse,
   ProjectTicket,
   RunReviewPackage,
   RunTicketReviewRequest,
@@ -351,6 +352,18 @@ class IronDevApiClient {
 
   async selectProject(projectId: number, signal?: AbortSignal): Promise<{ projectId: number }> {
     return this.request<{ projectId: number }>(`/api/projects/${projectId}/select`, { method: 'POST', signal });
+  }
+
+  async startProject(
+    name: string,
+    clientOperationId: string,
+    signal?: AbortSignal
+  ): Promise<StartProjectResponse> {
+    return this.request<StartProjectResponse>('/api/projects/start', {
+      method: 'POST',
+      body: { name, clientOperationId },
+      signal
+    });
   }
 
   /**

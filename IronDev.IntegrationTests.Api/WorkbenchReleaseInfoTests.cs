@@ -16,7 +16,7 @@ public sealed class WorkbenchReleaseInfoTests
             new ConfigurationBuilder().Build(),
             new StubHostEnvironment("Test"));
 
-        Assert.AreEqual("0.1.0-preview.1", info.Version);
+        Assert.AreEqual("0.1.0-preview.2", info.Version);
         Assert.AreEqual("V1", info.Mode);
         Assert.AreEqual("default", info.PreviewId);
         Assert.IsFalse(info.V2Enabled);
@@ -31,7 +31,7 @@ public sealed class WorkbenchReleaseInfoTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["WorkbenchV2:Version"] = "0.1.0-preview.1",
+                ["WorkbenchV2:Version"] = "0.1.0-preview.2",
                 ["WorkbenchV2:Enabled"] = "true",
                 ["WorkbenchV2:V1FallbackEnabled"] = "true",
                 ["WorkbenchV2:PreviewId"] = "workbench-pr00a",

@@ -36,7 +36,7 @@ export type ProductRouteKind =
   | 'signIn'
   | 'tenantSelect'
   | 'projects'
-  | 'projectConnect'
+  | 'projectNew'
   | 'projectSetup'
   | 'board'
   | 'chat'
@@ -129,7 +129,8 @@ export function parseProductRoute(pathname: string): ProductRoute {
   if (normalized === '/sign-in') return route(normalized, 'signIn');
   if (normalized === '/tenants/select') return route(normalized, 'tenantSelect');
   if (normalized === '/projects') return route(normalized, 'projects');
-  if (normalized === '/projects/connect') return route(normalized, 'projectConnect');
+  if (normalized === '/projects/new') return route(normalized, 'projectNew');
+  if (normalized === '/projects/connect') return route(normalized, 'projectNew', { compatibility: true });
 
   if (isGovernancePath(normalized)) {
     return route(normalized, 'library', { librarySection: 'governance', compatibility: true });

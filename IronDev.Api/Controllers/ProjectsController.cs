@@ -6,6 +6,7 @@ using IronDev.Core.Governance;
 using IronDev.Core.Models;
 using IronDev.Services;
 using IronDev.Core.RunReadiness;
+using IronDev.Core.Workbench;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,6 +18,7 @@ namespace IronDev.Api.Controllers;
 public sealed class ProjectsController : ControllerBase
 {
     private readonly IProjectService _projects;
+    private readonly IProjectStartService _projectStart;
     private readonly IProjectContextExportService _export;
     private readonly IProjectMembershipService _memberships;
     private readonly ICurrentTenantContext _tenant;
@@ -25,6 +27,7 @@ public sealed class ProjectsController : ControllerBase
 
     public ProjectsController(
         IProjectService projects,
+        IProjectStartService projectStart,
         IProjectContextExportService export,
         IProjectMembershipService memberships,
         ICurrentTenantContext tenant,
@@ -32,6 +35,7 @@ public sealed class ProjectsController : ControllerBase
         ILogger<ProjectsController> logger)
     {
         _projects = projects;
+        _projectStart = projectStart;
         _export = export;
         _memberships = memberships;
         _tenant = tenant;
@@ -82,6 +86,48 @@ public sealed class ProjectsController : ControllerBase
         return CreatedAtAction(nameof(GetProject), new { projectId = id }, project);
     }
 
+    [HttpPost("start")]
+    public async Task<ActionResult<StartProjectResult>> StartProject(
+        [FromBody] StartProjectRequest request,
+        CancellationToken ct)
+    {
+        var user = CurrentUser();
+        try
+        {
+            var result = await _projectStart.StartAsync(
+                new StartProjectCommand(
+                    _tenant.TenantId,
+                    user.UserId,
+                    request.ClientOperationId,
+                    request.Name),
+                ct);
+
+            return result.IsReplay
+                ? Ok(result)
+                : CreatedAtAction(nameof(GetProject), new { projectId = result.ProjectId }, result);
+        }
+        catch (ProjectStartValidationException exception)
+        {
+            return BadRequest(new { error = "project_start_invalid", message = exception.Message });
+        }
+        catch (ProjectStartOperationMismatchException exception)
+        {
+            return Conflict(new
+            {
+                error = ProjectStartOperationMismatchException.ErrorCode,
+                message = exception.Message
+            });
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                error = "project_start_forbidden",
+                message = exception.Message
+            });
+        }
+    }
+
     [HttpPatch("{projectId:int}")]
     public async Task<ActionResult<Project>> UpdateProject(int projectId, Project project, CancellationToken ct)
     {
@@ -124,6 +170,7 @@ public sealed class ProjectsController : ControllerBase
 
     public sealed record UpdateLocalPathRequest(string LocalPath);
     public sealed record MarkIndexStaleRequest(string Reason);
+    public sealed record StartProjectRequest(string Name, Guid ClientOperationId);
 
     private CurrentUserContext CurrentUser() => new(
         HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());

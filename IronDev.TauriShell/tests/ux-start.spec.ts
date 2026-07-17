@@ -24,41 +24,62 @@ test('an unreachable API gets a named preflight with a retry, not a dead chip', 
   await expect(page.getByText('start-pr-manual-test.ps1')).toBeVisible();
 });
 
-test('signed in without a project lands on the chooser; badges are backend readiness truth', async ({ page }) => {
+test('signed in without a project lands on the chooser and entry is not readiness-gated', async ({ page }) => {
   await mockStart(page, { selectedProjectId: null });
   await page.goto('/');
 
   await expect(page.getByTestId('flow.chooser')).toBeVisible();
-  await expect(page.getByTestId('flow.chooser.readiness.7')).toContainText('Ready');
-  await expect(page.getByTestId('flow.chooser.readiness.8')).toContainText('Setup required, 2 items');
+  await expect(page.getByTestId('flow.chooser.phase.7')).toContainText('Open Workbench');
+  await expect(page.getByTestId('flow.chooser.phase.8')).toContainText('Open Workbench');
 
   // Selecting a project changes context — the Board renders with the same truth.
   await page.getByTestId('flow.chooser.project.7').click();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
+  await page.getByTestId('flow.nav.board').click();
   await expect(page.getByTestId('flow.board.columns')).toBeVisible();
   await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Ready for project work');
 });
 
-test('creating a project lands on the readiness screen, never straight into work', async ({ page }) => {
+test('starting a project lands directly in Workbench without repository input', async ({ page }) => {
   await mockStart(page, { selectedProjectId: null });
+  await page.route('**/irondev-api/api/projects/start', (route) => route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      projectId: 9,
+      tenantId: 3,
+      name: 'Fresh idea',
+      projectLifecyclePhase: 'Shaping',
+      executionReadiness: 'NotConfigured',
+      repositoryBinding: null,
+      workbenchSessionId: '11111111-1111-1111-1111-111111111111',
+      leaseEpoch: 1,
+      clientOperationId: '22222222-2222-2222-2222-222222222222',
+      createdAtUtc: '2026-07-18T00:00:00Z',
+      isReplay: false
+    })
+  }));
   await page.route('**/irondev-api/api/projects', async (route) => {
-    if (route.request().method() === 'POST') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ id: 9, tenantId: 3, name: 'FreshRepo', localPath: 'C:\\repos\\FreshRepo' })
-      });
-      return;
-    }
-    await route.fallback();
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' },
+        { id: 8, tenantId: 3, name: 'ParcelTracker', localPath: null },
+        { id: 9, tenantId: 3, name: 'Fresh idea', localPath: null }
+      ])
+    });
   });
   await page.goto('/');
 
-  await page.getByTestId('flow.projectEntry.connect').click();
-  await page.getByTestId('flow.chooser.create.name').fill('FreshRepo');
-  await page.getByTestId('flow.chooser.create.path').fill('C:\\repos\\FreshRepo');
-  await page.getByTestId('flow.chooser.create.submit').click();
+  await page.getByTestId('flow.projectEntry.start').click();
+  await page.getByTestId('flow.startProject.name').fill('Fresh idea');
+  await expect(page.getByPlaceholder(/path/i)).toHaveCount(0);
+  await page.getByTestId('flow.startProject.submit').click();
 
-  await expect(page.getByTestId('flow.projectSetup')).toBeVisible();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('flow.projectSetup')).toHaveCount(0);
 });
 
 test('Board: a gate-waiting item outranks new work, with the reason named', async ({ page }) => {
@@ -71,6 +92,8 @@ test('Board: a gate-waiting item outranks new work, with the reason named', asyn
   });
   await page.goto('/');
 
+  await page.getByTestId('flow.chooser.project.7').click();
+  await page.getByTestId('flow.nav.board').click();
   await expect(page.getByTestId('flow.cockpit.primary.review')).toContainText('Review waiting item');
   await expect(page.getByTestId('flow.cockpit.attention')).toContainText('search-by-author');
   await expect(page.getByTestId('flow.cockpit.attention')).toContainText('Waiting for approval');
@@ -125,6 +148,8 @@ test('Board: blocked readiness switches the primary action to setup and names ev
   });
   await page.goto('/');
 
+  await page.getByTestId('flow.chooser.project.7').click();
+  await page.getByTestId('flow.nav.board').click();
   await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Setup incomplete · 2 blocker(s)');
   await expect(page.getByTestId('flow.cockpit.primary.setup')).toContainText('Complete project setup');
   await expect(page.getByTestId('flow.cockpit.setup')).toContainText('Supply the test command');

@@ -1,27 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ProjectSummary } from '../../api/types';
 import { IronDevBrand } from '../../components/IronDevBrand';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
-import { ConnectProjectScreen } from './ConnectProjectScreen';
 import { ProjectTile } from './ProjectTile';
-import type { ProjectTileReadiness } from './projectEntryTypes';
-import { isReadyReadiness } from './projectEntryTypes';
+import { StartProjectScreen } from './StartProjectScreen';
 
 interface ProjectEntryScreenProps {
-  onOpenBoard: (projectId: number) => void;
-  onOpenProvisioning: (projectId: number) => void;
+  onOpenWorkbench: (projectId: number) => void;
   onOpenSettings: () => void;
-  initialScreen?: 'grid' | 'connect';
-  onOpenConnect?: () => void;
-  onBackFromConnect?: () => void;
+  initialScreen?: 'grid' | 'new';
+  onOpenNew?: () => void;
+  onBackFromNew?: () => void;
 }
 
 function initials(name: string | null | undefined): string {
-  if (!name) {
-    return '.';
-  }
-
+  if (!name) return '.';
   return name
     .split(/\s+/)
     .map((part) => part[0])
@@ -31,73 +25,21 @@ function initials(name: string | null | undefined): string {
     .toUpperCase();
 }
 
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : 'status unavailable';
-}
-
 export function ProjectEntryScreen({
-  onOpenBoard,
-  onOpenProvisioning,
+  onOpenWorkbench,
   onOpenSettings,
   initialScreen = 'grid',
-  onOpenConnect,
-  onBackFromConnect
+  onOpenNew,
+  onBackFromNew
 }: ProjectEntryScreenProps) {
   const session = useSessionContext();
   const project = useProjectContext();
-  const connectTileRef = useRef<HTMLButtonElement | null>(null);
-  const readinessRequests = useRef<Record<number, Promise<ProjectTileReadiness>>>({});
-  const [screen, setScreen] = useState<'grid' | 'connect'>(initialScreen);
-  const [readinessById, setReadinessById] = useState<Record<number, ProjectTileReadiness>>({});
+  const startTileRef = useRef<HTMLButtonElement | null>(null);
+  const [screen, setScreen] = useState<'grid' | 'new'>(initialScreen);
   const [openingProjectId, setOpeningProjectId] = useState<number | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
 
-  const loadReadiness = useCallback(
-    (projectId: number): Promise<ProjectTileReadiness> => {
-      const pending = readinessRequests.current[projectId];
-      if (pending) {
-        return pending;
-      }
-
-      const request = session.client
-        .getProvisioningReadiness(projectId)
-        .then((readiness): ProjectTileReadiness => ({ kind: 'loaded', readiness }))
-        .catch((error: unknown): ProjectTileReadiness => ({ kind: 'error', message: describeError(error) }))
-        .then((result) => {
-          setReadinessById((previous) => ({ ...previous, [projectId]: result }));
-          delete readinessRequests.current[projectId];
-          return result;
-        });
-
-      readinessRequests.current[projectId] = request;
-      return request;
-    },
-    [session.client]
-  );
-
-  useEffect(() => {
-    setScreen(initialScreen);
-  }, [initialScreen]);
-
-  useEffect(() => {
-    const projectIds = project.projects
-      .map((candidate) => candidate.id)
-      .filter((projectId): projectId is number => typeof projectId === 'number' && Number.isFinite(projectId));
-
-    setReadinessById((previous) => {
-      const next: Record<number, ProjectTileReadiness> = {};
-      for (const projectId of projectIds) {
-        next[projectId] = previous[projectId] ?? { kind: 'loading' };
-      }
-      return next;
-    });
-
-    for (const projectId of projectIds) {
-      if (!readinessRequests.current[projectId]) {
-        void loadReadiness(projectId);
-      }
-    }
-  }, [loadReadiness, project.projects]);
+  useEffect(() => setScreen(initialScreen), [initialScreen]);
 
   const openProject = async (candidate: ProjectSummary) => {
     const projectId = candidate.id;
@@ -108,21 +50,9 @@ export function ProjectEntryScreen({
 
     setOpeningProjectId(projectId);
     setPageError(null);
-
     try {
-      const currentReadiness = readinessById[projectId];
-      const readiness =
-        currentReadiness?.kind === 'loaded' || currentReadiness?.kind === 'error'
-          ? currentReadiness
-          : await loadReadiness(projectId);
-
       await project.selectProjectContext(projectId);
-
-      if (isReadyReadiness(readiness)) {
-        onOpenBoard(projectId);
-      } else {
-        onOpenProvisioning(projectId);
-      }
+      onOpenWorkbench(projectId);
     } catch {
       setPageError(`${candidate.name ?? 'Project'} could not be opened. Retry or check the connection.`);
     } finally {
@@ -130,16 +60,16 @@ export function ProjectEntryScreen({
     }
   };
 
-  const showConnect = () => {
+  const showNew = () => {
     setPageError(null);
-    setScreen('connect');
-    onOpenConnect?.();
+    setScreen('new');
+    onOpenNew?.();
   };
 
   const showGrid = () => {
     setScreen('grid');
-    onBackFromConnect?.();
-    window.setTimeout(() => connectTileRef.current?.focus(), 0);
+    onBackFromNew?.();
+    window.setTimeout(() => startTileRef.current?.focus(), 0);
   };
 
   const displayName = project.userProfile?.displayName ?? 'Signed in';
@@ -162,22 +92,11 @@ export function ProjectEntryScreen({
                   {workbench ? `${workbench.mode} ${workbench.version} / ${workbench.previewId}` : 'Unknown'}
                 </dd>
               </div>
-              <div>
-                <dt>Commit</dt>
-                <dd>{workbench?.apiCommit ?? 'Unknown'}</dd>
-              </div>
-              <div>
-                <dt>Environment</dt>
-                <dd>{session.environmentInfo?.environment ?? 'Unknown'}</dd>
-              </div>
-              <div>
-                <dt>API</dt>
-                <dd>{session.config.apiBaseUrl}</dd>
-              </div>
+              <div><dt>Commit</dt><dd>{workbench?.apiCommit ?? 'Unknown'}</dd></div>
+              <div><dt>Environment</dt><dd>{session.environmentInfo?.environment ?? 'Unknown'}</dd></div>
+              <div><dt>API</dt><dd>{session.config.apiBaseUrl}</dd></div>
             </dl>
-            <button className="fl-btn fl-mini" type="button" onClick={onOpenSettings}>
-              Connection settings
-            </button>
+            <button className="fl-btn fl-mini" type="button" onClick={onOpenSettings}>Connection settings</button>
           </details>
           <span>{displayName}</span>
           <span className="fl-avatar">{initials(project.userProfile?.displayName)}</span>
@@ -185,8 +104,8 @@ export function ProjectEntryScreen({
       </header>
 
       <section className="fl-project-entry__body">
-        {screen === 'connect' ? (
-          <ConnectProjectScreen onBack={showGrid} onProjectCreated={onOpenProvisioning} />
+        {screen === 'new' ? (
+          <StartProjectScreen onBack={showGrid} onProjectStarted={onOpenWorkbench} />
         ) : (
           <>
             <div className="fl-auth-intro">
@@ -194,16 +113,12 @@ export function ProjectEntryScreen({
               <h1 className="fl-h1">Choose a project</h1>
               <p className="fl-sub">
                 {project.projects.length === 0
-                  ? 'No projects are connected yet.'
-                  : 'Open an existing project or connect a local repository.'}
+                  ? 'Start a project, then shape the idea in Workbench.'
+                  : 'Open an existing project or start a new one.'}
               </p>
             </div>
 
-            {pageError ? (
-              <div className="fl-error" data-testid="flow.projectEntry.error" role="alert">
-                {pageError}
-              </div>
-            ) : null}
+            {pageError ? <div className="fl-error" data-testid="flow.projectEntry.error" role="alert">{pageError}</div> : null}
 
             {project.isRefreshing && project.projects.length === 0 ? (
               <div className="fl-project-grid" data-testid="flow.projectEntry.skeletons" aria-label="Loading projects">
@@ -219,25 +134,22 @@ export function ProjectEntryScreen({
                     <ProjectTile
                       key={projectId}
                       project={candidate}
-                      readiness={readinessById[projectId]}
                       isOpening={openingProjectId === projectId}
                       onOpen={() => void openProject(candidate)}
                     />
                   );
                 })}
                 <button
-                  ref={connectTileRef}
+                  ref={startTileRef}
                   type="button"
                   className="fl-project-tile fl-project-tile--connect"
-                  data-testid="flow.projectEntry.connect"
-                  aria-label="Connect another project. Add a local repository"
-                  onClick={showConnect}
+                  data-testid="flow.projectEntry.start"
+                  aria-label="Start a new project"
+                  onClick={showNew}
                 >
-                  <span className="fl-project-tile__plus" aria-hidden="true">
-                    +
-                  </span>
-                  <span className="fl-project-tile__name">Connect another project</span>
-                  <span className="fl-project-tile__path">Add a local repository</span>
+                  <span className="fl-project-tile__plus" aria-hidden="true">+</span>
+                  <span className="fl-project-tile__name">Start new project</span>
+                  <span className="fl-project-tile__path">Shape an idea first</span>
                 </button>
               </div>
             )}

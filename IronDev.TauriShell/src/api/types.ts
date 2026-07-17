@@ -83,7 +83,22 @@ export interface LocalTestPreflightInfo {
 }
 
 export type ProjectTicket = components['schemas']['ProjectTicket'] & { revision?: number };
-export type ProjectSummary = components['schemas']['Project'];
+export type ProjectSummary = components['schemas']['Project'] & {
+  lifecyclePhase?: string | null;
+};
+export interface StartProjectResponse {
+  projectId: number;
+  tenantId: number;
+  name: string;
+  projectLifecyclePhase: 'Shaping' | string;
+  executionReadiness: 'NotConfigured' | string;
+  repositoryBinding: null;
+  workbenchSessionId: string;
+  leaseEpoch: number;
+  clientOperationId: string;
+  createdAtUtc: string;
+  isReplay: boolean;
+}
 export type ProjectGovernanceOverview = components['schemas']['ProjectGovernanceOverview'];
 export type ProjectGovernanceAttentionItem = components['schemas']['ProjectGovernanceAttentionItem'];
 export type ProjectGovernanceControl = components['schemas']['ProjectGovernanceControl'];
