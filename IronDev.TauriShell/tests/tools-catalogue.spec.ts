@@ -163,7 +163,7 @@ async function mockToolsWorkspace(page: Page, options: ToolsMockOptions = {}): P
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/projects/7/select', (route) => json(route, { projectId: 7 }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, { projectId: 7 }));
   await page.route('**/irondev-api/api/projects/7/tickets', (route) => json(route, []));
   await page.route('**/irondev-api/api/projects/7/chat/sessions', (route) => json(route, []));
 

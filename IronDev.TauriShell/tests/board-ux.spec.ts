@@ -183,7 +183,7 @@ async function mockBoardEntry(page: Page, board: ReturnType<typeof boardResponse
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/projects/7/select', (route) => json(route, { projectId: 7 }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, { projectId: 7 }));
   await page.route('**/irondev-api/api/projects/7/board', (route) => json(route, board, boardStatus));
 }
 

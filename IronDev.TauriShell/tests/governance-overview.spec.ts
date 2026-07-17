@@ -153,6 +153,19 @@ async function prepareSelectedProject(page: Page) {
   }));
   await page.route('**/irondev-api/api/tenants', async (route) => fulfillJson(route, [{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }]));
   await page.route('**/irondev-api/api/projects', async (route) => fulfillJson(route, [{ id: 7, tenantId: 3, name: 'IronDeveloper' }]));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route) => fulfillJson(route, {
+    projectId: 7,
+    tenantId: 3,
+    name: 'IronDeveloper',
+    projectLifecyclePhase: 'Shaping',
+    executionReadiness: 'NotConfigured',
+    repositoryBinding: null,
+    workbenchSessionId: 7007,
+    leaseEpoch: 1,
+    wasResumed: true,
+    wasTakenOver: false,
+    clientOperationId: '00000000-0000-0000-0000-000000000007'
+  }));
   await page.route('**/irondev-api/api/projects/7/**', async (route) => fulfillJson(route, {}));
   await page.route('**/irondev-api/api/projects/7/notifications**', async (route) => fulfillJson(route, {
     projectId: 7, unreadCount: 0, notifications: [], boundary: 'Notification visibility grants no authority.'

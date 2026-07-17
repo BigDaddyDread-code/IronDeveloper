@@ -354,6 +354,25 @@ async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Pro
   await page.route('**/irondev-api/health', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) })
   );
+  await page.route('**/irondev-api/api/localtest/preflight', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        state: 'LocalTestReady',
+        environment: 'LocalTest',
+        database: 'IronDeveloper_Test',
+        apiBuildCommit: 'test-commit',
+        launcherRepositoryCommit: 'test-commit',
+        apiBaseUrl: 'http://localhost:5000',
+        sessionMode: 'SmokeSimulation',
+        sandboxApplyRequested: false,
+        sandboxApplyEnabled: false,
+        sandboxApplyRoot: null,
+        capabilities: ['WorkflowSmokeSimulation']
+      })
+    })
+  );
   await page.route('**/irondev-api/api/environment', (route) =>
     route.fulfill({
       status: 200,
@@ -382,8 +401,24 @@ async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Pro
       body: JSON.stringify([{ id: 7, tenantId: 3, name: options.projectName ?? 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
     })
   );
-  await page.route('**/irondev-api/api/projects/7/select', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) })
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        projectId: 7,
+        tenantId: 3,
+        name: options.projectName ?? 'BookSeller',
+        projectLifecyclePhase: 'Shaping',
+        executionReadiness: 'NotConfigured',
+        repositoryBinding: null,
+        workbenchSessionId: 7007,
+        leaseEpoch: 1,
+        wasResumed: true,
+        wasTakenOver: false,
+        clientOperationId: '00000000-0000-0000-0000-000000000007'
+      })
+    })
   );
   await page.route('**/irondev-api/api/projects/7/chat/document-sources', (route) =>
     options.documentSourceStatus && options.documentSourceStatus >= 400

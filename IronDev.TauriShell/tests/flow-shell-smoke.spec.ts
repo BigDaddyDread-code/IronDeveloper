@@ -160,7 +160,7 @@ test('multiple tenants render a separate tenant chooser', async ({ page }) => {
 
 test('board renders pipeline columns with project tickets', async ({ page }) => {
   await mockSelectedProject(page);
-  await page.goto('/');
+  await page.goto('/projects/7/board');
 
   await expect(page.getByTestId('flow.shell')).toBeVisible();
   await expect(page.getByTestId('flow.board.columns')).toBeVisible();
@@ -169,22 +169,20 @@ test('board renders pipeline columns with project tickets', async ({ page }) => 
   await expect(page.getByTestId('flow.board.columns')).toContainText('Add book sorting to catalog');
 });
 
-test('legacy workspace deep links redirect with a compatibility notice and stay out of primary navigation', async ({ page }) => {
+test('legacy workspace deep links require an explicit project choice on clean startup', async ({ page }) => {
   await mockSelectedProject(page);
   await page.goto('/tickets');
 
-  await expect(page).toHaveURL(/\/projects\/7\/board$/);
-  await expect(page.getByTestId('flow.legacyRouteNotice')).toContainText('/tickets');
-  await expect(page.getByTestId('flow.legacyRouteNotice')).toContainText('Open canonical surface');
-  await expect(page.locator('.fl-product-nav')).not.toContainText('Tickets');
-  await expect(page.locator('.fl-product-nav')).not.toContainText('Build');
-  await expect(page.locator('.fl-product-nav')).not.toContainText('Runs');
+  await expect(page).toHaveURL('/tickets');
+  await expect(page.getByTestId('flow.chooser')).toBeVisible();
+  await expect(page.getByTestId('flow.shell')).toHaveCount(0);
 });
 
 test('shell supports skip navigation, current-page semantics, and route focus management', async ({ page }) => {
   await mockSelectedProject(page);
   await page.goto('/projects/7/board');
 
+  await expect(page.getByTestId('flow.shell')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
   await page.keyboard.press('Enter');
@@ -199,7 +197,7 @@ test('shell supports skip navigation, current-page semantics, and route focus ma
 
 test('shape stage earns promotion through the readiness gate', async ({ page }) => {
   await mockSelectedProject(page);
-  await page.goto('/');
+  await page.goto('/projects/7/board');
 
   await page.getByTestId('flow.board.new').click();
   await expect(page.getByTestId('flow.stagerail')).toBeVisible();
@@ -220,7 +218,7 @@ test('shape stage earns promotion through the readiness gate', async ({ page }) 
 
 test('settings labels membership handoff and the local policy draft honestly', async ({ page }) => {
   await mockSelectedProject(page);
-  await page.goto('/');
+  await page.goto('/projects/7/board');
 
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
@@ -239,7 +237,7 @@ test('settings labels membership handoff and the local policy draft honestly', a
 test('library members lists backend-owned project membership', async ({ page }) => {
   await mockSelectedProject(page);
   await mockMembersDirectory(page);
-  await page.goto('/');
+  await page.goto('/projects/7/board');
 
   await page.getByTestId('flow.nav.library').click();
   await page.getByTestId('flow.library.nav.members').click();
@@ -250,7 +248,7 @@ test('library members lists backend-owned project membership', async ({ page }) 
   await expect(page.getByTestId('flow.members.row.8')).toContainText('Project member');
 });
 
-test('governance deep link renders the timeline viewer inside the Library', async ({ page }) => {
+test('legacy governance deep links require an explicit project choice on clean startup', async ({ page }) => {
   await mockSelectedProject(page);
   await page.route('**/irondev-api/api/governance/**', async (route) => {
     await route.fulfill({
@@ -261,11 +259,9 @@ test('governance deep link renders the timeline viewer inside the Library', asyn
   });
   await page.goto('/governance/timeline');
 
-  await expect(page.getByTestId('flow.shell')).toBeVisible();
-  await expect(page.getByTestId('flow.governanceHost')).toBeVisible();
-  await expect(page.getByTestId('flow.governance.compatibilityNotice')).toContainText('Legacy evidence view');
-  await expect(page.locator('.fl-chips')).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Governance Timeline' })).toBeVisible();
+  await expect(page).toHaveURL('/governance/timeline');
+  await expect(page.getByTestId('flow.chooser')).toBeVisible();
+  await expect(page.getByTestId('flow.shell')).toHaveCount(0);
 });
 
 test('audit library route renders read-only ledger rows and filters', async ({ page }) => {
@@ -458,8 +454,24 @@ async function mockSelectedProject(page: import('@playwright/test').Page) {
       body: JSON.stringify([{ id: 7, tenantId: 3, name: 'IronDeveloper', description: 'Dogfood project' }])
     });
   });
-  await page.route('**/irondev-api/api/projects/7/select', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
+  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        projectId: 7,
+        tenantId: 3,
+        name: 'IronDeveloper',
+        projectLifecyclePhase: 'Shaping',
+        executionReadiness: 'NotConfigured',
+        repositoryBinding: null,
+        workbenchSessionId: 7007,
+        leaseEpoch: 1,
+        wasResumed: true,
+        wasTakenOver: false,
+        clientOperationId: '00000000-0000-0000-0000-000000000007'
+      })
+    });
   });
   await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
     if (route.request().method() !== 'GET') {

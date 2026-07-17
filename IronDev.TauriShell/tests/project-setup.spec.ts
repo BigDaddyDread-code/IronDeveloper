@@ -119,7 +119,7 @@ async function mockSetup(page: Page, options: SetupMockOptions) {
       body: JSON.stringify([{ id: 7, tenantId: 3, name: 'SecondRepo', localPath: options.projectPath?.() ?? 'C:\\repos\\Second' }])
     });
   });
-  await page.route('**/irondev-api/api/projects/7/select', (route) =>
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) })
   );
   await page.route('**/irondev-api/api/projects/7/tickets', (route) =>
