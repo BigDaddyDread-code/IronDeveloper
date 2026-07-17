@@ -46,7 +46,7 @@ public sealed class ProjectService : IProjectService
 
     public async Task<IReadOnlyList<Project>> GetProjectsAsync(CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        const string projectionSql = """
             SELECT p.Id, p.TenantId, p.Name, p.Description, p.LocalPath, p.CreatedDate, p.UpdatedDate,
                    p.LastIndexedUtc, p.IndexingStatus, p.IndexedFileCount,
                    phase.Phase AS LifecyclePhase, readiness.ExecutionReadiness
@@ -62,8 +62,18 @@ public sealed class ProjectService : IProjectService
             WHERE p.TenantId = @TenantId
             ORDER BY p.CreatedDate DESC;
             """;
+        const string legacySql = """
+            SELECT p.Id, p.TenantId, p.Name, p.Description, p.LocalPath, p.CreatedDate, p.UpdatedDate,
+                   p.LastIndexedUtc, p.IndexingStatus, p.IndexedFileCount
+            FROM dbo.Projects p
+            WHERE p.TenantId = @TenantId
+            ORDER BY p.CreatedDate DESC;
+            """;
 
         using var connection = _connectionFactory.CreateConnection();
+        var sql = await HasWorkbenchEntryProjectionsAsync(connection, cancellationToken)
+            ? projectionSql
+            : legacySql;
         var rows = await connection.QueryAsync<Project>(new CommandDefinition(
             sql,
             new { TenantId = _tenant.TenantId },
@@ -74,7 +84,7 @@ public sealed class ProjectService : IProjectService
 
     public async Task<Project?> GetByIdAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        const string projectionSql = """
             SELECT p.Id, p.TenantId, p.Name, p.Description, p.LocalPath, p.CreatedDate, p.UpdatedDate,
                    p.LastIndexedUtc, p.IndexingStatus, p.IndexedFileCount,
                    phase.Phase AS LifecyclePhase, readiness.ExecutionReadiness
@@ -90,8 +100,18 @@ public sealed class ProjectService : IProjectService
             WHERE p.Id = @ProjectId
               AND p.TenantId = @TenantId;
             """;
+        const string legacySql = """
+            SELECT p.Id, p.TenantId, p.Name, p.Description, p.LocalPath, p.CreatedDate, p.UpdatedDate,
+                   p.LastIndexedUtc, p.IndexingStatus, p.IndexedFileCount
+            FROM dbo.Projects p
+            WHERE p.Id = @ProjectId
+              AND p.TenantId = @TenantId;
+            """;
 
         using var connection = _connectionFactory.CreateConnection();
+        var sql = await HasWorkbenchEntryProjectionsAsync(connection, cancellationToken)
+            ? projectionSql
+            : legacySql;
         return await connection.QuerySingleOrDefaultAsync<Project>(new CommandDefinition(
             sql,
             new { ProjectId = projectId, TenantId = _tenant.TenantId },
@@ -158,4 +178,16 @@ public sealed class ProjectService : IProjectService
             new { ProjectId = projectId, TenantId = _tenant.TenantId, Reason = reason },
             cancellationToken: cancellationToken));
     }
+
+    private static async Task<bool> HasWorkbenchEntryProjectionsAsync(
+        System.Data.IDbConnection connection,
+        CancellationToken cancellationToken) =>
+        await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            """
+            SELECT CASE
+                WHEN OBJECT_ID(N'dbo.ProjectLifecyclePhases', N'U') IS NOT NULL
+                 AND OBJECT_ID(N'dbo.ProjectReadinessAssessments', N'U') IS NOT NULL
+                THEN 1 ELSE 0 END;
+            """,
+            cancellationToken: cancellationToken)) == 1;
 }
