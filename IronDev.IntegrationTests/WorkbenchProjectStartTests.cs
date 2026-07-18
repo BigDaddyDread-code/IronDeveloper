@@ -158,10 +158,51 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
         Assert.IsTrue(takenOver.WasTakenOver);
         Assert.AreEqual(2L, takenOver.LeaseEpoch);
         Assert.AreNotEqual(start.WorkbenchSessionId, takenOver.WorkbenchSessionId);
-        Assert.IsFalse(await entry.HasCurrentWriteLeaseAsync(
+        Assert.IsFalse(await entry.ValidateAndRenewCurrentWriteLeaseAsync(
             1, ownerUserId, start.ProjectId, start.WorkbenchSessionId, start.LeaseEpoch));
-        Assert.IsTrue(await entry.HasCurrentWriteLeaseAsync(
+        Assert.IsTrue(await entry.ValidateAndRenewCurrentWriteLeaseAsync(
             1, secondUserId, start.ProjectId, takenOver.WorkbenchSessionId, takenOver.LeaseEpoch));
+    }
+
+    [TestMethod]
+    public async Task LeaseValidation_RenewsTheCurrentFenceAndRequiresAnActiveActorAndTenantMembership()
+    {
+        var actorUserId = await SeedActorAsync();
+        var start = await CreateService(new NoOpProjectStartFailureInjector()).StartAsync(
+            new StartProjectCommand(1, actorUserId, Guid.NewGuid(), "Lease renewal proof"));
+        var entry = new WorkbenchProjectEntryService(ServiceProvider.GetRequiredService<IDbConnectionFactory>());
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.ExecuteAsync("""
+            UPDATE dbo.WorkbenchWriteLeases
+            SET HeartbeatAtUtc=DATEADD(MINUTE, -29, SYSUTCDATETIME()),
+                ExpiresAtUtc=DATEADD(MINUTE, 1, SYSUTCDATETIME())
+            WHERE TenantId=1 AND ProjectId=@ProjectId AND WorkbenchSessionId=@WorkbenchSessionId;
+            """, new { start.ProjectId, start.WorkbenchSessionId });
+
+        Assert.IsTrue(await entry.ValidateAndRenewCurrentWriteLeaseAsync(
+            1, actorUserId, start.ProjectId, start.WorkbenchSessionId, start.LeaseEpoch));
+
+        var renewed = await connection.QuerySingleAsync<LeaseTimes>("""
+            SELECT HeartbeatAtUtc, ExpiresAtUtc
+            FROM dbo.WorkbenchWriteLeases
+            WHERE TenantId=1 AND ProjectId=@ProjectId AND WorkbenchSessionId=@WorkbenchSessionId;
+            """, new { start.ProjectId, start.WorkbenchSessionId });
+        Assert.IsTrue(renewed.HeartbeatAtUtc > DateTime.UtcNow.AddMinutes(-1));
+        Assert.IsTrue(renewed.ExpiresAtUtc > DateTime.UtcNow.AddMinutes(29));
+
+        await connection.ExecuteAsync(
+            "DELETE dbo.TenantUsers WHERE TenantId=1 AND UserId=@ActorUserId;",
+            new { ActorUserId = actorUserId });
+        Assert.IsFalse(await entry.ValidateAndRenewCurrentWriteLeaseAsync(
+            1, actorUserId, start.ProjectId, start.WorkbenchSessionId, start.LeaseEpoch));
+
+        await connection.ExecuteAsync("""
+            INSERT dbo.TenantUsers(TenantId, UserId, Role) VALUES (1, @ActorUserId, N'Owner');
+            UPDATE dbo.Users SET IsActive=0 WHERE Id=@ActorUserId;
+            """, new { ActorUserId = actorUserId });
+        Assert.IsFalse(await entry.ValidateAndRenewCurrentWriteLeaseAsync(
+            1, actorUserId, start.ProjectId, start.WorkbenchSessionId, start.LeaseEpoch));
     }
 
     [TestMethod]
@@ -329,5 +370,11 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
         public int Projects { get; init; }
         public int Members { get; init; }
         public int Operations { get; init; }
+    }
+
+    private sealed class LeaseTimes
+    {
+        public DateTime HeartbeatAtUtc { get; init; }
+        public DateTime ExpiresAtUtc { get; init; }
     }
 }

@@ -75,11 +75,11 @@ test('versioned preview identity remains visible after login', async ({ page }) 
   await mockProjectEntryApi(page);
   await page.goto('/');
 
-  await expect(page.getByTestId('auth.workbenchIdentity')).toContainText('V2 0.1.0-preview.3 / workbench-pr01');
+  await expect(page.getByTestId('auth.workbenchIdentity')).toContainText('V2 0.1.0-preview.4 / workbench-pr01');
   await page.getByTestId('auth.submit').click();
 
-  await expect(page.getByTestId('flow.projectEntry.health')).toContainText('V2 0.1.0-preview.3 / workbench-pr01');
-  await expect(page.getByTestId('flow.projectEntry.workbenchIdentity')).toContainText('V2 0.1.0-preview.3 / workbench-pr01');
+  await expect(page.getByTestId('flow.projectEntry.health')).toContainText('V2 0.1.0-preview.4 / workbench-pr01');
+  await expect(page.getByTestId('flow.projectEntry.workbenchIdentity')).toContainText('V2 0.1.0-preview.4 / workbench-pr01');
 });
 
 test('configured fallback does not auto-open a project', async ({ page }) => {
@@ -143,6 +143,20 @@ test('project selection failure stays on the project screen', async ({ page }) =
   await expect(page.getByTestId('flow.chooser')).toBeVisible();
   await expect(page.getByTestId('flow.projectEntry.error')).toContainText('ParcelTracker could not be opened');
   await expect(page.getByTestId('flow.projectSetup')).toHaveCount(0);
+});
+
+test('project open reuses its operation id after an ambiguous transport failure', async ({ page }) => {
+  const state = await mockProjectEntryApi(page, { signedIn: true, selectionTransportFailures: [8] });
+  await page.goto('/');
+
+  await page.getByTestId('flow.chooser.project.8').click();
+  await expect(page.getByTestId('flow.projectEntry.error')).toContainText('ParcelTracker could not be opened');
+
+  await page.getByTestId('flow.chooser.project.8').click();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
+
+  expect(state.workbenchOpenOperationIds).toHaveLength(2);
+  expect(state.workbenchOpenOperationIds[1]).toBe(state.workbenchOpenOperationIds[0]);
 });
 
 test('start tile opens repository-independent project entry', async ({ page }) => {
@@ -259,6 +273,7 @@ async function mockProjectEntryApi(page: Page, options: MockOptions = {}) {
     projectListRequests: 0,
     legacySelectionRequests: 0,
     workbenchOpenRequests: 0,
+    workbenchOpenOperationIds: [],
     startOperationIds: [],
     chatMutationBodies: [],
     startedProject: null
@@ -309,7 +324,7 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
         nextSafeAction: 'Sign in with the documented LocalTest credentials.',
         resetCommand: null,
         detail: 'LocalTest front door is ready.',
-        workbenchVersion: '0.1.0-preview.3',
+        workbenchVersion: '0.1.0-preview.4',
         workbenchMode: 'V2',
         previewId: 'workbench-pr01',
         sessionMode: 'SmokeSimulation',
@@ -329,7 +344,7 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
         database: 'IronDeveloper_Test_workbench_pr01',
         isTestEnvironment: true,
         workbench: {
-          version: '0.1.0-preview.3',
+          version: '0.1.0-preview.4',
           mode: 'V2',
           v2Enabled: true,
           v1FallbackEnabled: true,
@@ -399,10 +414,15 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
     });
     await page.route(`**/irondev-api/api/workbench/projects/${projectId}/open`, (route) => {
       state.workbenchOpenRequests += 1;
+      const request = route.request().postDataJSON() as { clientOperationId?: string; takeOverExistingLease?: boolean };
+      state.workbenchOpenOperationIds.push(request.clientOperationId ?? '');
+      if (options.selectionTransportFailures?.includes(projectId) &&
+          state.workbenchOpenOperationIds.filter((operationId) => operationId === request.clientOperationId).length === 1) {
+        return route.abort('connectionfailed');
+      }
       if (options.selectionFailures?.includes(projectId)) {
         return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Project unavailable' }) });
       }
-      const request = route.request().postDataJSON() as { clientOperationId?: string; takeOverExistingLease?: boolean };
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -580,6 +600,7 @@ interface MockOptions {
   readinessByProject?: Record<number, Record<string, unknown>>;
   readinessFailures?: number[];
   selectionFailures?: number[];
+  selectionTransportFailures?: number[];
   ticketsByProject?: Record<number, Array<Record<string, unknown>>>;
   projectListGate?: Promise<void>;
 }
@@ -588,6 +609,7 @@ interface MockState {
   projectListRequests: number;
   legacySelectionRequests: number;
   workbenchOpenRequests: number;
+  workbenchOpenOperationIds: string[];
   startOperationIds: string[];
   chatMutationBodies: Array<Record<string, unknown>>;
   startedProject: { id: number; tenantId: number; name: string; localPath: null; lifecyclePhase: string } | null;

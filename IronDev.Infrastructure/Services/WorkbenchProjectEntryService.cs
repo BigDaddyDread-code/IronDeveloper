@@ -326,7 +326,7 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
         }
     }
 
-    public async Task<bool> HasCurrentWriteLeaseAsync(
+    public async Task<bool> ValidateAndRenewCurrentWriteLeaseAsync(
         int tenantId,
         int actorUserId,
         int projectId,
@@ -335,9 +335,11 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
         CancellationToken cancellationToken = default)
     {
         using var connection = _connections.CreateConnection();
-        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+        return await connection.ExecuteAsync(new CommandDefinition(
             """
-            SELECT COUNT(1)
+            UPDATE lease
+            SET HeartbeatAtUtc=SYSUTCDATETIME(),
+                ExpiresAtUtc=DATEADD(MINUTE, 30, SYSUTCDATETIME())
             FROM dbo.WorkbenchWriteLeases lease
             INNER JOIN dbo.WorkbenchSessions session
                 ON session.TenantId=lease.TenantId AND session.ProjectId=lease.ProjectId
@@ -345,6 +347,10 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
             INNER JOIN dbo.ProjectMembers member
                 ON member.TenantId=lease.TenantId AND member.ProjectId=lease.ProjectId
                AND member.UserId=@ActorUserId AND member.Status=N'Active'
+            INNER JOIN dbo.TenantUsers tenantMember
+                ON tenantMember.TenantId=lease.TenantId AND tenantMember.UserId=@ActorUserId
+            INNER JOIN dbo.Users actor
+                ON actor.Id=@ActorUserId AND actor.IsActive=1
             WHERE lease.TenantId=@TenantId AND lease.ProjectId=@ProjectId
               AND lease.WorkbenchSessionId=@WorkbenchSessionId AND lease.LeaseEpoch=@LeaseEpoch
               AND lease.HolderActorUserId=@ActorUserId AND lease.RevokedAtUtc IS NULL

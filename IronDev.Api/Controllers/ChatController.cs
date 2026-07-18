@@ -379,7 +379,7 @@ public sealed class ChatController : ControllerBase
             leaseEpoch <= 0 ||
             _workbenchEntry is null ||
             _tenant is null ||
-            !await _workbenchEntry.HasCurrentWriteLeaseAsync(
+            !await _workbenchEntry.ValidateAndRenewCurrentWriteLeaseAsync(
                 _tenant.TenantId,
                 actorUserId,
                 projectId,

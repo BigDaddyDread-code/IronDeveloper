@@ -59,6 +59,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [accessStatus, setAccessStatus] = useState<ProductAccessStatus>('loading');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const refreshRequestEpoch = useRef(0);
+  const pendingOpenOperation = useRef<{ payloadKey: string; operationId: string } | null>(null);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId),
@@ -77,6 +78,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setSelectedProjectId(null);
     setSelectedProjectName(null);
     setWorkbenchSession(null);
+    pendingOpenOperation.current = null;
     setProjectSelectionMode('missing');
   }, [config.selectedTenantId]);
 
@@ -192,6 +194,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setSelectedProjectId(null);
         setSelectedProjectName(null);
         setWorkbenchSession(null);
+        pendingOpenOperation.current = null;
         setProjectSelectionMode('missing');
         setAccessStatus('loading');
         refreshConfig();
@@ -214,11 +217,25 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const opened: WorkbenchProjectEntryContext = await client.openWorkbenchProject(
-        projectId,
-        crypto.randomUUID(),
-        takeOver
-      );
+      const payloadKey = `${projectId}:${takeOver ? 'takeover' : 'resume'}`;
+      const pending = pendingOpenOperation.current?.payloadKey === payloadKey
+        ? pendingOpenOperation.current
+        : { payloadKey, operationId: crypto.randomUUID() };
+      pendingOpenOperation.current = pending;
+
+      let opened: WorkbenchProjectEntryContext;
+      try {
+        opened = await client.openWorkbenchProject(projectId, pending.operationId, takeOver);
+      } catch (error) {
+        if (error instanceof IronDevApiError && pendingOpenOperation.current?.operationId === pending.operationId) {
+          pendingOpenOperation.current = null;
+        }
+        throw error;
+      }
+
+      if (pendingOpenOperation.current?.operationId === pending.operationId) {
+        pendingOpenOperation.current = null;
+      }
       setSelectedProjectId(projectId);
       setProjectSelectionMode('api');
       setSelectedProjectName(opened.name);
@@ -233,6 +250,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   );
 
   const activateStartedProject = useCallback((started: StartProjectResponse) => {
+    pendingOpenOperation.current = null;
     setSelectedProjectId(started.projectId);
     setSelectedProjectName(started.name);
     setProjectSelectionMode('api');

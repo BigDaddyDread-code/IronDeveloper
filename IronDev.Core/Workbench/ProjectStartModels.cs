@@ -111,7 +111,7 @@ public interface IWorkbenchProjectEntryService
         OpenWorkbenchProjectCommand command,
         CancellationToken cancellationToken = default);
 
-    Task<bool> HasCurrentWriteLeaseAsync(
+    Task<bool> ValidateAndRenewCurrentWriteLeaseAsync(
         int tenantId,
         int actorUserId,
         int projectId,

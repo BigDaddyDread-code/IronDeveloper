@@ -24,6 +24,7 @@ public sealed class ProjectsController : ControllerBase
     private readonly ICurrentTenantContext _tenant;
     private readonly IProjectApplyCapabilityService _applyCapability;
     private readonly ILogger<ProjectsController> _logger;
+    private readonly bool _workbenchV2Enabled;
 
     public ProjectsController(
         IProjectService projects,
@@ -32,7 +33,8 @@ public sealed class ProjectsController : ControllerBase
         IProjectMembershipService memberships,
         ICurrentTenantContext tenant,
         IProjectApplyCapabilityService applyCapability,
-        ILogger<ProjectsController> logger)
+        ILogger<ProjectsController> logger,
+        IConfiguration configuration)
     {
         _projects = projects;
         _projectStart = projectStart;
@@ -41,6 +43,7 @@ public sealed class ProjectsController : ControllerBase
         _tenant = tenant;
         _applyCapability = applyCapability;
         _logger = logger;
+        _workbenchV2Enabled = configuration.GetValue("WorkbenchV2:Enabled", false);
     }
 
     [HttpGet]
@@ -54,6 +57,7 @@ public sealed class ProjectsController : ControllerBase
     [HttpGet("{projectId:int}")]
     public async Task<ActionResult<Project>> GetProject(int projectId, CancellationToken ct)
     {
+        if (!await HasProjectAccessAsync(projectId, ct)) return ProjectNotFound();
         var project = await _projects.GetByIdAsync(projectId, ct);
         return project is null ? NotFound() : Ok(project);
     }
@@ -61,6 +65,15 @@ public sealed class ProjectsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Project>> Create(Project project, CancellationToken ct)
     {
+        if (_workbenchV2Enabled)
+        {
+            return StatusCode(StatusCodes.Status410Gone, new
+            {
+                error = "legacy_project_creation_disabled",
+                message = "Legacy repository-provisioning project creation is disabled in Workbench V2. Start the project through POST /api/projects/start."
+            });
+        }
+
         if (project.TenantId > 0 && project.TenantId != _tenant.TenantId)
         {
             return BadRequest(GovernedRefusal.Create(
@@ -131,6 +144,7 @@ public sealed class ProjectsController : ControllerBase
     [HttpPatch("{projectId:int}")]
     public async Task<ActionResult<Project>> UpdateProject(int projectId, Project project, CancellationToken ct)
     {
+        if (!await HasProjectAccessAsync(projectId, ct)) return ProjectNotFound();
         if (string.IsNullOrWhiteSpace(project.Name))
             return BadRequest(new { error = "Project name is required." });
 
@@ -141,6 +155,7 @@ public sealed class ProjectsController : ControllerBase
     [HttpPost("{projectId:int}/select")]
     public async Task<IActionResult> SelectProject(int projectId, CancellationToken ct)
     {
+        if (!await HasProjectAccessAsync(projectId, ct)) return ProjectNotFound();
         var user = CurrentUser();
         // Selecting an existing project is the explicit, authenticated requalification
         // point for a new launcher session. The apply boundary still rechecks the
@@ -152,6 +167,7 @@ public sealed class ProjectsController : ControllerBase
     [HttpPut("{projectId:int}/local-path")]
     public async Task<IActionResult> UpdateLocalPath(int projectId, [FromBody] UpdateLocalPathRequest request, CancellationToken ct)
     {
+        if (!await HasProjectAccessAsync(projectId, ct)) return ProjectNotFound();
         await _projects.UpdateLocalPathAsync(projectId, request.LocalPath, ct);
         // A deliberate path change invalidates the old path binding and explicitly
         // creates a new authenticated, session-bound server qualification when safe.
@@ -164,6 +180,7 @@ public sealed class ProjectsController : ControllerBase
     [HttpPost("{projectId:int}/mark-index-stale")]
     public async Task<IActionResult> MarkIndexStale(int projectId, [FromBody] MarkIndexStaleRequest request, CancellationToken ct)
     {
+        if (!await HasProjectAccessAsync(projectId, ct)) return ProjectNotFound();
         await _projects.MarkIndexStaleAsync(projectId, request.Reason, ct);
         return Ok();
     }
@@ -174,6 +191,15 @@ public sealed class ProjectsController : ControllerBase
 
     private CurrentUserContext CurrentUser() => new(
         HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
+
+    private async Task<bool> HasProjectAccessAsync(int projectId, CancellationToken ct)
+    {
+        var user = CurrentUser();
+        return await _memberships.HasAccessAsync(_tenant.TenantId, projectId, user.UserId, ct);
+    }
+
+    private NotFoundObjectResult ProjectNotFound() =>
+        NotFound(new { error = "Project not found or you no longer have access." });
 
     private async Task TryQualifyDisposableProjectAsync(int projectId, int qualifyingActorUserId, CancellationToken ct)
     {
@@ -204,6 +230,9 @@ public sealed class ProjectsController : ControllerBase
     }
 
     [HttpGet("{projectId:int}/context-pack")]
-    public Task<string> ExportContextPack(int projectId) =>
-        _export.ExportProjectContextPackAsync(projectId);
+    public async Task<ActionResult<string>> ExportContextPack(int projectId, CancellationToken ct)
+    {
+        if (!await HasProjectAccessAsync(projectId, ct)) return ProjectNotFound();
+        return Ok(await _export.ExportProjectContextPackAsync(projectId));
+    }
 }
