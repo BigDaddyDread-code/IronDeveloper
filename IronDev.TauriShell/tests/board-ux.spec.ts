@@ -173,6 +173,19 @@ async function mockBoardEntry(page: Page, board: ReturnType<typeof boardResponse
     window.localStorage.setItem('irondev.selectedProjectId', '7');
   });
   await page.route('**/irondev-api/health', (route) => json(route, { status: 'healthy' }));
+  await page.route('**/irondev-api/api/localtest/preflight', (route) => json(route, {
+    state: 'LocalTestReady',
+    environment: 'LocalTest',
+    database: 'IronDeveloper_Test',
+    apiBuildCommit: 'test-commit',
+    launcherRepositoryCommit: 'test-commit',
+    apiBaseUrl: 'http://localhost:5000',
+    sessionMode: 'SmokeSimulation',
+    sandboxApplyRequested: false,
+    sandboxApplyEnabled: false,
+    sandboxApplyRoot: null,
+    capabilities: ['WorkflowSmokeSimulation']
+  }));
   await page.route('**/irondev-api/api/environment', (route) =>
     json(route, { environment: 'LocalTest', database: 'IronDeveloper_Test', isTestEnvironment: true })
   );
@@ -183,7 +196,22 @@ async function mockBoardEntry(page: Page, board: ReturnType<typeof boardResponse
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, { projectId: 7 }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => {
+    const request = route.request().postDataJSON() as { clientOperationId?: string };
+    return json(route, {
+      projectId: 7,
+      tenantId: 3,
+      name: 'BookSeller',
+      projectLifecyclePhase: 'Shaping',
+      executionReadiness: 'Ready',
+      workbenchSessionId: 7007,
+      leaseEpoch: 1,
+      wasResumed: false,
+      wasTakenOver: false,
+      clientOperationId: request.clientOperationId,
+      repositoryBinding: null
+    });
+  });
   await page.route('**/irondev-api/api/projects/7/board', (route) => json(route, board, boardStatus));
 }
 
