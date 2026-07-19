@@ -416,6 +416,10 @@ try {
 
     Invoke-TestLane -Name "SQL-backed governance stores" -Filter $sqlStoreFilter
 
+    Invoke-TestLane `
+        -Name "Workbench PR-02A agent-run state machine" `
+        -Filter "FullyQualifiedName~WorkbenchAgentRunStateMachineTests|FullyQualifiedName~PersistAsync_TransactionUsesExplicitRequestTenantInsteadOfAmbientTenant"
+
     $realDatabaseSmokeFilter = @(
         "FullyQualifiedName~RealDatabaseApprovalDecisionSmokeTests",
         "FullyQualifiedName~RealDatabaseDogfoodReceiptSmokeTests",
@@ -459,6 +463,11 @@ try {
         -Name "DUX1 LocalTest front-door trust" `
         -Project $script:ApiProject `
         -Filter "FullyQualifiedName~LocalTestFrontDoorTrustTests"
+
+    Invoke-TestLane `
+        -Name "Workbench PR-02A API contract" `
+        -Project $script:ApiProject `
+        -Filter "FullyQualifiedName~WorkbenchAgentRunApiTests"
 
     # Selection is not execution: the DEMO/HERO seed proofs were previously only
     # SELECTED by the category lanes above, never executed. Execute them by exact

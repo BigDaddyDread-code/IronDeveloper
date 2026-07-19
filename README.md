@@ -85,10 +85,10 @@ Workbench previews carry a programme version from `workbench-version.json`, the 
 
 The example owns `IronDeveloper_Test_workbench_pr00a`, `C:\IronDevTestWorkspaces\workbench-pr00a`, and `C:\IronDevTestLogs\workbench-pr00a`. Reusing the command resets only those targets. Use different `-ApiBaseUrl` and `-UiPort` values when running two previews at the same time.
 
-The stacked project-first preview can run beside PR-00A:
+The current durable agent-run preview can run beside the earlier previews:
 
 ```powershell
-.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -PreviewId workbench-pr01 -ApiBaseUrl http://127.0.0.1:5210 -UiPort 5191
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -PreviewId workbench-pr02a -ApiBaseUrl http://127.0.0.1:5220 -UiPort 5201
 ```
 
 See [Workbench preview history](Docs/workbench/PREVIEW_HISTORY.md) for the version-to-PR test record.

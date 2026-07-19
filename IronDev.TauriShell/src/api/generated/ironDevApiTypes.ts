@@ -11059,6 +11059,214 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/agent-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SubmitWorkbenchAgentRunRequest"];
+                    "text/json": components["schemas"]["SubmitWorkbenchAgentRunRequest"];
+                    "application/*+json": components["schemas"]["SubmitWorkbenchAgentRunRequest"];
+                };
+            };
+            responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SubmitWorkbenchAgentRunResult"];
+                        "application/json": components["schemas"]["SubmitWorkbenchAgentRunResult"];
+                        "text/json": components["schemas"]["SubmitWorkbenchAgentRunResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/agent-runs/{agentRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkbenchAgentRunSnapshot"];
+                        "application/json": components["schemas"]["WorkbenchAgentRunSnapshot"];
+                        "text/json": components["schemas"]["WorkbenchAgentRunSnapshot"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/agent-runs/{agentRunId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    agentRunId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CancelWorkbenchAgentRunRequest"];
+                    "text/json": components["schemas"]["CancelWorkbenchAgentRunRequest"];
+                    "application/*+json": components["schemas"]["CancelWorkbenchAgentRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["CancelWorkbenchAgentRunResult"];
+                        "application/json": components["schemas"]["CancelWorkbenchAgentRunResult"];
+                        "text/json": components["schemas"]["CancelWorkbenchAgentRunResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workbench/projects/{projectId}/open": {
         parameters: {
             query?: never;
@@ -12688,6 +12896,23 @@ export interface components {
         };
         BuilderWorkspacePermissionRequest: {
             enabled?: boolean | null;
+        };
+        CancelWorkbenchAgentRunRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+        };
+        CancelWorkbenchAgentRunResult: {
+            /** Format: uuid */
+            agentRunId?: string;
+            status?: string | null;
+            cancellationRequested?: boolean;
+            /** Format: uuid */
+            clientOperationId?: string;
+            isReplay?: boolean;
         };
         /** @enum {string} */
         ChatAuditSource: "NormalizedRows" | "TagsFallback" | "None";
@@ -17171,6 +17396,37 @@ export interface components {
             /** Format: int32 */
             maxRetries?: number;
         };
+        SubmitWorkbenchAgentRunRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            chatSessionId?: number;
+            message?: string | null;
+        };
+        SubmitWorkbenchAgentRunResult: {
+            /** Format: uuid */
+            agentRunId?: string;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: int64 */
+            chatSessionId?: number;
+            /** Format: int64 */
+            userMessageId?: number;
+            status?: string | null;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: date-time */
+            createdAtUtc?: string;
+            isReplay?: boolean;
+        };
         SupersedeDecisionRequest: {
             replacement?: components["schemas"]["ProjectDecision"];
         };
@@ -17589,6 +17845,37 @@ export interface components {
         };
         UpdateLocalPathRequest: {
             localPath?: string | null;
+        };
+        WorkbenchAgentRunSnapshot: {
+            /** Format: uuid */
+            agentRunId?: string;
+            /** Format: int32 */
+            tenantId?: number;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: int32 */
+            actorUserId?: number;
+            /** Format: int64 */
+            chatSessionId?: number;
+            /** Format: int64 */
+            sourceUserMessageId?: number;
+            status?: string | null;
+            /** Format: int32 */
+            attemptCount?: number;
+            /** Format: int64 */
+            assistantMessageId?: number | null;
+            /** Format: date-time */
+            createdAtUtc?: string;
+            /** Format: date-time */
+            startedAtUtc?: string | null;
+            /** Format: date-time */
+            completedAtUtc?: string | null;
+            /** Format: date-time */
+            cancellationRequestedAtUtc?: string | null;
         };
         WorkbenchProjectEntryContext: {
             /** Format: int32 */

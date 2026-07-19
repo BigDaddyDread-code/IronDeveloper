@@ -18,6 +18,7 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
         await ApplyMigrationAsync("migrate_user_mutation_attribution.sql");
         await DropWorkbenchMigrationObjectsAsync();
         await ApplyMigrationAsync("migrate_workbench_project_start.sql");
+        await ApplyMigrationAsync("migrate_workbench_agent_runs.sql");
     }
 
     [TestMethod]
@@ -325,7 +326,11 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
     {
         await using var connection = new SqlConnection(ConnectionString);
         await connection.ExecuteAsync("""
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultAgentRunId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations SET ResultAgentRunId=NULL;';
             DROP TABLE IF EXISTS dbo.WorkbenchOutboxEvents;
+            DROP TABLE IF EXISTS dbo.WorkbenchAgentRunAttempts;
+            DROP TABLE IF EXISTS dbo.WorkbenchAgentRuns;
             DROP TABLE IF EXISTS dbo.ClientOperations;
             DROP TABLE IF EXISTS dbo.WorkbenchWriteLeases;
             DROP TABLE IF EXISTS dbo.WorkbenchSessions;
