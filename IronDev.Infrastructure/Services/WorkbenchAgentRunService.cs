@@ -99,6 +99,33 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             if (chatSessionExists == 0)
                 throw new WorkbenchAgentRunValidationException("The selected chat session does not belong to this project.");
 
+            var conversationBound = await connection.ExecuteAsync(new CommandDefinition(
+                """
+                UPDATE dbo.WorkbenchSessions WITH (UPDLOCK, HOLDLOCK)
+                SET ActiveChatSessionId=COALESCE(ActiveChatSessionId, @ChatSessionId)
+                WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@WorkbenchSessionId
+                  AND Status=N'Active'
+                  AND (ActiveChatSessionId IS NULL OR ActiveChatSessionId=@ChatSessionId);
+                """,
+                command,
+                transaction,
+                cancellationToken: cancellationToken));
+            if (conversationBound != 1)
+                throw new WorkbenchChatSessionBindingException();
+
+            var activeRunExists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                """
+                SELECT COUNT(1)
+                FROM dbo.WorkbenchAgentRuns WITH (UPDLOCK, HOLDLOCK)
+                WHERE TenantId=@TenantId AND ProjectId=@ProjectId
+                  AND WorkbenchSessionId=@WorkbenchSessionId AND ActiveRunSlot=1;
+                """,
+                command,
+                transaction,
+                cancellationToken: cancellationToken));
+            if (activeRunExists != 0)
+                throw new WorkbenchAgentRunAlreadyActiveException();
+
             var agentRunId = Guid.NewGuid();
             var createdAtUtc = DateTime.UtcNow;
 
@@ -151,11 +178,13 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 INSERT dbo.WorkbenchAgentRuns
                     (AgentRunId, TenantId, ProjectId, WorkbenchSessionId, LeaseEpoch, ActorUserId,
                      ChatSessionId, SourceUserMessageId, ClientOperationRecordId, ClientOperationId,
-                     AgentVersion, PromptVersion, ToolPolicyVersion, OutputSchemaVersion, Status, CreatedAtUtc)
+                     AgentVersion, PromptVersion, ToolPolicyVersion, ContextSchemaVersion,
+                     ContextCanonicalizationVersion, OutputSchemaVersion, Status, ActiveRunSlot, CreatedAtUtc)
                 VALUES
                     (@AgentRunId, @TenantId, @ProjectId, @WorkbenchSessionId, @LeaseEpoch, @ActorUserId,
                      @ChatSessionId, @SourceUserMessageId, @ClientOperationRecordId, @ClientOperationId,
-                     @AgentVersion, @PromptVersion, @ToolPolicyVersion, @OutputSchemaVersion, N'Pending', @CreatedAtUtc);
+                     @AgentVersion, @PromptVersion, @ToolPolicyVersion, @ContextSchemaVersion,
+                     @ContextCanonicalizationVersion, @OutputSchemaVersion, N'Pending', 1, @CreatedAtUtc);
                 """,
                 new
                 {
@@ -172,6 +201,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     AgentVersion = WorkbenchBusinessAnalystContract.AgentVersion,
                     PromptVersion = WorkbenchBusinessAnalystContract.PromptVersion,
                     ToolPolicyVersion = WorkbenchBusinessAnalystContract.ToolPolicyVersion,
+                    ContextSchemaVersion = WorkbenchBusinessAnalystContract.ContextSchemaVersion,
+                    ContextCanonicalizationVersion = WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion,
                     OutputSchemaVersion = WorkbenchBusinessAnalystContract.OutputSchemaVersion,
                     CreatedAtUtc = createdAtUtc
                 },
@@ -344,12 +375,21 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     """
                     UPDATE dbo.WorkbenchAgentRuns
                     SET Status=N'Cancelled', CancellationRequestedAtUtc=COALESCE(CancellationRequestedAtUtc, SYSUTCDATETIME()),
-                        CompletedAtUtc=COALESCE(CompletedAtUtc, SYSUTCDATETIME()), ClaimExpiresAtUtc=NULL
+                        CompletedAtUtc=COALESCE(CompletedAtUtc, SYSUTCDATETIME()), ClaimExpiresAtUtc=NULL,
+                        ActiveRunSlot=NULL
                     WHERE AgentRunId=@AgentRunId;
                     """,
                     new { command.AgentRunId },
                     transaction,
                     cancellationToken: cancellationToken));
+
+                await CloseUnfinishedAttemptAsync(
+                    connection,
+                    transaction,
+                    command.AgentRunId,
+                    "Cancelled",
+                    "run_cancelled_before_result",
+                    cancellationToken);
             }
 
             var result = new CancelWorkbenchAgentRunResult(
@@ -499,6 +539,17 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 return null;
             }
 
+            if (run.Status == WorkbenchAgentRunStates.Running && run.ClaimToken is { } expiredClaimToken)
+            {
+                await CloseAttemptWithoutResponseAsync(
+                    connection,
+                    transaction,
+                    expiredClaimToken,
+                    "ClaimExpired",
+                    "claim_expired_before_reclaim",
+                    cancellationToken);
+            }
+
             var claimToken = Guid.NewGuid();
             var claimExpiresAtUtc = DateTime.UtcNow.Add(claimDuration);
             var attemptCount = run.AttemptCount + 1;
@@ -542,6 +593,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 run.AgentVersion,
                 run.PromptVersion,
                 run.ToolPolicyVersion,
+                run.ContextSchemaVersion,
+                run.ContextCanonicalizationVersion,
                 run.OutputSchemaVersion);
         }
         catch
@@ -557,7 +610,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         WorkbenchBusinessAnalystOutput output,
         CancellationToken cancellationToken = default)
     {
-        WorkbenchBusinessAnalystOutputValidator.Validate(output, context);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(output);
         var outputJson = JsonSerializer.Serialize(output, JsonOptions);
         var outputHash = ComputeHash(outputJson);
 
@@ -597,14 +651,24 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
 
             if (run.AssistantMessageId is not null)
             {
-                var exactReplay = run.ClaimToken == claim.ClaimToken &&
-                                  RunReferencesMatchClaim(run, claim) &&
+                var exactClaim = run.ClaimToken == claim.ClaimToken &&
+                                 RunReferencesMatchClaim(run, claim);
+                var authoritativeReplay = exactClaim &&
+                                          TryLoadAndValidateAuthoritativeContext(
+                                              run,
+                                              claim,
+                                              context,
+                                              out var storedReplayContext) &&
+                                          OutputMatchesContext(output, storedReplayContext!);
+                var exactReplay = authoritativeReplay &&
                                   string.Equals(run.OutputHash, outputHash, StringComparison.OrdinalIgnoreCase);
                 if (!exactReplay)
                 {
-                    var diagnosticCode = run.ClaimToken == claim.ClaimToken
-                        ? "materialization_replay_output_mismatch"
-                        : "late_result_after_reclaim";
+                    var diagnosticCode = !exactClaim
+                        ? "late_result_after_reclaim"
+                        : !authoritativeReplay
+                            ? "materialization_replay_context_mismatch"
+                            : "materialization_replay_output_mismatch";
                     await RecordRestrictedLateResultAsync(
                         connection,
                         transaction,
@@ -670,6 +734,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             if (!RunReferencesMatchClaim(run, claim))
             {
                 await MarkFailedCoreAsync(connection, transaction, run, "run_reference_mismatch", outputHash, cancellationToken);
+                await CompleteAttemptAsync(connection, transaction, claim.ClaimToken, "Rejected", outputHash, "run_reference_mismatch", cancellationToken);
                 transaction.Commit();
                 return new WorkbenchAgentRunMaterializationResult(
                     run.AgentRunId,
@@ -680,10 +745,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     RejectionReason: "run_reference_mismatch");
             }
 
-            if (string.IsNullOrWhiteSpace(run.ContextHash) ||
-                !string.Equals(run.ContextHash, context.ContextHash, StringComparison.OrdinalIgnoreCase) ||
-                run.BasedOnUnderstandingRevision != context.UnderstandingRevision ||
-                output.OutputSchemaVersion != run.OutputSchemaVersion)
+            if (!TryLoadAndValidateAuthoritativeContext(run, claim, context, out var storedContext))
             {
                 await MarkFailedCoreAsync(connection, transaction, run, "context_snapshot_mismatch", outputHash, cancellationToken);
                 await CompleteAttemptAsync(connection, transaction, claim.ClaimToken, "Rejected", outputHash, "context_snapshot_mismatch", cancellationToken);
@@ -695,6 +757,26 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     AssistantMessageId: null,
                     IsReplay: false,
                     RejectionReason: "context_snapshot_mismatch");
+            }
+
+            try
+            {
+                // The persisted snapshot is the final materialization authority. The caller context is
+                // compared above only as an additional guard against in-process mutation.
+                WorkbenchBusinessAnalystOutputValidator.Validate(output, storedContext!);
+            }
+            catch (WorkbenchAgentOutputValidationException)
+            {
+                await MarkFailedCoreAsync(connection, transaction, run, "agent_output_schema_invalid", outputHash, cancellationToken);
+                await CompleteAttemptAsync(connection, transaction, claim.ClaimToken, "Rejected", outputHash, "agent_output_schema_invalid", cancellationToken);
+                transaction.Commit();
+                return new WorkbenchAgentRunMaterializationResult(
+                    run.AgentRunId,
+                    WorkbenchAgentRunStates.Failed,
+                    Materialized: false,
+                    AssistantMessageId: null,
+                    IsReplay: false,
+                    RejectionReason: "agent_output_schema_invalid");
             }
 
             if (!fenceCurrent)
@@ -728,17 +810,17 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 transaction,
                 cancellationToken: cancellationToken));
 
-            await CompleteAttemptAsync(
-                connection,
-                transaction,
-                claim.ClaimToken,
-                output.Outcome,
-                outputHash,
-                diagnosticCode: null,
-                cancellationToken);
             if (validReferences == 0)
             {
                 await MarkFailedCoreAsync(connection, transaction, run, "source_reference_invalid", outputHash, cancellationToken);
+                await CompleteAttemptAsync(
+                    connection,
+                    transaction,
+                    claim.ClaimToken,
+                    "Rejected",
+                    outputHash,
+                    "source_reference_invalid",
+                    cancellationToken);
                 transaction.Commit();
                 return new WorkbenchAgentRunMaterializationResult(
                     run.AgentRunId,
@@ -748,6 +830,15 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     IsReplay: false,
                     RejectionReason: "source_reference_invalid");
             }
+
+            await CompleteAttemptAsync(
+                connection,
+                transaction,
+                claim.ClaimToken,
+                output.Outcome,
+                outputHash,
+                diagnosticCode: null,
+                cancellationToken);
 
             var assistantTags = BuildWorkbenchAssistantTags(run, output);
             var assistantMessageId = await connection.QuerySingleAsync<long>(new CommandDefinition(
@@ -795,7 +886,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 UPDATE dbo.WorkbenchAgentRuns
                 SET Status=@Status, ValidatedOutputJson=@OutputJson, OutputHash=@OutputHash,
                     AssistantMessageId=@AssistantMessageId, MaterializedAtUtc=SYSUTCDATETIME(),
-                    CompletedAtUtc=SYSUTCDATETIME(), ClaimExpiresAtUtc=NULL
+                    CompletedAtUtc=SYSUTCDATETIME(), ClaimExpiresAtUtc=NULL, ActiveRunSlot=NULL
                 WHERE AgentRunId=@AgentRunId AND Status=N'Running' AND ClaimToken=@ClaimToken
                   AND AssistantMessageId IS NULL;
                 """,
@@ -1108,7 +1199,89 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         run.LeaseEpoch == claim.LeaseEpoch &&
         run.ActorUserId == claim.ActorUserId &&
         run.ChatSessionId == claim.ChatSessionId &&
-        run.SourceUserMessageId == claim.SourceUserMessageId;
+        run.SourceUserMessageId == claim.SourceUserMessageId &&
+        run.AgentVersion == claim.AgentVersion &&
+        run.PromptVersion == claim.PromptVersion &&
+        run.ToolPolicyVersion == claim.ToolPolicyVersion &&
+        run.ContextSchemaVersion == claim.ContextSchemaVersion &&
+        run.ContextCanonicalizationVersion == claim.ContextCanonicalizationVersion &&
+        run.OutputSchemaVersion == claim.OutputSchemaVersion;
+
+    private static bool TryLoadAndValidateAuthoritativeContext(
+        AgentRunRow run,
+        WorkbenchAgentRunClaim claim,
+        WorkbenchBusinessAnalystContext suppliedContext,
+        out WorkbenchBusinessAnalystContext? storedContext)
+    {
+        storedContext = null;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(run.ContextSnapshotJson) ||
+                string.IsNullOrWhiteSpace(run.ContextHash) ||
+                run.BasedOnUnderstandingRevision is null ||
+                !RunReferencesMatchClaim(run, claim))
+                return false;
+
+            storedContext = WorkbenchBusinessAnalystContextCodec.Deserialize(
+                run.ContextSnapshotJson,
+                run.ContextSchemaVersion,
+                run.ContextCanonicalizationVersion);
+            if (storedContext.AgentRunId != run.AgentRunId || storedContext.AgentRunId != claim.AgentRunId ||
+                storedContext.TenantId != run.TenantId || storedContext.TenantId != claim.TenantId ||
+                storedContext.ProjectId != run.ProjectId || storedContext.ProjectId != claim.ProjectId ||
+                storedContext.WorkbenchSessionId != run.WorkbenchSessionId ||
+                storedContext.WorkbenchSessionId != claim.WorkbenchSessionId ||
+                storedContext.LeaseEpoch != run.LeaseEpoch || storedContext.LeaseEpoch != claim.LeaseEpoch ||
+                storedContext.ChatSessionId != run.ChatSessionId || storedContext.ChatSessionId != claim.ChatSessionId ||
+                storedContext.SourceUserMessageId != run.SourceUserMessageId ||
+                storedContext.SourceUserMessageId != claim.SourceUserMessageId ||
+                storedContext.UnderstandingRevision != run.BasedOnUnderstandingRevision ||
+                storedContext.AgentVersion != run.AgentVersion || storedContext.AgentVersion != claim.AgentVersion ||
+                storedContext.PromptVersion != run.PromptVersion || storedContext.PromptVersion != claim.PromptVersion ||
+                storedContext.ToolPolicyVersion != run.ToolPolicyVersion ||
+                storedContext.ToolPolicyVersion != claim.ToolPolicyVersion ||
+                storedContext.ContextSchemaVersion != run.ContextSchemaVersion ||
+                storedContext.ContextSchemaVersion != claim.ContextSchemaVersion ||
+                storedContext.ContextCanonicalizationVersion != run.ContextCanonicalizationVersion ||
+                storedContext.ContextCanonicalizationVersion != claim.ContextCanonicalizationVersion ||
+                storedContext.OutputSchemaVersion != run.OutputSchemaVersion ||
+                storedContext.OutputSchemaVersion != claim.OutputSchemaVersion ||
+                !string.Equals(storedContext.ContextHash, run.ContextHash, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(
+                    WorkbenchBusinessAnalystContextCodec.ComputeHash(storedContext),
+                    run.ContextHash,
+                    StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            // Hash the actual supplied contents rather than trusting its ContextHash property. Exact
+            // canonical equality makes caller mutation observable even when the old hash is retained.
+            return string.Equals(suppliedContext.ContextHash, run.ContextHash, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(
+                       WorkbenchBusinessAnalystContextCodec.CanonicalizeWithoutHash(suppliedContext),
+                       WorkbenchBusinessAnalystContextCodec.CanonicalizeWithoutHash(storedContext),
+                       StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or ArgumentException)
+        {
+            storedContext = null;
+            return false;
+        }
+    }
+
+    private static bool OutputMatchesContext(
+        WorkbenchBusinessAnalystOutput output,
+        WorkbenchBusinessAnalystContext context)
+    {
+        try
+        {
+            WorkbenchBusinessAnalystOutputValidator.Validate(output, context);
+            return true;
+        }
+        catch (WorkbenchAgentOutputValidationException)
+        {
+            return false;
+        }
+    }
 
     private static bool SameFence(AgentRunRow left, AgentRunRow right) =>
         left.TenantId == right.TenantId &&
@@ -1149,7 +1322,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 DiagnosticCode=COALESCE(DiagnosticCode, @DiagnosticCode),
                 DiagnosticHash=COALESCE(DiagnosticHash, @DiagnosticHash),
                 DiagnosticAtUtc=COALESCE(DiagnosticAtUtc, SYSUTCDATETIME()),
-                CompletedAtUtc=COALESCE(CompletedAtUtc, SYSUTCDATETIME()), ClaimExpiresAtUtc=NULL
+                CompletedAtUtc=COALESCE(CompletedAtUtc, SYSUTCDATETIME()), ClaimExpiresAtUtc=NULL,
+                ActiveRunSlot=NULL
             WHERE AgentRunId=@AgentRunId AND Status IN (N'Pending', N'Running');
             """,
             new
@@ -1163,6 +1337,17 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             },
             transaction,
             cancellationToken: cancellationToken));
+
+        if (run.Status == WorkbenchAgentRunStates.Running && run.ClaimToken is { } claimToken)
+        {
+            await CloseAttemptWithoutResponseAsync(
+                connection,
+                transaction,
+                claimToken,
+                status,
+                diagnosticCode,
+                cancellationToken);
+        }
 
         var payload = JsonSerializer.Serialize(new { run.AgentRunId, status, reason = diagnosticCode }, JsonOptions);
         await InsertOutboxAsync(connection, transaction, run, status == WorkbenchAgentRunStates.Superseded ? "AgentRunSuperseded" : "AgentRunStale", payload, cancellationToken);
@@ -1180,7 +1365,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             """
             UPDATE dbo.WorkbenchAgentRuns
             SET Status=N'Failed', DiagnosticCode=@DiagnosticCode, DiagnosticHash=@DiagnosticHash,
-                DiagnosticAtUtc=SYSUTCDATETIME(), CompletedAtUtc=SYSUTCDATETIME(), ClaimExpiresAtUtc=NULL
+                DiagnosticAtUtc=SYSUTCDATETIME(), CompletedAtUtc=SYSUTCDATETIME(), ClaimExpiresAtUtc=NULL,
+                ActiveRunSlot=NULL
             WHERE AgentRunId=@AgentRunId AND Status=N'Running';
             """,
             new { run.AgentRunId, DiagnosticCode = diagnosticCode, DiagnosticHash = diagnosticHash },
@@ -1256,6 +1442,40 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             transaction,
             cancellationToken: cancellationToken));
 
+    private static Task CloseAttemptWithoutResponseAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        Guid claimToken,
+        string outcome,
+        string diagnosticCode,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE dbo.WorkbenchAgentRunAttempts
+            SET Outcome=@Outcome, DiagnosticCode=@DiagnosticCode, CompletedAtUtc=SYSUTCDATETIME()
+            WHERE ClaimToken=@ClaimToken AND CompletedAtUtc IS NULL;
+            """,
+            new { ClaimToken = claimToken, Outcome = outcome, DiagnosticCode = diagnosticCode },
+            transaction,
+            cancellationToken: cancellationToken));
+
+    private static Task CloseUnfinishedAttemptAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        Guid agentRunId,
+        string outcome,
+        string diagnosticCode,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE dbo.WorkbenchAgentRunAttempts
+            SET Outcome=@Outcome, DiagnosticCode=@DiagnosticCode, CompletedAtUtc=SYSUTCDATETIME()
+            WHERE AgentRunId=@AgentRunId AND CompletedAtUtc IS NULL;
+            """,
+            new { AgentRunId = agentRunId, Outcome = outcome, DiagnosticCode = diagnosticCode },
+            transaction,
+            cancellationToken: cancellationToken));
+
     private static WorkbenchAgentRunSnapshot ToSnapshot(AgentRunRow run) => new(
         run.AgentRunId,
         run.TenantId,
@@ -1297,6 +1517,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         public string AgentVersion { get; init; } = string.Empty;
         public string PromptVersion { get; init; } = string.Empty;
         public string ToolPolicyVersion { get; init; } = string.Empty;
+        public int ContextSchemaVersion { get; init; }
+        public int ContextCanonicalizationVersion { get; init; }
         public int OutputSchemaVersion { get; init; }
         public string Status { get; init; } = string.Empty;
         public int AttemptCount { get; init; }

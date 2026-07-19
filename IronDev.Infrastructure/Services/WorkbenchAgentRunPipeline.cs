@@ -1,14 +1,160 @@
 using System.Data;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Dapper;
 using IronDev.Core.Workbench;
 using IronDev.Data;
 
 namespace IronDev.Infrastructure.Services;
 
+internal static class WorkbenchBusinessAnalystContextCodec
+{
+    private static readonly JsonSerializerOptions StrictJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = false,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+    };
+    private static readonly JsonSerializerOptions Version1CanonicalJsonOptions = new(JsonSerializerDefaults.Web);
+
+    internal static WorkbenchBusinessAnalystContext Deserialize(
+        string snapshotJson,
+        int contextSchemaVersion,
+        int contextCanonicalizationVersion)
+    {
+        var context = (contextSchemaVersion, contextCanonicalizationVersion) switch
+        {
+            (WorkbenchBusinessAnalystContract.ContextSchemaVersion1,
+             WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion1) =>
+                DeserializeVersion1(snapshotJson),
+            (WorkbenchBusinessAnalystContract.ContextSchemaVersion2,
+             WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2) =>
+                DeserializeVersion2(snapshotJson),
+            _ => throw Unsupported(contextSchemaVersion, contextCanonicalizationVersion)
+        };
+        EnsureComplete(context);
+        return context;
+    }
+
+    internal static string Serialize(WorkbenchBusinessAnalystContext context) =>
+        (context.ContextSchemaVersion, context.ContextCanonicalizationVersion) switch
+        {
+            (WorkbenchBusinessAnalystContract.ContextSchemaVersion1,
+             WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion1) =>
+                JsonSerializer.Serialize(ToVersion1(context), Version1CanonicalJsonOptions),
+            (WorkbenchBusinessAnalystContract.ContextSchemaVersion2,
+             WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2) =>
+                JsonSerializer.Serialize(context, StrictJsonOptions),
+            _ => throw Unsupported(context.ContextSchemaVersion, context.ContextCanonicalizationVersion)
+        };
+
+    internal static string CanonicalizeWithoutHash(WorkbenchBusinessAnalystContext context) =>
+        (context.ContextSchemaVersion, context.ContextCanonicalizationVersion) switch
+        {
+            (WorkbenchBusinessAnalystContract.ContextSchemaVersion1,
+             WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion1) =>
+                JsonSerializer.Serialize(
+                    ToVersion1(context) with { ContextHash = string.Empty },
+                    Version1CanonicalJsonOptions),
+            (WorkbenchBusinessAnalystContract.ContextSchemaVersion2,
+             WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2) =>
+                JsonSerializer.Serialize(context with { ContextHash = string.Empty }, StrictJsonOptions),
+            _ => throw Unsupported(context.ContextSchemaVersion, context.ContextCanonicalizationVersion)
+        };
+
+    internal static string ComputeHash(WorkbenchBusinessAnalystContext context) =>
+        WorkbenchAgentRunService.ComputeHash(CanonicalizeWithoutHash(context));
+
+    private static WorkbenchBusinessAnalystContext DeserializeVersion1(string snapshotJson)
+    {
+        var legacy = JsonSerializer.Deserialize<Version1Context>(snapshotJson, StrictJsonOptions)
+            ?? throw new InvalidOperationException("The stored Workbench agent context could not be read.");
+        return new WorkbenchBusinessAnalystContext(
+            legacy.AgentRunId,
+            legacy.TenantId,
+            legacy.ProjectId,
+            legacy.ProjectName,
+            legacy.WorkbenchSessionId,
+            legacy.LeaseEpoch,
+            legacy.ChatSessionId,
+            legacy.SourceUserMessageId,
+            legacy.UnderstandingRevision,
+            legacy.UnderstandingJson,
+            legacy.Messages,
+            legacy.AgentVersion,
+            legacy.PromptVersion,
+            legacy.ToolPolicyVersion,
+            WorkbenchBusinessAnalystContract.ContextSchemaVersion1,
+            WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion1,
+            legacy.OutputSchemaVersion,
+            legacy.ContextHash);
+    }
+
+    private static WorkbenchBusinessAnalystContext DeserializeVersion2(string snapshotJson)
+    {
+        var context = JsonSerializer.Deserialize<WorkbenchBusinessAnalystContext>(snapshotJson, StrictJsonOptions)
+            ?? throw new InvalidOperationException("The stored Workbench agent context could not be read.");
+        if (context.ContextSchemaVersion != WorkbenchBusinessAnalystContract.ContextSchemaVersion2 ||
+            context.ContextCanonicalizationVersion != WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2)
+            throw new InvalidOperationException("The stored Workbench agent context version does not match its run.");
+        return context;
+    }
+
+    private static Version1Context ToVersion1(WorkbenchBusinessAnalystContext context) => new(
+        context.AgentRunId,
+        context.TenantId,
+        context.ProjectId,
+        context.ProjectName,
+        context.WorkbenchSessionId,
+        context.LeaseEpoch,
+        context.ChatSessionId,
+        context.SourceUserMessageId,
+        context.UnderstandingRevision,
+        context.UnderstandingJson,
+        context.Messages,
+        context.AgentVersion,
+        context.PromptVersion,
+        context.ToolPolicyVersion,
+        context.OutputSchemaVersion,
+        context.ContextHash);
+
+    private static void EnsureComplete(WorkbenchBusinessAnalystContext context)
+    {
+        if (context.AgentRunId == Guid.Empty || string.IsNullOrWhiteSpace(context.ProjectName) ||
+            string.IsNullOrWhiteSpace(context.UnderstandingJson) || context.Messages is null ||
+            string.IsNullOrWhiteSpace(context.AgentVersion) || string.IsNullOrWhiteSpace(context.PromptVersion) ||
+            string.IsNullOrWhiteSpace(context.ToolPolicyVersion) || string.IsNullOrWhiteSpace(context.ContextHash))
+            throw new InvalidOperationException("The stored Workbench agent context is incomplete.");
+    }
+
+    private static InvalidOperationException Unsupported(
+        int contextSchemaVersion,
+        int contextCanonicalizationVersion) =>
+        new($"Unsupported Workbench agent context format {contextSchemaVersion}/{contextCanonicalizationVersion}.");
+
+    // Version 1 is the exact pre-hardening JSON shape and property order. It deliberately omits
+    // explicit context version fields so its historical hash remains reproducible without rewriting
+    // the immutable stored snapshot. Version 2 is the first shape that embeds those fields.
+    private sealed record Version1Context(
+        Guid AgentRunId,
+        int TenantId,
+        int ProjectId,
+        string ProjectName,
+        long WorkbenchSessionId,
+        long LeaseEpoch,
+        long ChatSessionId,
+        long SourceUserMessageId,
+        long UnderstandingRevision,
+        string UnderstandingJson,
+        IReadOnlyList<WorkbenchAgentContextMessage> Messages,
+        string AgentVersion,
+        string PromptVersion,
+        string ToolPolicyVersion,
+        int OutputSchemaVersion,
+        string ContextHash);
+}
+
 public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssembler
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDbConnectionFactory _connections;
 
     public WorkbenchAgentContextAssembler(IDbConnectionFactory connections) => _connections = connections;
@@ -26,7 +172,8 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
                 """
                 SELECT AgentRunId, TenantId, ProjectId, WorkbenchSessionId, LeaseEpoch, ActorUserId,
                        ChatSessionId, SourceUserMessageId, Status, ClaimToken,
-                       AgentVersion, PromptVersion, ToolPolicyVersion, OutputSchemaVersion,
+                       AgentVersion, PromptVersion, ToolPolicyVersion, ContextSchemaVersion,
+                       ContextCanonicalizationVersion, OutputSchemaVersion,
                        ContextSnapshotJson, ContextHash, BasedOnUnderstandingRevision
                 FROM dbo.WorkbenchAgentRuns WITH (UPDLOCK, HOLDLOCK)
                 WHERE AgentRunId=@AgentRunId;
@@ -38,9 +185,11 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
             EnsureCurrentClaim(run, claim);
             if (!string.IsNullOrWhiteSpace(run.ContextSnapshotJson))
             {
-                var stored = JsonSerializer.Deserialize<WorkbenchBusinessAnalystContext>(run.ContextSnapshotJson, JsonOptions)
-                    ?? throw new InvalidOperationException("The stored Workbench agent context could not be read.");
-                EnsureContextIntegrity(stored, run.ContextHash, run.BasedOnUnderstandingRevision);
+                var stored = WorkbenchBusinessAnalystContextCodec.Deserialize(
+                    run.ContextSnapshotJson,
+                    run.ContextSchemaVersion,
+                    run.ContextCanonicalizationVersion);
+                EnsureContextIntegrity(stored, run);
                 await connection.ExecuteAsync(new CommandDefinition(
                     """
                     UPDATE dbo.WorkbenchAgentRunAttempts
@@ -120,11 +269,13 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
                 run.AgentVersion,
                 run.PromptVersion,
                 run.ToolPolicyVersion,
+                run.ContextSchemaVersion,
+                run.ContextCanonicalizationVersion,
                 run.OutputSchemaVersion,
                 ContextHash: string.Empty);
             var contextHash = ComputeContextHash(contextWithoutHash);
             var context = contextWithoutHash with { ContextHash = contextHash };
-            var snapshotJson = JsonSerializer.Serialize(context, JsonOptions);
+            var snapshotJson = WorkbenchBusinessAnalystContextCodec.Serialize(context);
 
             var bound = await connection.ExecuteAsync(new CommandDefinition(
                 """
@@ -162,18 +313,25 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
     }
 
     internal static string ComputeContextHash(WorkbenchBusinessAnalystContext context) =>
-        WorkbenchAgentRunService.ComputeHash(JsonSerializer.Serialize(
-            context with { ContextHash = string.Empty }, JsonOptions));
+        WorkbenchBusinessAnalystContextCodec.ComputeHash(context);
 
     private static void EnsureContextIntegrity(
         WorkbenchBusinessAnalystContext context,
-        string? storedHash,
-        long? storedRevision)
+        ContextRunRow run)
     {
-        if (string.IsNullOrWhiteSpace(storedHash) || storedRevision is null ||
-            !string.Equals(context.ContextHash, storedHash, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(ComputeContextHash(context), storedHash, StringComparison.OrdinalIgnoreCase) ||
-            context.UnderstandingRevision != storedRevision)
+        if (string.IsNullOrWhiteSpace(run.ContextHash) || run.BasedOnUnderstandingRevision is null ||
+            !string.Equals(context.ContextHash, run.ContextHash, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(ComputeContextHash(context), run.ContextHash, StringComparison.OrdinalIgnoreCase) ||
+            context.AgentRunId != run.AgentRunId || context.TenantId != run.TenantId ||
+            context.ProjectId != run.ProjectId || context.WorkbenchSessionId != run.WorkbenchSessionId ||
+            context.LeaseEpoch != run.LeaseEpoch || context.ChatSessionId != run.ChatSessionId ||
+            context.SourceUserMessageId != run.SourceUserMessageId ||
+            context.UnderstandingRevision != run.BasedOnUnderstandingRevision ||
+            context.AgentVersion != run.AgentVersion || context.PromptVersion != run.PromptVersion ||
+            context.ToolPolicyVersion != run.ToolPolicyVersion ||
+            context.ContextSchemaVersion != run.ContextSchemaVersion ||
+            context.ContextCanonicalizationVersion != run.ContextCanonicalizationVersion ||
+            context.OutputSchemaVersion != run.OutputSchemaVersion)
             throw new InvalidOperationException("The stored Workbench agent context failed its integrity check.");
     }
 
@@ -185,7 +343,10 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
             run.LeaseEpoch != claim.LeaseEpoch || run.ActorUserId != claim.ActorUserId ||
             run.ChatSessionId != claim.ChatSessionId || run.SourceUserMessageId != claim.SourceUserMessageId ||
             run.AgentVersion != claim.AgentVersion || run.PromptVersion != claim.PromptVersion ||
-            run.ToolPolicyVersion != claim.ToolPolicyVersion || run.OutputSchemaVersion != claim.OutputSchemaVersion)
+            run.ToolPolicyVersion != claim.ToolPolicyVersion ||
+            run.ContextSchemaVersion != claim.ContextSchemaVersion ||
+            run.ContextCanonicalizationVersion != claim.ContextCanonicalizationVersion ||
+            run.OutputSchemaVersion != claim.OutputSchemaVersion)
             throw new WorkbenchLeaseFenceException();
     }
 
@@ -204,6 +365,8 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
         public string AgentVersion { get; init; } = string.Empty;
         public string PromptVersion { get; init; } = string.Empty;
         public string ToolPolicyVersion { get; init; } = string.Empty;
+        public int ContextSchemaVersion { get; init; }
+        public int ContextCanonicalizationVersion { get; init; }
         public int OutputSchemaVersion { get; init; }
         public string? ContextSnapshotJson { get; init; }
         public string? ContextHash { get; init; }

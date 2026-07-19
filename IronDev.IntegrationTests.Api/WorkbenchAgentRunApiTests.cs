@@ -65,6 +65,35 @@ public sealed class WorkbenchAgentRunApiTests : ApiTestBase
         Assert.AreEqual(agentRunId, replay.GetProperty("agentRunId").GetGuid());
         Assert.IsTrue(replay.GetProperty("isReplay").GetBoolean());
 
+        var concurrentResponse = await client.PostAsJsonAsync(
+            $"/api/workbench/projects/{projectId}/agent-runs",
+            new
+            {
+                workbenchSessionId,
+                leaseEpoch,
+                clientOperationId = Guid.NewGuid(),
+                chatSessionId,
+                message = "A second active turn must wait."
+            });
+        Assert.AreEqual(HttpStatusCode.Conflict, concurrentResponse.StatusCode);
+        var concurrent = await concurrentResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.AreEqual("workbench_agent_run_active", concurrent.GetProperty("error").GetString());
+
+        var otherChatSessionId = await CreateChatSessionAsync(projectId, "Different Workbench conversation");
+        var switchedChatResponse = await client.PostAsJsonAsync(
+            $"/api/workbench/projects/{projectId}/agent-runs",
+            new
+            {
+                workbenchSessionId,
+                leaseEpoch,
+                clientOperationId = Guid.NewGuid(),
+                chatSessionId = otherChatSessionId,
+                message = "Do not switch this Workbench session to another chat."
+            });
+        Assert.AreEqual(HttpStatusCode.Conflict, switchedChatResponse.StatusCode);
+        var switchedChat = await switchedChatResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.AreEqual("workbench_chat_session_mismatch", switchedChat.GetProperty("error").GetString());
+
         var mismatchResponse = await client.PostAsJsonAsync(
             $"/api/workbench/projects/{projectId}/agent-runs",
             new
@@ -103,6 +132,18 @@ public sealed class WorkbenchAgentRunApiTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, cancelReplayResponse.StatusCode);
         var cancelReplay = await cancelReplayResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.IsTrue(cancelReplay.GetProperty("isReplay").GetBoolean());
+
+        var nextTurnResponse = await client.PostAsJsonAsync(
+            $"/api/workbench/projects/{projectId}/agent-runs",
+            new
+            {
+                workbenchSessionId,
+                leaseEpoch,
+                clientOperationId = Guid.NewGuid(),
+                chatSessionId,
+                message = "The terminal run released the conversation slot."
+            });
+        Assert.AreEqual(HttpStatusCode.Accepted, nextTurnResponse.StatusCode);
     }
 
     [TestMethod]

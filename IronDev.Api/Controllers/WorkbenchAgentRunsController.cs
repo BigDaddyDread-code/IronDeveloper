@@ -116,6 +116,10 @@ public sealed class WorkbenchAgentRunsController : ControllerBase
             BadRequest(new { error = "workbench_agent_run_invalid", message = validation.Message }),
         ProjectStartOperationMismatchException mismatch =>
             Conflict(new { error = ProjectStartOperationMismatchException.ErrorCode, message = mismatch.Message }),
+        WorkbenchChatSessionBindingException binding =>
+            Conflict(new { error = WorkbenchChatSessionBindingException.ErrorCode, message = binding.Message }),
+        WorkbenchAgentRunAlreadyActiveException active =>
+            Conflict(new { error = WorkbenchAgentRunAlreadyActiveException.ErrorCode, message = active.Message }),
         WorkbenchLeaseFenceException fence =>
             Conflict(new { error = WorkbenchLeaseFenceException.ErrorCode, message = fence.Message }),
         WorkbenchProjectNotAccessibleException or WorkbenchAgentRunNotFoundException =>

@@ -29,7 +29,14 @@ public static class WorkbenchBusinessAnalystContract
     public const string AgentVersion = "business-analyst-v0.1";
     public const string PromptVersion = "workbench-shaping-v1";
     public const string ToolPolicyVersion = "workbench-ba-readonly-v1";
-    public const int OutputSchemaVersion = 1;
+    public const int ContextSchemaVersion1 = 1;
+    public const int ContextCanonicalizationVersion1 = 1;
+    public const int ContextSchemaVersion2 = 2;
+    public const int ContextCanonicalizationVersion2 = 2;
+    public const int OutputSchemaVersion1 = 1;
+    public const int ContextSchemaVersion = ContextSchemaVersion2;
+    public const int ContextCanonicalizationVersion = ContextCanonicalizationVersion2;
+    public const int OutputSchemaVersion = OutputSchemaVersion1;
 }
 
 public enum WorkbenchAgentRunFailurePoint
@@ -120,6 +127,8 @@ public sealed record WorkbenchAgentRunClaim(
     string AgentVersion,
     string PromptVersion,
     string ToolPolicyVersion,
+    int ContextSchemaVersion,
+    int ContextCanonicalizationVersion,
     int OutputSchemaVersion);
 
 public sealed record WorkbenchAgentContextMessage(
@@ -143,6 +152,8 @@ public sealed record WorkbenchBusinessAnalystContext(
     string AgentVersion,
     string PromptVersion,
     string ToolPolicyVersion,
+    int ContextSchemaVersion,
+    int ContextCanonicalizationVersion,
     int OutputSchemaVersion,
     string ContextHash);
 
@@ -270,9 +281,13 @@ public static class WorkbenchBusinessAnalystOutputValidator
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(context);
 
-        if (output.OutputSchemaVersion != WorkbenchBusinessAnalystContract.OutputSchemaVersion)
+        if (context.OutputSchemaVersion != WorkbenchBusinessAnalystContract.OutputSchemaVersion1)
             throw new WorkbenchAgentOutputValidationException(
-                $"outputSchemaVersion must be {WorkbenchBusinessAnalystContract.OutputSchemaVersion}.");
+                $"Unsupported output schema version {context.OutputSchemaVersion} for this agent run.");
+
+        if (output.OutputSchemaVersion != WorkbenchBusinessAnalystContract.OutputSchemaVersion1)
+            throw new WorkbenchAgentOutputValidationException(
+                $"outputSchemaVersion must be {WorkbenchBusinessAnalystContract.OutputSchemaVersion1} for this agent run.");
 
         if (string.IsNullOrWhiteSpace(output.ContextHash) ||
             output.ContextHash.Length != 64 ||
@@ -296,6 +311,26 @@ public static class WorkbenchBusinessAnalystOutputValidator
 }
 
 public sealed class WorkbenchAgentRunValidationException(string message) : Exception(message);
+
+public sealed class WorkbenchChatSessionBindingException : Exception
+{
+    public const string ErrorCode = "workbench_chat_session_mismatch";
+
+    public WorkbenchChatSessionBindingException()
+        : base("This Workbench session is already bound to a different chat session.")
+    {
+    }
+}
+
+public sealed class WorkbenchAgentRunAlreadyActiveException : Exception
+{
+    public const string ErrorCode = "workbench_agent_run_active";
+
+    public WorkbenchAgentRunAlreadyActiveException()
+        : base("This Workbench session already has a pending or running Business Analyst turn.")
+    {
+    }
+}
 
 public sealed class WorkbenchAgentRunNotFoundException : Exception;
 

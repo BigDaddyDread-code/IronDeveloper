@@ -42,28 +42,179 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.IsTrue(replay.IsReplay);
         await Assert.ThrowsExactlyAsync<ProjectStartOperationMismatchException>(() =>
             service.SubmitAsync(command with { Message = "Changed payload" }));
+        await Assert.ThrowsExactlyAsync<WorkbenchAgentRunAlreadyActiveException>(() =>
+            service.SubmitAsync(fixture.Submit(Guid.NewGuid(), "A concurrent turn must be rejected.")));
 
         await using var connection = new SqlConnection(ConnectionString);
+        var otherChatSessionId = await connection.QuerySingleAsync<long>("""
+            INSERT dbo.ProjectChatSessions(TenantId, ProjectId, Title)
+            OUTPUT inserted.Id
+            VALUES (1, @ProjectId, N'Other Workbench conversation');
+            """, new { fixture.ProjectId });
+        await Assert.ThrowsExactlyAsync<WorkbenchChatSessionBindingException>(() =>
+            service.SubmitAsync(fixture.Submit(Guid.NewGuid(), "Do not switch conversations.") with
+            {
+                ChatSessionId = otherChatSessionId
+            }));
+
         var counts = await connection.QuerySingleAsync<RunCounts>("""
             SELECT
                 (SELECT COUNT(1) FROM dbo.ChatMessages WHERE Id=@UserMessageId AND Role=N'user') AS UserMessages,
                 (SELECT COUNT(1) FROM dbo.WorkbenchAgentRuns WHERE AgentRunId=@AgentRunId AND Status=N'Pending') AS AgentRuns,
                 (SELECT COUNT(1) FROM dbo.ClientOperations WHERE ResultAgentRunId=@AgentRunId AND Status=N'Completed') AS Operations,
-                (SELECT COUNT(1) FROM dbo.WorkbenchOutboxEvents WHERE AgentRunId=@AgentRunId AND EventKind=N'AgentRunRequested') AS RequestedEvents;
-            """, new { first.UserMessageId, first.AgentRunId });
+                (SELECT COUNT(1) FROM dbo.WorkbenchOutboxEvents WHERE AgentRunId=@AgentRunId AND EventKind=N'AgentRunRequested') AS RequestedEvents,
+                (SELECT ActiveChatSessionId FROM dbo.WorkbenchSessions
+                 WHERE TenantId=1 AND ProjectId=@ProjectId AND Id=@WorkbenchSessionId) AS ActiveChatSessionId,
+                (SELECT COUNT(1) FROM dbo.WorkbenchAgentRuns
+                 WHERE TenantId=1 AND ProjectId=@ProjectId AND WorkbenchSessionId=@WorkbenchSessionId
+                   AND ActiveRunSlot=1) AS ActiveRuns;
+            """, new { first.UserMessageId, first.AgentRunId, fixture.ProjectId, fixture.WorkbenchSessionId });
         Assert.AreEqual(1, counts.UserMessages);
         Assert.AreEqual(1, counts.AgentRuns);
         Assert.AreEqual(1, counts.Operations);
         Assert.AreEqual(1, counts.RequestedEvents);
+        Assert.AreEqual(fixture.ChatSessionId, counts.ActiveChatSessionId);
+        Assert.AreEqual(1, counts.ActiveRuns);
 
         var provenance = await connection.QuerySingleAsync<RunProvenance>("""
-            SELECT AgentVersion, PromptVersion, ToolPolicyVersion, OutputSchemaVersion
+            SELECT AgentVersion, PromptVersion, ToolPolicyVersion, ContextSchemaVersion,
+                   ContextCanonicalizationVersion, OutputSchemaVersion
             FROM dbo.WorkbenchAgentRuns WHERE AgentRunId=@AgentRunId;
             """, new { first.AgentRunId });
         Assert.AreEqual(WorkbenchBusinessAnalystContract.AgentVersion, provenance.AgentVersion);
         Assert.AreEqual(WorkbenchBusinessAnalystContract.PromptVersion, provenance.PromptVersion);
         Assert.AreEqual(WorkbenchBusinessAnalystContract.ToolPolicyVersion, provenance.ToolPolicyVersion);
+        Assert.AreEqual(WorkbenchBusinessAnalystContract.ContextSchemaVersion, provenance.ContextSchemaVersion);
+        Assert.AreEqual(
+            WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion,
+            provenance.ContextCanonicalizationVersion);
         Assert.AreEqual(WorkbenchBusinessAnalystContract.OutputSchemaVersion, provenance.OutputSchemaVersion);
+    }
+
+    [TestMethod]
+    public async Task ActiveRunDatabaseInvariant_RejectsNullActiveSlotTerminalSlotAndDuplicateSessionRun()
+    {
+        var fixture = await CreateFixtureAsync("Database active-run invariant");
+        var service = CreateRunService();
+        var first = await service.SubmitAsync(fixture.Submit(Guid.NewGuid(), "First active run."));
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var activeNull = await Assert.ThrowsExactlyAsync<SqlException>(() => connection.ExecuteAsync("""
+            UPDATE dbo.WorkbenchAgentRuns
+            SET ActiveRunSlot=NULL
+            WHERE AgentRunId=@AgentRunId;
+            """, new { first.AgentRunId }));
+        StringAssert.Contains(activeNull.Message, "CK_WorkbenchAgentRuns_ActiveRunSlot");
+
+        var terminalSlot = await Assert.ThrowsExactlyAsync<SqlException>(() => connection.ExecuteAsync("""
+            UPDATE dbo.WorkbenchAgentRuns
+            SET Status=N'Failed', ActiveRunSlot=1, CompletedAtUtc=SYSUTCDATETIME()
+            WHERE AgentRunId=@AgentRunId;
+            """, new { first.AgentRunId }));
+        StringAssert.Contains(terminalSlot.Message, "CK_WorkbenchAgentRuns_ActiveRunSlot");
+
+        await service.CancelAsync(new CancelWorkbenchAgentRunCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            first.AgentRunId,
+            Guid.NewGuid()));
+        var second = await service.SubmitAsync(fixture.Submit(Guid.NewGuid(), "Second active run."));
+
+        var duplicate = await Assert.ThrowsExactlyAsync<SqlException>(() => connection.ExecuteAsync("""
+            UPDATE dbo.WorkbenchAgentRuns
+            SET Status=N'Pending', ActiveRunSlot=1, CompletedAtUtc=NULL, CancellationRequestedAtUtc=NULL
+            WHERE AgentRunId=@FirstAgentRunId;
+            """, new { FirstAgentRunId = first.AgentRunId }));
+        StringAssert.Contains(duplicate.Message, "UX_WorkbenchAgentRuns_ActiveSession");
+
+        var state = await connection.QuerySingleAsync<ActiveRunConstraintState>("""
+            SELECT
+                (SELECT COUNT(1) FROM dbo.WorkbenchAgentRuns
+                 WHERE TenantId=1 AND ProjectId=@ProjectId AND WorkbenchSessionId=@WorkbenchSessionId
+                   AND ActiveRunSlot=1) AS ActiveRuns,
+                (SELECT Status FROM dbo.WorkbenchAgentRuns WHERE AgentRunId=@FirstAgentRunId) AS FirstStatus,
+                (SELECT Status FROM dbo.WorkbenchAgentRuns WHERE AgentRunId=@SecondAgentRunId) AS SecondStatus;
+            """, new
+        {
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            FirstAgentRunId = first.AgentRunId,
+            SecondAgentRunId = second.AgentRunId
+        });
+        Assert.AreEqual(1, state.ActiveRuns);
+        Assert.AreEqual(WorkbenchAgentRunStates.Cancelled, state.FirstStatus);
+        Assert.AreEqual(WorkbenchAgentRunStates.Pending, state.SecondStatus);
+    }
+
+    [TestMethod]
+    [DataRow(WorkbenchAgentRunStates.Completed)]
+    [DataRow(WorkbenchAgentRunStates.NeedsInput)]
+    [DataRow(WorkbenchAgentRunStates.Failed)]
+    [DataRow(WorkbenchAgentRunStates.Cancelled)]
+    public async Task MigrationUpgrade_ReconcilesUnfinishedAttemptToKnownTerminalRunOutcome(string terminalStatus)
+    {
+        var fixture = await CreateFixtureAsync($"Upgrade reconciliation {terminalStatus}");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(fixture.Submit(Guid.NewGuid(), "Terminal outcome migration test."));
+        var claim = await service.ClaimAsync(submitted.AgentRunId, "upgrade-reconciliation-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+
+        switch (terminalStatus)
+        {
+            case WorkbenchAgentRunStates.Completed:
+            case WorkbenchAgentRunStates.NeedsInput:
+            {
+                var context = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+                var result = await service.MaterializeAsync(
+                    claim,
+                    context,
+                    ValidOutput(context, "Known terminal output.") with { Outcome = terminalStatus });
+                Assert.IsTrue(result.Materialized);
+                break;
+            }
+            case WorkbenchAgentRunStates.Failed:
+                await service.MarkFailedAsync(claim, "known_terminal_failure", new string('f', 64));
+                break;
+            case WorkbenchAgentRunStates.Cancelled:
+                await service.CancelAsync(new CancelWorkbenchAgentRunCommand(
+                    1,
+                    fixture.ActorUserId,
+                    fixture.ProjectId,
+                    fixture.WorkbenchSessionId,
+                    fixture.LeaseEpoch,
+                    submitted.AgentRunId,
+                    Guid.NewGuid()));
+                break;
+            default:
+                Assert.Fail($"Unsupported terminal status {terminalStatus}.");
+                break;
+        }
+
+        await using (var simulateOriginalMigration = new SqlConnection(ConnectionString))
+        {
+            await simulateOriginalMigration.ExecuteAsync("""
+                UPDATE dbo.WorkbenchAgentRunAttempts
+                SET Outcome=NULL, ResponseHash=NULL, DiagnosticCode=NULL, CompletedAtUtc=NULL
+                WHERE AgentRunId=@AgentRunId AND ClaimToken=@ClaimToken;
+                """, new { submitted.AgentRunId, claim.ClaimToken });
+        }
+
+        await ApplyMigrationAsync("migrate_workbench_agent_runs.sql");
+
+        await using var verify = new SqlConnection(ConnectionString);
+        var attempt = await verify.QuerySingleAsync<AttemptUpgradeState>("""
+            SELECT run.Status, attempt.Outcome, attempt.DiagnosticCode, attempt.CompletedAtUtc
+            FROM dbo.WorkbenchAgentRuns run
+            INNER JOIN dbo.WorkbenchAgentRunAttempts attempt ON attempt.AgentRunId=run.AgentRunId
+            WHERE run.AgentRunId=@AgentRunId AND attempt.ClaimToken=@ClaimToken;
+            """, new { submitted.AgentRunId, claim.ClaimToken });
+        Assert.AreEqual(terminalStatus, attempt.Status);
+        Assert.AreEqual(terminalStatus, attempt.Outcome);
+        Assert.AreEqual("migration_reconciled_unfinished_attempt", attempt.DiagnosticCode);
+        Assert.IsNotNull(attempt.CompletedAtUtc);
     }
 
     [TestMethod]
@@ -146,9 +297,40 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.IsNotNull(secondClaim);
         Assert.AreEqual(2, secondClaim.AttemptCount);
         Assert.AreNotEqual(firstClaim.ClaimToken, secondClaim.ClaimToken);
+
+        await using (var reclaimVerify = new SqlConnection(ConnectionString))
+        {
+            var reclaimState = await reclaimVerify.QuerySingleAsync<ReclaimAttemptState>("""
+                SELECT
+                    (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                     WHERE AgentRunId=@AgentRunId AND AttemptNumber=1 AND CompletedAtUtc IS NULL) AS PriorUnfinishedAttempts,
+                    (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                     WHERE AgentRunId=@AgentRunId AND CompletedAtUtc IS NULL) AS UnfinishedAttempts,
+                    (SELECT Outcome FROM dbo.WorkbenchAgentRunAttempts
+                     WHERE AgentRunId=@AgentRunId AND AttemptNumber=1) AS PriorOutcome,
+                    (SELECT DiagnosticCode FROM dbo.WorkbenchAgentRunAttempts
+                     WHERE AgentRunId=@AgentRunId AND AttemptNumber=1) AS PriorDiagnosticCode;
+                """, new { submitted.AgentRunId });
+            Assert.AreEqual(0, reclaimState.PriorUnfinishedAttempts);
+            Assert.AreEqual(1, reclaimState.UnfinishedAttempts);
+            Assert.AreEqual("ClaimExpired", reclaimState.PriorOutcome);
+            Assert.AreEqual("claim_expired_before_reclaim", reclaimState.PriorDiagnosticCode);
+
+            await Assert.ThrowsExactlyAsync<SqlException>(() => reclaimVerify.ExecuteAsync("""
+                INSERT dbo.WorkbenchAgentRunAttempts
+                    (AgentRunId, AttemptNumber, ClaimToken, WorkerId)
+                VALUES
+                    (@AgentRunId, 3, NEWID(), N'invalid-second-active-attempt');
+                """, new { submitted.AgentRunId }));
+        }
+
         var secondContext = await assembler.AssembleAsync(secondClaim);
         Assert.AreEqual(firstContext.ContextHash, secondContext.ContextHash);
         Assert.AreEqual(1L, secondContext.UnderstandingRevision);
+        Assert.AreEqual(WorkbenchBusinessAnalystContract.ContextSchemaVersion, secondContext.ContextSchemaVersion);
+        Assert.AreEqual(
+            WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion,
+            secondContext.ContextCanonicalizationVersion);
         Assert.AreEqual(firstContext.Messages.Count, secondContext.Messages.Count);
 
         var output = ValidOutput(secondContext, "A single durable assistant answer.");
@@ -178,7 +360,7 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
                 (SELECT COUNT(1) FROM dbo.WorkbenchOutboxEvents WHERE AgentRunId=@AgentRunId AND EventKind=N'AgentRunMaterialized') AS MaterializedEvents,
                 (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts WHERE AgentRunId=@AgentRunId) AS Attempts,
                 (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts WHERE AgentRunId=@AgentRunId AND ContextHash IS NOT NULL) AS ContextStampedAttempts,
-                (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts WHERE AgentRunId=@AgentRunId AND Outcome=N'LateRestricted') AS LateRestrictedAttempts,
+                (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts WHERE AgentRunId=@AgentRunId AND Outcome=N'ClaimExpired') AS ClaimExpiredAttempts,
                 (SELECT COUNT(1) FROM dbo.ChatMessages WHERE Id=@AssistantMessageId AND ReplyToMessageId=@SourceUserMessageId) AS ReplyLinks,
                 (SELECT COUNT(1) FROM dbo.ChatMessages
                  WHERE Id=@AssistantMessageId
@@ -200,12 +382,23 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.AreEqual(1, counts.MaterializedEvents);
         Assert.AreEqual(2, counts.Attempts);
         Assert.AreEqual(2, counts.ContextStampedAttempts);
-        Assert.AreEqual(1, counts.LateRestrictedAttempts);
+        Assert.AreEqual(1, counts.ClaimExpiredAttempts);
         Assert.AreEqual(1, counts.ReplyLinks);
         Assert.AreEqual(1, counts.VersionedEnvelopes);
         Assert.AreEqual(1, counts.GovernanceRows);
         Assert.AreEqual(1, counts.ClarificationRows);
         Assert.AreEqual(1, counts.TraceRows);
+
+        var otherChatSessionId = await verify.QuerySingleAsync<long>("""
+            INSERT dbo.ProjectChatSessions(TenantId, ProjectId, Title)
+            OUTPUT inserted.Id
+            VALUES (1, @ProjectId, N'Conversation switch after completion');
+            """, new { fixture.ProjectId });
+        await Assert.ThrowsExactlyAsync<WorkbenchChatSessionBindingException>(() =>
+            service.SubmitAsync(fixture.Submit(Guid.NewGuid(), "A terminal run must not release the chat binding.") with
+            {
+                ChatSessionId = otherChatSessionId
+            }));
 
         var followup = await service.SubmitAsync(
             fixture.Submit(Guid.NewGuid(), "Use the trusted prior assistant response."));
@@ -285,7 +478,11 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
                    (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
                     WHERE AgentRunId=run.AgentRunId AND ContextHash IS NOT NULL) AS ContextStampedAttempts,
                    (SELECT COUNT(DISTINCT ContextHash) FROM dbo.WorkbenchAgentRunAttempts
-                    WHERE AgentRunId=run.AgentRunId AND ContextHash IS NOT NULL) AS DistinctContextHashes
+                    WHERE AgentRunId=run.AgentRunId AND ContextHash IS NOT NULL) AS DistinctContextHashes,
+                   (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=run.AgentRunId AND CompletedAtUtc IS NULL) AS UnfinishedAttempts,
+                   (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=run.AgentRunId AND Outcome=N'ClaimExpired') AS ClaimExpiredAttempts
             FROM dbo.WorkbenchAgentRuns run
             WHERE run.AgentRunId=@AgentRunId;
             """, new { submitted.AgentRunId });
@@ -295,11 +492,13 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.AreEqual(1, finalState.MaterializedEvents);
         Assert.AreEqual(2, finalState.ContextStampedAttempts);
         Assert.AreEqual(1, finalState.DistinctContextHashes);
+        Assert.AreEqual(0, finalState.UnfinishedAttempts);
+        Assert.AreEqual(1, finalState.ClaimExpiredAttempts);
         Assert.IsFalse(string.IsNullOrWhiteSpace(recoveryAgent.ContextHash));
     }
 
     [TestMethod]
-    public async Task Takeover_SupersedesInFlightRunAndLateResultIsDiagnosticOnly()
+    public async Task Takeover_SupersedesRunningRunAndLateResultIsDiagnosticOnly()
     {
         var fixture = await CreateFixtureAsync("Takeover agent run");
         var service = CreateRunService();
@@ -307,7 +506,6 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         var claim = await service.ClaimAsync(submitted.AgentRunId, "old-epoch-worker", TimeSpan.FromMinutes(5));
         Assert.IsNotNull(claim);
         var context = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
-        var pending = await service.SubmitAsync(fixture.Submit(Guid.NewGuid(), "This pending run must also be superseded."));
         var secondActor = await SeedAdditionalActorAsync("takeover");
         await using (var connection = new SqlConnection(ConnectionString))
         {
@@ -321,6 +519,11 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             new OpenWorkbenchProjectCommand(1, secondActor, fixture.ProjectId, Guid.NewGuid(), TakeOver: true));
         Assert.IsTrue(takeover.WasTakenOver);
         Assert.AreEqual(2L, takeover.LeaseEpoch);
+
+        await AssertSingleAttemptClosedWithoutResponseAsync(
+            submitted.AgentRunId,
+            "Superseded",
+            "workbench_lease_taken_over");
 
         await service.MarkFailedAsync(
             claim,
@@ -350,26 +553,87 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.IsNull(state.OutputHash);
         Assert.IsNull(state.AssistantMessageId);
         Assert.AreEqual(0, state.AssistantMessages);
-        Assert.AreEqual("LateRestricted", state.AttemptOutcome);
+        Assert.AreEqual("Superseded", state.AttemptOutcome);
         Assert.IsNotNull(state.DiagnosticHash);
         Assert.IsNotNull(state.AttemptResponseHash);
 
         var supersession = await verify.QuerySingleAsync<TakeoverCounts>("""
             SELECT
-                (SELECT Status FROM dbo.WorkbenchAgentRuns WHERE AgentRunId=@PendingAgentRunId) AS PendingStatus,
                 (SELECT COUNT(1) FROM dbo.WorkbenchAgentRuns
-                 WHERE AgentRunId IN (@RunningAgentRunId, @PendingAgentRunId) AND Status=N'Superseded') AS SupersededRuns,
+                 WHERE AgentRunId=@RunningAgentRunId AND Status=N'Superseded' AND ActiveRunSlot IS NULL) AS SupersededRuns,
                 (SELECT COUNT(1) FROM dbo.WorkbenchOutboxEvents
-                 WHERE AgentRunId IN (@RunningAgentRunId, @PendingAgentRunId)
+                 WHERE AgentRunId=@RunningAgentRunId
                    AND EventKind=N'AgentRunSuperseded') AS SupersededEvents;
             """, new
         {
-            RunningAgentRunId = submitted.AgentRunId,
-            PendingAgentRunId = pending.AgentRunId
+            RunningAgentRunId = submitted.AgentRunId
         });
-        Assert.AreEqual(WorkbenchAgentRunStates.Superseded, supersession.PendingStatus);
-        Assert.AreEqual(2, supersession.SupersededRuns);
-        Assert.AreEqual(2, supersession.SupersededEvents);
+        Assert.AreEqual(1, supersession.SupersededRuns);
+        Assert.AreEqual(1, supersession.SupersededEvents);
+    }
+
+    [TestMethod]
+    public async Task Takeover_SupersedesPendingRunAndReleasesActiveSlot()
+    {
+        var fixture = await CreateFixtureAsync("Takeover pending agent run");
+        var service = CreateRunService();
+        var pending = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Supersede this pending turn during takeover."));
+        var secondActor = await SeedAdditionalActorAsync("pending-takeover");
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            await connection.ExecuteAsync("""
+                INSERT dbo.ProjectMembers(TenantId, ProjectId, UserId, ProjectRole, Status, AddedByUserId)
+                VALUES (1, @ProjectId, @SecondActor, N'Contributor', N'Active', @OwnerActor);
+                """, new { fixture.ProjectId, SecondActor = secondActor, OwnerActor = fixture.ActorUserId });
+        }
+
+        var takeover = await new WorkbenchProjectEntryService(ConnectionFactory()).OpenAsync(
+            new OpenWorkbenchProjectCommand(1, secondActor, fixture.ProjectId, Guid.NewGuid(), TakeOver: true));
+
+        Assert.IsTrue(takeover.WasTakenOver);
+        await using var verify = new SqlConnection(ConnectionString);
+        var supersession = await verify.QuerySingleAsync<TakeoverCounts>("""
+            SELECT
+                (SELECT COUNT(1) FROM dbo.WorkbenchAgentRuns
+                 WHERE AgentRunId=@AgentRunId AND Status=N'Superseded' AND ActiveRunSlot IS NULL) AS SupersededRuns,
+                (SELECT COUNT(1) FROM dbo.WorkbenchOutboxEvents
+                 WHERE AgentRunId=@AgentRunId AND EventKind=N'AgentRunSuperseded') AS SupersededEvents;
+            """, new { AgentRunId = pending.AgentRunId });
+        Assert.AreEqual(1, supersession.SupersededRuns);
+        Assert.AreEqual(1, supersession.SupersededEvents);
+    }
+
+    [TestMethod]
+    public async Task ExpiredWorkbenchLease_ClosesRunningAttemptWithoutWaitingForProviderResult()
+    {
+        var fixture = await CreateFixtureAsync("Expired lease attempt");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(fixture.Submit(Guid.NewGuid(), "The provider will not return."));
+        var claim = await service.ClaimAsync(submitted.AgentRunId, "expired-lease-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+
+        await using (var expire = new SqlConnection(ConnectionString))
+        {
+            await expire.ExecuteAsync("""
+                UPDATE dbo.WorkbenchWriteLeases
+                SET ExpiresAtUtc=DATEADD(SECOND, -1, SYSUTCDATETIME())
+                WHERE TenantId=1 AND ProjectId=@ProjectId
+                  AND WorkbenchSessionId=@WorkbenchSessionId AND LeaseEpoch=@LeaseEpoch;
+                """, fixture);
+        }
+
+        var reopened = await new WorkbenchProjectEntryService(ConnectionFactory()).OpenAsync(
+            new OpenWorkbenchProjectCommand(1, fixture.ActorUserId, fixture.ProjectId, Guid.NewGuid(), TakeOver: false));
+        Assert.AreEqual(fixture.LeaseEpoch + 1, reopened.LeaseEpoch);
+
+        await AssertSingleAttemptClosedWithoutResponseAsync(
+            submitted.AgentRunId,
+            "Stale",
+            "lease_expired");
+
+        var snapshot = await service.GetAsync(1, fixture.ActorUserId, fixture.ProjectId, submitted.AgentRunId);
+        Assert.AreEqual(WorkbenchAgentRunStates.Stale, snapshot.Status);
     }
 
     [TestMethod]
@@ -392,7 +656,11 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         await using var connection = new SqlConnection(ConnectionString);
         var state = await connection.QuerySingleAsync<InvalidOutputState>("""
             SELECT Status, DiagnosticCode, DiagnosticHash, AssistantMessageId, ValidatedOutputJson,
-                   (SELECT COUNT(1) FROM dbo.ChatMessages WHERE TenantId=1 AND ProjectId=@ProjectId AND Role=N'assistant') AS AssistantMessages
+                   (SELECT COUNT(1) FROM dbo.ChatMessages WHERE TenantId=1 AND ProjectId=@ProjectId AND Role=N'assistant') AS AssistantMessages,
+                   (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=@AgentRunId AND CompletedAtUtc IS NULL) AS UnfinishedAttempts,
+                   (SELECT TOP (1) Outcome FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=@AgentRunId ORDER BY AttemptNumber DESC) AS AttemptOutcome
             FROM dbo.WorkbenchAgentRuns WHERE AgentRunId=@AgentRunId;
             """, new { fixture.ProjectId, submitted.AgentRunId });
         Assert.AreEqual(WorkbenchAgentRunStates.Failed, state.Status);
@@ -403,6 +671,232 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.IsNull(state.AssistantMessageId);
         Assert.IsNull(state.ValidatedOutputJson);
         Assert.AreEqual(0, state.AssistantMessages);
+        Assert.AreEqual(0, state.UnfinishedAttempts);
+        Assert.AreEqual("Failed", state.AttemptOutcome);
+    }
+
+    [TestMethod]
+    public async Task Materialize_RejectsCallerContextMutationThatRetainsOriginalHash()
+    {
+        var fixture = await CreateFixtureAsync("Caller context authority");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Keep the persisted context authoritative."));
+        var claim = await service.ClaimAsync(submitted.AgentRunId, "mutated-context-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        var storedContext = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+        var mutatedContext = storedContext with
+        {
+            ProjectName = "Caller-controlled replacement",
+            ContextHash = storedContext.ContextHash
+        };
+
+        var result = await service.MaterializeAsync(
+            claim,
+            mutatedContext,
+            ValidOutput(mutatedContext, "This response must not become visible."));
+
+        Assert.IsFalse(result.Materialized);
+        Assert.AreEqual(WorkbenchAgentRunStates.Failed, result.Status);
+        Assert.AreEqual("context_snapshot_mismatch", result.RejectionReason);
+        await AssertRejectedContextDidNotMaterializeAsync(fixture.ProjectId, submitted.AgentRunId);
+    }
+
+    [TestMethod]
+    public async Task Materialize_RejectsStoredSnapshotContentTampering()
+    {
+        var fixture = await CreateFixtureAsync("Stored context authority");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Detect persisted snapshot tampering."));
+        var claim = await service.ClaimAsync(submitted.AgentRunId, "tampered-snapshot-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        var context = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+
+        await using (var tamper = new SqlConnection(ConnectionString))
+        {
+            await tamper.ExecuteAsync("""
+                UPDATE dbo.WorkbenchAgentRuns
+                SET ContextSnapshotJson=JSON_MODIFY(ContextSnapshotJson, '$.projectName', N'Tampered persisted name')
+                WHERE AgentRunId=@AgentRunId;
+                """, new { submitted.AgentRunId });
+        }
+
+        var result = await service.MaterializeAsync(
+            claim,
+            context,
+            ValidOutput(context, "This response must not become visible."));
+
+        Assert.IsFalse(result.Materialized);
+        Assert.AreEqual(WorkbenchAgentRunStates.Failed, result.Status);
+        Assert.AreEqual("context_snapshot_mismatch", result.RejectionReason);
+        await AssertRejectedContextDidNotMaterializeAsync(fixture.ProjectId, submitted.AgentRunId);
+    }
+
+    [TestMethod]
+    public async Task Materialize_StrictlyRejectsUnknownStoredSnapshotMembers()
+    {
+        var fixture = await CreateFixtureAsync("Strict stored context schema");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Reject unknown stored context fields."));
+        var claim = await service.ClaimAsync(submitted.AgentRunId, "unknown-context-field-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        var context = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+
+        await using (var tamper = new SqlConnection(ConnectionString))
+        {
+            await tamper.ExecuteAsync("""
+                UPDATE dbo.WorkbenchAgentRuns
+                SET ContextSnapshotJson=JSON_MODIFY(ContextSnapshotJson, '$.unrecognizedAuthority', N'forged')
+                WHERE AgentRunId=@AgentRunId;
+                """, new { submitted.AgentRunId });
+        }
+
+        var result = await service.MaterializeAsync(
+            claim,
+            context,
+            ValidOutput(context, "This response must not become visible."));
+
+        Assert.IsFalse(result.Materialized);
+        Assert.AreEqual("context_snapshot_mismatch", result.RejectionReason);
+        await AssertRejectedContextDidNotMaterializeAsync(fixture.ProjectId, submitted.AgentRunId);
+    }
+
+    [TestMethod]
+    public async Task Materialize_AcceptsPinnedVersion1SnapshotWithoutRewritingIt()
+    {
+        var fixture = await CreateFixtureAsync("Version 1 context upgrade");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Continue a genuinely pre-hardening context snapshot."));
+        var currentClaim = await service.ClaimAsync(submitted.AgentRunId, "version-one-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(currentClaim);
+        var currentContext = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(currentClaim);
+        var (version1SnapshotJson, version1Hash) = CreateVersion1Snapshot(currentContext);
+        var version1Claim = currentClaim with
+        {
+            ContextSchemaVersion = WorkbenchBusinessAnalystContract.ContextSchemaVersion1,
+            ContextCanonicalizationVersion = WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion1
+        };
+
+        await using (var upgrade = new SqlConnection(ConnectionString))
+        {
+            await upgrade.ExecuteAsync("""
+                UPDATE dbo.WorkbenchAgentRuns
+                SET ContextSchemaVersion=@ContextSchemaVersion,
+                    ContextCanonicalizationVersion=@ContextCanonicalizationVersion,
+                    ContextSnapshotJson=@ContextSnapshotJson,
+                    ContextHash=@ContextHash
+                WHERE AgentRunId=@AgentRunId;
+
+                UPDATE dbo.WorkbenchAgentRunAttempts
+                SET ContextHash=@ContextHash
+                WHERE AgentRunId=@AgentRunId AND ClaimToken=@ClaimToken;
+                """, new
+            {
+                submitted.AgentRunId,
+                currentClaim.ClaimToken,
+                ContextSchemaVersion = WorkbenchBusinessAnalystContract.ContextSchemaVersion1,
+                ContextCanonicalizationVersion = WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion1,
+                ContextSnapshotJson = version1SnapshotJson,
+                ContextHash = version1Hash
+            });
+        }
+
+        var version1Context = await new WorkbenchAgentContextAssembler(ConnectionFactory())
+            .AssembleAsync(version1Claim);
+        Assert.AreEqual(WorkbenchBusinessAnalystContract.ContextSchemaVersion1, version1Context.ContextSchemaVersion);
+        Assert.AreEqual(
+            WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion1,
+            version1Context.ContextCanonicalizationVersion);
+        Assert.AreEqual(version1Hash, version1Context.ContextHash);
+
+        var result = await service.MaterializeAsync(
+            version1Claim,
+            version1Context,
+            ValidOutput(version1Context, "The pinned legacy snapshot remains usable."));
+        Assert.IsTrue(result.Materialized);
+
+        await using var verify = new SqlConnection(ConnectionString);
+        var persistedSnapshot = await verify.QuerySingleAsync<string>("""
+            SELECT ContextSnapshotJson FROM dbo.WorkbenchAgentRuns WHERE AgentRunId=@AgentRunId;
+            """, new { submitted.AgentRunId });
+        Assert.AreEqual(version1SnapshotJson, persistedSnapshot);
+        Assert.IsFalse(persistedSnapshot.Contains("contextSchemaVersion", StringComparison.Ordinal));
+        Assert.IsFalse(persistedSnapshot.Contains("contextCanonicalizationVersion", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task ContextCodec_FailsClosedForPartialAndUnknownVersionPairs()
+    {
+        var fixture = await CreateFixtureAsync("Unsupported context formats");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Reject ambiguous context format dispatch."));
+        var claim = await service.ClaimAsync(submitted.AgentRunId, "unsupported-context-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        _ = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await Assert.ThrowsExactlyAsync<SqlException>(() => connection.ExecuteAsync("""
+            UPDATE dbo.WorkbenchAgentRuns
+            SET ContextSchemaVersion=1, ContextCanonicalizationVersion=2
+            WHERE AgentRunId=@AgentRunId;
+            """, new { submitted.AgentRunId }));
+
+        await connection.ExecuteAsync("""
+            UPDATE dbo.WorkbenchAgentRuns
+            SET ContextSchemaVersion=3, ContextCanonicalizationVersion=3
+            WHERE AgentRunId=@AgentRunId;
+            """, new { submitted.AgentRunId });
+        var unknownClaim = claim with { ContextSchemaVersion = 3, ContextCanonicalizationVersion = 3 };
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(unknownClaim));
+    }
+
+    [TestMethod]
+    public async Task Materialize_InvalidSourceReferenceFailsRunAndRejectsAttempt()
+    {
+        var fixture = await CreateFixtureAsync("Invalid source reference");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Reject a source message whose trusted role changed."));
+        var claim = await service.ClaimAsync(submitted.AgentRunId, "source-reference-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        var context = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+
+        await using (var tamper = new SqlConnection(ConnectionString))
+        {
+            await tamper.ExecuteAsync("""
+                UPDATE dbo.ChatMessages SET Role=N'assistant' WHERE Id=@SourceUserMessageId;
+                """, new { claim.SourceUserMessageId });
+        }
+
+        var result = await service.MaterializeAsync(
+            claim,
+            context,
+            ValidOutput(context, "This response must not become visible."));
+
+        Assert.IsFalse(result.Materialized);
+        Assert.AreEqual(WorkbenchAgentRunStates.Failed, result.Status);
+        Assert.AreEqual("source_reference_invalid", result.RejectionReason);
+
+        await using var verify = new SqlConnection(ConnectionString);
+        var state = await verify.QuerySingleAsync<InvalidOutputState>("""
+            SELECT Status, DiagnosticCode, AssistantMessageId, ValidatedOutputJson,
+                   (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=@AgentRunId AND CompletedAtUtc IS NULL) AS UnfinishedAttempts,
+                   (SELECT TOP (1) Outcome FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=@AgentRunId ORDER BY AttemptNumber DESC) AS AttemptOutcome
+            FROM dbo.WorkbenchAgentRuns WHERE AgentRunId=@AgentRunId;
+            """, new { submitted.AgentRunId });
+        Assert.AreEqual(WorkbenchAgentRunStates.Failed, state.Status);
+        Assert.AreEqual("source_reference_invalid", state.DiagnosticCode);
+        Assert.IsNull(state.AssistantMessageId);
+        Assert.IsNull(state.ValidatedOutputJson);
+        Assert.AreEqual(0, state.UnfinishedAttempts);
+        Assert.AreEqual("Rejected", state.AttemptOutcome);
     }
 
     [TestMethod]
@@ -430,6 +924,11 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.IsTrue(cancelled.CancellationRequested);
         Assert.IsTrue(replay.IsReplay);
 
+        await AssertSingleAttemptClosedWithoutResponseAsync(
+            submitted.AgentRunId,
+            "Cancelled",
+            "run_cancelled_before_result");
+
         var late = await service.MaterializeAsync(claim, context, ValidOutput(context, "Cancelled output must stay hidden."));
         Assert.IsFalse(late.Materialized);
         Assert.AreEqual(WorkbenchAgentRunStates.Cancelled, late.Status);
@@ -454,8 +953,30 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.IsNull(state.OutputHash);
         Assert.IsNull(state.AssistantMessageId);
         Assert.AreEqual(0, state.AssistantMessages);
-        Assert.AreEqual("LateRestricted", state.AttemptOutcome);
+        Assert.AreEqual("Cancelled", state.AttemptOutcome);
         Assert.AreEqual(1, state.CancelledEvents);
+    }
+
+    private async Task AssertSingleAttemptClosedWithoutResponseAsync(
+        Guid agentRunId,
+        string expectedOutcome,
+        string expectedDiagnosticCode)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        var state = await connection.QuerySingleAsync<AttemptClosureState>("""
+            SELECT COUNT(1) AS Attempts,
+                   SUM(CASE WHEN CompletedAtUtc IS NULL THEN 1 ELSE 0 END) AS UnfinishedAttempts,
+                   MAX(Outcome) AS Outcome,
+                   MAX(DiagnosticCode) AS DiagnosticCode,
+                   MAX(ResponseHash) AS ResponseHash
+            FROM dbo.WorkbenchAgentRunAttempts
+            WHERE AgentRunId=@AgentRunId;
+            """, new { AgentRunId = agentRunId });
+        Assert.AreEqual(1, state.Attempts);
+        Assert.AreEqual(0, state.UnfinishedAttempts);
+        Assert.AreEqual(expectedOutcome, state.Outcome);
+        Assert.AreEqual(expectedDiagnosticCode, state.DiagnosticCode);
+        Assert.IsNull(state.ResponseHash);
     }
 
     private WorkbenchAgentRunService CreateRunService(IWorkbenchAgentRunFailureInjector? injector = null) =>
@@ -499,6 +1020,28 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             "INSERT dbo.TenantUsers(TenantId, UserId, Role) VALUES (1, @ActorUserId, N'Owner');",
             new { ActorUserId = actorUserId });
         return actorUserId;
+    }
+
+    private async Task AssertRejectedContextDidNotMaterializeAsync(int projectId, Guid agentRunId)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        var state = await connection.QuerySingleAsync<InvalidOutputState>("""
+            SELECT Status, DiagnosticCode, DiagnosticHash, AssistantMessageId, ValidatedOutputJson,
+                   (SELECT COUNT(1) FROM dbo.ChatMessages
+                    WHERE TenantId=1 AND ProjectId=@ProjectId AND Role=N'assistant') AS AssistantMessages,
+                   (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=@AgentRunId AND CompletedAtUtc IS NULL) AS UnfinishedAttempts,
+                   (SELECT TOP (1) Outcome FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=@AgentRunId ORDER BY AttemptNumber DESC) AS AttemptOutcome
+            FROM dbo.WorkbenchAgentRuns WHERE AgentRunId=@AgentRunId;
+            """, new { ProjectId = projectId, AgentRunId = agentRunId });
+        Assert.AreEqual(WorkbenchAgentRunStates.Failed, state.Status);
+        Assert.AreEqual("context_snapshot_mismatch", state.DiagnosticCode);
+        Assert.IsNull(state.AssistantMessageId);
+        Assert.IsNull(state.ValidatedOutputJson);
+        Assert.AreEqual(0, state.AssistantMessages);
+        Assert.AreEqual(0, state.UnfinishedAttempts);
+        Assert.AreEqual("Rejected", state.AttemptOutcome);
     }
 
     private async Task<int> SeedAdditionalActorAsync(string suffix)
@@ -560,6 +1103,33 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         WorkbenchAgentRunStates.Completed,
         message);
 
+    private static (string SnapshotJson, string ContextHash) CreateVersion1Snapshot(
+        WorkbenchBusinessAnalystContext context)
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var withoutHash = new Version1ContextFixture(
+            context.AgentRunId,
+            context.TenantId,
+            context.ProjectId,
+            context.ProjectName,
+            context.WorkbenchSessionId,
+            context.LeaseEpoch,
+            context.ChatSessionId,
+            context.SourceUserMessageId,
+            context.UnderstandingRevision,
+            context.UnderstandingJson,
+            context.Messages,
+            context.AgentVersion,
+            context.PromptVersion,
+            context.ToolPolicyVersion,
+            context.OutputSchemaVersion,
+            ContextHash: string.Empty);
+        var canonicalJson = JsonSerializer.Serialize(withoutHash, options);
+        var contextHash = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(canonicalJson))).ToLowerInvariant();
+        return (JsonSerializer.Serialize(withoutHash with { ContextHash = contextHash }, options), contextHash);
+    }
+
     private sealed record Fixture(
         int ActorUserId,
         int ProjectId,
@@ -577,6 +1147,24 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             ChatSessionId,
             message);
     }
+
+    private sealed record Version1ContextFixture(
+        Guid AgentRunId,
+        int TenantId,
+        int ProjectId,
+        string ProjectName,
+        long WorkbenchSessionId,
+        long LeaseEpoch,
+        long ChatSessionId,
+        long SourceUserMessageId,
+        long UnderstandingRevision,
+        string UnderstandingJson,
+        IReadOnlyList<WorkbenchAgentContextMessage> Messages,
+        string AgentVersion,
+        string PromptVersion,
+        string ToolPolicyVersion,
+        int OutputSchemaVersion,
+        string ContextHash);
 
     private sealed class ThrowAt(WorkbenchAgentRunFailurePoint point) : IWorkbenchAgentRunFailureInjector
     {
@@ -648,6 +1236,21 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         }
     }
 
+    private sealed class ActiveRunConstraintState
+    {
+        public int ActiveRuns { get; init; }
+        public string FirstStatus { get; init; } = string.Empty;
+        public string SecondStatus { get; init; } = string.Empty;
+    }
+
+    private sealed class AttemptUpgradeState
+    {
+        public string Status { get; init; } = string.Empty;
+        public string? Outcome { get; init; }
+        public string? DiagnosticCode { get; init; }
+        public DateTime? CompletedAtUtc { get; init; }
+    }
+
     private sealed class RunCounts
     {
         public int UserMessages { get; init; }
@@ -655,6 +1258,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         public int Operations { get; init; }
         public int RequestedEvents { get; init; }
         public int Attributions { get; init; }
+        public long? ActiveChatSessionId { get; init; }
+        public int ActiveRuns { get; init; }
     }
 
     private sealed class RunProvenance
@@ -662,6 +1267,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         public string AgentVersion { get; init; } = string.Empty;
         public string PromptVersion { get; init; } = string.Empty;
         public string ToolPolicyVersion { get; init; } = string.Empty;
+        public int ContextSchemaVersion { get; init; }
+        public int ContextCanonicalizationVersion { get; init; }
         public int OutputSchemaVersion { get; init; }
     }
 
@@ -671,7 +1278,7 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         public int MaterializedEvents { get; init; }
         public int Attempts { get; init; }
         public int ContextStampedAttempts { get; init; }
-        public int LateRestrictedAttempts { get; init; }
+        public int ClaimExpiredAttempts { get; init; }
         public int ReplyLinks { get; init; }
         public int VersionedEnvelopes { get; init; }
         public int GovernanceRows { get; init; }
@@ -688,6 +1295,25 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         public int MaterializedEvents { get; init; }
         public int ContextStampedAttempts { get; init; }
         public int DistinctContextHashes { get; init; }
+        public int UnfinishedAttempts { get; init; }
+        public int ClaimExpiredAttempts { get; init; }
+    }
+
+    private sealed class ReclaimAttemptState
+    {
+        public int PriorUnfinishedAttempts { get; init; }
+        public int UnfinishedAttempts { get; init; }
+        public string? PriorOutcome { get; init; }
+        public string? PriorDiagnosticCode { get; init; }
+    }
+
+    private sealed class AttemptClosureState
+    {
+        public int Attempts { get; init; }
+        public int UnfinishedAttempts { get; init; }
+        public string? Outcome { get; init; }
+        public string? DiagnosticCode { get; init; }
+        public string? ResponseHash { get; init; }
     }
 
     private sealed class LateResultState
@@ -708,7 +1334,6 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
 
     private sealed class TakeoverCounts
     {
-        public string PendingStatus { get; init; } = string.Empty;
         public int SupersededRuns { get; init; }
         public int SupersededEvents { get; init; }
     }
@@ -721,5 +1346,7 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         public long? AssistantMessageId { get; init; }
         public string? ValidatedOutputJson { get; init; }
         public int AssistantMessages { get; init; }
+        public int UnfinishedAttempts { get; init; }
+        public string? AttemptOutcome { get; init; }
     }
 }

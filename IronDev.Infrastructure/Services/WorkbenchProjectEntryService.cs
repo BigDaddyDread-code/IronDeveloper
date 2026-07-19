@@ -175,7 +175,8 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                     DiagnosticCode=COALESCE(run.DiagnosticCode, N'lease_expired'),
                     DiagnosticAtUtc=COALESCE(run.DiagnosticAtUtc, SYSUTCDATETIME()),
                     CompletedAtUtc=COALESCE(run.CompletedAtUtc, SYSUTCDATETIME()),
-                    ClaimExpiresAtUtc=NULL
+                    ClaimExpiresAtUtc=NULL,
+                    ActiveRunSlot=NULL
                 FROM dbo.WorkbenchAgentRuns run
                 INNER JOIN dbo.WorkbenchWriteLeases lease
                     ON lease.TenantId=run.TenantId AND lease.ProjectId=run.ProjectId
@@ -183,6 +184,21 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                 WHERE lease.TenantId=@TenantId AND lease.ProjectId=@ProjectId
                   AND lease.RevokedAtUtc IS NULL AND lease.ExpiresAtUtc <= SYSUTCDATETIME()
                   AND run.Status IN (N'Pending', N'Running');
+
+                UPDATE attempt
+                SET Outcome=N'Stale',
+                    DiagnosticCode=N'lease_expired',
+                    CompletedAtUtc=SYSUTCDATETIME()
+                FROM dbo.WorkbenchAgentRunAttempts attempt
+                INNER JOIN dbo.WorkbenchAgentRuns run
+                    ON run.AgentRunId=attempt.AgentRunId
+                INNER JOIN dbo.WorkbenchWriteLeases lease
+                    ON lease.TenantId=run.TenantId AND lease.ProjectId=run.ProjectId
+                  AND lease.WorkbenchSessionId=run.WorkbenchSessionId AND lease.LeaseEpoch=run.LeaseEpoch
+                WHERE lease.TenantId=@TenantId AND lease.ProjectId=@ProjectId
+                  AND lease.RevokedAtUtc IS NULL AND lease.ExpiresAtUtc <= SYSUTCDATETIME()
+                  AND run.Status=N'Stale'
+                  AND attempt.CompletedAtUtc IS NULL;
 
                 UPDATE session
                 SET Status=N'Historical', ClosedAtUtc=COALESCE(ClosedAtUtc, SYSUTCDATETIME())
@@ -344,10 +360,25 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                             DiagnosticCode=COALESCE(DiagnosticCode, N'workbench_lease_taken_over'),
                             DiagnosticAtUtc=COALESCE(DiagnosticAtUtc, SYSUTCDATETIME()),
                             CompletedAtUtc=COALESCE(CompletedAtUtc, SYSUTCDATETIME()),
-                            ClaimExpiresAtUtc=NULL
+                            ClaimExpiresAtUtc=NULL,
+                            ActiveRunSlot=NULL
                         WHERE TenantId=@TenantId AND ProjectId=@ProjectId
                           AND WorkbenchSessionId=@OldWorkbenchSessionId AND LeaseEpoch=@OldLeaseEpoch
                           AND Status IN (N'Pending', N'Running');
+
+                        UPDATE attempt
+                        SET Outcome=N'Superseded',
+                            DiagnosticCode=N'workbench_lease_taken_over',
+                            CompletedAtUtc=SYSUTCDATETIME()
+                        FROM dbo.WorkbenchAgentRunAttempts attempt
+                        INNER JOIN dbo.WorkbenchAgentRuns run
+                            ON run.AgentRunId=attempt.AgentRunId
+                        WHERE run.TenantId=@TenantId AND run.ProjectId=@ProjectId
+                          AND run.WorkbenchSessionId=@OldWorkbenchSessionId AND run.LeaseEpoch=@OldLeaseEpoch
+                          AND run.Status=N'Superseded'
+                          AND run.SupersededByWorkbenchSessionId=@NewWorkbenchSessionId
+                          AND run.SupersededByLeaseEpoch=@NewLeaseEpoch
+                          AND attempt.CompletedAtUtc IS NULL;
                         """,
                         new
                         {

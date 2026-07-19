@@ -20,6 +20,8 @@ public sealed class WorkbenchBusinessAnalystOutputValidatorTests
         WorkbenchBusinessAnalystContract.AgentVersion,
         WorkbenchBusinessAnalystContract.PromptVersion,
         WorkbenchBusinessAnalystContract.ToolPolicyVersion,
+        WorkbenchBusinessAnalystContract.ContextSchemaVersion,
+        WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion,
         WorkbenchBusinessAnalystContract.OutputSchemaVersion,
         new string('a', 64));
 
@@ -38,6 +40,11 @@ public sealed class WorkbenchBusinessAnalystOutputValidatorTests
 
         Assert.ThrowsException<WorkbenchAgentOutputValidationException>(() =>
             WorkbenchBusinessAnalystOutputValidator.Validate(output, Context));
+
+        var unsupportedContext = Context with { OutputSchemaVersion = 2 };
+        var matchingFutureOutput = ValidOutput() with { OutputSchemaVersion = 2 };
+        Assert.ThrowsException<WorkbenchAgentOutputValidationException>(() =>
+            WorkbenchBusinessAnalystOutputValidator.Validate(matchingFutureOutput, unsupportedContext));
     }
 
     [TestMethod]
