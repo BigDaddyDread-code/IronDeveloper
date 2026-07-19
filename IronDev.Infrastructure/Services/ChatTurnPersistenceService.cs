@@ -67,7 +67,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
 
         await connection.ExecuteAsync(new CommandDefinition(
             deleteSql,
-            new { request.ChatMessageId, TenantId = _tenant.TenantId },
+            new { request.ChatMessageId, request.TenantId },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -82,7 +82,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             governanceSql,
             new
             {
-                TenantId = _tenant.TenantId,
+                request.TenantId,
                 request.ProjectId,
                 request.ChatSessionId,
                 request.ChatMessageId,
@@ -112,7 +112,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             clarificationSql,
             new
             {
-                TenantId = _tenant.TenantId,
+                request.TenantId,
                 request.ProjectId,
                 request.ChatSessionId,
                 request.ChatMessageId,
@@ -135,7 +135,7 @@ public sealed class ChatTurnPersistenceService : IChatTurnPersistenceService
             traceSql,
             new
             {
-                TenantId = _tenant.TenantId,
+                request.TenantId,
                 request.ProjectId,
                 request.ChatSessionId,
                 request.ChatMessageId,

@@ -2277,6 +2277,33 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Append-only SQL lifecycle authority for rebuildable semantic/vector projections with locked source-level transitions."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-agent-runs",
+                        "path":  "Database/migrate_workbench_agent_runs.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.WorkbenchAgentRuns",
+                                               "dbo.WorkbenchAgentRunAttempts",
+                                               "typed WorkbenchOutboxEvents agent-run linkage",
+                                               "ClientOperations agent-run result linkage"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.WorkbenchSessions",
+                                              "dbo.ProjectChatSessions",
+                                              "dbo.ChatMessages",
+                                              "dbo.ClientOperations",
+                                              "dbo.WorkbenchOutboxEvents"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-02A durable Business Analyst operation state machine"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Fenced pending/running/terminal BA runs with immutable server context, versioned output schema, per-invocation attempts, recovery claims, and exactly-once assistant materialization."
                     }
                 ]
 }

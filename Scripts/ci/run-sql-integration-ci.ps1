@@ -162,6 +162,10 @@ Invoke-TestLane `
     -Name "SQL-backed governance stores" `
     -Filter $sqlStoreFilter
 
+Invoke-TestLane `
+    -Name "Workbench PR-02A agent-run state machine" `
+    -Filter "FullyQualifiedName~WorkbenchAgentRunStateMachineTests|FullyQualifiedName~PersistAsync_TransactionUsesExplicitRequestTenantInsteadOfAmbientTenant"
+
 Write-Section "SQL integration CI complete"
 Write-Host "A database-backed green check is evidence, not permission."
 & (Join-Path $PSScriptRoot "write-ci-evidence-summary.ps1") `

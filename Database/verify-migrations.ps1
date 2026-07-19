@@ -434,6 +434,19 @@ try {
             ,@{ Name = "Memory index lifecycle event procedure"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.usp_MemoryIndexLifecycleEvent_Record', N'P') IS NULL THEN 0 ELSE 1 END" }
             ,@{ Name = "Current memory index lifecycle view"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.vw_CurrentMemoryIndexLifecycle', N'V') IS NULL THEN 0 ELSE 1 END" }
              ,@{ Name = "Memory index lifecycle source index"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.MemoryIndexLifecycleEvents') AND name = N'IX_MemoryIndexLifecycleEvents_Source'" }
+             ,@{ Name = "dbo.WorkbenchAgentRuns table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.WorkbenchAgentRuns', N'U') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "dbo.WorkbenchAgentRunAttempts table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.WorkbenchAgentRunAttempts', N'U') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Workbench agent-run status constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.WorkbenchAgentRuns') AND name=N'CK_WorkbenchAgentRuns_Status'" }
+             ,@{ Name = "Workbench agent-run materialization constraint"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.WorkbenchAgentRuns') AND name=N'CK_WorkbenchAgentRuns_MaterializationState'" }
+             ,@{ Name = "Workbench agent-run exact fence foreign key"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.WorkbenchAgentRuns') AND name=N'FK_WorkbenchAgentRuns_ExactFence' AND is_not_trusted=0" }
+             ,@{ Name = "Workbench agent-run source-message uniqueness"; Sql = "SELECT COUNT(*) FROM sys.key_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.WorkbenchAgentRuns') AND name=N'UQ_WorkbenchAgentRuns_SourceMessage'" }
+             ,@{ Name = "Workbench agent-run assistant-message uniqueness"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.WorkbenchAgentRuns') AND name=N'UX_WorkbenchAgentRuns_AssistantMessage' AND is_unique=1" }
+             ,@{ Name = "Workbench agent-run claimable index"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.WorkbenchAgentRuns') AND name=N'IX_WorkbenchAgentRuns_Claimable'" }
+             ,@{ Name = "Workbench agent-run context hash column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.WorkbenchAgentRuns', N'ContextHash') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Workbench agent-run version columns"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.WorkbenchAgentRuns', N'AgentVersion') IS NULL OR COL_LENGTH(N'dbo.WorkbenchAgentRuns', N'PromptVersion') IS NULL OR COL_LENGTH(N'dbo.WorkbenchAgentRuns', N'ToolPolicyVersion') IS NULL OR COL_LENGTH(N'dbo.WorkbenchAgentRuns', N'OutputSchemaVersion') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Client operation agent-run result column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ClientOperations', N'ResultAgentRunId') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Workbench outbox typed agent-run column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.WorkbenchOutboxEvents', N'AgentRunId') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Workbench outbox agent-run foreign key"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.WorkbenchOutboxEvents') AND name=N'FK_WorkbenchOutboxEvents_AgentRun' AND is_not_trusted=0" }
         )
 
         foreach ($check in $checks) {

@@ -298,6 +298,12 @@ public abstract class IntegrationTestBase
                 EXEC sys.sp_executesql N'UPDATE dbo.ProjectTickets SET SourceChatMessageId=NULL, SourceChatSessionId=NULL;';
             IF COL_LENGTH('dbo.ProjectTickets', 'SourceDocumentVersionId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ProjectTickets SET SourceDocumentVersionId=NULL;';
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultAgentRunId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations SET ResultAgentRunId=NULL;';
+            IF OBJECT_ID('dbo.WorkbenchOutboxEvents', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchOutboxEvents;
+            IF OBJECT_ID('dbo.WorkbenchAgentRunAttempts', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRunAttempts;
+            IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
+            IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL DELETE FROM dbo.ClientOperations;
             DELETE FROM dbo.ChatMessages;
             IF OBJECT_ID('dbo.ProjectChannelPins', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelPins;
             IF OBJECT_ID('dbo.ProjectChannelMessageReads', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelMessageReads;
@@ -316,8 +322,6 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.WorkItems', 'U') IS NOT NULL DELETE FROM dbo.WorkItems;
             IF OBJECT_ID('dbo.RunEvents', 'U') IS NOT NULL DELETE FROM dbo.RunEvents;
             IF OBJECT_ID('dbo.Runs', 'U') IS NOT NULL DELETE FROM dbo.Runs;
-            IF OBJECT_ID('dbo.WorkbenchOutboxEvents', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchOutboxEvents;
-            IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL DELETE FROM dbo.ClientOperations;
             IF OBJECT_ID('dbo.WorkbenchWriteLeases', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchWriteLeases;
             IF OBJECT_ID('dbo.WorkbenchSessions', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchSessions;
             IF OBJECT_ID('dbo.ProjectReadinessAssessments', 'U') IS NOT NULL DELETE FROM dbo.ProjectReadinessAssessments;

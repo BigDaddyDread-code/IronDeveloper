@@ -312,6 +312,8 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_versioned_collaboration_writes.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_work_item_identity.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_user_mutation_attribution.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_project_start.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_agent_runs.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -631,7 +633,18 @@ public abstract class ApiTestBase
             DELETE FROM dbo.ProjectSummaries;
             DELETE FROM dbo.ProjectFiles;
             IF OBJECT_ID('dbo.ProjectObservableStates', 'U') IS NOT NULL DELETE FROM dbo.ProjectObservableStates;
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultAgentRunId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations SET ResultAgentRunId=NULL;';
+            IF OBJECT_ID('dbo.WorkbenchOutboxEvents', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchOutboxEvents;
+            IF OBJECT_ID('dbo.WorkbenchAgentRunAttempts', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRunAttempts;
+            IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
+            IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL DELETE FROM dbo.ClientOperations;
             DELETE FROM dbo.ChatMessages;
+            IF OBJECT_ID('dbo.WorkbenchWriteLeases', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchWriteLeases;
+            IF OBJECT_ID('dbo.WorkbenchSessions', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchSessions;
+            IF OBJECT_ID('dbo.ProjectReadinessAssessments', 'U') IS NOT NULL DELETE FROM dbo.ProjectReadinessAssessments;
+            IF OBJECT_ID('dbo.ProjectUnderstandings', 'U') IS NOT NULL DELETE FROM dbo.ProjectUnderstandings;
+            IF OBJECT_ID('dbo.ProjectLifecyclePhases', 'U') IS NOT NULL DELETE FROM dbo.ProjectLifecyclePhases;
             IF OBJECT_ID('dbo.ProjectChatSessions', 'U') IS NOT NULL DELETE FROM dbo.ProjectChatSessions;
             IF OBJECT_ID('dbo.ProjectMembers', 'U') IS NOT NULL DELETE FROM dbo.ProjectMembers;
             DELETE FROM dbo.Projects;

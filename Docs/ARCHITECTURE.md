@@ -80,6 +80,16 @@ The backend workflow spine must stay explicit and reviewable:
 | Build | `TicketsController` + `ITicketBuildOrchestrator` + `ITicketBuildRunService` | `POST /api/projects/{projectId}/tickets/{ticketId}/build-preview`, `POST .../build-runs`, `GET .../build-runs*` | Build readiness, disposable run scheduling, and durable run state transitions | Proposal mutation, proposal-only editing, unapproved command/root overrides | `build -> run event stream` |
 | Run | `IDisposableCodeRunService` + `IRunReviewPackageService` + `RunReportsController` | `POST /api/projects/{projectId}/tickets/{ticketId}/disposable-code-runs`, `GET .../build-runs/{runId}/review`, `GET .../review-package` | Execute backend-owned run profile, collect command/verification evidence, produce review package | Client-supplied workspace paths, stdout parsing as API authority, or real-repo mutation | `run -> review package (PausedForApproval)` |
 
+## Workbench V2 Business Analyst operation boundary
+
+PR-02A introduces the durable control plane for repository-independent Business Analyst turns. `POST /api/workbench/projects/{projectId}/agent-runs` is the submission authority: one serializable transaction validates the exact Workbench session and lease epoch, writes the user message, creates a `Pending` run, completes the scoped client operation, and emits a typed `AgentRunRequested` outbox event.
+
+External invocation is always outside the submission and materialization transactions. The worker claims `Pending` work (or an expired `Running` claim), records a distinct attempt, persists one immutable server-owned context snapshot and hash, invokes `IWorkbenchBusinessAnalystAgent`, and validates the versioned typed output. Context contains only project identity, the captured understanding revision, and same-chat messages through the source user message; it does not depend on repository, branch, code-index, provider-memory, or request/JWT state.
+
+`WorkbenchAgentRunService.MaterializeAsync` is the exactly-once assistant writer. It locks the current lease before the run, verifies the claim/context/fence, writes one assistant message, completes the attempt/run, and emits the terminal event in one transaction. Cancelled, superseded, stale, invalid, and late responses can retain bounded hashes and codes in run/attempt diagnostics but cannot create assistant messages or other visible domain output. A lease takeover supersedes old-epoch `Pending`/`Running` work and requests cancellation in the same transaction as the new fence.
+
+The hosted outbox worker is feature-disabled until PR-02B supplies the process-ready BA host. PR-02A exposes the API and deterministic processor seam for SQL/API proof; the current Workshop chat UI remains on its compatibility path until the later conversation slice switches submission and polling to this authority.
+
 Allowed transitions (only):
 
 ```text

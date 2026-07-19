@@ -129,8 +129,61 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                 transaction,
                 cancellationToken: cancellationToken));
 
+            // Serialize every open/takeover/expiry path on the project's active-lease key range
+            // before any AgentRun row is locked or changed.
+            _ = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
+                """
+                SELECT TOP (1) lease.Id
+                FROM dbo.WorkbenchWriteLeases lease WITH (UPDLOCK, HOLDLOCK)
+                WHERE lease.TenantId=@TenantId AND lease.ProjectId=@ProjectId
+                  AND lease.RevokedAtUtc IS NULL
+                ORDER BY lease.LeaseEpoch DESC;
+                """,
+                command,
+                transaction,
+                cancellationToken: cancellationToken));
+
             await connection.ExecuteAsync(new CommandDefinition(
                 """
+                INSERT dbo.WorkbenchOutboxEvents
+                    (EventId, TenantId, ProjectId, WorkbenchSessionId, AgentRunId, EventKind,
+                     PayloadJson, ClientOperationId, DedupeKey)
+                SELECT NEWID(), run.TenantId, run.ProjectId, run.WorkbenchSessionId, run.AgentRunId,
+                       N'AgentRunStale',
+                       CONCAT(N'{"agentRunId":"', CONVERT(NVARCHAR(36), run.AgentRunId),
+                              N'","reason":"lease_expired"}'),
+                       run.ClientOperationId,
+                       CONCAT(N'agent-run-stale:', CONVERT(NVARCHAR(36), run.AgentRunId))
+                FROM dbo.WorkbenchAgentRuns run
+                INNER JOIN dbo.WorkbenchWriteLeases lease
+                    ON lease.TenantId=run.TenantId AND lease.ProjectId=run.ProjectId
+                   AND lease.WorkbenchSessionId=run.WorkbenchSessionId AND lease.LeaseEpoch=run.LeaseEpoch
+                WHERE lease.TenantId=@TenantId AND lease.ProjectId=@ProjectId
+                  AND lease.RevokedAtUtc IS NULL AND lease.ExpiresAtUtc <= SYSUTCDATETIME()
+                  AND run.Status IN (N'Pending', N'Running')
+                  AND NOT EXISTS
+                  (
+                      SELECT 1 FROM dbo.WorkbenchOutboxEvents existing
+                      WHERE existing.DedupeKey=CONCAT(N'agent-run-stale:', CONVERT(NVARCHAR(36), run.AgentRunId))
+                  );
+
+                UPDATE run
+                SET Status=N'Stale',
+                    CancellationRequestedAtUtc=CASE WHEN run.Status=N'Running'
+                        THEN COALESCE(run.CancellationRequestedAtUtc, SYSUTCDATETIME())
+                        ELSE run.CancellationRequestedAtUtc END,
+                    DiagnosticCode=COALESCE(run.DiagnosticCode, N'lease_expired'),
+                    DiagnosticAtUtc=COALESCE(run.DiagnosticAtUtc, SYSUTCDATETIME()),
+                    CompletedAtUtc=COALESCE(run.CompletedAtUtc, SYSUTCDATETIME()),
+                    ClaimExpiresAtUtc=NULL
+                FROM dbo.WorkbenchAgentRuns run
+                INNER JOIN dbo.WorkbenchWriteLeases lease
+                    ON lease.TenantId=run.TenantId AND lease.ProjectId=run.ProjectId
+                   AND lease.WorkbenchSessionId=run.WorkbenchSessionId AND lease.LeaseEpoch=run.LeaseEpoch
+                WHERE lease.TenantId=@TenantId AND lease.ProjectId=@ProjectId
+                  AND lease.RevokedAtUtc IS NULL AND lease.ExpiresAtUtc <= SYSUTCDATETIME()
+                  AND run.Status IN (N'Pending', N'Running');
+
                 UPDATE session
                 SET Status=N'Historical', ClosedAtUtc=COALESCE(ClosedAtUtc, SYSUTCDATETIME())
                 FROM dbo.WorkbenchSessions session
@@ -203,6 +256,7 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                     new { activeLease.Id },
                     transaction,
                     cancellationToken: cancellationToken));
+
             }
             else
             {
@@ -260,6 +314,53 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                     },
                     transaction,
                     cancellationToken: cancellationToken));
+
+                if (wasTakenOver)
+                {
+                    await connection.ExecuteAsync(new CommandDefinition(
+                        """
+                        INSERT dbo.WorkbenchOutboxEvents
+                            (EventId, TenantId, ProjectId, WorkbenchSessionId, AgentRunId, EventKind,
+                             PayloadJson, ClientOperationId, DedupeKey)
+                        SELECT NEWID(), run.TenantId, run.ProjectId, run.WorkbenchSessionId, run.AgentRunId,
+                               N'AgentRunSuperseded',
+                               CONCAT(N'{"agentRunId":"', CONVERT(NVARCHAR(36), run.AgentRunId),
+                                      N'","supersededByWorkbenchSessionId":', CONVERT(NVARCHAR(30), @NewWorkbenchSessionId),
+                                      N',"supersededByLeaseEpoch":', CONVERT(NVARCHAR(30), @NewLeaseEpoch), N'}'),
+                               run.ClientOperationId,
+                               CONCAT(N'agent-run-superseded:', CONVERT(NVARCHAR(36), run.AgentRunId),
+                                      N':', CONVERT(NVARCHAR(30), @NewLeaseEpoch))
+                        FROM dbo.WorkbenchAgentRuns run
+                        WHERE run.TenantId=@TenantId AND run.ProjectId=@ProjectId
+                          AND run.WorkbenchSessionId=@OldWorkbenchSessionId AND run.LeaseEpoch=@OldLeaseEpoch
+                          AND run.Status IN (N'Pending', N'Running');
+
+                        UPDATE dbo.WorkbenchAgentRuns
+                        SET Status=N'Superseded',
+                            CancellationRequestedAtUtc=COALESCE(CancellationRequestedAtUtc, SYSUTCDATETIME()),
+                            SupersededAtUtc=COALESCE(SupersededAtUtc, SYSUTCDATETIME()),
+                            SupersededByWorkbenchSessionId=@NewWorkbenchSessionId,
+                            SupersededByLeaseEpoch=@NewLeaseEpoch,
+                            DiagnosticCode=COALESCE(DiagnosticCode, N'workbench_lease_taken_over'),
+                            DiagnosticAtUtc=COALESCE(DiagnosticAtUtc, SYSUTCDATETIME()),
+                            CompletedAtUtc=COALESCE(CompletedAtUtc, SYSUTCDATETIME()),
+                            ClaimExpiresAtUtc=NULL
+                        WHERE TenantId=@TenantId AND ProjectId=@ProjectId
+                          AND WorkbenchSessionId=@OldWorkbenchSessionId AND LeaseEpoch=@OldLeaseEpoch
+                          AND Status IN (N'Pending', N'Running');
+                        """,
+                        new
+                        {
+                            command.TenantId,
+                            command.ProjectId,
+                            OldWorkbenchSessionId = activeLease!.WorkbenchSessionId,
+                            OldLeaseEpoch = activeLease.LeaseEpoch,
+                            NewWorkbenchSessionId = workbenchSessionId,
+                            NewLeaseEpoch = leaseEpoch
+                        },
+                        transaction,
+                        cancellationToken: cancellationToken));
+                }
             }
 
             var result = new WorkbenchProjectEntryContext(

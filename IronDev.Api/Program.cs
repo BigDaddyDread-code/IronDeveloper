@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using IronDev.Api;
 using IronDev.Api.Controllers;
 using IronDev.AI;
 using IronDev.Api.Auth;
@@ -174,6 +175,14 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddSingleton<IProjectStartFailureInjector, NoOpProjectStartFailureInjector>();
 builder.Services.AddScoped<IProjectStartService, ProjectStartService>();
 builder.Services.AddScoped<IWorkbenchProjectEntryService, WorkbenchProjectEntryService>();
+builder.Services.AddSingleton<IWorkbenchAgentRunFailureInjector, NoOpWorkbenchAgentRunFailureInjector>();
+builder.Services.AddScoped<IWorkbenchAgentRunService, WorkbenchAgentRunService>();
+builder.Services.AddScoped<IWorkbenchAgentContextAssembler, WorkbenchAgentContextAssembler>();
+builder.Services.AddScoped<IWorkbenchAgentRunOutbox, WorkbenchAgentRunOutbox>();
+builder.Services.AddScoped<IWorkbenchAgentRunProcessor, WorkbenchAgentRunProcessor>();
+builder.Services.AddSingleton<IWorkbenchBusinessAnalystAgent, UnavailableWorkbenchBusinessAnalystAgent>();
+if (builder.Configuration.GetValue<bool>("Features:WorkbenchAgentRunWorker"))
+    builder.Services.AddHostedService<WorkbenchAgentRunOutboxWorker>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IProjectChatDocumentSourceService, ProjectChatDocumentSourceService>();
 builder.Services.AddScoped<IProjectToolCatalogueService, ProjectToolCatalogueService>();

@@ -104,6 +104,85 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
     }
 
     [TestMethod]
+    public async Task PersistAsync_TransactionUsesExplicitRequestTenantInsteadOfAmbientTenant()
+    {
+        const int requestTenantId = 1;
+        const int ambientTenantId = 2;
+        var projectId = await SeedProjectAsync(requestTenantId, "Explicit tenant audit write");
+        var chat = ServiceProvider.GetRequiredService<IChatHistoryService>();
+        var turnPersistence = ServiceProvider.GetRequiredService<IChatTurnPersistenceService>();
+        var sessionId = await chat.SaveSessionAsync(new ProjectChatSession
+        {
+            ProjectId = projectId,
+            Title = "Explicit tenant transaction test"
+        });
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        var messageId = await connection.QuerySingleAsync<long>(
+            """
+            INSERT dbo.ChatMessages
+                (TenantId, ProjectId, ChatSessionId, Role, Message, Tags)
+            OUTPUT inserted.Id
+            VALUES
+                (@TenantId, @ProjectId, @ChatSessionId, N'assistant', N'Explicit tenant audit response.', @Tags);
+            """,
+            new
+            {
+                TenantId = requestTenantId,
+                ProjectId = projectId,
+                ChatSessionId = sessionId,
+                Tags = BuildEnvelopeJson()
+            });
+
+        using (var transaction = connection.BeginTransaction())
+        {
+            TenantContext.TenantId = ambientTenantId;
+            try
+            {
+                await turnPersistence.PersistAsync(
+                    new ChatTurnPersistenceRequest(
+                        messageId,
+                        requestTenantId,
+                        projectId,
+                        sessionId,
+                        "assistant",
+                        BuildEnvelopeJson(),
+                        "Explicit tenant context.",
+                        null,
+                        null),
+                    connection,
+                    transaction);
+                transaction.Commit();
+            }
+            finally
+            {
+                TenantContext.TenantId = requestTenantId;
+            }
+        }
+
+        foreach (var table in new[] { "dbo.ChatTurnGovernance", "dbo.ChatTurnClarifications", "dbo.ChatTurnTraces" })
+        {
+            Assert.AreEqual(
+                1,
+                await CountRowsAsync(
+                    connection,
+                    table,
+                    "ChatMessageId = @MessageId AND TenantId = @TenantId",
+                    new { MessageId = messageId, TenantId = requestTenantId }),
+                $"{table} must use the explicit request tenant for background-safe transaction writes.");
+            Assert.AreEqual(
+                0,
+                await CountRowsAsync(
+                    connection,
+                    table,
+                    "ChatMessageId = @MessageId AND TenantId = @TenantId",
+                    new { MessageId = messageId, TenantId = ambientTenantId }),
+                $"{table} must not use the ambient request tenant for transaction writes.");
+        }
+    }
+
+    [TestMethod]
     public async Task SaveTurnAsync_AuditFailureDoesNotLeaveSuccessfulMessageWithoutAuditRows()
     {
         var projectId = await SeedProjectAsync();

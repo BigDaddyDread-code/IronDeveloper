@@ -194,6 +194,11 @@
                             "id":  "2026-07-workbench-pr01-project-start",
                             "path":  "Database/migrate_workbench_project_start.sql",
                             "description":  "Adds atomic project-first Workbench startup state, leases, idempotent client operations, and outbox events without repository provisioning."
+                       },
+                       {
+                            "id":  "2026-07-workbench-pr02a-agent-runs",
+                            "path":  "Database/migrate_workbench_agent_runs.sql",
+                            "description":  "Adds the fenced Workbench Business Analyst run state machine, claim metadata, exactly-once assistant materialization, and durable operation result linkage."
                        }
                    ]
 }

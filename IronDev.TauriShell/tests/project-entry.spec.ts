@@ -75,11 +75,11 @@ test('versioned preview identity remains visible after login', async ({ page }) 
   await mockProjectEntryApi(page);
   await page.goto('/');
 
-  await expect(page.getByTestId('auth.workbenchIdentity')).toContainText('V2 0.1.0-preview.4 / workbench-pr01');
+  await expect(page.getByTestId('auth.workbenchIdentity')).toContainText('V2 0.1.0-preview.5 / workbench-pr02a');
   await page.getByTestId('auth.submit').click();
 
-  await expect(page.getByTestId('flow.projectEntry.health')).toContainText('V2 0.1.0-preview.4 / workbench-pr01');
-  await expect(page.getByTestId('flow.projectEntry.workbenchIdentity')).toContainText('V2 0.1.0-preview.4 / workbench-pr01');
+  await expect(page.getByTestId('flow.projectEntry.health')).toContainText('V2 0.1.0-preview.5 / workbench-pr02a');
+  await expect(page.getByTestId('flow.projectEntry.workbenchIdentity')).toContainText('V2 0.1.0-preview.5 / workbench-pr02a');
 });
 
 test('configured fallback does not auto-open a project', async ({ page }) => {
@@ -324,9 +324,9 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
         nextSafeAction: 'Sign in with the documented LocalTest credentials.',
         resetCommand: null,
         detail: 'LocalTest front door is ready.',
-        workbenchVersion: '0.1.0-preview.4',
+        workbenchVersion: '0.1.0-preview.5',
         workbenchMode: 'V2',
-        previewId: 'workbench-pr01',
+        previewId: 'workbench-pr02a',
         sessionMode: 'SmokeSimulation',
         sandboxApplyRequested: false,
         sandboxApplyEnabled: false,
@@ -344,11 +344,11 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
         database: 'IronDeveloper_Test_workbench_pr01',
         isTestEnvironment: true,
         workbench: {
-          version: '0.1.0-preview.4',
+          version: '0.1.0-preview.5',
           mode: 'V2',
           v2Enabled: true,
           v1FallbackEnabled: true,
-          previewId: 'workbench-pr01',
+          previewId: 'workbench-pr02a',
           apiBuildIdentity: '1.0.0+test-commit',
           apiCommit: 'test-commit',
           resetSupported: true

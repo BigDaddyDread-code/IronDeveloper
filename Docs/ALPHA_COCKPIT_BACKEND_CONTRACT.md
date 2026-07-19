@@ -4,6 +4,17 @@ IronDev's cockpit API is project-scoped by default. Any endpoint that returns ti
 
 ## Contract Rules
 
+### Workbench V2 agent runs
+
+- `POST /api/workbench/projects/{projectId}/agent-runs` accepts only `workbenchSessionId`, `leaseEpoch`, `clientOperationId`, `chatSessionId`, and the user `message`. The client cannot supply prompt context, understanding state, repository context, role, model output, or an assistant message.
+- Submission returns `202 Accepted` with the durable run and source-user-message identities. Reusing the same scoped operation and payload returns the same identities; changed payload returns `409 operation_id_payload_mismatch`.
+- `GET /api/workbench/projects/{projectId}/agent-runs/{agentRunId}` exposes state/progress only. It must not expose raw prompts, context snapshots, provider output, or restricted diagnostics.
+- `POST /api/workbench/projects/{projectId}/agent-runs/{agentRunId}/cancel` requires the current session and lease epoch and is operation-journal idempotent.
+- Allowed run states are `Pending`, `Running`, `NeedsInput`, `Completed`, `Failed`, `Cancelled`, `Superseded`, and `Stale`; `NeedsInput` and `Completed` are terminal for that invocation.
+- Every agent-authored materialization carries the initiating actor, run ID, agent version, prompt version, tool-policy version, output-schema version, captured understanding revision, and server context hash.
+- At-least-once agent invocation is allowed. The unique assistant-message relationship plus the locked materialization transaction provides exactly-once visible output.
+- Takeover supersedes old-epoch pending/running work and requests cancellation atomically with the new lease. A late result is restricted diagnostic evidence only.
+
 - Prefer `/api/projects/{projectId}/...` routes for cockpit workflows.
 - Do not use global run identifiers as sufficient authorization or ownership proof.
 - Run proposals must be validated first: `CodeProposalValidator` must pass before any disposable run executes build/run commands.
