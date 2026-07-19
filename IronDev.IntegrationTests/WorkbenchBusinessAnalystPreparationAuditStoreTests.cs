@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace IronDev.IntegrationTests;
 
 [TestClass]
+[TestCategory("Store")]
 public sealed class WorkbenchBusinessAnalystPreparationAuditStoreTests : IntegrationTestBase
 {
     private static readonly string[] SnapshotToolNames =
