@@ -38,7 +38,7 @@ public sealed class LocalOpenAiCompatibleLlmService : ILLMService
             var completion = await _chatClient.CompleteChatAsync(new UserChatMessage[] { new(prompt) }, cancellationToken: ct);
             return completion.Value.Content[0].Text;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             throw new InvalidOperationException($"Local OpenAI compatible call failed: {ex.Message}", ex);
         }

@@ -19,7 +19,7 @@ public class ApiHarnessTests : ApiTestBase
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.AreEqual("healthy", body.GetProperty("status").GetString());
         var workbench = body.GetProperty("workbench");
-        Assert.AreEqual("0.1.0-preview.5", workbench.GetProperty("version").GetString());
+        Assert.AreEqual("0.1.0-preview.6", workbench.GetProperty("version").GetString());
         Assert.AreEqual("V1", workbench.GetProperty("mode").GetString());
         Assert.IsFalse(string.IsNullOrWhiteSpace(workbench.GetProperty("apiCommit").GetString()));
     }
@@ -62,7 +62,7 @@ public class ApiHarnessTests : ApiTestBase
         Assert.IsTrue(body.IsTestEnvironment);
         Assert.IsFalse(string.IsNullOrWhiteSpace(body.WorkspaceRoot));
         Assert.IsFalse(string.IsNullOrWhiteSpace(body.LogsRoot));
-        Assert.AreEqual("0.1.0-preview.5", body.Workbench.Version);
+        Assert.AreEqual("0.1.0-preview.6", body.Workbench.Version);
         Assert.AreEqual("default", body.Workbench.PreviewId);
         Assert.AreEqual("V1", body.Workbench.Mode);
     }

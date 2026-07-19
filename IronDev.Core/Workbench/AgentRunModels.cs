@@ -199,6 +199,11 @@ public interface IWorkbenchAgentRunService
         TimeSpan claimDuration,
         CancellationToken cancellationToken = default);
 
+    Task<bool> AuthorizeInvocationAsync(
+        WorkbenchAgentRunClaim claim,
+        TimeSpan renewedClaimDuration,
+        CancellationToken cancellationToken = default);
+
     Task<WorkbenchAgentRunMaterializationResult> MaterializeAsync(
         WorkbenchAgentRunClaim claim,
         WorkbenchBusinessAnalystContext context,
@@ -221,9 +226,17 @@ public interface IWorkbenchAgentContextAssembler
 
 public interface IWorkbenchBusinessAnalystAgent
 {
-    Task<string> ExecuteAsync(
+    Task<IWorkbenchBusinessAnalystPreparedInvocation> PrepareAsync(
+        WorkbenchAgentRunClaim claim,
         WorkbenchBusinessAnalystContext context,
         CancellationToken cancellationToken = default);
+}
+
+public interface IWorkbenchBusinessAnalystPreparedInvocation
+{
+    TimeSpan ProviderTimeout { get; }
+
+    Task<string> InvokeProviderAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IWorkbenchAgentRunOutbox
@@ -343,6 +356,22 @@ public sealed class WorkbenchAgentOutputValidationException : Exception
 
     public WorkbenchAgentOutputValidationException(string message, Exception innerException)
         : base(message, innerException)
+    {
+    }
+}
+
+public sealed class WorkbenchAgentProviderTimeoutException : Exception
+{
+    public WorkbenchAgentProviderTimeoutException()
+        : base("The Business Analyst provider did not complete within the bounded invocation timeout.")
+    {
+    }
+}
+
+public sealed class WorkbenchAgentProviderTimeoutConfigurationException : Exception
+{
+    public WorkbenchAgentProviderTimeoutConfigurationException(string message)
+        : base(message)
     {
     }
 }

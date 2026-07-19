@@ -180,7 +180,18 @@ builder.Services.AddScoped<IWorkbenchAgentRunService, WorkbenchAgentRunService>(
 builder.Services.AddScoped<IWorkbenchAgentContextAssembler, WorkbenchAgentContextAssembler>();
 builder.Services.AddScoped<IWorkbenchAgentRunOutbox, WorkbenchAgentRunOutbox>();
 builder.Services.AddScoped<IWorkbenchAgentRunProcessor, WorkbenchAgentRunProcessor>();
-builder.Services.AddSingleton<IWorkbenchBusinessAnalystAgent, UnavailableWorkbenchBusinessAnalystAgent>();
+builder.Services.AddSingleton<IWorkbenchBusinessAnalystExecutableContractRegistry,
+    WorkbenchBusinessAnalystExecutableContractRegistry>();
+builder.Services.AddSingleton<IWorkbenchBusinessAnalystSnapshotToolCatalogue,
+    WorkbenchBusinessAnalystSnapshotToolCatalogue>();
+builder.Services.AddSingleton<IWorkbenchBusinessAnalystPromptBuilder,
+    WorkbenchBusinessAnalystPromptBuilder>();
+builder.Services.AddScoped<IWorkbenchBusinessAnalystModelGateway,
+    WorkbenchBusinessAnalystModelGateway>();
+builder.Services.AddScoped<IWorkbenchBusinessAnalystPreparationAuditStore,
+    SqlWorkbenchBusinessAnalystPreparationAuditStore>();
+builder.Services.AddScoped<IWorkbenchBusinessAnalystAgent,
+    WorkbenchBusinessAnalystAgent>();
 if (builder.Configuration.GetValue<bool>("Features:WorkbenchAgentRunWorker"))
     builder.Services.AddHostedService<WorkbenchAgentRunOutboxWorker>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();

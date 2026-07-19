@@ -228,10 +228,7 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
                 SELECT bounded.Id AS MessageId, bounded.Role, bounded.Message, bounded.CreatedDate AS CreatedAtUtc
                 FROM
                 (
-                    SELECT TOP (50) message.Id,
-                           CASE WHEN message.Role=N'assistant' AND trustedRun.AgentRunId IS NOT NULL
-                                THEN N'assistant' ELSE N'user' END AS Role,
-                           message.Message, message.CreatedDate
+                    SELECT TOP (50) message.Id, message.Role, message.Message, message.CreatedDate
                     FROM dbo.ChatMessages message
                     LEFT JOIN dbo.WorkbenchAgentRuns trustedRun
                         ON trustedRun.TenantId=message.TenantId
@@ -241,7 +238,11 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
                        AND trustedRun.Status IN (N'Completed', N'NeedsInput')
                     WHERE message.TenantId=@TenantId AND message.ProjectId=@ProjectId
                       AND message.ChatSessionId=@ChatSessionId AND message.Id <= @SourceUserMessageId
-                      AND message.Role IN (N'user', N'assistant')
+                      AND
+                      (
+                          message.Role=N'user'
+                          OR (message.Role=N'assistant' AND trustedRun.AgentRunId IS NOT NULL)
+                      )
                     ORDER BY message.Id DESC
                 ) bounded
                 ORDER BY bounded.Id;
@@ -420,7 +421,8 @@ public sealed class WorkbenchAgentRunOutbox : IWorkbenchAgentRunOutbox
                         AND request.EventKind=N'AgentRunRequested' AND request.PublishedAtUtc IS NULL
                   )
             ) candidate
-            ORDER BY candidate.Recovery, candidate.ReadyAtUtc, candidate.OutboxEventId;
+            ORDER BY candidate.ReadyAtUtc, candidate.Recovery,
+                     candidate.OutboxEventId, candidate.AgentRunId;
             """,
             new { MaximumCount = maximumCount },
             cancellationToken: cancellationToken));
@@ -446,6 +448,7 @@ public sealed class WorkbenchAgentRunOutbox : IWorkbenchAgentRunOutbox
 public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
 {
     private static readonly TimeSpan ClaimDuration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan MaximumProviderTimeout = TimeSpan.FromMinutes(4);
     private readonly IWorkbenchAgentRunService _runs;
     private readonly IWorkbenchAgentContextAssembler _contexts;
     private readonly IWorkbenchBusinessAnalystAgent _agent;
@@ -482,7 +485,46 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
         try
         {
             var context = await _contexts.AssembleAsync(claim, cancellationToken);
-            rawOutput = await _agent.ExecuteAsync(context, cancellationToken);
+            var invocation = await _agent.PrepareAsync(claim, context, cancellationToken);
+            if (invocation.ProviderTimeout <= TimeSpan.Zero ||
+                invocation.ProviderTimeout > MaximumProviderTimeout ||
+                invocation.ProviderTimeout >= ClaimDuration)
+                throw new WorkbenchAgentProviderTimeoutConfigurationException(
+                    $"The Business Analyst provider timeout must be greater than zero and no more than {MaximumProviderTimeout.TotalSeconds:0} seconds.");
+
+            // This is deliberately the final await before InvokeProviderAsync. Provider/profile
+            // resolution, prompt construction, and tool preparation must all finish before the
+            // exact authority/fence check so revocation cannot be hidden behind preparation work.
+            if (!await _runs.AuthorizeInvocationAsync(claim, ClaimDuration, cancellationToken))
+                return;
+
+            using var providerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            providerCancellation.CancelAfter(invocation.ProviderTimeout);
+            Task<string>? providerTask = null;
+            try
+            {
+                providerTask = invocation.InvokeProviderAsync(providerCancellation.Token);
+                rawOutput = await providerTask.WaitAsync(invocation.ProviderTimeout, cancellationToken);
+            }
+            catch (TimeoutException) when (!cancellationToken.IsCancellationRequested)
+            {
+                providerCancellation.Cancel();
+                ObserveLateProviderFault(providerTask);
+                throw new WorkbenchAgentProviderTimeoutException();
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                ObserveLateProviderFault(providerTask);
+                // Some provider clients enforce their own timeout and may throw before the linked
+                // timeout token observes cancellation. Any provider-side cancellation that is not
+                // the worker shutdown token is the same bounded provider-timeout outcome.
+                throw new WorkbenchAgentProviderTimeoutException();
+            }
+            catch (OperationCanceledException)
+            {
+                ObserveLateProviderFault(providerTask);
+                throw;
+            }
             var output = WorkbenchBusinessAnalystOutputValidator.DeserializeAndValidate(rawOutput, context);
             await _runs.MaterializeAsync(claim, context, output, cancellationToken);
         }
@@ -493,9 +535,14 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
         }
         catch (Exception exception)
         {
-            var code = exception is WorkbenchAgentOutputValidationException
-                ? "agent_output_schema_invalid"
-                : "agent_execution_failed";
+            var code = exception switch
+            {
+                WorkbenchAgentOutputValidationException => "agent_output_schema_invalid",
+                WorkbenchBusinessAnalystContractNotSupportedException => "agent_contract_version_unsupported",
+                WorkbenchAgentProviderTimeoutException => "agent_provider_timeout",
+                WorkbenchAgentProviderTimeoutConfigurationException => "agent_provider_timeout_invalid",
+                _ => "agent_execution_failed"
+            };
             var diagnosticHash = exception is WorkbenchAgentOutputValidationException && rawOutput is not null
                 ? WorkbenchAgentRunService.ComputeHash(rawOutput)
                 : WorkbenchAgentRunService.ComputeHash(
@@ -503,13 +550,22 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
             await _runs.MarkFailedAsync(claim, code, diagnosticHash, cancellationToken);
         }
     }
-}
 
-public sealed class UnavailableWorkbenchBusinessAnalystAgent : IWorkbenchBusinessAnalystAgent
-{
-    public Task<string> ExecuteAsync(
-        WorkbenchBusinessAnalystContext context,
-        CancellationToken cancellationToken = default) =>
-        throw new InvalidOperationException(
-            "The Business Analyst host is not configured. PR-02B supplies the process-ready agent implementation.");
+    private static void ObserveLateProviderFault(Task? providerTask)
+    {
+        if (providerTask is null || providerTask.IsCompletedSuccessfully || providerTask.IsCanceled)
+            return;
+
+        if (providerTask.IsFaulted)
+        {
+            _ = providerTask.Exception;
+            return;
+        }
+
+        _ = providerTask.ContinueWith(
+            static completedTask => _ = completedTask.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
 }

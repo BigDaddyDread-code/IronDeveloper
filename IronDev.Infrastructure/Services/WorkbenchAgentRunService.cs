@@ -604,6 +604,87 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         }
     }
 
+    public async Task<bool> AuthorizeInvocationAsync(
+        WorkbenchAgentRunClaim claim,
+        TimeSpan renewedClaimDuration,
+        CancellationToken cancellationToken = default)
+    {
+        if (claim.AgentRunId == Guid.Empty || claim.ClaimToken == Guid.Empty || renewedClaimDuration <= TimeSpan.Zero)
+            throw new WorkbenchAgentRunValidationException(
+                "A current run claim and positive renewed claim duration are required.");
+        if (renewedClaimDuration.TotalSeconds > int.MaxValue)
+            throw new WorkbenchAgentRunValidationException("The renewed claim duration is too large.");
+
+        using var connection = _connections.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+        try
+        {
+            // Invocation authorization follows the same global order as takeover and materialization:
+            // lock the exact lease fence before locking the run. Profile/prompt preparation happens
+            // before this method; a successful return is therefore the last awaited authority check
+            // before the external provider call.
+            var fenceCurrent = await IsClaimFenceCurrentAsync(
+                connection,
+                transaction,
+                claim,
+                cancellationToken);
+            var run = await connection.QuerySingleOrDefaultAsync<AgentRunRow>(new CommandDefinition(
+                "SELECT * FROM dbo.WorkbenchAgentRuns WITH (UPDLOCK, HOLDLOCK) WHERE AgentRunId=@AgentRunId;",
+                new { claim.AgentRunId },
+                transaction,
+                cancellationToken: cancellationToken));
+            if (run is null)
+                throw new WorkbenchAgentRunNotFoundException();
+
+            var exactClaim = run.Status == WorkbenchAgentRunStates.Running &&
+                             run.ClaimToken == claim.ClaimToken &&
+                             RunReferencesMatchClaim(run, claim);
+            if (!exactClaim)
+            {
+                transaction.Commit();
+                return false;
+            }
+
+            if (!fenceCurrent)
+            {
+                await MarkRunWithoutCurrentFenceAsync(
+                    connection,
+                    transaction,
+                    run,
+                    "invocation_authority_not_current",
+                    diagnosticHash: null,
+                    cancellationToken);
+                transaction.Commit();
+                return false;
+            }
+
+            var renewed = await connection.ExecuteAsync(new CommandDefinition(
+                """
+                UPDATE dbo.WorkbenchAgentRuns
+                SET ClaimExpiresAtUtc=DATEADD(SECOND, @RenewedClaimSeconds, SYSUTCDATETIME())
+                WHERE AgentRunId=@AgentRunId AND Status=N'Running' AND ClaimToken=@ClaimToken
+                  AND CancellationRequestedAtUtc IS NULL
+                  AND ClaimExpiresAtUtc > SYSUTCDATETIME();
+                """,
+                new
+                {
+                    claim.AgentRunId,
+                    claim.ClaimToken,
+                    RenewedClaimSeconds = checked((int)Math.Ceiling(renewedClaimDuration.TotalSeconds))
+                },
+                transaction,
+                cancellationToken: cancellationToken));
+            transaction.Commit();
+            return renewed == 1;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
     public async Task<WorkbenchAgentRunMaterializationResult> MaterializeAsync(
         WorkbenchAgentRunClaim claim,
         WorkbenchBusinessAnalystContext context,

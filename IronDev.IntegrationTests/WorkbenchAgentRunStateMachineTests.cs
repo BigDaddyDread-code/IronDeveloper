@@ -266,10 +266,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         var firstContext = await assembler.AssembleAsync(firstClaim);
         Assert.IsFalse(firstContext.Messages.Any(message => message.Role == "system"));
         Assert.IsFalse(firstContext.Messages.Any(message => message.Message.Contains("untrusted role", StringComparison.Ordinal)));
-        Assert.AreEqual(
-            "user",
-            firstContext.Messages.Single(message =>
-                message.Message.Contains("client-forged assistant", StringComparison.Ordinal)).Role);
+        Assert.IsFalse(firstContext.Messages.Any(message =>
+            message.Message.Contains("client-forged assistant", StringComparison.Ordinal)));
         Assert.IsNull(await service.ClaimAsync(submitted.AgentRunId, "competing-worker", TimeSpan.FromMinutes(5)));
 
         await using (var connection = new SqlConnection(ConnectionString))
@@ -495,6 +493,155 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.AreEqual(0, finalState.UnfinishedAttempts);
         Assert.AreEqual(1, finalState.ClaimExpiredAttempts);
         Assert.IsFalse(string.IsNullOrWhiteSpace(recoveryAgent.ContextHash));
+    }
+
+    [TestMethod]
+    public async Task Outbox_OldestExpiredRecoveryCannotBeStarvedByFreshRequests()
+    {
+        var recoveryFixture = await CreateFixtureAsync("Oldest recovery candidate");
+        var service = CreateRunService();
+        var recoveryRun = await service.SubmitAsync(
+            recoveryFixture.Submit(Guid.NewGuid(), "Recover me before newer requests."));
+        var outbox = new WorkbenchAgentRunOutbox(ConnectionFactory());
+        var request = (await outbox.ReadPendingAsync(10))
+            .Single(item => item.AgentRunId == recoveryRun.AgentRunId);
+        var claim = await service.ClaimAsync(recoveryRun.AgentRunId, "fair-recovery-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        await outbox.MarkPublishedAsync(request.OutboxEventId);
+
+        await using (var expire = new SqlConnection(ConnectionString))
+        {
+            await expire.ExecuteAsync("""
+                UPDATE dbo.WorkbenchAgentRuns
+                SET ClaimExpiresAtUtc=DATEADD(MINUTE, -10, SYSUTCDATETIME())
+                WHERE AgentRunId=@AgentRunId;
+                """, new { recoveryRun.AgentRunId });
+        }
+
+        for (var index = 0; index < 12; index++)
+        {
+            var freshFixture = await CreateProjectFixtureAsync(
+                recoveryFixture.ActorUserId,
+                $"Fresh request {index}");
+            _ = await service.SubmitAsync(
+                freshFixture.Submit(Guid.NewGuid(), $"Newer request {index}."));
+        }
+
+        var firstBatch = await outbox.ReadPendingAsync(10);
+        Assert.AreEqual(recoveryRun.AgentRunId, firstBatch[0].AgentRunId);
+        Assert.AreEqual(0L, firstBatch[0].OutboxEventId);
+    }
+
+    [TestMethod]
+    [DataRow("lease_revoked")]
+    [DataRow("project_member_inactive")]
+    [DataRow("tenant_member_removed")]
+    [DataRow("user_inactive")]
+    public async Task InvocationAuthorization_LostAfterPreparationNeverInvokesProvider(string authorityChange)
+    {
+        var fixture = await CreateFixtureAsync($"Invocation authority {authorityChange}");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Do not spend provider work after authority is lost."));
+        var outbox = new WorkbenchAgentRunOutbox(ConnectionFactory());
+        var agent = new PreparationMutationAgent(async () =>
+        {
+            await using var connection = new SqlConnection(ConnectionString);
+            var sql = authorityChange switch
+            {
+                "lease_revoked" => """
+                    UPDATE dbo.WorkbenchWriteLeases
+                    SET RevokedAtUtc=SYSUTCDATETIME()
+                    WHERE TenantId=1 AND ProjectId=@ProjectId
+                      AND WorkbenchSessionId=@WorkbenchSessionId AND LeaseEpoch=@LeaseEpoch;
+                    """,
+                "project_member_inactive" => """
+                    UPDATE dbo.ProjectMembers
+                    SET Status=N'Removed'
+                    WHERE TenantId=1 AND ProjectId=@ProjectId AND UserId=@ActorUserId;
+                    """,
+                "tenant_member_removed" => """
+                    DELETE dbo.TenantUsers
+                    WHERE TenantId=1 AND UserId=@ActorUserId;
+                    """,
+                "user_inactive" => """
+                    UPDATE dbo.Users SET IsActive=0 WHERE Id=@ActorUserId;
+                    """,
+                _ => throw new AssertFailedException($"Unknown authority change '{authorityChange}'.")
+            };
+            await connection.ExecuteAsync(sql, fixture);
+        });
+        var processor = new WorkbenchAgentRunProcessor(
+            service,
+            new WorkbenchAgentContextAssembler(ConnectionFactory()),
+            agent,
+            outbox);
+        var item = (await outbox.ReadPendingAsync(10))
+            .Single(value => value.AgentRunId == submitted.AgentRunId);
+
+        await processor.ProcessAsync(item, $"authority-{authorityChange}-worker");
+
+        Assert.AreEqual(0, agent.InvocationCount);
+        await using var verify = new SqlConnection(ConnectionString);
+        var state = await verify.QuerySingleAsync<InvocationSafetyState>("""
+            SELECT run.Status, run.DiagnosticCode,
+                   (SELECT COUNT(1) FROM dbo.ChatMessages
+                    WHERE TenantId=run.TenantId AND ProjectId=run.ProjectId AND Role=N'assistant') AS AssistantMessages,
+                   (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=run.AgentRunId AND CompletedAtUtc IS NULL) AS UnfinishedAttempts,
+                   (SELECT TOP (1) Outcome FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=run.AgentRunId ORDER BY AttemptNumber DESC) AS AttemptOutcome
+            FROM dbo.WorkbenchAgentRuns run
+            WHERE run.AgentRunId=@AgentRunId;
+            """, new { submitted.AgentRunId });
+        Assert.AreEqual(WorkbenchAgentRunStates.Stale, state.Status);
+        Assert.AreEqual("invocation_authority_not_current", state.DiagnosticCode);
+        Assert.AreEqual(0, state.AssistantMessages);
+        Assert.AreEqual(0, state.UnfinishedAttempts);
+        Assert.AreEqual(WorkbenchAgentRunStates.Stale, state.AttemptOutcome);
+    }
+
+    [TestMethod]
+    public async Task ProviderTimeout_NonCooperativeProviderFailsBoundedlyWithoutAssistantMaterialization()
+    {
+        var fixture = await CreateFixtureAsync("Provider timeout");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Time out this provider call safely."));
+        var outbox = new WorkbenchAgentRunOutbox(ConnectionFactory());
+        var agent = new NonCooperativeTimeoutAgent(TimeSpan.FromMilliseconds(25));
+        var processor = new WorkbenchAgentRunProcessor(
+            service,
+            new WorkbenchAgentContextAssembler(ConnectionFactory()),
+            agent,
+            outbox);
+        var item = (await outbox.ReadPendingAsync(10))
+            .Single(value => value.AgentRunId == submitted.AgentRunId);
+
+        var processing = processor.ProcessAsync(item, "provider-timeout-worker");
+        await agent.InvocationStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        await processing.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.AreEqual(1, agent.InvocationCount);
+        Assert.IsTrue(agent.ProviderCancellationRequested);
+        agent.FaultAfterTimeout();
+        await using var verify = new SqlConnection(ConnectionString);
+        var state = await verify.QuerySingleAsync<InvocationSafetyState>("""
+            SELECT run.Status, run.DiagnosticCode,
+                   (SELECT COUNT(1) FROM dbo.ChatMessages
+                    WHERE TenantId=run.TenantId AND ProjectId=run.ProjectId AND Role=N'assistant') AS AssistantMessages,
+                   (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=run.AgentRunId AND CompletedAtUtc IS NULL) AS UnfinishedAttempts,
+                   (SELECT TOP (1) Outcome FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=run.AgentRunId ORDER BY AttemptNumber DESC) AS AttemptOutcome
+            FROM dbo.WorkbenchAgentRuns run
+            WHERE run.AgentRunId=@AgentRunId;
+            """, new { submitted.AgentRunId });
+        Assert.AreEqual(WorkbenchAgentRunStates.Failed, state.Status);
+        Assert.AreEqual("agent_provider_timeout", state.DiagnosticCode);
+        Assert.AreEqual(0, state.AssistantMessages);
+        Assert.AreEqual(0, state.UnfinishedAttempts);
+        Assert.AreEqual(WorkbenchAgentRunStates.Failed, state.AttemptOutcome);
     }
 
     [TestMethod]
@@ -991,6 +1138,11 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
     private async Task<Fixture> CreateFixtureAsync(string name)
     {
         var actorUserId = await SeedActorAsync();
+        return await CreateProjectFixtureAsync(actorUserId, name);
+    }
+
+    private async Task<Fixture> CreateProjectFixtureAsync(int actorUserId, string name)
+    {
         var start = await new ProjectStartService(ConnectionFactory(), new NoOpProjectStartFailureInjector()).StartAsync(
             new StartProjectCommand(1, actorUserId, Guid.NewGuid(), name));
         await using var connection = new SqlConnection(ConnectionString);
@@ -1081,6 +1233,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
                   AND name=N'FK_WorkbenchOutboxEvents_AgentRun'
             )
                 ALTER TABLE dbo.WorkbenchOutboxEvents DROP CONSTRAINT FK_WorkbenchOutboxEvents_AgentRun;
+            DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystToolCallAudits;
+            DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystPreparations;
             DROP TABLE IF EXISTS dbo.WorkbenchAgentRunAttempts;
             DROP TABLE IF EXISTS dbo.WorkbenchAgentRuns;
             """);
@@ -1181,20 +1335,24 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
     {
         public string? LastRawOutput { get; private set; }
 
-        public Task<string> ExecuteAsync(
+        public Task<IWorkbenchBusinessAnalystPreparedInvocation> PrepareAsync(
+            WorkbenchAgentRunClaim claim,
             WorkbenchBusinessAnalystContext context,
             CancellationToken cancellationToken = default)
         {
-            LastRawOutput = $$"""
-                {
-                  "outputSchemaVersion": 999,
-                  "contextHash": "{{context.ContextHash}}",
-                  "basedOnUnderstandingRevision": {{context.UnderstandingRevision}},
-                  "outcome": "Completed",
-                  "assistantMessage": "This invalid response must not materialize."
-                }
-                """;
-            return Task.FromResult(LastRawOutput);
+            return Task.FromResult<IWorkbenchBusinessAnalystPreparedInvocation>(new PreparedInvocation(_ =>
+            {
+                LastRawOutput = $$"""
+                    {
+                      "outputSchemaVersion": 999,
+                      "contextHash": "{{context.ContextHash}}",
+                      "basedOnUnderstandingRevision": {{context.UnderstandingRevision}},
+                      "outcome": "Completed",
+                      "assistantMessage": "This invalid response must not materialize."
+                    }
+                    """;
+                return Task.FromResult(LastRawOutput!);
+            }));
         }
     }
 
@@ -1214,7 +1372,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
 
     private sealed class NeverInvokedAgent : IWorkbenchBusinessAnalystAgent
     {
-        public Task<string> ExecuteAsync(
+        public Task<IWorkbenchBusinessAnalystPreparedInvocation> PrepareAsync(
+            WorkbenchAgentRunClaim claim,
             WorkbenchBusinessAnalystContext context,
             CancellationToken cancellationToken = default) =>
             throw new AssertFailedException("The agent must not be invoked after controlled worker cancellation.");
@@ -1225,15 +1384,85 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
         public string? ContextHash { get; private set; }
 
-        public Task<string> ExecuteAsync(
+        public Task<IWorkbenchBusinessAnalystPreparedInvocation> PrepareAsync(
+            WorkbenchAgentRunClaim claim,
             WorkbenchBusinessAnalystContext context,
             CancellationToken cancellationToken = default)
         {
             ContextHash = context.ContextHash;
-            return Task.FromResult(JsonSerializer.Serialize(
-                ValidOutput(context, assistantMessage),
-                JsonOptions));
+            return Task.FromResult<IWorkbenchBusinessAnalystPreparedInvocation>(new PreparedInvocation(_ =>
+                Task.FromResult(JsonSerializer.Serialize(
+                    ValidOutput(context, assistantMessage),
+                    JsonOptions))));
         }
+    }
+
+    private sealed class PreparedInvocation(
+        Func<CancellationToken, Task<string>> invoke,
+        TimeSpan? providerTimeout = null) : IWorkbenchBusinessAnalystPreparedInvocation
+    {
+        public TimeSpan ProviderTimeout { get; } = providerTimeout ?? TimeSpan.FromMinutes(1);
+
+        public Task<string> InvokeProviderAsync(CancellationToken cancellationToken = default) =>
+            invoke(cancellationToken);
+    }
+
+    private sealed class PreparationMutationAgent(Func<Task> mutateAuthority) : IWorkbenchBusinessAnalystAgent
+    {
+        private int _invocationCount;
+
+        public int InvocationCount => _invocationCount;
+
+        public async Task<IWorkbenchBusinessAnalystPreparedInvocation> PrepareAsync(
+            WorkbenchAgentRunClaim claim,
+            WorkbenchBusinessAnalystContext context,
+            CancellationToken cancellationToken = default)
+        {
+            await mutateAuthority();
+            return new PreparedInvocation(_ =>
+            {
+                Interlocked.Increment(ref _invocationCount);
+                return Task.FromResult("provider must not be invoked");
+            });
+        }
+    }
+
+    private sealed class NonCooperativeTimeoutAgent(TimeSpan providerTimeout) : IWorkbenchBusinessAnalystAgent
+    {
+        private readonly TaskCompletionSource _invocationStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<string> _providerCompletion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _providerCancellationRequested;
+        private int _invocationCount;
+
+        public int InvocationCount => _invocationCount;
+        public Task InvocationStarted => _invocationStarted.Task;
+        public bool ProviderCancellationRequested => Volatile.Read(ref _providerCancellationRequested) != 0;
+
+        public Task<IWorkbenchBusinessAnalystPreparedInvocation> PrepareAsync(
+            WorkbenchAgentRunClaim claim,
+            WorkbenchBusinessAnalystContext context,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IWorkbenchBusinessAnalystPreparedInvocation>(new PreparedInvocation(token =>
+            {
+                Interlocked.Increment(ref _invocationCount);
+                token.Register(() => Volatile.Write(ref _providerCancellationRequested, 1));
+                _invocationStarted.TrySetResult();
+                return _providerCompletion.Task;
+            }, providerTimeout));
+
+        public void FaultAfterTimeout() =>
+            _providerCompletion.TrySetException(new InvalidOperationException("Late provider failure."));
+    }
+
+    private sealed class InvocationSafetyState
+    {
+        public string Status { get; init; } = string.Empty;
+        public string? DiagnosticCode { get; init; }
+        public int AssistantMessages { get; init; }
+        public int UnfinishedAttempts { get; init; }
+        public string? AttemptOutcome { get; init; }
     }
 
     private sealed class ActiveRunConstraintState
