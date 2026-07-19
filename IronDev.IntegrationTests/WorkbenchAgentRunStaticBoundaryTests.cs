@@ -1,10 +1,10 @@
 namespace IronDev.IntegrationTests;
 
 [TestClass]
+[TestCategory("StaticBoundary")]
 public sealed class WorkbenchAgentRunStaticBoundaryTests
 {
     [TestMethod]
-    [TestCategory("StaticBoundary")]
     public void WorkerAndContextAssembler_DoNotDependOnRequestOrRepositoryContext()
     {
         var root = RepositoryRoot();
