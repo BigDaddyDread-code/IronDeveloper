@@ -53,8 +53,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const errorSessionIdRef = useRef<number | null>(null);
 
   const projectId = project.selectedProjectId;
+  const workbenchSession = project.workbenchSession;
   const disabledReason =
-    getChatBlockedReason(session.tokenConfigured, projectId, session.apiStatus.status, project.accessStatus) ??
+    getChatBlockedReason(session.tokenConfigured, projectId, workbenchSession !== null, session.apiStatus.status, project.accessStatus) ??
     (isHistoryLoading ? 'Workshop history is loading.' : null);
   const sendDisabledReason = disabledReason ?? getChatSendBlockedReason(draft, isSending);
   const projectLabel = project.selectedProjectName ?? (projectId ? `Project ${projectId}` : 'Project required');
@@ -219,8 +220,8 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
 
   const ensureChatSession = useCallback(
     async (prompt: string) => {
-      if (!projectId) {
-        throw new Error('Project is required before creating a chat session.');
+      if (!projectId || !workbenchSession) {
+        throw new Error('An active Workbench session is required before creating a chat session.');
       }
 
       if (sessionId) {
@@ -231,13 +232,16 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
       const createdSessionId = await session.client.saveProjectChatSession(projectId, {
         projectId,
         title,
-        summary: 'Project conversation'
+        summary: 'Project conversation',
+        workbenchSessionId: workbenchSession.workbenchSessionId,
+        leaseEpoch: workbenchSession.leaseEpoch,
+        clientOperationId: crypto.randomUUID()
       });
       freshConversationRef.current = false;
       setSessionId(createdSessionId);
       return { id: createdSessionId, created: true };
     },
-    [projectId, session.client, sessionId]
+    [projectId, session.client, sessionId, workbenchSession]
   );
 
   const sendMessage = useCallback(
@@ -246,7 +250,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
       const displayText = request?.displayText ?? prompt;
       const blockedReason = disabledReason ?? (request ? (isSending ? 'Workshop request is already sending.' : null) : getChatSendBlockedReason(draft, isSending));
 
-      if (!projectId || blockedReason || !prompt) {
+      if (!projectId || !workbenchSession || blockedReason || !prompt) {
         return;
       }
 
@@ -277,7 +281,10 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           role: 'user',
           message: displayText,
           tags: request?.mode ?? 'projectQuestion',
-          documentVersionIds: attachedSource ? [attachedSource.documentVersionId] : []
+          documentVersionIds: attachedSource ? [attachedSource.documentVersionId] : [],
+          workbenchSessionId: workbenchSession.workbenchSessionId,
+          leaseEpoch: workbenchSession.leaseEpoch,
+          clientOperationId: crypto.randomUUID()
         });
 
         setMessages((current) =>
@@ -294,7 +301,10 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           sessionId: activeSessionId,
           activeModel: null,
           mode: request?.mode ?? 'projectQuestion',
-          sourceMessageId: savedUserMessageId
+          sourceMessageId: savedUserMessageId,
+          workbenchSessionId: workbenchSession.workbenchSessionId,
+          leaseEpoch: workbenchSession.leaseEpoch,
+          clientOperationId: crypto.randomUUID()
         });
         const responseMode = coerceChatGovernanceMode(response.mode);
         const responseGate = getChatModeGate({ ...response, mode: responseMode });
@@ -310,7 +320,10 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           contextSummary: response.contextSummary ?? null,
           linkedFilePaths: response.linkedFilePaths ?? null,
           linkedSymbols: response.linkedSymbols ?? null,
-          replyToMessageId: savedUserMessageId
+          replyToMessageId: savedUserMessageId,
+          workbenchSessionId: workbenchSession.workbenchSessionId,
+          leaseEpoch: workbenchSession.leaseEpoch,
+          clientOperationId: crypto.randomUUID()
         });
 
         const assistantMessage: ChatWorkspaceMessage = {
@@ -362,7 +375,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
         }
       }
     },
-    [disabledReason, draft, ensureChatSession, isSending, onSessionCreated, projectId, selectedDocumentSource, session.client, sessionId]
+    [disabledReason, draft, ensureChatSession, isSending, onSessionCreated, projectId, selectedDocumentSource, session.client, sessionId, workbenchSession]
   );
 
   const reviewProjectState = useCallback(() => {
@@ -780,13 +793,17 @@ function createSessionTitle(prompt: string) {
   return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
 }
 
-function getChatBlockedReason(tokenConfigured: boolean, projectId: number | null, apiStatus: string, accessStatus: string) {
+function getChatBlockedReason(tokenConfigured: boolean, projectId: number | null, hasWorkbenchSession: boolean, apiStatus: string, accessStatus: string) {
   if (!tokenConfigured) {
     return 'Authentication is required before chat can use project context.';
   }
 
   if (!projectId) {
     return 'Select a project before chatting with IronDev.';
+  }
+
+  if (!hasWorkbenchSession) {
+    return 'Open the project in Workbench before sending a message.';
   }
 
   if (apiStatus === 'loading') {

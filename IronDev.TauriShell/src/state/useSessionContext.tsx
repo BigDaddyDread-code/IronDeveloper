@@ -76,7 +76,7 @@ function clientPreflight(
       : 'Wait for the LocalTest identity and seed checks to complete.',
     resetCommand,
     detail,
-    workbenchVersion: import.meta.env.VITE_IRONDEV_WORKBENCH_VERSION ?? '0.1.0-preview.1',
+    workbenchVersion: import.meta.env.VITE_IRONDEV_WORKBENCH_VERSION ?? '0.1.0-preview.4',
     workbenchMode: import.meta.env.VITE_IRONDEV_WORKBENCH_MODE === 'V2' ? 'V2' : 'V1',
     previewId: import.meta.env.VITE_IRONDEV_PREVIEW_ID ?? 'default',
     sessionMode: import.meta.env.VITE_IRONDEV_LOCALTEST_SESSION_MODE ?? '',

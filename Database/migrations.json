@@ -189,6 +189,11 @@
                             "id":  "2026-07-cln-27-memory-index-lifecycle",
                             "path":  "Database/migrate_memory_index_lifecycle.sql",
                             "description":  "Creates the append-only SQL-authoritative lifecycle ledger and validated transitions for rebuildable semantic/vector projections."
+                       },
+                       {
+                            "id":  "2026-07-workbench-pr01-project-start",
+                            "path":  "Database/migrate_workbench_project_start.sql",
+                            "description":  "Adds atomic project-first Workbench startup state, leases, idempotent client operations, and outbox events without repository provisioning."
                        }
                    ]
 }

@@ -115,7 +115,7 @@ export function FlowShell() {
       } else if (project.accessStatus === 'projectRequired') {
         navigateProductPath('/projects', true);
       } else if (hasProjectAccess && selectedProjectId !== null) {
-        navigateProductPath(projectPath(selectedProjectId, 'board'), true);
+        navigateProductPath('/projects', true);
       }
       return;
     }
@@ -126,7 +126,7 @@ export function FlowShell() {
         return;
       }
       if (hasProjectAccess && selectedProjectId !== null) {
-        navigateProductPath(projectPath(selectedProjectId, 'board'), true);
+        navigateProductPath('/projects', true);
         return;
       }
       if (project.accessStatus === 'projectRequired') {
@@ -137,9 +137,14 @@ export function FlowShell() {
 
     if (currentRoute.kind === 'tenantSelect' && project.accessStatus !== 'tenantRequired') {
       navigateProductPath(
-        hasProjectAccess && selectedProjectId !== null ? projectPath(selectedProjectId, 'board') : '/projects',
+        '/projects',
         true
       );
+      return;
+    }
+
+    if (currentRoute.pathname === '/chat' && project.accessStatus === 'projectRequired') {
+      navigateProductPath('/projects', true);
       return;
     }
 
@@ -154,7 +159,7 @@ export function FlowShell() {
     navigateProductPath(canonicalPath, true);
   }, [currentRoute, hasProjectAccess, project.accessStatus, selectedProjectId]);
 
-  // A project-scoped deep link selects that project through the existing API.
+  // A project-scoped deep link explicitly opens that project through Workbench V2.
   // Missing IDs become an honest route outcome rather than silently opening a
   // different project's Board.
   useEffect(() => {
@@ -274,6 +279,11 @@ export function FlowShell() {
     navigateProductPath(projectPath(projectId, 'board'));
   };
 
+  const openProjectWorkbench = (projectId = project.selectedProjectId) => {
+    if (projectId === null) return;
+    navigateProductPath(projectPath(projectId, 'chat'));
+  };
+
   const openProjectSetup = (projectId = project.selectedProjectId) => {
     if (projectId === null) return;
     navigateProductPath(projectPath(projectId, 'setup'));
@@ -355,15 +365,14 @@ export function FlowShell() {
     return <main className="fl-root fl-route-loading" data-testid="flow.routeLoading">Opening project...</main>;
   }
 
-  if (currentRoute.kind === 'projects' || currentRoute.kind === 'projectConnect') {
+  if (currentRoute.kind === 'projects' || currentRoute.kind === 'projectNew') {
     return (
       <ProjectChooser
-        initialScreen={currentRoute.kind === 'projectConnect' ? 'connect' : 'grid'}
-        onOpenConnect={() => navigateProductPath('/projects/connect')}
-        onBackFromConnect={() => navigateProductPath('/projects')}
+        initialScreen={currentRoute.kind === 'projectNew' ? 'new' : 'grid'}
+        onOpenNew={() => navigateProductPath('/projects/new')}
+        onBackFromNew={() => navigateProductPath('/projects')}
         onOpenSettings={openSettings}
-        onOpenBoard={openProjectBoard}
-        onOpenProvisioning={openProjectSetup}
+        onOpenWorkbench={openProjectWorkbench}
       />
     );
   }
@@ -374,11 +383,10 @@ export function FlowShell() {
   ) {
     return (
       <ProjectChooser
-        onOpenConnect={() => navigateProductPath('/projects/connect')}
-        onBackFromConnect={() => navigateProductPath('/projects')}
+        onOpenNew={() => navigateProductPath('/projects/new')}
+        onBackFromNew={() => navigateProductPath('/projects')}
         onOpenSettings={openSettings}
-        onOpenBoard={openProjectBoard}
-        onOpenProvisioning={openProjectSetup}
+        onOpenWorkbench={openProjectWorkbench}
       />
     );
   }

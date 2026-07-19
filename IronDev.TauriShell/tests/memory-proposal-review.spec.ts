@@ -292,7 +292,7 @@ async function seedShellContext(page: Page) {
     await fulfillJson(route, 200, [{ id: 7, tenantId: 3, name: 'IronDeveloper', description: 'Memory proposal project' }]);
   });
 
-  await page.route('**/irondev-api/api/projects/7/select', async (route) => {
+  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route) => {
     await fulfillJson(route, 200, { projectId: 7 });
   });
 }

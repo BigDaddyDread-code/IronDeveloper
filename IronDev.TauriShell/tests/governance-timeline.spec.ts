@@ -220,7 +220,7 @@ async function seedShellContext(page: Page) {
     });
   });
 
-  await page.route('**/irondev-api/api/projects/7/select', async (route) => {
+  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
 }

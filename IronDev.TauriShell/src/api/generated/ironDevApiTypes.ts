@@ -7129,6 +7129,49 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/projects/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartProjectRequest"];
+                    "text/json": components["schemas"]["StartProjectRequest"];
+                    "application/*+json": components["schemas"]["StartProjectRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StartProjectResult"];
+                        "application/json": components["schemas"]["StartProjectResult"];
+                        "text/json": components["schemas"]["StartProjectResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/select": {
         parameters: {
             query?: never;
@@ -11016,6 +11059,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["OpenWorkbenchProjectRequest"];
+                    "text/json": components["schemas"]["OpenWorkbenchProjectRequest"];
+                    "application/*+json": components["schemas"]["OpenWorkbenchProjectRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkbenchProjectEntryContext"];
+                        "application/json": components["schemas"]["WorkbenchProjectEntryContext"];
+                        "text/json": components["schemas"]["WorkbenchProjectEntryContext"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workflow/runs": {
         parameters: {
             query?: never;
@@ -12621,6 +12709,12 @@ export interface components {
             mode?: string | null;
             /** Format: int64 */
             sourceMessageId?: number | null;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
         };
         ChatCompletionResponse: {
             response?: string | null;
@@ -13732,6 +13826,9 @@ export interface components {
             nextSafeAction?: string | null;
             resetCommand?: string | null;
             detail?: string | null;
+            workbenchVersion?: string | null;
+            workbenchMode?: string | null;
+            previewId?: string | null;
             sessionMode?: string | null;
             sandboxApplyRequested?: boolean;
             sandboxApplyEnabled?: boolean;
@@ -14043,6 +14140,11 @@ export interface components {
             /** Format: date-time */
             lastRebuildAtUtc?: string | null;
         };
+        OpenWorkbenchProjectRequest: {
+            /** Format: uuid */
+            clientOperationId?: string;
+            takeOver?: boolean;
+        };
         OutputVerificationEvidence: {
             expected: string | null;
             actual?: string | null;
@@ -14306,6 +14408,8 @@ export interface components {
             /** Format: date-time */
             lastIndexedUtc?: string | null;
             indexingStatus?: string | null;
+            lifecyclePhase?: string | null;
+            executionReadiness?: string | null;
             /** Format: int32 */
             indexedFileCount?: number | null;
         };
@@ -16044,6 +16148,12 @@ export interface components {
             /** Format: int64 */
             replyToMessageId?: number | null;
             documentVersionIds?: number[] | null;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
         };
         SaveProjectChatSessionRequest: {
             /** Format: int64 */
@@ -16052,6 +16162,12 @@ export interface components {
             projectId?: number;
             title?: string | null;
             summary?: string | null;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
         };
         ScenarioVerification: {
             kind: string | null;
@@ -17025,6 +17141,30 @@ export interface components {
             state: string | null;
             isDisposable: boolean;
         };
+        StartProjectRequest: {
+            name?: string | null;
+            /** Format: uuid */
+            clientOperationId?: string;
+        };
+        StartProjectResult: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int32 */
+            tenantId?: number;
+            name?: string | null;
+            projectLifecyclePhase?: string | null;
+            executionReadiness?: string | null;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: date-time */
+            createdAtUtc?: string;
+            isReplay?: boolean;
+            readonly repositoryBinding?: unknown;
+        };
         StartTicketBuildRunRequest: {
             /** Format: uuid */
             workflowRunId?: string | null;
@@ -17449,6 +17589,24 @@ export interface components {
         };
         UpdateLocalPathRequest: {
             localPath?: string | null;
+        };
+        WorkbenchProjectEntryContext: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int32 */
+            tenantId?: number;
+            name?: string | null;
+            projectLifecyclePhase?: string | null;
+            executionReadiness?: string | null;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            wasResumed?: boolean;
+            wasTakenOver?: boolean;
+            /** Format: uuid */
+            clientOperationId?: string;
+            readonly repositoryBinding?: unknown;
         };
         WorkflowAuthorityFlagsDto: {
             grantsApproval?: boolean;

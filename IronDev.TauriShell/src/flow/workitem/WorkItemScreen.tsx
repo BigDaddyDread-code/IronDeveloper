@@ -467,7 +467,7 @@ export function WorkItemScreen({
     async (event: FormEvent) => {
       event.preventDefault();
       const text = prompt.trim();
-      if (text.length === 0 || project.selectedProjectId === null || isThinking) {
+      if (text.length === 0 || project.selectedProjectId === null || project.workbenchSession === null || isThinking) {
         return;
       }
       setPrompt('');
@@ -478,7 +478,10 @@ export function WorkItemScreen({
       try {
         const response = await session.client.completeChat(project.selectedProjectId, {
           prompt: `You are helping a business analyst shape a work item. Requirement so far: "${draft.title || text}". New input: "${text}". Reply briefly for a shaping discussion.`,
-          mode: 'discussion'
+          mode: 'discussion',
+          workbenchSessionId: project.workbenchSession.workbenchSessionId,
+          leaseEpoch: project.workbenchSession.leaseEpoch,
+          clientOperationId: crypto.randomUUID()
         });
         const reply = response.response ?? 'No response.';
         setDiscussion((prev) => [...prev, { id: nextEntryId(), role: 'assistant', text: reply }]);
@@ -502,7 +505,7 @@ export function WorkItemScreen({
         setIsThinking(false);
       }
     },
-    [prompt, project.selectedProjectId, session.client, draft.title, isThinking]
+    [prompt, project.selectedProjectId, project.workbenchSession, session.client, draft.title, isThinking]
   );
 
   const addCriterion = useCallback((text: string) => {

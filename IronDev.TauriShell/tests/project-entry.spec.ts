@@ -50,16 +50,16 @@ function setupCheck(code: string, label: string, detectedValue: string) {
 }
 
 const DEFAULT_PROJECTS = [
-  { id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' },
-  { id: 8, tenantId: 3, name: 'ParcelTracker', localPath: 'C:\\repos\\ParcelTracker' },
-  { id: 10, tenantId: 3, name: 'StatusDown', localPath: 'C:\\repos\\StatusDown' }
+  { id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller', lifecyclePhase: 'Shaping', executionReadiness: 'Ready' },
+  { id: 8, tenantId: 3, name: 'ParcelTracker', localPath: 'C:\\repos\\ParcelTracker', lifecyclePhase: 'Shaping', executionReadiness: 'NotConfigured' },
+  { id: 10, tenantId: 3, name: 'StatusDown', localPath: 'C:\\repos\\StatusDown', lifecyclePhase: 'Delivery', executionReadiness: 'ValidationRequired' }
 ];
 
 test('explicit login lands on the project screen and ignores any prior selected project', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.selectedProjectId', '7');
   });
-  await mockProjectEntryApi(page);
+  const state = await mockProjectEntryApi(page);
   await page.goto('/');
 
   await page.getByTestId('auth.submit').click();
@@ -67,17 +67,19 @@ test('explicit login lands on the project screen and ignores any prior selected 
   await expect(page.getByTestId('flow.chooser')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Choose a project' })).toBeVisible();
   await expect(page.getByTestId('flow.shell')).toHaveCount(0);
+  expect(state.legacySelectionRequests).toBe(0);
+  expect(state.workbenchOpenRequests).toBe(0);
 });
 
 test('versioned preview identity remains visible after login', async ({ page }) => {
   await mockProjectEntryApi(page);
   await page.goto('/');
 
-  await expect(page.getByTestId('auth.workbenchIdentity')).toContainText('V2 0.1.0-preview.1 / workbench-pr00a');
+  await expect(page.getByTestId('auth.workbenchIdentity')).toContainText('V2 0.1.0-preview.4 / workbench-pr01');
   await page.getByTestId('auth.submit').click();
 
-  await expect(page.getByTestId('flow.projectEntry.health')).toContainText('V2 0.1.0-preview.1 / workbench-pr00a');
-  await expect(page.getByTestId('flow.projectEntry.workbenchIdentity')).toContainText('V2 0.1.0-preview.1 / workbench-pr00a');
+  await expect(page.getByTestId('flow.projectEntry.health')).toContainText('V2 0.1.0-preview.4 / workbench-pr01');
+  await expect(page.getByTestId('flow.projectEntry.workbenchIdentity')).toContainText('V2 0.1.0-preview.4 / workbench-pr01');
 });
 
 test('configured fallback does not auto-open a project', async ({ page }) => {
@@ -88,7 +90,7 @@ test('configured fallback does not auto-open a project', async ({ page }) => {
   await expect(page.getByTestId('flow.board.columns')).toHaveCount(0);
 });
 
-test('projects render as whole clickable tiles with the connect tile last', async ({ page }) => {
+test('projects render as whole clickable tiles with the start tile last', async ({ page }) => {
   const projects = createDeferred();
   const state = await mockProjectEntryApi(page, { signedIn: true, projectListGate: projects.promise });
   await page.goto('/');
@@ -97,13 +99,13 @@ test('projects render as whole clickable tiles with the connect tile last', asyn
   projects.resolve();
   const grid = page.getByTestId('flow.chooser.list');
   await expect(grid).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Open BookSeller\. Ready/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Open ParcelTracker\. Setup required/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Connect another project. Add a local repository' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Open BookSeller in Workbench/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Open ParcelTracker in Workbench/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start a new project' })).toBeVisible();
 
   const tiles = grid.locator('.fl-project-tile');
   await expect(tiles).toHaveCount(4);
-  await expect(tiles.nth(3)).toHaveAttribute('data-testid', 'flow.projectEntry.connect');
+  await expect(tiles.nth(3)).toHaveAttribute('data-testid', 'flow.projectEntry.start');
 
   const projectTileHeight = (await tiles.first().boundingBox())?.height;
   const connectTileHeight = (await tiles.nth(3).boundingBox())?.height;
@@ -111,35 +113,25 @@ test('projects render as whole clickable tiles with the connect tile last', asyn
   expect(Math.abs((projectTileHeight ?? 0) - (connectTileHeight ?? 0))).toBeLessThanOrEqual(2);
 });
 
-test('ready project opens Board', async ({ page }) => {
+test('existing project opens Workbench without a readiness gate', async ({ page }) => {
   await mockProjectEntryApi(page, { signedIn: true });
   await page.goto('/');
 
   await page.getByTestId('flow.chooser.project.7').click();
 
   await expect(page.getByTestId('flow.shell')).toBeVisible();
-  await expect(page.getByTestId('flow.board.columns')).toBeVisible();
-  await expect(page.getByTestId('flow.cockpit.badge')).toContainText('Ready for project work');
+  await expect(page.getByTestId('flow.shell')).toBeVisible();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
 });
 
-test('unready project opens Project Setup', async ({ page }) => {
+test('repository-free project opens Workbench instead of Project Setup', async ({ page }) => {
   await mockProjectEntryApi(page, { signedIn: true });
   await page.goto('/');
 
   await page.getByTestId('flow.chooser.project.8').click();
 
-  await expect(page.getByTestId('flow.projectSetup')).toBeVisible();
-  await expect(page.getByTestId('flow.projectSetup.next')).toContainText('Confirm the build command');
-});
-
-test('readiness failure still opens Project Setup', async ({ page }) => {
-  await mockProjectEntryApi(page, { signedIn: true, readinessFailures: [10] });
-  await page.goto('/');
-
-  await expect(page.getByTestId('flow.chooser.readiness.10')).toContainText('Status unavailable');
-  await page.getByTestId('flow.chooser.project.10').click();
-
-  await expect(page.getByTestId('flow.projectSetup.unavailable')).toBeVisible();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('flow.projectSetup')).toHaveCount(0);
 });
 
 test('project selection failure stays on the project screen', async ({ page }) => {
@@ -153,38 +145,89 @@ test('project selection failure stays on the project screen', async ({ page }) =
   await expect(page.getByTestId('flow.projectSetup')).toHaveCount(0);
 });
 
-test('connect tile opens a dedicated screen and suggests the project name from path', async ({ page }) => {
+test('project open reuses its operation id after an ambiguous transport failure', async ({ page }) => {
+  const state = await mockProjectEntryApi(page, { signedIn: true, selectionTransportFailures: [8] });
+  await page.goto('/');
+
+  await page.getByTestId('flow.chooser.project.8').click();
+  await expect(page.getByTestId('flow.projectEntry.error')).toContainText('ParcelTracker could not be opened');
+
+  await page.getByTestId('flow.chooser.project.8').click();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
+
+  expect(state.workbenchOpenOperationIds).toHaveLength(2);
+  expect(state.workbenchOpenOperationIds[1]).toBe(state.workbenchOpenOperationIds[0]);
+});
+
+test('start tile opens repository-independent project entry', async ({ page }) => {
   await mockProjectEntryApi(page, { signedIn: true });
   await page.goto('/');
 
-  await page.getByTestId('flow.projectEntry.connect').click();
+  await page.getByTestId('flow.projectEntry.start').click();
 
-  await expect(page.getByTestId('flow.connectProject')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Connect a project' })).toBeFocused();
+  await expect(page.getByTestId('flow.startProject')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Start a new project' })).toBeFocused();
+  await expect(page.getByText('Repository setup happens later.')).toBeVisible();
+  await expect(page.getByTestId('flow.startProject.name')).toBeVisible();
+  await expect(page.getByText(/LocalTest sandbox/i)).toHaveCount(0);
+  await expect(page.getByText(/Starter/i)).toHaveCount(0);
+  await expect(page.getByPlaceholder(/path/i)).toHaveCount(0);
 
-  await page.getByTestId('flow.chooser.create.path').fill('C:\\repos\\FreshRepo');
-  await expect(page.getByTestId('flow.chooser.create.name')).toHaveValue('FreshRepo');
-
-  await page.getByTestId('flow.connectProject.back').click();
-  await expect(page.getByTestId('flow.projectEntry.connect')).toBeFocused();
+  await page.getByTestId('flow.startProject.back').click();
+  await expect(page.getByTestId('flow.projectEntry.start')).toBeFocused();
 });
 
-test('project creation opens Project Setup and failed creation preserves values', async ({ page }) => {
-  await mockProjectEntryApi(page, { signedIn: true, createFailure: true });
+test('project start preserves its idempotency key on retry and opens Workbench', async ({ page }) => {
+  const state = await mockProjectEntryApi(page, { signedIn: true, createFailure: true });
   await page.goto('/');
 
-  await page.getByTestId('flow.projectEntry.connect').click();
-  await page.getByTestId('flow.chooser.create.name').fill('FreshRepo');
-  await page.getByTestId('flow.chooser.create.path').fill('C:\\repos\\FreshRepo');
-  await page.getByTestId('flow.chooser.create.submit').click();
+  await page.getByTestId('flow.projectEntry.start').click();
+  await page.getByTestId('flow.startProject.name').fill('Fresh idea / no tech selected');
+  await page.getByTestId('flow.startProject.submit').click();
 
-  await expect(page.getByTestId('flow.chooser.create.error')).toContainText('Repository path was rejected');
-  await expect(page.getByTestId('flow.chooser.create.name')).toHaveValue('FreshRepo');
-  await expect(page.getByTestId('flow.chooser.create.path')).toHaveValue('C:\\repos\\FreshRepo');
+  await expect(page.getByTestId('flow.startProject.error')).toContainText('Project could not be started');
+  await expect(page.getByTestId('flow.startProject.name')).toHaveValue('Fresh idea / no tech selected');
 
-  await mockCreateSuccess(page);
-  await page.getByTestId('flow.chooser.create.submit').click();
-  await expect(page.getByTestId('flow.projectSetup')).toBeVisible();
+  await mockCreateSuccess(page, state);
+  await page.getByTestId('flow.startProject.submit').click();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('flow.projectSetup')).toHaveCount(0);
+  expect(state.startOperationIds).toHaveLength(2);
+  expect(state.startOperationIds[1]).toBe(state.startOperationIds[0]);
+});
+
+test('project start uses a new operation id when the failed payload changes', async ({ page }) => {
+  const state = await mockProjectEntryApi(page, { signedIn: true, createFailure: true });
+  await page.goto('/');
+
+  await page.getByTestId('flow.projectEntry.start').click();
+  await page.getByTestId('flow.startProject.name').fill('First idea');
+  await page.getByTestId('flow.startProject.submit').click();
+  await expect(page.getByTestId('flow.startProject.error')).toBeVisible();
+
+  await mockCreateSuccess(page, state);
+  await page.getByTestId('flow.startProject.name').fill('Changed idea');
+  await page.getByTestId('flow.startProject.submit').click();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
+
+  expect(state.startOperationIds).toHaveLength(2);
+  expect(state.startOperationIds[1]).not.toBe(state.startOperationIds[0]);
+});
+
+test('Workshop mutations carry the current Workbench session and lease epoch', async ({ page }) => {
+  const state = await mockProjectEntryApi(page, { signedIn: true });
+  await page.goto('/');
+
+  await page.getByTestId('flow.chooser.project.7').click();
+  await page.getByTestId('chat.composer.input').fill('Shape this project');
+  await page.getByTestId('chat.command.send').click();
+  await expect.poll(() => state.chatMutationBodies.length).toBe(4);
+
+  for (const body of state.chatMutationBodies) {
+    expect(body.workbenchSessionId).toBe(7007);
+    expect(body.leaseEpoch).toBe(1);
+    expect(body.clientOperationId).toMatch(/^[0-9a-f-]{36}$/i);
+  }
 });
 
 test('keyboard activates a project tile', async ({ page }) => {
@@ -194,7 +237,7 @@ test('keyboard activates a project tile', async ({ page }) => {
   await page.getByTestId('flow.chooser.project.7').focus();
   await page.keyboard.press('Enter');
 
-  await expect(page.getByTestId('flow.board.columns')).toBeVisible();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
 });
 
 test('changing projects clears the active work item', async ({ page }) => {
@@ -211,20 +254,30 @@ test('changing projects clears the active work item', async ({ page }) => {
   });
   await page.goto('/');
 
+  await page.getByTestId('flow.chooser.project.7').click();
+  await page.getByTestId('flow.nav.board').click();
   await page.getByRole('button', { name: /BookSeller only ticket/ }).click();
   await expect(page.getByTestId('flow.stagerail')).toBeVisible();
   await expect(page.locator('body')).toContainText('BookSeller only ticket');
 
   await page.getByTestId('flow.projectSwitcher').click();
   await page.getByTestId('flow.chooser.project.8').click();
-  await expect(page.getByTestId('flow.board.columns')).toBeVisible();
+  await expect(page.getByTestId('flow.nav.workshop')).toHaveAttribute('aria-current', 'page');
 
   await expect(page.getByTestId('flow.nav.workitem')).toBeDisabled();
   await expect(page.locator('body')).not.toContainText('BookSeller only ticket');
 });
 
 async function mockProjectEntryApi(page: Page, options: MockOptions = {}) {
-  const state: MockState = { projectListRequests: 0 };
+  const state: MockState = {
+    projectListRequests: 0,
+    legacySelectionRequests: 0,
+    workbenchOpenRequests: 0,
+    workbenchOpenOperationIds: [],
+    startOperationIds: [],
+    chatMutationBodies: [],
+    startedProject: null
+  };
   if (options.signedIn) {
     await page.addInitScript(({ selectedProjectId, fallbackProjectId }) => {
       window.localStorage.setItem('irondev.token', 'tenant-token');
@@ -241,7 +294,7 @@ async function mockProjectEntryApi(page: Page, options: MockOptions = {}) {
   }
 
   await mockCommonApi(page, options, state);
-  await mockCreateRoute(page, options);
+  await mockCreateRoute(page, options, state);
   return state;
 }
 
@@ -271,9 +324,9 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
         nextSafeAction: 'Sign in with the documented LocalTest credentials.',
         resetCommand: null,
         detail: 'LocalTest front door is ready.',
-        workbenchVersion: '0.1.0-preview.1',
+        workbenchVersion: '0.1.0-preview.4',
         workbenchMode: 'V2',
-        previewId: 'workbench-pr00a',
+        previewId: 'workbench-pr01',
         sessionMode: 'SmokeSimulation',
         sandboxApplyRequested: false,
         sandboxApplyEnabled: false,
@@ -288,14 +341,14 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
       contentType: 'application/json',
       body: JSON.stringify({
         environment: 'LocalTest',
-        database: 'IronDeveloper_Test_workbench_pr00a',
+        database: 'IronDeveloper_Test_workbench_pr01',
         isTestEnvironment: true,
         workbench: {
-          version: '0.1.0-preview.1',
+          version: '0.1.0-preview.4',
           mode: 'V2',
           v2Enabled: true,
           v1FallbackEnabled: true,
-          previewId: 'workbench-pr00a',
+          previewId: 'workbench-pr01',
           apiBuildIdentity: '1.0.0+test-commit',
           apiCommit: 'test-commit',
           resetSupported: true
@@ -346,16 +399,47 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
 
     state.projectListRequests += 1;
     await options.projectListGate;
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(projects) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(state.startedProject ? [...projects, state.startedProject] : projects)
+    });
   });
 
-  for (const candidate of [...projects, { id: 9, tenantId: 3, name: 'FreshRepo', localPath: 'C:\\repos\\FreshRepo' }]) {
+  for (const candidate of [...projects, { id: 9, tenantId: 3, name: 'Fresh idea / no tech selected', localPath: null, lifecyclePhase: 'Shaping' }]) {
     const projectId = candidate.id;
     await page.route(`**/irondev-api/api/projects/${projectId}/select`, (route) => {
+      state.legacySelectionRequests += 1;
+      return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Legacy selection must not be called.' }) });
+    });
+    await page.route(`**/irondev-api/api/workbench/projects/${projectId}/open`, (route) => {
+      state.workbenchOpenRequests += 1;
+      const request = route.request().postDataJSON() as { clientOperationId?: string; takeOverExistingLease?: boolean };
+      state.workbenchOpenOperationIds.push(request.clientOperationId ?? '');
+      if (options.selectionTransportFailures?.includes(projectId) &&
+          state.workbenchOpenOperationIds.filter((operationId) => operationId === request.clientOperationId).length === 1) {
+        return route.abort('connectionfailed');
+      }
       if (options.selectionFailures?.includes(projectId)) {
         return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Project unavailable' }) });
       }
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId }) });
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          projectId,
+          tenantId: 3,
+          name: candidate.name,
+          projectLifecyclePhase: candidate.lifecyclePhase ?? 'Shaping',
+          executionReadiness: 'NotConfigured',
+          repositoryBinding: candidate.localPath ?? null,
+          workbenchSessionId: 7000 + projectId,
+          leaseEpoch: 1,
+          wasResumed: false,
+          wasTakenOver: request.takeOverExistingLease === true,
+          clientOperationId: request.clientOperationId
+        })
+      });
     });
     await page.route(`**/irondev-api/api/projects/${projectId}/tickets`, async (route) => {
       if (route.request().method() !== 'GET') {
@@ -400,6 +484,28 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
       tickets: ticketsByProject[projectId] ?? [],
       readiness: boardReadiness
     });
+    await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions`, (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      }
+      state.chatMutationBodies.push(route.request().postDataJSON() as Record<string, unknown>);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(9007) });
+    });
+    await page.route(`**/irondev-api/api/projects/${projectId}/chat/sessions/9007/messages`, (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      }
+      state.chatMutationBodies.push(route.request().postDataJSON() as Record<string, unknown>);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state.chatMutationBodies.length) });
+    });
+    await page.route(`**/irondev-api/api/projects/${projectId}/chat/complete`, (route) => {
+      state.chatMutationBodies.push(route.request().postDataJSON() as Record<string, unknown>);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ response: 'Let us shape the idea.', mode: 'Exploration', reasoningTrace: [] })
+      });
+    });
   }
 
   await page.route('**/irondev-api/api/projects/**/tickets/**/build-readiness', (route) =>
@@ -430,48 +536,52 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
   );
 }
 
-async function mockCreateRoute(page: Page, options: MockOptions) {
-  await page.route('**/irondev-api/api/projects', async (route) => {
-    if (route.request().method() !== 'POST') {
-      await route.fallback();
-      return;
-    }
-
+async function mockCreateRoute(page: Page, options: MockOptions, state: MockState) {
+  await page.route('**/irondev-api/api/projects/start', async (route) => {
+    const request = route.request().postDataJSON() as { clientOperationId: string };
+    state.startOperationIds.push(request.clientOperationId);
     if (options.createFailure) {
       await route.fulfill({
-        status: 400,
+        status: 503,
         contentType: 'application/json',
-        body: JSON.stringify({ error: 'Repository path was rejected' })
+        body: JSON.stringify({ error: 'project_start_failed', message: 'Project could not be started' })
       });
       return;
     }
 
+    state.startedProject = { id: 9, tenantId: 3, name: 'Fresh idea / no tech selected', localPath: null, lifecyclePhase: 'Shaping' };
     await route.fulfill({
-      status: 200,
+      status: 201,
       contentType: 'application/json',
-      body: JSON.stringify({ id: 9, tenantId: 3, name: 'FreshRepo', localPath: 'C:\\repos\\FreshRepo' })
+      body: JSON.stringify(startProjectResponse())
     });
   });
 }
 
-async function mockCreateSuccess(page: Page) {
-  await page.unroute('**/irondev-api/api/projects');
-  await page.route('**/irondev-api/api/projects', async (route) => {
-    if (route.request().method() === 'POST') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ id: 9, tenantId: 3, name: 'FreshRepo', localPath: 'C:\\repos\\FreshRepo' })
-      });
-      return;
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(DEFAULT_PROJECTS)
-    });
+async function mockCreateSuccess(page: Page, state: MockState) {
+  state.startedProject = { id: 9, tenantId: 3, name: 'Fresh idea / no tech selected', localPath: null, lifecyclePhase: 'Shaping' };
+  await page.unroute('**/irondev-api/api/projects/start');
+  await page.route('**/irondev-api/api/projects/start', (route) => {
+    const request = route.request().postDataJSON() as { clientOperationId: string };
+    state.startOperationIds.push(request.clientOperationId);
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(startProjectResponse()) });
   });
+}
+
+function startProjectResponse() {
+  return {
+    projectId: 9,
+    tenantId: 3,
+    name: 'Fresh idea / no tech selected',
+    projectLifecyclePhase: 'Shaping',
+    executionReadiness: 'NotConfigured',
+    repositoryBinding: null,
+    workbenchSessionId: 9009,
+    leaseEpoch: 1,
+    clientOperationId: '22222222-2222-2222-2222-222222222222',
+    createdAtUtc: '2026-07-18T00:00:00Z',
+    isReplay: false
+  };
 }
 
 interface MockOptions {
@@ -479,14 +589,28 @@ interface MockOptions {
   selectedProjectId?: number | null;
   fallbackProjectId?: number;
   createFailure?: boolean;
-  projects?: Array<{ id: number; tenantId: number; name: string; localPath: string }>;
+  projects?: Array<{
+    id: number;
+    tenantId: number;
+    name: string;
+    localPath: string | null;
+    lifecyclePhase?: string;
+    executionReadiness?: string;
+  }>;
   readinessByProject?: Record<number, Record<string, unknown>>;
   readinessFailures?: number[];
   selectionFailures?: number[];
+  selectionTransportFailures?: number[];
   ticketsByProject?: Record<number, Array<Record<string, unknown>>>;
   projectListGate?: Promise<void>;
 }
 
 interface MockState {
   projectListRequests: number;
+  legacySelectionRequests: number;
+  workbenchOpenRequests: number;
+  workbenchOpenOperationIds: string[];
+  startOperationIds: string[];
+  chatMutationBodies: Array<Record<string, unknown>>;
+  startedProject: { id: number; tenantId: number; name: string; localPath: null; lifecyclePhase: string } | null;
 }

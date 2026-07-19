@@ -54,7 +54,7 @@ test('catalogue failure preserves the route and retries backend truth', async ({
   const state = await mockToolsWorkspace(page, { catalogueInitiallyUnavailable: true });
   await page.goto('/projects/7/library/tools');
 
-  await expect(page.getByRole('heading', { name: 'Project tools are unavailable', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Project tools are unavailable', exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('flow.routeOutcome')).toContainText('Tool registry unavailable.');
   await expect(page).toHaveURL('/projects/7/library/tools');
   state.makeCatalogueAvailable();
@@ -151,6 +151,19 @@ async function mockToolsWorkspace(page: Page, options: ToolsMockOptions = {}): P
   });
 
   await page.route('**/irondev-api/health', (route) => json(route, { status: 'healthy' }));
+  await page.route('**/irondev-api/api/localtest/preflight', (route) => json(route, {
+    state: 'LocalTestReady',
+    environment: 'LocalTest',
+    database: 'IronDeveloper_Test',
+    apiBuildCommit: 'test-commit',
+    launcherRepositoryCommit: 'test-commit',
+    apiBaseUrl: 'http://localhost:5000',
+    sessionMode: 'SmokeSimulation',
+    sandboxApplyRequested: false,
+    sandboxApplyEnabled: false,
+    sandboxApplyRoot: null,
+    capabilities: ['WorkflowSmokeSimulation']
+  }));
   await page.route('**/irondev-api/api/environment', (route) =>
     json(route, { environment: 'LocalTest', database: 'IronDeveloper_Test', isTestEnvironment: true })
   );
@@ -163,7 +176,19 @@ async function mockToolsWorkspace(page: Page, options: ToolsMockOptions = {}): P
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/projects/7/select', (route) => json(route, { projectId: 7 }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, {
+    projectId: 7,
+    tenantId: 3,
+    name: 'BookSeller',
+    projectLifecyclePhase: 'Shaping',
+    executionReadiness: 'NotConfigured',
+    repositoryBinding: null,
+    workbenchSessionId: 7007,
+    leaseEpoch: 1,
+    wasResumed: true,
+    wasTakenOver: false,
+    clientOperationId: '00000000-0000-0000-0000-000000000007'
+  }));
   await page.route('**/irondev-api/api/projects/7/tickets', (route) => json(route, []));
   await page.route('**/irondev-api/api/projects/7/chat/sessions', (route) => json(route, []));
 

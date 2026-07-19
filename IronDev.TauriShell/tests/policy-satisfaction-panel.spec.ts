@@ -295,7 +295,7 @@ async function seedShellContext(page: Page) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 7, tenantId: 3, name: 'IronDeveloper', description: 'Dogfood project' }]) });
   });
 
-  await page.route('**/irondev-api/api/projects/7/select', async (route: Route) => {
+  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
 }

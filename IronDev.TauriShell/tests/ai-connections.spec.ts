@@ -32,7 +32,7 @@ test('settings shows tenant AI connection metadata without credential material',
     ]
   });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.aiConnections').click();
@@ -114,7 +114,7 @@ test('settings stores and revokes AI credentials without rendering the secret', 
     ]
   });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.aiConnections').click();
@@ -140,7 +140,7 @@ test('settings stores and revokes AI credentials without rendering the secret', 
 test('settings shows an honest empty state when no AI connections are returned', async ({ page }) => {
   await mockWorkspace(page, { connections: [] });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.aiConnections').click();
@@ -163,7 +163,7 @@ test('settings tests a controlled connection and renders durable health truth', 
     }]
   });
 
-  await page.goto('/');
+  await page.goto('/projects/7/board');
   await page.getByTestId('flow.userMenu').click();
   await page.getByTestId('flow.nav.settings').click();
   await page.getByTestId('flow.settings.section.aiConnections').click();
@@ -213,7 +213,7 @@ async function mockWorkspace(page: Page, options: { connections: unknown[] }) {
   await page.route('**/irondev-api/api/projects', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 7, tenantId: 3, name: 'BookSeller', description: 'Dogfood project' }]) });
   });
-  await page.route('**/irondev-api/api/projects/7/select', async (route) => {
+  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
   });
   await page.route('**/irondev-api/api/v1/ai-connections/**', async (route) => {

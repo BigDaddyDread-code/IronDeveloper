@@ -148,7 +148,7 @@ async function mockTicketDraftWorkspace(
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/projects/7/select', (route) => json(route, { projectId: 7 }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, { projectId: 7 }));
 
   await page.route(/\/irondev-api\/api\/projects\/7\/chat\/sessions$/, (route) =>
     json(route, [{ id: 9007, tenantId: 3, projectId: 7, title: 'Catalog sorting', updatedDate: '2026-07-10T08:00:00Z' }])

@@ -9779,6 +9779,54 @@
         }
       }
     },
+    "/api/projects/start": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartProjectRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartProjectRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartProjectResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartProjectResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartProjectResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/select": {
       "post": {
         "tags": [
@@ -14676,6 +14724,65 @@
         }
       }
     },
+    "/api/workbench/projects/{projectId}/open": {
+      "post": {
+        "tags": [
+          "WorkbenchProjects"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenWorkbenchProjectRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenWorkbenchProjectRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenWorkbenchProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchProjectEntryContext"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchProjectEntryContext"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchProjectEntryContext"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workflow/runs": {
       "get": {
         "tags": [
@@ -19208,6 +19315,18 @@
             "type": "integer",
             "format": "int64",
             "nullable": true
+          },
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -23527,6 +23646,18 @@
             "type": "string",
             "nullable": true
           },
+          "workbenchVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "workbenchMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "previewId": {
+            "type": "string",
+            "nullable": true
+          },
           "sessionMode": {
             "type": "string",
             "nullable": true
@@ -24716,6 +24847,19 @@
         },
         "additionalProperties": false
       },
+      "OpenWorkbenchProjectRequest": {
+        "type": "object",
+        "properties": {
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "takeOver": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "OutputVerificationEvidence": {
         "required": [
           "expected"
@@ -25734,6 +25878,14 @@
             "nullable": true
           },
           "indexingStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "lifecyclePhase": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionReadiness": {
             "type": "string",
             "nullable": true
           },
@@ -31827,6 +31979,18 @@
               "format": "int64"
             },
             "nullable": true
+          },
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -31850,6 +32014,18 @@
           "summary": {
             "type": "string",
             "nullable": true
+          },
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -35590,6 +35766,69 @@
         },
         "additionalProperties": false
       },
+      "StartProjectRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StartProjectResult": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tenantId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectLifecyclePhase": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionReadiness": {
+            "type": "string",
+            "nullable": true
+          },
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isReplay": {
+            "type": "boolean"
+          },
+          "repositoryBinding": {
+            "nullable": true,
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
       "StartTicketBuildRunRequest": {
         "type": "object",
         "properties": {
@@ -37188,6 +37427,54 @@
           "localPath": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbenchProjectEntryContext": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tenantId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectLifecyclePhase": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionReadiness": {
+            "type": "string",
+            "nullable": true
+          },
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "wasResumed": {
+            "type": "boolean"
+          },
+          "wasTakenOver": {
+            "type": "boolean"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "repositoryBinding": {
+            "nullable": true,
+            "readOnly": true
           }
         },
         "additionalProperties": false
@@ -39143,6 +39430,9 @@
     },
     {
       "name": "ToolRequestsV1"
+    },
+    {
+      "name": "WorkbenchProjects"
     },
     {
       "name": "WorkflowReadOnlyApi"

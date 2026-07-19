@@ -13,6 +13,7 @@
     "dev:localtest": "vite --host 127.0.0.1 --mode localtest",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
+    "preview:playwright": "vite build --mode playwright && vite preview --host 127.0.0.1 --port 5173",
     "test": "playwright test",
     "test:localtest": "playwright test tests/localtest-manual-smoke.spec.ts",
     "test:visual-smoke": "playwright test tests/chat-visual-smoke.spec.ts",

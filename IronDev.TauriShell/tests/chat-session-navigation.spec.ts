@@ -196,11 +196,12 @@ test('authorized channel creation lands on its canonical shared route', async ({
 });
 
 test('session-list failure preserves the route and retries backend truth', async ({ page }) => {
-  const state = await mockSessionWorkspace(page, { failSessionListOnce: true });
+  const state = await mockSessionWorkspace(page, { failSessionListUntilAllowed: true });
   await page.goto('/projects/7/workshop/sessions/9008');
 
   await expect(page.getByTestId('flow.routeOutcome.kind')).toContainText('503');
   await expect(page.getByRole('heading', { name: 'Conversations are unavailable' })).toBeVisible();
+  state.allowSessionListSuccess();
   await page.getByRole('button', { name: 'Retry' }).click();
 
   await expect(page).toHaveURL('/projects/7/workshop/sessions/9008');
@@ -284,6 +285,7 @@ test.describe('narrow session navigation', () => {
 
 interface SessionMockOptions {
   failSessionListOnce?: boolean;
+  failSessionListUntilAllowed?: boolean;
   failMarkRead?: boolean;
   failAssistantCompletionOnce?: boolean;
   withNotification?: boolean;
@@ -298,9 +300,11 @@ interface SessionMockState {
   markReadResponses: number;
   assistantCompletionRequests: number;
   markNotificationReadRequests: number;
+  allowSessionListSuccess: () => void;
 }
 
 async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}): Promise<SessionMockState> {
+  let sessionListFailureAllowed = false;
   const state: SessionMockState = {
     createdSessionCount: 0,
     sessionListRequests: 0,
@@ -308,7 +312,10 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
     markReadRequests: 0,
     markReadResponses: 0,
     assistantCompletionRequests: 0,
-    markNotificationReadRequests: 0
+    markNotificationReadRequests: 0,
+    allowSessionListSuccess: () => {
+      sessionListFailureAllowed = true;
+    }
   };
   let nextSessionId = 9010;
   let nextMessageId = 9200;
@@ -427,6 +434,19 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
   });
 
   await page.route('**/irondev-api/health', (route) => json(route, { status: 'healthy' }));
+  await page.route('**/irondev-api/api/localtest/preflight', (route) => json(route, {
+    state: 'LocalTestReady',
+    environment: 'LocalTest',
+    database: 'IronDeveloper_Test',
+    apiBuildCommit: 'test-commit',
+    launcherRepositoryCommit: 'test-commit',
+    apiBaseUrl: 'http://localhost:5000',
+    sessionMode: 'SmokeSimulation',
+    sandboxApplyRequested: false,
+    sandboxApplyEnabled: false,
+    sandboxApplyRoot: null,
+    capabilities: ['WorkflowSmokeSimulation']
+  }));
   await page.route('**/irondev-api/api/environment', (route) =>
     json(route, { environment: 'LocalTest', database: 'IronDeveloper_Test', isTestEnvironment: true })
   );
@@ -439,7 +459,19 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/projects/7/select', (route) => json(route, { projectId: 7 }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, {
+    projectId: 7,
+    tenantId: 3,
+    name: 'BookSeller',
+    projectLifecyclePhase: 'Shaping',
+    executionReadiness: 'NotConfigured',
+    repositoryBinding: null,
+    workbenchSessionId: 7007,
+    leaseEpoch: 1,
+    wasResumed: true,
+    wasTakenOver: false,
+    clientOperationId: '00000000-0000-0000-0000-000000000007'
+  }));
 
   await page.route(/\/irondev-api\/api\/projects\/7\/channels$/, async (route) => {
     if (route.request().method() === 'GET') {
@@ -652,7 +684,8 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
   await page.route(/\/irondev-api\/api\/projects\/7\/chat\/sessions$/, async (route) => {
     if (route.request().method() === 'GET') {
       state.sessionListRequests += 1;
-      if (options.failSessionListOnce && state.sessionListRequests === 1) {
+      if ((options.failSessionListOnce && state.sessionListRequests === 1) ||
+          (options.failSessionListUntilAllowed && !sessionListFailureAllowed)) {
         return json(route, { error: 'Session store unavailable.' }, 500);
       }
       return json(route, sessions);

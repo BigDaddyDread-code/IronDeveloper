@@ -98,6 +98,8 @@ import type {
   ProjectImplementationPlan,
   ProjectFileSummary,
   ProjectSummary,
+  StartProjectResponse,
+  WorkbenchProjectEntryContext,
   ProjectTicket,
   RunReviewPackage,
   RunTicketReviewRequest,
@@ -154,7 +156,9 @@ export function getIronDevApiConfig(): IronDevApiConfig {
   const configuredBaseUrl =
     import.meta.env.VITE_IRONDEV_API_BASE_URL ?? window.localStorage.getItem('irondev.apiBaseUrl');
   const apiBaseUrl = (configuredBaseUrl?.trim() || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
-  const shouldUseViteProxy = import.meta.env.DEV && isDefaultLocalApi(apiBaseUrl);
+  const shouldUseViteProxy =
+    (import.meta.env.DEV || import.meta.env.VITE_IRONDEV_USE_PROXY === 'true') &&
+    isDefaultLocalApi(apiBaseUrl);
 
   const rawFallbackProjectId =
     import.meta.env.VITE_IRONDEV_PROJECT_ID ??
@@ -351,6 +355,31 @@ class IronDevApiClient {
 
   async selectProject(projectId: number, signal?: AbortSignal): Promise<{ projectId: number }> {
     return this.request<{ projectId: number }>(`/api/projects/${projectId}/select`, { method: 'POST', signal });
+  }
+
+  async startProject(
+    name: string,
+    clientOperationId: string,
+    signal?: AbortSignal
+  ): Promise<StartProjectResponse> {
+    return this.request<StartProjectResponse>('/api/projects/start', {
+      method: 'POST',
+      body: { name, clientOperationId },
+      signal
+    });
+  }
+
+  async openWorkbenchProject(
+    projectId: number,
+    clientOperationId: string,
+    takeOver = false,
+    signal?: AbortSignal
+  ): Promise<WorkbenchProjectEntryContext> {
+    return this.request<WorkbenchProjectEntryContext>(`/api/workbench/projects/${projectId}/open`, {
+      method: 'POST',
+      body: { clientOperationId, takeOver },
+      signal
+    });
   }
 
   /**

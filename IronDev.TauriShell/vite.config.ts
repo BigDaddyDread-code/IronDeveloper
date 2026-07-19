@@ -32,7 +32,15 @@ export default defineConfig(({ mode }) => {
     preview: {
       host: '127.0.0.1',
       port: 4173,
-      strictPort: true
+      strictPort: true,
+      proxy: {
+        '/irondev-api': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/irondev-api/, '')
+        }
+      }
     },
     clearScreen: false
   };
