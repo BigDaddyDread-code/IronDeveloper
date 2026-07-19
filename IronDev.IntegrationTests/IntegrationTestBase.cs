@@ -301,6 +301,26 @@ public abstract class IntegrationTestBase
             IF COL_LENGTH('dbo.ClientOperations', 'ResultAgentRunId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations SET ResultAgentRunId=NULL;';
             IF OBJECT_ID('dbo.WorkbenchOutboxEvents', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchOutboxEvents;
+            IF OBJECT_ID('dbo.WorkbenchBusinessAnalystToolCallAudits', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_WorkbenchBusinessAnalystToolCallAudits_BlockUpdateDelete', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_WorkbenchBusinessAnalystToolCallAudits_BlockUpdateDelete
+                        ON dbo.WorkbenchBusinessAnalystToolCallAudits;
+                DELETE FROM dbo.WorkbenchBusinessAnalystToolCallAudits;
+                IF OBJECT_ID('dbo.TR_WorkbenchBusinessAnalystToolCallAudits_BlockUpdateDelete', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_WorkbenchBusinessAnalystToolCallAudits_BlockUpdateDelete
+                        ON dbo.WorkbenchBusinessAnalystToolCallAudits;
+            END
+            IF OBJECT_ID('dbo.WorkbenchBusinessAnalystPreparations', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_WorkbenchBusinessAnalystPreparations_BlockUpdateDelete', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_WorkbenchBusinessAnalystPreparations_BlockUpdateDelete
+                        ON dbo.WorkbenchBusinessAnalystPreparations;
+                DELETE FROM dbo.WorkbenchBusinessAnalystPreparations;
+                IF OBJECT_ID('dbo.TR_WorkbenchBusinessAnalystPreparations_BlockUpdateDelete', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_WorkbenchBusinessAnalystPreparations_BlockUpdateDelete
+                        ON dbo.WorkbenchBusinessAnalystPreparations;
+            END
             IF OBJECT_ID('dbo.WorkbenchAgentRunAttempts', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRunAttempts;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
             IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL DELETE FROM dbo.ClientOperations;

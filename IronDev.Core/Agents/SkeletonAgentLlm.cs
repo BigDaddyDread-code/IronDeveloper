@@ -7,6 +7,7 @@ public sealed record SkeletonAgentLlm
     public required IronDev.Core.ILLMService Llm { get; init; }
     public required string Provider { get; init; }
     public required string Model { get; init; }
+    public int TimeoutSeconds { get; init; } = 60;
 }
 
 /// <summary>
@@ -24,6 +25,14 @@ public interface IAgentLlmResolver
         int projectId,
         CancellationToken cancellationToken = default) =>
         ResolveAsync(role, cancellationToken);
+
+    Task<SkeletonAgentLlm> ResolveAsync(
+        EffectiveSkeletonAgentProfile effectiveProfile,
+        int tenantId,
+        int projectId,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException(
+            "This model resolver cannot bind an already-captured effective agent profile snapshot.");
 }
 
 /// <summary>

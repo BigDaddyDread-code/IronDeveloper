@@ -2279,6 +2279,33 @@
                         "notes":  "Append-only SQL lifecycle authority for rebuildable semantic/vector projections with locked source-level transitions."
                     },
                     {
+                        "id":  "database.migrate-workbench-project-start",
+                        "path":  "Database/migrate_workbench_project_start.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.ProjectLifecyclePhases",
+                                               "dbo.ProjectUnderstandings",
+                                               "dbo.ProjectReadinessAssessments",
+                                               "dbo.WorkbenchSessions",
+                                               "dbo.WorkbenchWriteLeases",
+                                               "dbo.ClientOperations",
+                                               "dbo.WorkbenchOutboxEvents"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Tenants",
+                                              "dbo.Projects",
+                                              "dbo.Users"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-01 atomic project-first entry"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Manifest consistency record for the existing repository-independent project-start migration. The migration itself is unchanged."
+                    },
+                    {
                         "id":  "database.migrate-workbench-agent-runs",
                         "path":  "Database/migrate_workbench_agent_runs.sql",
                         "kind":  "migration-script",
@@ -2304,6 +2331,29 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Fenced pending/running/terminal BA runs with immutable server context, versioned output schema, per-invocation attempts, recovery claims, and exactly-once assistant materialization."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-ba-preparation-audit",
+                        "path":  "Database/migrate_workbench_ba_preparation_audit.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.WorkbenchBusinessAnalystPreparations",
+                                               "dbo.WorkbenchBusinessAnalystToolCallAudits",
+                                               "exact preparation-to-attempt binding",
+                                               "append-only preparation and tool-call triggers"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.WorkbenchAgentRuns",
+                                              "dbo.WorkbenchAgentRunAttempts"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-02B durable Business Analyst host provenance"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Stores deterministic hashes and bounded safe summaries for the effective profile, actual model preparation, and fixed read-only snapshot tools. Raw prompts, tool payloads, model output, and chain-of-thought are deliberately excluded."
                     }
                 ]
 }

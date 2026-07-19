@@ -45,7 +45,7 @@ public sealed class OllamaLlmService : ILLMService
             var body = await response.Content.ReadFromJsonAsync<OllamaResponse>(cancellationToken: ct);
             return body?.Response ?? string.Empty;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             throw new InvalidOperationException($"Ollama call failed: {ex.Message}", ex);
         }

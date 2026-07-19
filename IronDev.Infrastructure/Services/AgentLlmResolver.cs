@@ -51,7 +51,8 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
                 Role = role,
                 Llm = new DeterministicAlphaSmokeLlmService(role, _configuration),
                 Provider = DeterministicAlphaSmokeLlmService.ProviderName,
-                Model = $"deterministic-{role.ToString().ToLowerInvariant()}"
+                Model = $"deterministic-{role.ToString().ToLowerInvariant()}",
+                TimeoutSeconds = ResolveGlobalTimeoutSeconds()
             };
         }
 
@@ -86,7 +87,8 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
                 Role = role,
                 Llm = new DeterministicAlphaSmokeLlmService(role, _configuration),
                 Provider = DeterministicAlphaSmokeLlmService.ProviderName,
-                Model = $"deterministic-{role.ToString().ToLowerInvariant()}"
+                Model = $"deterministic-{role.ToString().ToLowerInvariant()}",
+                TimeoutSeconds = ResolveGlobalTimeoutSeconds()
             };
         }
         if (tenantId <= 0 || projectId <= 0)
@@ -94,6 +96,33 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
 
         var profile = (await _profiles.ListEffectiveAsync(tenantId, projectId, cancellationToken).ConfigureAwait(false))
             .Single(item => item.Role == role);
+        return await ResolveAsync(profile, tenantId, projectId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<SkeletonAgentLlm> ResolveAsync(
+        EffectiveSkeletonAgentProfile effectiveProfile,
+        int tenantId,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(effectiveProfile);
+        if (tenantId <= 0 || projectId <= 0)
+            throw new InvalidOperationException("A governed project run requires tenant and project identity before resolving an agent model.");
+
+        var role = effectiveProfile.Role;
+        if (IsDeterministicAlphaSmoke())
+        {
+            return new SkeletonAgentLlm
+            {
+                Role = role,
+                Llm = new DeterministicAlphaSmokeLlmService(role, _configuration),
+                Provider = DeterministicAlphaSmokeLlmService.ProviderName,
+                Model = $"deterministic-{role.ToString().ToLowerInvariant()}",
+                TimeoutSeconds = ResolveGlobalTimeoutSeconds()
+            };
+        }
+
+        var profile = effectiveProfile;
         var global = _configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions();
         var provider = profile.Provider.Trim();
         var baseUrl = global.BaseUrl;
@@ -118,7 +147,8 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
                 Role = role,
                 Llm = new DeterministicAlphaSmokeLlmService(role, _configuration),
                 Provider = ProjectRunProviders.LocalTestDeterministic,
-                Model = profile.Model
+                Model = profile.Model,
+                TimeoutSeconds = profile.TimeoutSeconds
             };
         }
 
@@ -155,9 +185,13 @@ public sealed class AgentLlmResolver : IAgentLlmResolver
             Role = role,
             Llm = llm,
             Provider = provider,
-            Model = options.Model ?? string.Empty
+            Model = options.Model ?? string.Empty,
+            TimeoutSeconds = options.TimeoutSeconds
         };
     }
+
+    private int ResolveGlobalTimeoutSeconds() =>
+        (_configuration.GetSection("Ai").Get<LlmOptions>() ?? new LlmOptions()).TimeoutSeconds;
 
     private bool IsDeterministicAlphaSmoke() =>
         string.Equals(_configuration["AlphaSmoke:Enabled"], "true", StringComparison.OrdinalIgnoreCase) &&

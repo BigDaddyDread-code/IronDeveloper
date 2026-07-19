@@ -85,11 +85,19 @@ Workbench previews carry a programme version from `workbench-version.json`, the 
 
 The example owns `IronDeveloper_Test_workbench_pr00a`, `C:\IronDevTestWorkspaces\workbench-pr00a`, and `C:\IronDevTestLogs\workbench-pr00a`. Reusing the command resets only those targets. Use different `-ApiBaseUrl` and `-UiPort` values when running two previews at the same time.
 
-The current durable agent-run preview can run beside the earlier previews:
+The current stateless Business Analyst host preview can run beside the earlier previews:
 
 ```powershell
-.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -PreviewId workbench-pr02a -ApiBaseUrl http://127.0.0.1:5220 -UiPort 5201
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -PreviewId workbench-pr02b -ApiBaseUrl http://127.0.0.1:5230 -UiPort 5211
 ```
+
+With that preview running, exercise the real PR-02B submit, worker, stateless host, and exactly-once materialization path:
+
+```powershell
+.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5230 -PreviewId workbench-pr02b
+```
+
+The proof verifies the preview-scoped database's hash-only preparation record and exact three read-only snapshot-tool records, then prints the project and chat IDs plus a preview-pinned follow-up command. Restart the same preview without `-Reset`, run that follow-up, and the continuity marker must come from the durable Workbench context rather than provider-side conversation memory.
 
 See [Workbench preview history](Docs/workbench/PREVIEW_HISTORY.md) for the version-to-PR test record.
 
