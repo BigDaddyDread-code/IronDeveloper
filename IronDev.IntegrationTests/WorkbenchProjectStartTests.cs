@@ -136,11 +136,27 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
             new StartProjectCommand(1, ownerUserId, Guid.NewGuid(), "Lease proof"));
         var entry = new WorkbenchProjectEntryService(ServiceProvider.GetRequiredService<IDbConnectionFactory>());
 
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            await connection.ExecuteAsync(
+                "DELETE dbo.ProjectUnderstandings WHERE TenantId=1 AND ProjectId=@ProjectId;",
+                new { start.ProjectId });
+        }
+
         var resumed = await entry.OpenAsync(new OpenWorkbenchProjectCommand(
             1, ownerUserId, start.ProjectId, Guid.NewGuid(), TakeOver: false));
         Assert.IsTrue(resumed.WasResumed);
         Assert.AreEqual(start.WorkbenchSessionId, resumed.WorkbenchSessionId);
         Assert.AreEqual(1L, resumed.LeaseEpoch);
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            var understandingJson = await connection.QuerySingleAsync<string>(
+                "SELECT UnderstandingJson FROM dbo.ProjectUnderstandings WHERE TenantId=1 AND ProjectId=@ProjectId;",
+                new { start.ProjectId });
+            var understanding = ProjectUnderstandingDocumentCodec.Deserialize(understandingJson);
+            Assert.AreEqual(ProjectUnderstandingContract.SchemaVersion, understanding.SchemaVersion);
+            Assert.AreEqual(0, understanding.Facts.Count);
+        }
 
         var secondUserId = await SeedAdditionalActorAsync("takeover");
         await using (var connection = new SqlConnection(ConnectionString))
@@ -333,12 +349,13 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
             DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystToolCallAudits;
             DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystPreparations;
             DROP TABLE IF EXISTS dbo.WorkbenchAgentRunAttempts;
+            DROP TABLE IF EXISTS dbo.ProjectRenameProposals;
+            DROP TABLE IF EXISTS dbo.ProjectUnderstandings;
             DROP TABLE IF EXISTS dbo.WorkbenchAgentRuns;
             DROP TABLE IF EXISTS dbo.ClientOperations;
             DROP TABLE IF EXISTS dbo.WorkbenchWriteLeases;
             DROP TABLE IF EXISTS dbo.WorkbenchSessions;
             DROP TABLE IF EXISTS dbo.ProjectReadinessAssessments;
-            DROP TABLE IF EXISTS dbo.ProjectUnderstandings;
             DROP TABLE IF EXISTS dbo.ProjectLifecyclePhases;
             """);
     }

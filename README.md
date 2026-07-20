@@ -89,16 +89,18 @@ The current Workshop conversation-authority preview can run beside the earlier p
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -EnableConversationAuthority -PreviewId workbench-pr02c-a `
-  -ApiBaseUrl http://127.0.0.1:5240 -UiPort 5221
+  -EnableConversationAuthority -PreviewId workbench-pr02c-b `
+  -ApiBaseUrl http://127.0.0.1:5250 -UiPort 5231
 ```
 
-Sign in, open or create a repository-free project, and send a Workshop message. The UI verifies Business Analyst readiness before creating the first conversation, submits one durable AgentRun, shows its queued/running/terminal state, supports cancellation, recovers active or bounded terminal state after reload, and displays only server-owned persisted replies. It intentionally hides document attachment while that context contract is deferred.
+Sign in, open or create a repository-free project, and send a Workshop message. The UI displays the durable Project Understanding beside the conversation, including fact confidence, provenance, user locks, explicit conflicts, pending project-name proposals, and read-only operational status. Conversation execution remains server-owned and fenced.
+
+To exercise the deterministic rename flow, send `Rename project to CalmPlan` as its own Workshop message and accept the proposal in Project Context.
 
 With that preview running, the lower-level submit/worker/stateless-host continuity proof is also available:
 
 ```powershell
-.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5240 -PreviewId workbench-pr02c-a
+.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5250 -PreviewId workbench-pr02c-b
 ```
 
 The proof verifies the preview-scoped database's hash-only preparation record and exact three read-only snapshot-tool records, then prints the project and chat IDs plus a preview-pinned follow-up command. Restart the same preview without `-Reset`, run that follow-up, and the continuity marker must come from the durable Workbench context rather than provider-side conversation memory.

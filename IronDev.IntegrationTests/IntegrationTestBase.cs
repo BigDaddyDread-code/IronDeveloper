@@ -332,6 +332,8 @@ public abstract class IntegrationTestBase
                         ON dbo.WorkbenchBusinessAnalystPreparations;
             END
             IF OBJECT_ID('dbo.WorkbenchAgentRunAttempts', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRunAttempts;
+            IF OBJECT_ID('dbo.ProjectRenameProposals', 'U') IS NOT NULL DELETE FROM dbo.ProjectRenameProposals;
+            IF OBJECT_ID('dbo.ProjectUnderstandings', 'U') IS NOT NULL DELETE FROM dbo.ProjectUnderstandings;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
             IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL DELETE FROM dbo.ClientOperations;
             DELETE FROM dbo.ChatMessages;
@@ -355,7 +357,6 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.WorkbenchWriteLeases', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchWriteLeases;
             IF OBJECT_ID('dbo.WorkbenchSessions', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchSessions;
             IF OBJECT_ID('dbo.ProjectReadinessAssessments', 'U') IS NOT NULL DELETE FROM dbo.ProjectReadinessAssessments;
-            IF OBJECT_ID('dbo.ProjectUnderstandings', 'U') IS NOT NULL DELETE FROM dbo.ProjectUnderstandings;
             IF OBJECT_ID('dbo.ProjectLifecyclePhases', 'U') IS NOT NULL DELETE FROM dbo.ProjectLifecyclePhases;
             IF OBJECT_ID('dbo.UserMutationAttribution', 'U') IS NOT NULL TRUNCATE TABLE dbo.UserMutationAttribution;
             IF OBJECT_ID('dbo.ArtifactSourceReferences', 'U') IS NOT NULL DELETE FROM dbo.ArtifactSourceReferences;

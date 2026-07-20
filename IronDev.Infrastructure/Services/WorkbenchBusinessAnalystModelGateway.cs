@@ -184,8 +184,7 @@ public sealed class WorkbenchBusinessAnalystModelGateway
 
     private sealed class LocalTestPreparedInvocation : IWorkbenchBusinessAnalystPreparedInvocation
     {
-        private static readonly JsonSerializerOptions OutputJsonOptions =
-            new(JsonSerializerDefaults.Web);
+        private const string RenamePhrasePrefix = "Rename project to ";
         private readonly WorkbenchBusinessAnalystContext _context;
         private readonly string _safeRequestId;
         private readonly int _estimatedInputTokens;
@@ -224,13 +223,38 @@ public sealed class WorkbenchBusinessAnalystModelGateway
             var assistantMessage = needsInput
                 ? $"{continuityMarker} Please describe the product outcome and primary users you want this project to serve."
                 : $"{continuityMarker} {BuildLocalTestAssistantMessage(latestUserMessage!)}";
+            var sourceMessageId = userMessages.LastOrDefault()?.MessageId ?? _context.SourceUserMessageId;
+            var proposedName = !needsInput && TryReadRenameProposal(latestUserMessage!, out var name)
+                ? name
+                : null;
+            var patch = _context.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion2 &&
+                        !needsInput && proposedName is null
+                ? new ProjectUnderstandingPatch(
+                    [
+                        new ProjectUnderstandingFactChange(
+                            "ProductSummary",
+                            latestUserMessage!,
+                            ProjectUnderstandingFactStates.Confirmed,
+                            [sourceMessageId],
+                            "Captured from the latest explicit user message.")
+                    ],
+                    [])
+                : null;
             var output = new WorkbenchBusinessAnalystOutput(
-                WorkbenchBusinessAnalystContract.OutputSchemaVersion1,
+                _context.OutputSchemaVersion,
                 _context.ContextHash,
                 _context.UnderstandingRevision,
                 needsInput ? WorkbenchAgentRunStates.NeedsInput : WorkbenchAgentRunStates.Completed,
-                assistantMessage);
-            var json = JsonSerializer.Serialize(output, OutputJsonOptions);
+                assistantMessage,
+                patch,
+                _context.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion2 &&
+                proposedName is not null
+                    ? new WorkbenchProjectRenameProposalOutput(
+                        proposedName,
+                        [sourceMessageId],
+                        "Captured from the explicit LocalTest rename phrase.")
+                    : null);
+            var json = WorkbenchBusinessAnalystOutputValidator.Serialize(output);
             return Task.FromResult(new WorkbenchBusinessAnalystProviderResponse
             {
                 Output = json,
@@ -263,6 +287,22 @@ public sealed class WorkbenchBusinessAnalystModelGateway
 
         private static int EstimateTokens(string value) =>
             (Encoding.UTF8.GetByteCount(value) + 2) / 3;
+
+        private static bool TryReadRenameProposal(string message, out string proposedName)
+        {
+            proposedName = string.Empty;
+            if (!message.StartsWith(RenamePhrasePrefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var candidate = message[RenamePhrasePrefix.Length..].Trim();
+            if (candidate.EndsWith(".", StringComparison.Ordinal))
+                candidate = candidate[..^1].TrimEnd();
+            if (candidate.Length is 0 or > 200 || candidate.Any(char.IsControl))
+                return false;
+
+            proposedName = candidate;
+            return true;
+        }
     }
 
     private static WorkbenchBusinessAnalystProviderResponse ValidateProviderResponse(

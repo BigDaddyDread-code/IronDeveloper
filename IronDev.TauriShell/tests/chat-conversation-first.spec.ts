@@ -6,9 +6,9 @@ test('empty Workshop is conversation-first with useful starters and no backstage
   await page.goto('/projects/7/workshop');
 
   await expect(page.getByRole('heading', { name: 'Workshop', exact: true })).toBeVisible();
-  await expect(page.getByText('BookSeller / Direct with Workshop guide')).toBeVisible();
+  await expect(page.getByText('BookSeller / Direct with Business Analyst')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'What would you like to work on?' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Review the current project' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Review current project understanding' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shape a new feature' })).toBeVisible();
   await expect(page.getByTestId('chat.contextPanel')).toHaveCount(0);
 
@@ -32,9 +32,9 @@ test('starter actions use the existing composer and project-review request', asy
   await expect(page.getByTestId('chat.composer.input')).toBeFocused();
 
   await page.reload();
-  await page.getByRole('button', { name: 'Review the current project' }).click();
+  await page.getByRole('button', { name: 'Review current project understanding' }).click();
   await expect.poll(() => state.lastCompletionMode).toBe('projectStateReview');
-  await expect(page.getByText('Review Project State')).toBeVisible();
+  await expect(page.getByText('Review Project Understanding')).toBeVisible();
 });
 
 test('a historical user message reads as conversation, not a framed inspection screen', async ({ page }) => {

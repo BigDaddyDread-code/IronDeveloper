@@ -852,7 +852,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(output);
-        var outputJson = JsonSerializer.Serialize(output, JsonOptions);
+        var outputJson = WorkbenchBusinessAnalystOutputValidator.Serialize(output);
         var outputHash = ComputeHash(outputJson);
 
         using var connection = _connections.CreateConnection();
@@ -1050,7 +1050,13 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 transaction,
                 cancellationToken: cancellationToken));
 
-            if (validReferences == 0)
+            if (validReferences == 0 ||
+                !await ValidateOutputSourceReferencesAsync(
+                    connection,
+                    transaction,
+                    run,
+                    output,
+                    cancellationToken))
             {
                 await MarkFailedCoreAsync(connection, transaction, run, "source_reference_invalid", outputHash, cancellationToken);
                 await CompleteAttemptAsync(
@@ -1070,6 +1076,14 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     IsReplay: false,
                     RejectionReason: "source_reference_invalid");
             }
+
+            await ApplyUnderstandingOutputAsync(
+                connection,
+                transaction,
+                run,
+                storedContext!,
+                output,
+                cancellationToken);
 
             await CompleteAttemptAsync(
                 connection,
@@ -1701,6 +1715,311 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             transaction,
             cancellationToken: cancellationToken));
 
+    private static async Task<bool> ValidateOutputSourceReferencesAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        AgentRunRow run,
+        WorkbenchBusinessAnalystOutput output,
+        CancellationToken cancellationToken)
+    {
+        if (output.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion1)
+            return true;
+
+        var sourceMessageIds = (output.UnderstandingPatch?.FactChanges ?? [])
+            .SelectMany(change => change.SourceMessageIds)
+            .Concat(output.RenameProposal?.SourceMessageIds ?? [])
+            .Distinct()
+            .ToArray();
+        if (sourceMessageIds.Length == 0)
+            return true;
+
+        var count = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            """
+            SELECT COUNT(1)
+            FROM dbo.ChatMessages message WITH (HOLDLOCK)
+            WHERE message.TenantId=@TenantId AND message.ProjectId=@ProjectId
+              AND message.ChatSessionId=@ChatSessionId AND message.Role=N'user'
+              AND message.Id IN @SourceMessageIds;
+            """,
+            new
+            {
+                run.TenantId,
+                run.ProjectId,
+                run.ChatSessionId,
+                SourceMessageIds = sourceMessageIds
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+        return count == sourceMessageIds.Length;
+    }
+
+    private static async Task ApplyUnderstandingOutputAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        AgentRunRow run,
+        WorkbenchBusinessAnalystContext storedContext,
+        WorkbenchBusinessAnalystOutput output,
+        CancellationToken cancellationToken)
+    {
+        if (output.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion1)
+            return;
+
+        var current = await connection.QuerySingleOrDefaultAsync<UnderstandingMaterializationRow>(new CommandDefinition(
+            """
+            SELECT TOP (1) understanding.Revision, understanding.UnderstandingJson, project.Name AS ProjectName
+            FROM dbo.ProjectUnderstandings understanding WITH (UPDLOCK, HOLDLOCK)
+            INNER JOIN dbo.Projects project WITH (UPDLOCK, HOLDLOCK)
+                ON project.TenantId=understanding.TenantId AND project.Id=understanding.ProjectId
+            WHERE understanding.TenantId=@TenantId AND understanding.ProjectId=@ProjectId
+            ORDER BY understanding.Revision DESC;
+            """,
+            run,
+            transaction,
+            cancellationToken: cancellationToken))
+            ?? throw new InvalidOperationException("The project understanding required for materialization is missing.");
+
+        // Decoding the frozen base is intentional even when the latest revision advanced: it
+        // proves the result was based on a valid typed document or an explicit PR-01 placeholder.
+        var baseDocument = ProjectUnderstandingDocumentCodec.Deserialize(storedContext.UnderstandingJson);
+        var document = ProjectUnderstandingDocumentCodec.Deserialize(current.UnderstandingJson);
+        var nextRevision = checked(current.Revision + 1);
+        var facts = document.Facts.ToDictionary(value => value.Key, StringComparer.Ordinal);
+        var baseFacts = baseDocument.Facts.ToDictionary(value => value.Key, StringComparer.Ordinal);
+        var conflicts = document.Conflicts.ToList();
+        var changed = false;
+
+        foreach (var proposed in output.UnderstandingPatch?.FactChanges ?? [])
+        {
+            var value = proposed.Value.Trim();
+            var evidence = proposed.EvidenceSummary.Trim();
+            var sources = proposed.SourceMessageIds.Distinct().Order().ToArray();
+            if (!facts.TryGetValue(proposed.Key, out var currentFact))
+            {
+                facts[proposed.Key] = AgentFact(proposed.Key, value, proposed.State, sources, evidence, run, nextRevision);
+                changed = true;
+                continue;
+            }
+
+            if (string.Equals(currentFact.Value, value, StringComparison.Ordinal))
+            {
+                if (currentFact.State == ProjectUnderstandingFactStates.Inferred &&
+                    proposed.State == ProjectUnderstandingFactStates.Confirmed)
+                {
+                    facts[proposed.Key] = AgentFact(
+                        proposed.Key,
+                        value,
+                        ProjectUnderstandingFactStates.Confirmed,
+                        sources,
+                        evidence,
+                        run,
+                        nextRevision) with { UserLocked = currentFact.UserLocked };
+                    changed = true;
+                }
+                continue;
+            }
+
+            var changedSinceFrozenBase = !baseFacts.TryGetValue(proposed.Key, out var baseFact) ||
+                !SameFactSemantics(baseFact, currentFact);
+            if (currentFact.State == ProjectUnderstandingFactStates.Inferred &&
+                !currentFact.UserLocked &&
+                !changedSinceFrozenBase)
+            {
+                facts[proposed.Key] = AgentFact(
+                    proposed.Key,
+                    value,
+                    proposed.State,
+                    sources,
+                    evidence,
+                    run,
+                    nextRevision);
+                changed = true;
+                continue;
+            }
+
+            var duplicate = conflicts.Any(conflict =>
+                conflict.Status == ProjectUnderstandingConflictStates.Open &&
+                conflict.FactKey == proposed.Key &&
+                string.Equals(conflict.CurrentValue, currentFact.Value, StringComparison.Ordinal) &&
+                string.Equals(conflict.ProposedValue, value, StringComparison.Ordinal));
+            if (!duplicate)
+            {
+                conflicts.Add(new ProjectUnderstandingConflict(
+                    Guid.NewGuid(),
+                    proposed.Key,
+                    currentFact.Value,
+                    value,
+                    sources,
+                    evidence,
+                    run.AgentRunId,
+                    nextRevision,
+                    ProjectUnderstandingConflictStates.Open));
+                changed = true;
+            }
+            if (currentFact.State != ProjectUnderstandingFactStates.Conflicted)
+            {
+                facts[proposed.Key] = currentFact with
+                {
+                    State = ProjectUnderstandingFactStates.Conflicted,
+                    Revision = nextRevision
+                };
+                changed = true;
+            }
+        }
+
+        var openQuestions = document.OpenQuestions;
+        if (output.UnderstandingPatch?.OpenQuestions is { } proposedQuestions &&
+            !openQuestions.SequenceEqual(proposedQuestions, StringComparer.Ordinal))
+        {
+            openQuestions = proposedQuestions.Select(value => value.Trim()).ToArray();
+            changed = true;
+        }
+
+        if (changed)
+        {
+            var next = new ProjectUnderstandingDocument(
+                ProjectUnderstandingContract.SchemaVersion,
+                facts.Values.ToArray(),
+                conflicts,
+                openQuestions);
+            var understandingJson = ProjectUnderstandingDocumentCodec.Serialize(next);
+            await connection.ExecuteAsync(new CommandDefinition(
+                """
+                UPDATE dbo.ProjectUnderstandings
+                SET Status=N'Superseded'
+                WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Revision=@CurrentRevision;
+
+                INSERT dbo.ProjectUnderstandings
+                    (TenantId, ProjectId, Revision, Status, UnderstandingJson, DocumentSchemaVersion,
+                     BasedOnRevision, CreatedByActorUserId, CreatedByAgentRunId)
+                VALUES
+                    (@TenantId, @ProjectId, @NextRevision, N'Draft', @UnderstandingJson, 1,
+                     @BasedOnRevision, @ActorUserId, @AgentRunId);
+                """,
+                new
+                {
+                    run.TenantId,
+                    run.ProjectId,
+                    CurrentRevision = current.Revision,
+                    NextRevision = nextRevision,
+                    UnderstandingJson = understandingJson,
+                    BasedOnRevision = output.BasedOnUnderstandingRevision,
+                    run.ActorUserId,
+                    run.AgentRunId
+                },
+                transaction,
+                cancellationToken: cancellationToken));
+            await InsertOutboxAsync(
+                connection,
+                transaction,
+                run,
+                "ProjectUnderstandingRevised",
+                JsonSerializer.Serialize(new
+                {
+                    run.AgentRunId,
+                    revision = nextRevision,
+                    basedOnRevision = output.BasedOnUnderstandingRevision
+                }, JsonOptions),
+                cancellationToken);
+        }
+
+        if (output.RenameProposal is not { } rename)
+            return;
+        var proposedName = rename.ProposedName.Trim();
+        if (string.Equals(current.ProjectName, proposedName, StringComparison.Ordinal))
+            return;
+
+        var existingPending = await connection.QuerySingleOrDefaultAsync<PendingRenameRow>(new CommandDefinition(
+            """
+            SELECT TOP (1) ProposalId, ProposedName, BasedOnProjectName
+            FROM dbo.ProjectRenameProposals WITH (UPDLOCK, HOLDLOCK)
+            WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Status=N'Pending';
+            """,
+            run,
+            transaction,
+            cancellationToken: cancellationToken));
+        if (existingPending is not null &&
+            string.Equals(existingPending.ProposedName, proposedName, StringComparison.Ordinal) &&
+            string.Equals(existingPending.BasedOnProjectName, current.ProjectName, StringComparison.Ordinal))
+            return;
+
+        if (existingPending is not null)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                """
+                UPDATE dbo.ProjectRenameProposals
+                SET Status=N'Superseded', DecisionAtUtc=SYSUTCDATETIME()
+                WHERE ProposalId=@ProposalId AND Status=N'Pending';
+                """,
+                new { existingPending.ProposalId },
+                transaction,
+                cancellationToken: cancellationToken));
+        }
+
+        var proposalId = Guid.NewGuid();
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            INSERT dbo.ProjectRenameProposals
+                (ProposalId, TenantId, ProjectId, ProposedName, Status, BasedOnProjectName,
+                 BasedOnUnderstandingRevision, ProposedByAgentRunId, InitiatingActorUserId,
+                 SourceMessageIdsJson, EvidenceSummary)
+            VALUES
+                (@ProposalId, @TenantId, @ProjectId, @ProposedName, N'Pending', @BasedOnProjectName,
+                 @BasedOnUnderstandingRevision, @AgentRunId, @ActorUserId,
+                 @SourceMessageIdsJson, @EvidenceSummary);
+            """,
+            new
+            {
+                ProposalId = proposalId,
+                run.TenantId,
+                run.ProjectId,
+                ProposedName = proposedName,
+                BasedOnProjectName = current.ProjectName,
+                BasedOnUnderstandingRevision = output.BasedOnUnderstandingRevision,
+                run.AgentRunId,
+                run.ActorUserId,
+                SourceMessageIdsJson = JsonSerializer.Serialize(
+                    rename.SourceMessageIds.Distinct().Order().ToArray(),
+                    JsonOptions),
+                EvidenceSummary = rename.EvidenceSummary.Trim()
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+        await InsertOutboxAsync(
+            connection,
+            transaction,
+            run,
+            "ProjectRenameProposed",
+            JsonSerializer.Serialize(new { run.AgentRunId, proposalId }, JsonOptions),
+            cancellationToken);
+    }
+
+    private static ProjectUnderstandingFact AgentFact(
+        string key,
+        string value,
+        string state,
+        IReadOnlyList<long> sources,
+        string evidence,
+        AgentRunRow run,
+        long revision) =>
+        new(
+            key,
+            value,
+            state,
+            UserLocked: false,
+            ProjectUnderstandingAuthorKinds.Agent,
+            AuthorActorUserId: null,
+            run.AgentRunId,
+            sources,
+            evidence,
+            revision);
+
+    private static bool SameFactSemantics(
+        ProjectUnderstandingFact left,
+        ProjectUnderstandingFact right) =>
+        string.Equals(left.Value, right.Value, StringComparison.Ordinal) &&
+        string.Equals(left.State, right.State, StringComparison.Ordinal) &&
+        left.UserLocked == right.UserLocked;
+
     private static Task CompleteAttemptAsync(
         IDbConnection connection,
         IDbTransaction transaction,
@@ -1806,6 +2125,20 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         public string PayloadHash { get; init; } = string.Empty;
         public string? CanonicalResultJson { get; init; }
         public string? ResultHash { get; init; }
+    }
+
+    private sealed class UnderstandingMaterializationRow
+    {
+        public long Revision { get; init; }
+        public string UnderstandingJson { get; init; } = string.Empty;
+        public string ProjectName { get; init; } = string.Empty;
+    }
+
+    private sealed class PendingRenameRow
+    {
+        public Guid ProposalId { get; init; }
+        public string ProposedName { get; init; } = string.Empty;
+        public string BasedOnProjectName { get; init; } = string.Empty;
     }
 
     private sealed class AgentRunRow

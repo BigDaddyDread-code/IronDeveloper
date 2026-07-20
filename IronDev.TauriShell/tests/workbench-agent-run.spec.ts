@@ -739,12 +739,12 @@ async function mockAgentRunWorkspace(page: Page, options: AgentRunMockOptions = 
     database: 'IronDeveloper_Test',
     isTestEnvironment: true,
     workbench: {
-      version: '0.1.0-preview.7',
+      version: '0.1.0-preview.8',
       mode: 'V2',
       v2Enabled: true,
       v1FallbackEnabled: true,
       conversationAuthorityEnabled: true,
-      previewId: 'workbench-pr02c-a',
+      previewId: 'workbench-pr02c-b',
       apiBuildIdentity: 'test-build',
       apiCommit: 'test-commit',
       resetSupported: true

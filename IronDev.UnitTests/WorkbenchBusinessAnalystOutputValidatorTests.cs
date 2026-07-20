@@ -36,13 +36,13 @@ public sealed class WorkbenchBusinessAnalystOutputValidatorTests
     [TestMethod]
     public void Validate_RejectsUnknownSchemaVersion()
     {
-        var output = ValidOutput() with { OutputSchemaVersion = 2 };
+        var output = ValidOutput() with { OutputSchemaVersion = 99 };
 
         Assert.ThrowsException<WorkbenchAgentOutputValidationException>(() =>
             WorkbenchBusinessAnalystOutputValidator.Validate(output, Context));
 
-        var unsupportedContext = Context with { OutputSchemaVersion = 2 };
-        var matchingFutureOutput = ValidOutput() with { OutputSchemaVersion = 2 };
+        var unsupportedContext = Context with { OutputSchemaVersion = 99 };
+        var matchingFutureOutput = ValidOutput() with { OutputSchemaVersion = 99 };
         Assert.ThrowsException<WorkbenchAgentOutputValidationException>(() =>
             WorkbenchBusinessAnalystOutputValidator.Validate(matchingFutureOutput, unsupportedContext));
     }
@@ -78,11 +78,13 @@ public sealed class WorkbenchBusinessAnalystOutputValidatorTests
     {
         var unknown = $$"""
             {
-              "outputSchemaVersion": 1,
+              "outputSchemaVersion": 2,
               "contextHash": "{{Context.ContextHash}}",
               "basedOnUnderstandingRevision": 3,
               "outcome": "Completed",
               "assistantMessage": "answer",
+              "understandingPatch": null,
+              "renameProposal": null,
               "unexpectedAuthority": true
             }
             """;
@@ -91,24 +93,30 @@ public sealed class WorkbenchBusinessAnalystOutputValidatorTests
               "contextHash": "{{Context.ContextHash}}",
               "basedOnUnderstandingRevision": 3,
               "outcome": "Completed",
-              "assistantMessage": "answer"
+              "assistantMessage": "answer",
+              "understandingPatch": null,
+              "renameProposal": null
             }
             """;
         var missingContextHash = """
             {
-              "outputSchemaVersion": 1,
+              "outputSchemaVersion": 2,
               "basedOnUnderstandingRevision": 3,
               "outcome": "Completed",
-              "assistantMessage": "answer"
+              "assistantMessage": "answer",
+              "understandingPatch": null,
+              "renameProposal": null
             }
             """;
         var nullContextHash = """
             {
-              "outputSchemaVersion": 1,
+              "outputSchemaVersion": 2,
               "contextHash": null,
               "basedOnUnderstandingRevision": 3,
               "outcome": "Completed",
-              "assistantMessage": "answer"
+              "assistantMessage": "answer",
+              "understandingPatch": null,
+              "renameProposal": null
             }
             """;
 
@@ -128,4 +136,47 @@ public sealed class WorkbenchBusinessAnalystOutputValidatorTests
         Context.UnderstandingRevision,
         WorkbenchAgentRunStates.Completed,
         "Let us clarify the users and desired outcome.");
+
+    [TestMethod]
+    public void Validate_V2RejectsUnknownFactAndNonFrozenSource()
+    {
+        var unknownFact = ValidOutput() with
+        {
+            UnderstandingPatch = new ProjectUnderstandingPatch(
+                [new ProjectUnderstandingFactChange(
+                    "BuildPassed", "yes", ProjectUnderstandingFactStates.Confirmed, [7000], "User said so.")])
+        };
+        Assert.ThrowsException<WorkbenchAgentOutputValidationException>(() =>
+            WorkbenchBusinessAnalystOutputValidator.Validate(unknownFact, Context));
+
+        var foreignSource = ValidOutput() with
+        {
+            UnderstandingPatch = new ProjectUnderstandingPatch(
+                [new ProjectUnderstandingFactChange(
+                    "Goals", "Ship safely", ProjectUnderstandingFactStates.Confirmed, [9999], "User said so.")])
+        };
+        Assert.ThrowsException<WorkbenchAgentOutputValidationException>(() =>
+            WorkbenchBusinessAnalystOutputValidator.Validate(foreignSource, Context));
+    }
+
+    [TestMethod]
+    public void Serialize_PreservesTheExactVersion1Shape()
+    {
+        var legacyContext = Context with
+        {
+            PromptVersion = WorkbenchBusinessAnalystContract.PromptVersion1,
+            OutputSchemaVersion = WorkbenchBusinessAnalystContract.OutputSchemaVersion1
+        };
+        var output = new WorkbenchBusinessAnalystOutput(
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion1,
+            legacyContext.ContextHash,
+            legacyContext.UnderstandingRevision,
+            WorkbenchAgentRunStates.Completed,
+            "Legacy output.");
+
+        var json = WorkbenchBusinessAnalystOutputValidator.Serialize(output);
+        Assert.IsFalse(json.Contains("understandingPatch", StringComparison.Ordinal));
+        Assert.IsFalse(json.Contains("renameProposal", StringComparison.Ordinal));
+        WorkbenchBusinessAnalystOutputValidator.Validate(output, legacyContext);
+    }
 }

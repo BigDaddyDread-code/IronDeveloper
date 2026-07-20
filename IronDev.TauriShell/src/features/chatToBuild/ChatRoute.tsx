@@ -5,6 +5,7 @@ import { RouteOutcomeScreen } from '../../flow/components/RouteOutcomeScreen';
 import { ChatWorkspace } from './ChatWorkspace';
 import { useProjectChat } from './useProjectChat';
 import { useProjectChannels } from './useProjectChannels';
+import { useProjectUnderstanding } from './useProjectUnderstanding';
 
 interface ChatRouteProps {
   route: WorkspaceRoute;
@@ -27,6 +28,15 @@ export function ChatRoute({
 }: ChatRouteProps) {
   const chat = useProjectChat({ requestedSessionId, onSessionCreated: onOpenSession });
   const channels = useProjectChannels();
+  const terminalAgentRunKey = chat.agentRun &&
+    chat.agentRun.status !== 'Pending' &&
+    chat.agentRun.status !== 'Running'
+    ? `${chat.agentRun.agentRunId}:${chat.agentRun.status}`
+    : null;
+  const projectUnderstanding = useProjectUnderstanding({
+    enabled: chat.conversationAuthorityEnabled,
+    terminalAgentRunKey
+  });
 
   const routeSummary = useMemo(
     () => [
@@ -98,6 +108,7 @@ export function ChatRoute({
         isCancellingAgentRun={chat.isCancellingAgentRun}
         agentRun={chat.agentRun}
         conversationAuthorityEnabled={chat.conversationAuthorityEnabled}
+        projectUnderstanding={projectUnderstanding}
         hasUnresolvedDurableOperation={chat.hasUnresolvedDurableOperation}
         agentCancellationDeliveryUnresolved={chat.agentCancellationDeliveryUnresolved}
         boundAgentRunChatSessionId={chat.boundAgentRunChatSessionId}

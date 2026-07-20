@@ -101,6 +101,99 @@ export interface WorkbenchProjectEntryContext {
   wasTakenOver: boolean;
   clientOperationId: string;
 }
+
+export type ProjectUnderstandingFactState = 'Unknown' | 'Inferred' | 'Confirmed' | 'Conflicted';
+
+export interface ProjectUnderstandingFact {
+  key: string;
+  value: string;
+  state: ProjectUnderstandingFactState | string;
+  userLocked: boolean;
+  authorKind: string;
+  authorActorUserId: number | null;
+  authorAgentRunId: string | null;
+  sourceMessageIds: number[];
+  evidenceSummary: string;
+  revision: number;
+}
+
+export interface ProjectUnderstandingConflict {
+  conflictId: string;
+  factKey: string;
+  currentValue: string;
+  proposedValue: string;
+  sourceMessageIds: number[];
+  evidenceSummary: string;
+  createdByAgentRunId: string;
+  createdAtRevision: number;
+  status: string;
+  resolvedAtRevision: number | null;
+  resolvedByActorUserId: number | null;
+}
+
+export interface ProjectRenameProposal {
+  proposalId: string;
+  proposedName: string;
+  status: string;
+  basedOnProjectName: string;
+  basedOnUnderstandingRevision: number;
+  proposedByAgentRunId: string;
+  initiatingActorUserId: number;
+  sourceMessageIds: number[];
+  evidenceSummary: string;
+  createdAtUtc: string;
+}
+
+export interface ProjectUnderstandingOperationalProjection {
+  projectLifecyclePhase: string;
+  projectLifecycleAuthority: 'ProjectLifecyclePhase' | string;
+  executionReadiness: string;
+  executionReadinessAuthority: 'ProjectReadinessAssessment' | string;
+  repositoryBinding: unknown | null;
+}
+
+export interface ProjectUnderstandingReadModel {
+  projectId: number;
+  tenantId: number;
+  projectName: string;
+  revision: number;
+  facts: ProjectUnderstandingFact[];
+  conflicts: ProjectUnderstandingConflict[];
+  openQuestions: string[];
+  pendingRenameProposal: ProjectRenameProposal | null;
+  operationalProjections: ProjectUnderstandingOperationalProjection;
+}
+
+export type ProjectUnderstandingFactAction = 'Edit' | 'Confirm' | 'SetLock' | 'ResolveConflict';
+
+export interface UpdateProjectUnderstandingFactRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  expectedUnderstandingRevision: number;
+  clientOperationId: string;
+  action: ProjectUnderstandingFactAction;
+  conflictId?: string;
+  value?: string;
+  userLocked?: boolean;
+}
+
+export interface ProjectUnderstandingMutationResult {
+  snapshot: ProjectUnderstandingReadModel;
+  clientOperationId: string;
+  isReplay: boolean;
+}
+
+export interface AcceptProjectRenameProposalRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+}
+
+export interface AcceptProjectRenameProposalResult {
+  snapshot: ProjectUnderstandingReadModel;
+  clientOperationId: string;
+  isReplay: boolean;
+}
 export interface StartProjectResponse {
   projectId: number;
   tenantId: number;

@@ -11395,6 +11395,214 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/understanding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProjectUnderstandingSnapshot"];
+                        "application/json": components["schemas"]["ProjectUnderstandingSnapshot"];
+                        "text/json": components["schemas"]["ProjectUnderstandingSnapshot"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/understanding/facts/{factKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    factKey: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PutProjectUnderstandingFactRequest"];
+                    "text/json": components["schemas"]["PutProjectUnderstandingFactRequest"];
+                    "application/*+json": components["schemas"]["PutProjectUnderstandingFactRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PutProjectUnderstandingFactResult"];
+                        "application/json": components["schemas"]["PutProjectUnderstandingFactResult"];
+                        "text/json": components["schemas"]["PutProjectUnderstandingFactResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/rename-proposals/{proposalId}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    proposalId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AcceptProjectRenameProposalRequest"];
+                    "text/json": components["schemas"]["AcceptProjectRenameProposalRequest"];
+                    "application/*+json": components["schemas"]["AcceptProjectRenameProposalRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AcceptProjectRenameProposalResult"];
+                        "application/json": components["schemas"]["AcceptProjectRenameProposalResult"];
+                        "text/json": components["schemas"]["AcceptProjectRenameProposalResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workflow/runs": {
         parameters: {
             query?: never;
@@ -12066,6 +12274,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptProjectRenameProposalRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+        };
+        AcceptProjectRenameProposalResult: {
+            snapshot?: components["schemas"]["ProjectUnderstandingSnapshot"];
+            /** Format: uuid */
+            clientOperationId?: string;
+            isReplay?: boolean;
+        };
         AcceptedApprovalApiErrorDto: {
             category: string | null;
             code: string | null;
@@ -15333,6 +15555,13 @@ export interface components {
             readUtc?: string | null;
             boundary?: string | null;
         };
+        ProjectOperationalProjection: {
+            projectLifecyclePhase?: string | null;
+            projectLifecycleAuthority?: string | null;
+            executionReadiness?: string | null;
+            executionReadinessAuthority?: string | null;
+            repositoryBinding?: unknown;
+        };
         ProjectProfile: {
             /** Format: int64 */
             projectProfileId?: number;
@@ -15398,6 +15627,23 @@ export interface components {
             nextAction?: components["schemas"]["ProvisioningNextAction"];
             proposedProfile?: components["schemas"]["ProjectProfile"];
             boundary?: string | null;
+        };
+        ProjectRenameProposalSnapshot: {
+            /** Format: uuid */
+            proposalId?: string;
+            proposedName?: string | null;
+            status?: string | null;
+            basedOnProjectName?: string | null;
+            /** Format: int64 */
+            basedOnUnderstandingRevision?: number;
+            /** Format: uuid */
+            proposedByAgentRunId?: string;
+            /** Format: int32 */
+            initiatingActorUserId?: number;
+            sourceMessageIds?: number[] | null;
+            evidenceSummary?: string | null;
+            /** Format: date-time */
+            createdAtUtc?: string;
         };
         ProjectRule: {
             /** Format: int64 */
@@ -15580,6 +15826,53 @@ export interface components {
             healthStatus?: string | null;
             effectiveScopeSummary?: string | null;
             boundary?: string | null;
+        };
+        ProjectUnderstandingConflict: {
+            /** Format: uuid */
+            conflictId?: string;
+            factKey?: string | null;
+            currentValue?: string | null;
+            proposedValue?: string | null;
+            sourceMessageIds?: number[] | null;
+            evidenceSummary?: string | null;
+            /** Format: uuid */
+            createdByAgentRunId?: string;
+            /** Format: int64 */
+            createdAtRevision?: number;
+            status?: string | null;
+            /** Format: int64 */
+            resolvedAtRevision?: number | null;
+            /** Format: int32 */
+            resolvedByActorUserId?: number | null;
+        };
+        ProjectUnderstandingFact: {
+            key?: string | null;
+            value?: string | null;
+            state?: string | null;
+            userLocked?: boolean;
+            authorKind?: string | null;
+            /** Format: int32 */
+            authorActorUserId?: number | null;
+            /** Format: uuid */
+            authorAgentRunId?: string | null;
+            sourceMessageIds?: number[] | null;
+            evidenceSummary?: string | null;
+            /** Format: int64 */
+            revision?: number;
+        };
+        ProjectUnderstandingSnapshot: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int32 */
+            tenantId?: number;
+            projectName?: string | null;
+            /** Format: int64 */
+            revision?: number;
+            facts?: components["schemas"]["ProjectUnderstandingFact"][] | null;
+            conflicts?: components["schemas"]["ProjectUnderstandingConflict"][] | null;
+            openQuestions?: string[] | null;
+            pendingRenameProposal?: components["schemas"]["ProjectRenameProposalSnapshot"];
+            operationalProjections?: components["schemas"]["ProjectOperationalProjection"];
         };
         ProjectWorkItemActionReadModel: {
             kind?: string | null;
@@ -15809,6 +16102,27 @@ export interface components {
             reasonCode?: string | null;
             label?: string | null;
             nextSafeAction?: string | null;
+        };
+        PutProjectUnderstandingFactRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            expectedUnderstandingRevision?: number;
+            action?: string | null;
+            /** Format: uuid */
+            conflictId?: string | null;
+            value?: string | null;
+            userLocked?: boolean | null;
+        };
+        PutProjectUnderstandingFactResult: {
+            snapshot?: components["schemas"]["ProjectUnderstandingSnapshot"];
+            /** Format: uuid */
+            clientOperationId?: string;
+            isReplay?: boolean;
         };
         ReconciliationAction: {
             title?: string | null;

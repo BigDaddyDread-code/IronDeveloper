@@ -23,6 +23,7 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         await ApplyMigrationAsync("migrate_workbench_project_start.sql");
         await DropAgentRunMigrationObjectsAsync();
         await ApplyMigrationAsync("migrate_workbench_agent_runs.sql");
+        await ApplyMigrationAsync("migrate_workbench_project_understanding.sql");
     }
 
     [TestMethod]
@@ -1253,6 +1254,437 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.AreEqual(1, state.CancelledEvents);
     }
 
+    [TestMethod]
+    public async Task ProjectUnderstanding_DirectFactWriteIsFencedRevisionedAndIdempotent()
+    {
+        var fixture = await CreateFixtureAsync("Direct understanding write");
+        var service = new WorkbenchProjectUnderstandingService(ConnectionFactory());
+        var operationId = Guid.NewGuid();
+        var command = new PutProjectUnderstandingFactCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            operationId,
+            ExpectedUnderstandingRevision: 1,
+            "Goals",
+            ProjectUnderstandingFactActions.Edit,
+            ConflictId: null,
+            Value: "Help teams shape reliable products",
+            UserLocked: null);
+
+        var first = await service.PutFactAsync(command);
+        var replay = await service.PutFactAsync(command);
+
+        Assert.AreEqual(2L, first.Snapshot.Revision);
+        Assert.IsFalse(first.IsReplay);
+        Assert.IsTrue(replay.IsReplay);
+        var fact = first.Snapshot.Facts.Single();
+        Assert.AreEqual("Goals", fact.Key);
+        Assert.AreEqual(ProjectUnderstandingFactStates.Confirmed, fact.State);
+        Assert.IsFalse(fact.UserLocked);
+        Assert.AreEqual(ProjectUnderstandingAuthorKinds.Actor, fact.AuthorKind);
+        Assert.AreEqual(fixture.ActorUserId, fact.AuthorActorUserId);
+
+        await Assert.ThrowsExactlyAsync<WorkbenchLeaseFenceException>(() =>
+            service.PutFactAsync(command with
+            {
+                ClientOperationId = Guid.NewGuid(),
+                ExpectedUnderstandingRevision = 2,
+                LeaseEpoch = command.LeaseEpoch + 1,
+                Value = "Fenced mutation"
+            }));
+
+        await Assert.ThrowsExactlyAsync<ProjectStartOperationMismatchException>(() =>
+            service.PutFactAsync(command with { Value = "Changed payload" }));
+        var stale = await Assert.ThrowsExactlyAsync<ProjectUnderstandingRevisionConflictException>(() =>
+            service.PutFactAsync(command with
+            {
+                ClientOperationId = Guid.NewGuid(),
+                Value = "A stale overwrite"
+            }));
+        Assert.AreEqual(2L, stale.CurrentRevision);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        Assert.AreEqual(2, await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(1) FROM dbo.ProjectUnderstandings WHERE TenantId=1 AND ProjectId=@ProjectId;",
+            new { fixture.ProjectId }));
+        Assert.AreEqual(1, await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(1) FROM dbo.ClientOperations WHERE ClientOperationId=@OperationId;",
+            new { OperationId = operationId }));
+    }
+
+    [TestMethod]
+    public async Task Materialize_V2KeepsLockedValueCreatesConflictAndAcceptsRenameExactlyOnce()
+    {
+        var fixture = await CreateFixtureAsync("Untitled shaping project");
+        var runs = CreateRunService();
+        var submitted = await runs.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Build a calm planning tool and call this project CalmPlan."));
+        var claim = await runs.ClaimAsync(submitted.AgentRunId, "understanding-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        var context = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+
+        var understanding = new WorkbenchProjectUnderstandingService(ConnectionFactory());
+        await understanding.PutFactAsync(new PutProjectUnderstandingFactCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            Guid.NewGuid(),
+            ExpectedUnderstandingRevision: 1,
+            "ProductSummary",
+            ProjectUnderstandingFactActions.Edit,
+            ConflictId: null,
+            Value: "A deliberately locked summary",
+            UserLocked: null));
+        await understanding.PutFactAsync(new PutProjectUnderstandingFactCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            Guid.NewGuid(),
+            ExpectedUnderstandingRevision: 2,
+            "ProductSummary",
+            ProjectUnderstandingFactActions.SetLock,
+            ConflictId: null,
+            Value: null,
+            UserLocked: true));
+
+        var output = new WorkbenchBusinessAnalystOutput(
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion2,
+            context.ContextHash,
+            context.UnderstandingRevision,
+            WorkbenchAgentRunStates.Completed,
+            "I kept your locked summary and surfaced the conflicting interpretation for review.",
+            new ProjectUnderstandingPatch(
+                [
+                    new ProjectUnderstandingFactChange(
+                        "ProductSummary",
+                        "A calm planning tool",
+                        ProjectUnderstandingFactStates.Confirmed,
+                        [context.SourceUserMessageId],
+                        "The user explicitly described a calm planning tool.")
+                ],
+                ["Who are the primary users?"]),
+            new WorkbenchProjectRenameProposalOutput(
+                "CalmPlan",
+                [context.SourceUserMessageId],
+                "The user explicitly supplied this project name."));
+
+        var materialized = await runs.MaterializeAsync(claim, context, output);
+        var replay = await runs.MaterializeAsync(claim, context, output);
+        Assert.IsTrue(materialized.Materialized);
+        Assert.IsFalse(materialized.IsReplay);
+        Assert.IsTrue(replay.IsReplay);
+
+        var snapshot = await understanding.GetAsync(1, fixture.ActorUserId, fixture.ProjectId);
+        Assert.AreEqual(4L, snapshot.Revision);
+        var fact = snapshot.Facts.Single(value => value.Key == "ProductSummary");
+        Assert.AreEqual("A deliberately locked summary", fact.Value);
+        Assert.AreEqual(ProjectUnderstandingFactStates.Conflicted, fact.State);
+        Assert.IsTrue(fact.UserLocked);
+        var conflict = snapshot.Conflicts.Single();
+        Assert.AreEqual("A calm planning tool", conflict.ProposedValue);
+        Assert.AreEqual(ProjectUnderstandingConflictStates.Open, conflict.Status);
+        Assert.IsNotNull(snapshot.PendingRenameProposal);
+        Assert.AreEqual("CalmPlan", snapshot.PendingRenameProposal.ProposedName);
+
+        var acceptOperationId = Guid.NewGuid();
+        var acceptCommand = new AcceptProjectRenameProposalCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            snapshot.PendingRenameProposal.ProposalId,
+            acceptOperationId);
+        var accepted = await understanding.AcceptRenameAsync(acceptCommand);
+        var acceptedReplay = await understanding.AcceptRenameAsync(acceptCommand);
+        Assert.AreEqual("CalmPlan", accepted.Snapshot.ProjectName);
+        Assert.IsNull(accepted.Snapshot.PendingRenameProposal);
+        Assert.IsTrue(acceptedReplay.IsReplay);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var counts = await connection.QuerySingleAsync<UnderstandingMaterializationCounts>("""
+            SELECT
+                (SELECT COUNT(1) FROM dbo.ProjectUnderstandings WHERE ProjectId=@ProjectId) AS Understandings,
+                (SELECT COUNT(1) FROM dbo.ProjectRenameProposals WHERE ProjectId=@ProjectId) AS RenameProposals,
+                (SELECT COUNT(1) FROM dbo.ChatMessages WHERE ProjectId=@ProjectId AND Role=N'assistant') AS AssistantMessages;
+            """, new { fixture.ProjectId });
+        Assert.AreEqual(4, counts.Understandings);
+        Assert.AreEqual(1, counts.RenameProposals);
+        Assert.AreEqual(1, counts.AssistantMessages);
+    }
+
+    [TestMethod]
+    public async Task ProjectUnderstanding_FactActionsPreserveLocksAndResolveOnlyTheNamedConflict()
+    {
+        var fixture = await CreateFixtureAsync("Fact action semantics");
+        var submitted = await CreateRunService().SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "The goal may be B or C."));
+        var firstConflictId = Guid.NewGuid();
+        var secondConflictId = Guid.NewGuid();
+        var document = new ProjectUnderstandingDocument(
+            ProjectUnderstandingContract.SchemaVersion,
+            [
+                new ProjectUnderstandingFact(
+                    "Goals",
+                    "A",
+                    ProjectUnderstandingFactStates.Conflicted,
+                    UserLocked: false,
+                    ProjectUnderstandingAuthorKinds.Actor,
+                    fixture.ActorUserId,
+                    AuthorAgentRunId: null,
+                    SourceMessageIds: [],
+                    "Seeded current value for fact-action verification.",
+                    Revision: 2)
+            ],
+            [
+                new ProjectUnderstandingConflict(
+                    firstConflictId,
+                    "Goals",
+                    "A",
+                    "B",
+                    [submitted.UserMessageId],
+                    "First explicit alternative.",
+                    submitted.AgentRunId,
+                    CreatedAtRevision: 2,
+                    ProjectUnderstandingConflictStates.Open),
+                new ProjectUnderstandingConflict(
+                    secondConflictId,
+                    "Goals",
+                    "A",
+                    "C",
+                    [submitted.UserMessageId],
+                    "Second explicit alternative.",
+                    submitted.AgentRunId,
+                    CreatedAtRevision: 2,
+                    ProjectUnderstandingConflictStates.Open)
+            ],
+            []);
+        await AppendUnderstandingAsync(fixture, 1, 2, document);
+
+        var understanding = new WorkbenchProjectUnderstandingService(ConnectionFactory());
+        var locked = await understanding.PutFactAsync(new PutProjectUnderstandingFactCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            Guid.NewGuid(),
+            ExpectedUnderstandingRevision: 2,
+            "Goals",
+            ProjectUnderstandingFactActions.SetLock,
+            ConflictId: null,
+            Value: null,
+            UserLocked: true));
+
+        var lockedFact = locked.Snapshot.Facts.Single(value => value.Key == "Goals");
+        Assert.AreEqual("A", lockedFact.Value);
+        Assert.AreEqual(ProjectUnderstandingFactStates.Conflicted, lockedFact.State);
+        Assert.IsTrue(lockedFact.UserLocked);
+        Assert.AreEqual(2, locked.Snapshot.Conflicts.Count(value =>
+            value.Status == ProjectUnderstandingConflictStates.Open));
+
+        var firstResolution = await understanding.PutFactAsync(new PutProjectUnderstandingFactCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            Guid.NewGuid(),
+            ExpectedUnderstandingRevision: 3,
+            "Goals",
+            ProjectUnderstandingFactActions.ResolveConflict,
+            firstConflictId,
+            Value: "B",
+            UserLocked: null));
+
+        var firstResolvedFact = firstResolution.Snapshot.Facts.Single(value => value.Key == "Goals");
+        Assert.AreEqual("B", firstResolvedFact.Value);
+        Assert.AreEqual(ProjectUnderstandingFactStates.Conflicted, firstResolvedFact.State);
+        Assert.AreEqual(ProjectUnderstandingConflictStates.Resolved,
+            firstResolution.Snapshot.Conflicts.Single(value => value.ConflictId == firstConflictId).Status);
+        Assert.AreEqual(ProjectUnderstandingConflictStates.Open,
+            firstResolution.Snapshot.Conflicts.Single(value => value.ConflictId == secondConflictId).Status);
+
+        var secondResolution = await understanding.PutFactAsync(new PutProjectUnderstandingFactCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            Guid.NewGuid(),
+            ExpectedUnderstandingRevision: 4,
+            "Goals",
+            ProjectUnderstandingFactActions.ResolveConflict,
+            secondConflictId,
+            Value: "B",
+            UserLocked: null));
+        Assert.AreEqual(ProjectUnderstandingFactStates.Confirmed,
+            secondResolution.Snapshot.Facts.Single(value => value.Key == "Goals").State);
+        Assert.AreEqual(0, secondResolution.Snapshot.Conflicts.Count(value =>
+            value.Status == ProjectUnderstandingConflictStates.Open));
+    }
+
+    [TestMethod]
+    public async Task Materialize_V2CreatesConflictWhenTheSameFactChangedAfterTheFrozenBase()
+    {
+        var fixture = await CreateFixtureAsync("Stale same-fact merge");
+        var runs = CreateRunService();
+        var submitted = await runs.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "The goal is the stale proposal."));
+        var claim = await runs.ClaimAsync(submitted.AgentRunId, "stale-merge-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        var context = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+
+        await AppendUnderstandingAsync(
+            fixture,
+            basedOnRevision: 1,
+            revision: 2,
+            new ProjectUnderstandingDocument(
+                ProjectUnderstandingContract.SchemaVersion,
+                [
+                    new ProjectUnderstandingFact(
+                        "Goals",
+                        "A newer inference",
+                        ProjectUnderstandingFactStates.Inferred,
+                        UserLocked: false,
+                        ProjectUnderstandingAuthorKinds.Actor,
+                        fixture.ActorUserId,
+                        AuthorAgentRunId: null,
+                        SourceMessageIds: [],
+                        "A concurrent project-understanding decision.",
+                        Revision: 2)
+                ],
+                [],
+                []));
+
+        var materialized = await runs.MaterializeAsync(
+            claim,
+            context,
+            new WorkbenchBusinessAnalystOutput(
+                WorkbenchBusinessAnalystContract.OutputSchemaVersion2,
+                context.ContextHash,
+                context.UnderstandingRevision,
+                WorkbenchAgentRunStates.Completed,
+                "I surfaced the stale difference for review.",
+                new ProjectUnderstandingPatch(
+                    [
+                        new ProjectUnderstandingFactChange(
+                            "Goals",
+                            "The stale proposal",
+                            ProjectUnderstandingFactStates.Inferred,
+                            [context.SourceUserMessageId],
+                            "Inferred from the frozen user message.")
+                    ],
+                    []),
+                RenameProposal: null));
+
+        Assert.IsTrue(materialized.Materialized);
+        var snapshot = await new WorkbenchProjectUnderstandingService(ConnectionFactory()).GetAsync(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId);
+        var fact = snapshot.Facts.Single(value => value.Key == "Goals");
+        Assert.AreEqual("A newer inference", fact.Value);
+        Assert.AreEqual(ProjectUnderstandingFactStates.Conflicted, fact.State);
+        Assert.AreEqual("The stale proposal", snapshot.Conflicts.Single().ProposedValue);
+    }
+
+    [TestMethod]
+    public async Task ProjectUnderstanding_RejectsRenameWhenTheCanonicalProjectNameChanged()
+    {
+        var fixture = await CreateFixtureAsync("Rename proposal base");
+        var runs = CreateRunService();
+        var submitted = await runs.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Rename this project to CalmPlan."));
+        var claim = await runs.ClaimAsync(submitted.AgentRunId, "rename-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        var context = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+        var materialized = await runs.MaterializeAsync(
+            claim,
+            context,
+            new WorkbenchBusinessAnalystOutput(
+                WorkbenchBusinessAnalystContract.OutputSchemaVersion2,
+                context.ContextHash,
+                context.UnderstandingRevision,
+                WorkbenchAgentRunStates.Completed,
+                "I proposed the requested project name.",
+                UnderstandingPatch: null,
+                new WorkbenchProjectRenameProposalOutput(
+                    "CalmPlan",
+                    [context.SourceUserMessageId],
+                    "The user explicitly supplied the project name.")));
+        Assert.IsTrue(materialized.Materialized);
+
+        var understanding = new WorkbenchProjectUnderstandingService(ConnectionFactory());
+        var snapshot = await understanding.GetAsync(1, fixture.ActorUserId, fixture.ProjectId);
+        Assert.IsNotNull(snapshot.PendingRenameProposal);
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            await connection.ExecuteAsync(
+                "UPDATE dbo.Projects SET Name=N'Changed elsewhere' WHERE TenantId=1 AND Id=@ProjectId;",
+                new { fixture.ProjectId });
+        }
+
+        await Assert.ThrowsExactlyAsync<ProjectRenameProposalStaleException>(() =>
+            understanding.AcceptRenameAsync(new AcceptProjectRenameProposalCommand(
+                1,
+                fixture.ActorUserId,
+                fixture.ProjectId,
+                fixture.WorkbenchSessionId,
+                fixture.LeaseEpoch,
+                snapshot.PendingRenameProposal.ProposalId,
+                Guid.NewGuid())));
+
+        var after = await understanding.GetAsync(1, fixture.ActorUserId, fixture.ProjectId);
+        Assert.AreEqual("Changed elsewhere", after.ProjectName);
+        Assert.IsNotNull(after.PendingRenameProposal);
+        Assert.AreEqual(ProjectRenameProposalStates.Pending, after.PendingRenameProposal.Status);
+
+        var resubmitted = await runs.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Rename this changed project to CalmPlan."));
+        var reclaim = await runs.ClaimAsync(
+            resubmitted.AgentRunId,
+            "rename-recovery-worker",
+            TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(reclaim);
+        var refreshedContext = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(reclaim);
+        Assert.IsTrue((await runs.MaterializeAsync(
+            reclaim,
+            refreshedContext,
+            new WorkbenchBusinessAnalystOutput(
+                WorkbenchBusinessAnalystContract.OutputSchemaVersion2,
+                refreshedContext.ContextHash,
+                refreshedContext.UnderstandingRevision,
+                WorkbenchAgentRunStates.Completed,
+                "I refreshed the rename proposal against the current project name.",
+                UnderstandingPatch: null,
+                new WorkbenchProjectRenameProposalOutput(
+                    "CalmPlan",
+                    [refreshedContext.SourceUserMessageId],
+                    "The user explicitly repeated the project name.")))).Materialized);
+
+        var refreshed = await understanding.GetAsync(1, fixture.ActorUserId, fixture.ProjectId);
+        Assert.IsNotNull(refreshed.PendingRenameProposal);
+        Assert.AreNotEqual(snapshot.PendingRenameProposal.ProposalId, refreshed.PendingRenameProposal.ProposalId);
+        Assert.AreEqual("Changed elsewhere", refreshed.PendingRenameProposal.BasedOnProjectName);
+        var accepted = await understanding.AcceptRenameAsync(new AcceptProjectRenameProposalCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            refreshed.PendingRenameProposal.ProposalId,
+            Guid.NewGuid()));
+        Assert.AreEqual("CalmPlan", accepted.Snapshot.ProjectName);
+    }
+
     private async Task AssertSingleAttemptClosedWithoutResponseAsync(
         Guid agentRunId,
         string expectedOutcome,
@@ -1302,6 +1734,36 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             VALUES (1, @ProjectId, N'Workbench shaping');
             """, new { start.ProjectId });
         return new Fixture(actorUserId, start.ProjectId, start.WorkbenchSessionId, start.LeaseEpoch, chatSessionId);
+    }
+
+    private async Task AppendUnderstandingAsync(
+        Fixture fixture,
+        long basedOnRevision,
+        long revision,
+        ProjectUnderstandingDocument document)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.ExecuteAsync(
+            """
+            UPDATE dbo.ProjectUnderstandings
+            SET Status=N'Superseded'
+            WHERE TenantId=1 AND ProjectId=@ProjectId AND Revision=@BasedOnRevision;
+
+            INSERT dbo.ProjectUnderstandings
+                (TenantId, ProjectId, Revision, Status, UnderstandingJson, DocumentSchemaVersion,
+                 BasedOnRevision, CreatedByActorUserId, CreatedByAgentRunId)
+            VALUES
+                (1, @ProjectId, @Revision, N'Draft', @UnderstandingJson, 1,
+                 @BasedOnRevision, @ActorUserId, NULL);
+            """,
+            new
+            {
+                fixture.ProjectId,
+                Revision = revision,
+                BasedOnRevision = basedOnRevision,
+                fixture.ActorUserId,
+                UnderstandingJson = ProjectUnderstandingDocumentCodec.Serialize(document)
+            });
     }
 
     private async Task<int> SeedActorAsync()
@@ -1392,6 +1854,16 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystInvocationAudits;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystToolCallAudits;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystPreparations;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.ProjectRenameProposals;");
+        await connection.ExecuteAsync("""
+            IF EXISTS
+            (
+                SELECT 1 FROM sys.foreign_keys
+                WHERE parent_object_id=OBJECT_ID(N'dbo.ProjectUnderstandings')
+                  AND name=N'FK_ProjectUnderstandings_AgentRun'
+            )
+                ALTER TABLE dbo.ProjectUnderstandings DROP CONSTRAINT FK_ProjectUnderstandings_AgentRun;
+            """);
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchAgentRunAttempts;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchAgentRuns;");
     }
@@ -1456,6 +1928,13 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             operationId,
             ChatSessionId,
             message);
+    }
+
+    private sealed class UnderstandingMaterializationCounts
+    {
+        public int Understandings { get; init; }
+        public int RenameProposals { get; init; }
+        public int AssistantMessages { get; init; }
     }
 
     private sealed record Version1ContextFixture(
