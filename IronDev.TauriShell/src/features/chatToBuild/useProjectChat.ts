@@ -94,6 +94,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const agentSubmissionInFlightRef = useRef(false);
   const agentSubmissionGenerationRef = useRef(0);
   const agentTerminalHistoryRefreshRef = useRef<string | null>(null);
+  const unresolvedDurableOperationsRef = useRef<Record<string, UnresolvedDurableOperation>>({});
   const unresolvedAgentCancellationsRef = useRef<Record<string, UnresolvedAgentCancellation>>({});
   const agentRunRef = useRef<ChatAgentRunState | null>(agentRun);
   const agentCancellationUiInvocationRef = useRef<object | null>(null);
@@ -148,21 +149,23 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     prompt: string,
     kind: UnresolvedDurableOperation['kind']
   ) => {
-    setUnresolvedDurableOperations((current) => ({
-      ...current,
+    const next = {
+      ...unresolvedDurableOperationsRef.current,
       [contextKey]: { prompt, kind }
-    }));
+    };
+    unresolvedDurableOperationsRef.current = next;
+    setUnresolvedDurableOperations(next);
   }, []);
 
   const clearDurableOperationUnresolved = useCallback((contextKey: string, prompt: string) => {
-    setUnresolvedDurableOperations((current) => {
-      if (current[contextKey]?.prompt !== prompt) {
-        return current;
-      }
-      const next = { ...current };
-      delete next[contextKey];
-      return next;
-    });
+    const current = unresolvedDurableOperationsRef.current;
+    if (current[contextKey]?.prompt !== prompt) {
+      return;
+    }
+    const next = { ...current };
+    delete next[contextKey];
+    unresolvedDurableOperationsRef.current = next;
+    setUnresolvedDurableOperations(next);
   }, []);
 
   const markAgentCancellationUnresolved = useCallback((
@@ -373,6 +376,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
       const cancellationDeliveryIsUnresolved = () =>
         pollingAuthorityContextKey !== null &&
         unresolvedAgentCancellationsRef.current[pollingAuthorityContextKey]?.agentRunId === agentRunId;
+      const submissionDeliveryIsUnresolved = () =>
+        pollingAuthorityContextKey !== null &&
+        unresolvedDurableOperationsRef.current[pollingAuthorityContextKey]?.kind === 'SubmitRun';
       agentPollControllerRef.current?.abort();
       const controller = new AbortController();
       agentPollControllerRef.current = controller;
@@ -411,7 +417,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
               setCancellingAgentRun(false);
               setErrorMessage(cancellationDeliveryIsUnresolved()
                 ? 'Cancellation delivery could not be confirmed. Retry cancellation to replay the same operation safely.'
-                : describeTerminalAgentRunOutcome(snapshot));
+                : submissionDeliveryIsUnresolved()
+                  ? 'Delivery could not be confirmed. Send the unchanged message again to retry the same operation safely.'
+                  : describeTerminalAgentRunOutcome(snapshot));
               agentTerminalHistoryRefreshRef.current = terminalAgentRunRefreshKey(
                 pollingAuthorityContextKey,
                 snapshot
@@ -420,7 +428,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
               return;
             }
 
-            if (!cancellationDeliveryIsUnresolved()) {
+            if (!cancellationDeliveryIsUnresolved() && !submissionDeliveryIsUnresolved()) {
               setErrorMessage(null);
             }
             await waitForAgentRunPoll(controller.signal, 750);
