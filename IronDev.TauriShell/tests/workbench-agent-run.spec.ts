@@ -581,7 +581,10 @@ test('a late project-A success cannot erase project-B ambiguous-submit identity'
         status: 'Pending',
         clientOperationId: body.clientOperationId,
         createdAtUtc: '2026-07-20T02:00:00Z',
-        isReplay: false
+        isReplay: false,
+        invocationKind: 'Conversation',
+        ticketProposalSetId: null,
+        ticketProposalRevision: null
       }, 202);
     }
     if (request.method() === 'GET' && url.pathname.endsWith(`/${projectBRunId}`)) {
@@ -1034,7 +1037,10 @@ async function mockAgentRunWorkspace(page: Page, options: AgentRunMockOptions = 
         status: 'Pending',
         clientOperationId: body.clientOperationId,
         createdAtUtc: '2026-07-20T02:00:00Z',
-        isReplay: false
+        isReplay: false,
+        invocationKind: 'Conversation',
+        ticketProposalSetId: null,
+        ticketProposalRevision: null
       };
       submitReceipts.set(body.clientOperationId, { body: { ...body }, result });
 

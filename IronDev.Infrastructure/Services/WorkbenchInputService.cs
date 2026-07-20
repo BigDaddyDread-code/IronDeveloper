@@ -13,7 +13,7 @@ public sealed class WorkbenchInputService : IWorkbenchInputService
         "Available commands:\n/help - Show this command menu.\n/ticket [instruction] - Prepare ticket proposals from the current project understanding.";
     public const string TicketTitle = "Ticket proposals";
     public const string TicketMessage =
-        "Ticket proposal routing is ready. Proposal generation is enabled by the next Workbench slice.";
+        "Ticket proposal generation has started from the current governed Workbench context.";
     public const string UnknownCommandMessage =
         "Unknown Workbench command. Use /help to see the available commands.";
 
@@ -35,7 +35,7 @@ public sealed class WorkbenchInputService : IWorkbenchInputService
     {
         Validate(command);
         var route = WorkbenchInputRouter.Parse(command.ComposerText);
-        if (route.Kind == WorkbenchInputKinds.Conversation)
+        if (route.Kind is WorkbenchInputKinds.Conversation or WorkbenchInputKinds.Ticket)
         {
             if (command.ChatSessionId is not > 0)
                 throw new WorkbenchInputValidationException(
@@ -50,7 +50,11 @@ public sealed class WorkbenchInputService : IWorkbenchInputService
                     command.LeaseEpoch,
                     command.ClientOperationId,
                     command.ChatSessionId.Value,
-                    command.ComposerText),
+                    command.ComposerText,
+                    route.Kind == WorkbenchInputKinds.Ticket
+                        ? WorkbenchAgentInvocationKinds.TicketProposalGeneration
+                        : WorkbenchAgentInvocationKinds.Conversation,
+                    route.Kind == WorkbenchInputKinds.Ticket ? route.Instruction : null),
                 cancellationToken);
             return new DispatchWorkbenchInputResult(
                 WorkbenchInputKinds.AgentRun,
@@ -58,10 +62,12 @@ public sealed class WorkbenchInputService : IWorkbenchInputService
                 command.WorkbenchSessionId,
                 command.LeaseEpoch,
                 command.ClientOperationId,
-                NormalizedCommand: null,
-                Instruction: null,
-                Title: null,
-                Message: null,
+                NormalizedCommand: route.Kind == WorkbenchInputKinds.Ticket
+                    ? WorkbenchSlashCommands.Ticket
+                    : null,
+                Instruction: route.Instruction,
+                Title: route.Kind == WorkbenchInputKinds.Ticket ? TicketTitle : null,
+                Message: route.Kind == WorkbenchInputKinds.Ticket ? TicketMessage : null,
                 agentRun.IsReplay,
                 AgentRun: agentRun);
         }

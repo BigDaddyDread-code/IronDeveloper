@@ -13,18 +13,19 @@ The machine-readable current version is `workbench-version.json`. Each preview u
 | `0.1.0-preview.7` | PR-02C-A | `workbench-pr02c-a` | Workshop AgentRun authority, role-preserving provider requests, aggregate input/output budgets, pre-write readiness, active/terminal recovery, cancellation, and idempotent project-scoped chat entry |
 | `0.1.0-preview.8` | PR-02C-B | `workbench-pr02c-b` | Typed Project Understanding facts, provenance, locks, conflicts, explicit rename acceptance, and authority-labelled operational projections |
 | `0.1.0-preview.9` | PR-03 | `workbench-pr03` | Deterministic `/help` and `/ticket`, exact allowlist parsing, hash-only rejection audit, and zero-AgentRun help/typo handling |
+| `0.1.0-preview.10` | PR-04A | `workbench-pr04a` | Governed `/ticket` generation, durable proposal review, provenance, immutable revisions, fenced edits, and regeneration without permanent tickets |
 
-Start the current PR-03 preview alongside the earlier previews:
+Start the current PR-04A preview alongside the earlier previews:
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -EnableConversationAuthority -PreviewId workbench-pr03 `
-  -ApiBaseUrl http://127.0.0.1:5280 -UiPort 5261
+  -EnableConversationAuthority -PreviewId workbench-pr04a `
+  -ApiBaseUrl http://127.0.0.1:5310 -UiPort 5291
 ```
 
-The PR-03 preview owns database `IronDeveloper_Test_workbench_pr03`, workspace `C:\IronDevTestWorkspaces\workbench-pr03`, logs `C:\IronDevTestLogs\workbench-pr03`, API `http://127.0.0.1:5280`, and UI `http://127.0.0.1:5261`.
+The PR-04A preview owns database `IronDeveloper_Test_workbench_pr04a`, workspace `C:\IronDevTestWorkspaces\workbench-pr04a`, logs `C:\IronDevTestLogs\workbench-pr04a`, API `http://127.0.0.1:5310`, and UI `http://127.0.0.1:5291`.
 
-Project creation and shaping remain repository-independent. A slash command exists only when `/` is the first meaningful composer character. The server recognizes only `/help` and `/ticket`, normalizes their token case, and preserves the optional instruction. Unknown tokens are rejected before chat-session creation, message persistence, AgentRun creation, or provider availability checks; the rejection row stores the raw token and payload hash rather than the full composer text. `/help` is deterministic and invokes no AgentRun. In PR-03 `/ticket` establishes the governed route but does not yet create proposals or permanent tickets; PR-04A owns generation and review.
+Project creation and shaping remain repository-independent. A slash command exists only when `/` is the first meaningful composer character. `/help` remains deterministic and unknown tokens remain hash-only rejections with no chat or AgentRun side effects. In PR-04A, `/ticket` submits a trusted Business Analyst AgentRun against frozen Workbench context and materializes either one to five ordered proposals or a zero-proposal `NeedsInput` result. The review panel reloads from durable state and supports source navigation, editing, reordering, dependency-safe removal, issue resolution, regeneration, and immutable full-snapshot history. Every review write is lease-fenced, expected-revision checked, and idempotent. No review or regeneration action creates a permanent ticket, repository, execution authorization, or readiness claim.
 
 For the deterministic LocalTest rename path, send `Rename project to CalmPlan` as its own Workshop message, then accept the pending proposal in Project Context.
 

@@ -113,6 +113,16 @@ import type {
   SubmitWorkbenchAgentRunResult,
   SubmitWorkbenchInputRequest,
   SubmitWorkbenchInputResult,
+  TicketProposalMutationResult,
+  TicketProposalMutationAuthority,
+  TicketProposalReadModel,
+  TicketProposalRevisionReadModel,
+  TicketProposalSetReadModel,
+  UpdateTicketProposalRequest,
+  ReorderTicketProposalsRequest,
+  RemoveTicketProposalRequest,
+  ResolveTicketProposalIssueRequest,
+  RegenerateTicketProposalsRequest,
   WorkbenchProjectEntryContext,
   WorkbenchAgentRunSnapshot,
   ProjectTicket,
@@ -963,6 +973,165 @@ class IronDevApiClient {
     return result;
   }
 
+  async getCurrentTicketProposalSet(
+    projectId: number,
+    workbenchSessionId: number,
+    leaseEpoch: number,
+    signal?: AbortSignal
+  ): Promise<TicketProposalSetReadModel | null> {
+    const query = new URLSearchParams({
+      workbenchSessionId: String(workbenchSessionId),
+      leaseEpoch: String(leaseEpoch)
+    });
+    try {
+      const result = await this.request<unknown>(
+        `/api/workbench/projects/${projectId}/ticket-proposal-sets/current?${query.toString()}`,
+        { method: 'GET', signal }
+      );
+      if (result === undefined || result === null) {
+        return null;
+      }
+      if (!isTicketProposalSetReadModel(result, projectId, workbenchSessionId, leaseEpoch)) {
+        throw new IronDevApiProtocolError('Current ticket proposal set');
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof IronDevApiError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async getTicketProposalSetHistory(
+    projectId: number,
+    proposalSetId: string,
+    workbenchSessionId: number,
+    leaseEpoch: number,
+    signal?: AbortSignal
+  ): Promise<TicketProposalRevisionReadModel[]> {
+    const query = new URLSearchParams({
+      workbenchSessionId: String(workbenchSessionId),
+      leaseEpoch: String(leaseEpoch)
+    });
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/ticket-proposal-sets/${encodeURIComponent(proposalSetId)}/history?${query.toString()}`,
+      { method: 'GET', signal }
+    );
+    if (!Array.isArray(result) || !result.every((entry) =>
+      isTicketProposalRevisionReadModel(
+        entry,
+        projectId,
+        proposalSetId,
+        workbenchSessionId,
+        leaseEpoch))) {
+      throw new IronDevApiProtocolError('Ticket proposal history');
+    }
+    return result;
+  }
+
+  async updateTicketProposal(
+    projectId: number,
+    proposalSetId: string,
+    proposalId: string,
+    request: UpdateTicketProposalRequest,
+    signal?: AbortSignal
+  ): Promise<TicketProposalMutationResult> {
+    return this.submitTicketProposalMutation(
+      projectId,
+      proposalSetId,
+      `/proposals/${encodeURIComponent(proposalId)}`,
+      'PATCH',
+      request,
+      signal
+    );
+  }
+
+  async reorderTicketProposals(
+    projectId: number,
+    proposalSetId: string,
+    request: ReorderTicketProposalsRequest,
+    signal?: AbortSignal
+  ): Promise<TicketProposalMutationResult> {
+    return this.submitTicketProposalMutation(projectId, proposalSetId, '/reorder', 'POST', request, signal);
+  }
+
+  async removeTicketProposal(
+    projectId: number,
+    proposalSetId: string,
+    proposalId: string,
+    request: RemoveTicketProposalRequest,
+    signal?: AbortSignal
+  ): Promise<TicketProposalMutationResult> {
+    return this.submitTicketProposalMutation(
+      projectId,
+      proposalSetId,
+      `/proposals/${encodeURIComponent(proposalId)}/remove`,
+      'POST',
+      request,
+      signal
+    );
+  }
+
+  async resolveTicketProposalIssue(
+    projectId: number,
+    proposalSetId: string,
+    issueId: string,
+    request: ResolveTicketProposalIssueRequest,
+    signal?: AbortSignal
+  ): Promise<TicketProposalMutationResult> {
+    return this.submitTicketProposalMutation(
+      projectId,
+      proposalSetId,
+      `/issues/${encodeURIComponent(issueId)}/resolve`,
+      'POST',
+      request,
+      signal
+    );
+  }
+
+  async regenerateTicketProposals(
+    projectId: number,
+    proposalSetId: string,
+    request: RegenerateTicketProposalsRequest,
+    signal?: AbortSignal
+  ): Promise<SubmitWorkbenchAgentRunResult> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/ticket-proposal-sets/${encodeURIComponent(proposalSetId)}/regenerations`,
+      { method: 'POST', body: request, signal }
+    );
+    if (!isSubmitWorkbenchAgentRunResult(result, projectId, {
+      workbenchSessionId: request.workbenchSessionId,
+      leaseEpoch: request.leaseEpoch,
+      clientOperationId: request.clientOperationId,
+      chatSessionId: request.chatSessionId,
+      message: request.instruction
+    }) || result.invocationKind !== 'TicketProposalRegeneration' ||
+      result.ticketProposalSetId !== proposalSetId ||
+      result.ticketProposalRevision !== request.expectedProposalSetRevision) {
+      throw new IronDevApiProtocolError('Ticket proposal regeneration');
+    }
+    return result;
+  }
+
+  private async submitTicketProposalMutation(
+    projectId: number,
+    proposalSetId: string,
+    suffix: string,
+    method: 'PATCH' | 'POST',
+    request: TicketProposalMutationAuthority,
+    signal?: AbortSignal
+  ): Promise<TicketProposalMutationResult> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/ticket-proposal-sets/${encodeURIComponent(proposalSetId)}${suffix}`,
+      { method, body: request, signal }
+    );
+    if (!isTicketProposalMutationResult(result, projectId, proposalSetId, request)) {
+      throw new IronDevApiProtocolError('Ticket proposal mutation');
+    }
+    return result;
+  }
+
   async getWorkbenchAgentRun(
     projectId: number,
     agentRunId: string,
@@ -1053,6 +1222,13 @@ class IronDevApiClient {
 
   async getProjectChatMessages(projectId: number, sessionId: number, signal?: AbortSignal): Promise<ChatMessage[]> {
     return this.request<ChatMessage[]>(`/api/projects/${projectId}/chat/sessions/${sessionId}/messages`, {
+      method: 'GET',
+      signal
+    });
+  }
+
+  async getProjectChatMessage(projectId: number, messageId: number, signal?: AbortSignal): Promise<ChatMessage> {
+    return this.request<ChatMessage>(`/api/projects/${projectId}/chat/messages/${messageId}`, {
       method: 'GET',
       signal
     });
@@ -1832,7 +2008,16 @@ function isSubmitWorkbenchAgentRunResult(
     value.status === 'Pending' &&
     value.clientOperationId === request.clientOperationId &&
     isTimestampString(value.createdAtUtc) &&
-    typeof value.isReplay === 'boolean';
+    typeof value.isReplay === 'boolean' &&
+    (value.invocationKind === 'Conversation' ||
+      value.invocationKind === 'TicketProposalGeneration' ||
+      value.invocationKind === 'TicketProposalRegeneration') &&
+    ((value.invocationKind === 'Conversation' &&
+      value.ticketProposalSetId === null && value.ticketProposalRevision === null) ||
+      (value.invocationKind === 'TicketProposalGeneration' &&
+        isNonEmptyUuidString(value.ticketProposalSetId) && value.ticketProposalRevision === null) ||
+      (value.invocationKind === 'TicketProposalRegeneration' &&
+        isNonEmptyUuidString(value.ticketProposalSetId) && isPositiveInteger(value.ticketProposalRevision)));
 }
 
 function isSubmitWorkbenchInputResult(
@@ -1854,19 +2039,29 @@ function isSubmitWorkbenchInputResult(
   }
 
   if (value.kind === 'AgentRun') {
-    return value.normalizedCommand === null &&
-      value.instruction === null &&
-      value.title === null &&
-      value.message === null &&
+    const agentRun = value.agentRun;
+    if (!isSubmitWorkbenchAgentRunResult(agentRun, projectId, {
+      workbenchSessionId: request.workbenchSessionId,
+      leaseEpoch: request.leaseEpoch,
+      clientOperationId: request.clientOperationId,
+      chatSessionId: request.chatSessionId ?? 0,
+      message: request.composerText.trim()
+    })) {
+      return false;
+    }
+    const ticketCommand = value.normalizedCommand === '/ticket';
+    return (ticketCommand
+      ? (value.instruction === null || typeof value.instruction === 'string') &&
+        isNonEmptyString(value.title) &&
+        isNonEmptyString(value.message) &&
+        agentRun.invocationKind === 'TicketProposalGeneration'
+      : value.normalizedCommand === null &&
+        value.instruction === null &&
+        value.title === null &&
+        value.message === null &&
+        agentRun.invocationKind === 'Conversation') &&
       value.rawCommandToken === null &&
-      value.reasonCode === null &&
-      isSubmitWorkbenchAgentRunResult(value.agentRun, projectId, {
-        workbenchSessionId: request.workbenchSessionId,
-        leaseEpoch: request.leaseEpoch,
-        clientOperationId: request.clientOperationId,
-        chatSessionId: request.chatSessionId ?? 0,
-        message: request.composerText.trim()
-      });
+      value.reasonCode === null;
   }
 
   const commandMatchesKind =
@@ -1879,6 +2074,121 @@ function isSubmitWorkbenchInputResult(
     value.agentRun === null &&
     value.rawCommandToken === null &&
     value.reasonCode === null;
+}
+
+function isTicketProposalSetReadModel(
+  value: unknown,
+  projectId: number,
+  workbenchSessionId?: number,
+  leaseEpoch?: number
+): value is TicketProposalSetReadModel {
+  if (!isJsonRecord(value) ||
+      !isNonEmptyUuidString(value.ticketProposalSetId) ||
+      value.projectId !== projectId ||
+      (workbenchSessionId !== undefined && value.workbenchSessionId !== workbenchSessionId) ||
+      (leaseEpoch !== undefined && value.leaseEpoch !== leaseEpoch) ||
+      !isPositiveInteger(value.workbenchSessionId) ||
+      !isPositiveInteger(value.leaseEpoch) ||
+      !isPositiveInteger(value.revision) ||
+      !isPositiveInteger(value.basedOnUnderstandingRevision) ||
+      (value.status !== 'Ready' && value.status !== 'NeedsInput') ||
+      (value.splitReason !== null && typeof value.splitReason !== 'string') ||
+      !Array.isArray(value.proposals) ||
+      !value.proposals.every(isTicketProposalReadModel) ||
+      !Array.isArray(value.openQuestions) ||
+      !value.openQuestions.every(isTicketProposalIssueReadModel) ||
+      !Array.isArray(value.potentialConflicts) ||
+      !value.potentialConflicts.every(isTicketProposalIssueReadModel) ||
+      !isPositiveIntegerArray(value.sourceMessageIds) ||
+      !isNonEmptyUuidString(value.createdByAgentRunId) ||
+      !isTimestampString(value.createdAtUtc) ||
+      !isTimestampString(value.updatedAtUtc)) {
+    return false;
+  }
+
+  const proposals = value.proposals as TicketProposalReadModel[];
+  if ((value.status === 'Ready' && (proposals.length < 1 || proposals.length > 5)) ||
+      (value.status === 'NeedsInput' &&
+        (proposals.length !== 0 || value.openQuestions.length + value.potentialConflicts.length === 0))) {
+    return false;
+  }
+  const proposalIds = new Set(proposals.map((proposal) => proposal.ticketProposalId));
+  const orders = proposals.map((proposal) => proposal.suggestedOrder).sort((left, right) => left - right);
+  return proposalIds.size === proposals.length &&
+    orders.every((order, index) => order === index + 1) &&
+    proposals.every((proposal) => proposal.dependencyProposalIds.every(
+      (dependencyId) => dependencyId !== proposal.ticketProposalId && proposalIds.has(dependencyId)
+    ));
+}
+
+function isTicketProposalReadModel(value: unknown): value is TicketProposalReadModel {
+  return isJsonRecord(value) &&
+    isNonEmptyUuidString(value.ticketProposalId) &&
+    isNonEmptyString(value.title) &&
+    isNonEmptyString(value.problem) &&
+    isNonEmptyString(value.proposedChange) &&
+    Array.isArray(value.acceptanceCriteria) &&
+    value.acceptanceCriteria.length > 0 &&
+    value.acceptanceCriteria.every(isNonEmptyString) &&
+    Array.isArray(value.dependencyProposalIds) &&
+    value.dependencyProposalIds.every(isNonEmptyUuidString) &&
+    new Set(value.dependencyProposalIds).size === value.dependencyProposalIds.length &&
+    isPositiveInteger(value.suggestedOrder) &&
+    isPositiveIntegerArray(value.sourceMessageIds);
+}
+
+function isTicketProposalIssueReadModel(value: unknown) {
+  return isJsonRecord(value) &&
+    isNonEmptyUuidString(value.issueId) &&
+    isNonEmptyString(value.kind) &&
+    isNonEmptyString(value.text) &&
+    (value.status === 'Open' || value.status === 'Resolved') &&
+    (value.resolution === null || isNonEmptyString(value.resolution)) &&
+    (value.status !== 'Resolved' || isNonEmptyString(value.resolution)) &&
+    isPositiveIntegerArray(value.sourceMessageIds);
+}
+
+function isTicketProposalMutationResult(
+  value: unknown,
+  projectId: number,
+  proposalSetId: string,
+  request: TicketProposalMutationAuthority
+): value is TicketProposalMutationResult {
+  return isJsonRecord(value) &&
+    value.clientOperationId === request.clientOperationId &&
+    typeof value.isReplay === 'boolean' &&
+    isTicketProposalSetReadModel(
+      value.proposalSet,
+      projectId,
+      request.workbenchSessionId,
+      request.leaseEpoch) &&
+    value.proposalSet.ticketProposalSetId === proposalSetId &&
+    value.proposalSet.leaseEpoch === request.leaseEpoch &&
+    value.proposalSet.revision === request.expectedProposalSetRevision + 1;
+}
+
+function isTicketProposalRevisionReadModel(
+  value: unknown,
+  projectId: number,
+  proposalSetId: string,
+  workbenchSessionId: number,
+  leaseEpoch: number
+): value is TicketProposalRevisionReadModel {
+  return isJsonRecord(value) &&
+    isPositiveInteger(value.revision) &&
+    isNonEmptyString(value.changeKind) &&
+    isPositiveInteger(value.actorUserId) &&
+    (value.agentRunId === null || isNonEmptyUuidString(value.agentRunId)) &&
+    isTimestampString(value.createdAtUtc) &&
+    isTicketProposalSetReadModel(value.proposalSet, projectId, workbenchSessionId, leaseEpoch) &&
+    value.proposalSet.ticketProposalSetId === proposalSetId &&
+    value.proposalSet.revision === value.revision;
+}
+
+function isPositiveIntegerArray(value: unknown): value is number[] {
+  return Array.isArray(value) &&
+    value.every(isPositiveInteger) &&
+    new Set(value).size === value.length;
 }
 
 function isCancelWorkbenchAgentRunResult(

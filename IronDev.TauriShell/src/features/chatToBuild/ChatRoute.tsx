@@ -6,6 +6,7 @@ import { ChatWorkspace } from './ChatWorkspace';
 import { useProjectChat } from './useProjectChat';
 import { useProjectChannels } from './useProjectChannels';
 import { useProjectUnderstanding } from './useProjectUnderstanding';
+import { useTicketProposals } from './useTicketProposals';
 
 interface ChatRouteProps {
   route: WorkspaceRoute;
@@ -36,6 +37,11 @@ export function ChatRoute({
   const projectUnderstanding = useProjectUnderstanding({
     enabled: chat.conversationAuthorityEnabled,
     terminalAgentRunKey
+  });
+  const ticketProposals = useTicketProposals({
+    enabled: chat.conversationAuthorityEnabled,
+    refreshKey: terminalAgentRunKey,
+    onRegenerationTerminal: chat.retrySessionLoad
   });
 
   const routeSummary = useMemo(
@@ -109,6 +115,7 @@ export function ChatRoute({
         agentRun={chat.agentRun}
         conversationAuthorityEnabled={chat.conversationAuthorityEnabled}
         projectUnderstanding={projectUnderstanding}
+        ticketProposals={ticketProposals}
         hasUnresolvedDurableOperation={chat.hasUnresolvedDurableOperation}
         agentCancellationDeliveryUnresolved={chat.agentCancellationDeliveryUnresolved}
         boundAgentRunChatSessionId={chat.boundAgentRunChatSessionId}

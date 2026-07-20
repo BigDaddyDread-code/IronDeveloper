@@ -177,6 +177,7 @@ builder.Services.AddScoped<IProjectStartService, ProjectStartService>();
 builder.Services.AddScoped<IWorkbenchProjectEntryService, WorkbenchProjectEntryService>();
 builder.Services.AddScoped<IWorkbenchProjectUnderstandingService, WorkbenchProjectUnderstandingService>();
 builder.Services.AddScoped<IWorkbenchInputService, WorkbenchInputService>();
+builder.Services.AddScoped<IWorkbenchTicketProposalService, WorkbenchTicketProposalService>();
 builder.Services.AddSingleton<IWorkbenchAgentRunFailureInjector, NoOpWorkbenchAgentRunFailureInjector>();
 var workbenchAgentRunWorkerEnabled =
     builder.Configuration.GetValue<bool>("Features:WorkbenchAgentRunWorker");

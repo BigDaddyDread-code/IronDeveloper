@@ -215,6 +215,8 @@ public sealed class WorkbenchBusinessAnalystModelGateway
 
             var userMessages = _context.Messages.Where(message =>
                 string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (_context.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion3)
+                return Task.FromResult(BuildLocalTestTicketProposalResponse(userMessages));
             var latestUserMessage = userMessages.LastOrDefault()?.Message?.Trim();
             var needsInput = string.IsNullOrWhiteSpace(latestUserMessage);
             var priorUserTurnCount = Math.Max(0, userMessages.Length - (needsInput ? 0 : 1));
@@ -267,6 +269,205 @@ public sealed class WorkbenchBusinessAnalystModelGateway
                 UsageReported = true,
                 DurationMilliseconds = 0
             });
+        }
+
+        private WorkbenchBusinessAnalystProviderResponse BuildLocalTestTicketProposalResponse(
+            IReadOnlyList<WorkbenchAgentContextMessage> userMessages)
+        {
+            var sourceCommand = userMessages.LastOrDefault();
+            var shapingMessages = userMessages
+                .Where(message => message.MessageId != _context.SourceUserMessageId)
+                .ToArray();
+            var latestShaping = shapingMessages.LastOrDefault();
+            var instruction = _context.TicketInstruction?.Trim();
+            var hasProductContext = latestShaping is not null || !string.IsNullOrWhiteSpace(instruction);
+            var sourceIds = (latestShaping is null
+                    ? new[] { sourceCommand?.MessageId ?? _context.SourceUserMessageId }
+                    : new[] { latestShaping.MessageId, sourceCommand?.MessageId ?? _context.SourceUserMessageId })
+                .Distinct()
+                .Order()
+                .ToArray();
+
+            TicketProposalSetOutput proposalSet;
+            string outcome;
+            string assistantMessage;
+            if (_context.TicketProposalSnapshotJson is not null)
+            {
+                var reviewed = TicketProposalSetDocumentCodec.Deserialize(
+                    _context.TicketProposalSnapshotJson);
+                var focus = Compact(instruction ?? "Refine the reviewed proposal boundaries.", 300);
+                var regenerationSourceIds = sourceIds
+                    .Concat(reviewed.SourceMessageIds)
+                    .Concat(reviewed.Proposals.SelectMany(proposal => proposal.SourceMessageIds))
+                    .Concat(reviewed.OpenQuestions.SelectMany(issue => issue.SourceMessageIds))
+                    .Concat(reviewed.PotentialConflicts.SelectMany(issue => issue.SourceMessageIds))
+                    .Distinct()
+                    .Take(50)
+                    .Order()
+                    .ToArray();
+                var resolvedInput = reviewed.OpenQuestions
+                    .Concat(reviewed.PotentialConflicts)
+                    .Where(issue => issue.Status == TicketProposalIssueStatuses.Resolved &&
+                        !string.IsNullOrWhiteSpace(issue.Resolution))
+                    .Select(issue => issue.Resolution!.Trim())
+                    .ToArray();
+                var resolvedSummary = resolvedInput.Length == 0
+                    ? null
+                    : Compact(string.Join("; ", resolvedInput), 500);
+                var proposals = reviewed.Proposals.Count == 0
+                    ?
+                    [new TicketProposalOutput(
+                        "proposal-1",
+                        BuildLocalTestTitle(focus),
+                        resolvedInput.Length == 0
+                            ? focus
+                            : $"Resolved review input: {resolvedSummary}",
+                        $"Deliver a bounded change using the reviewed decision and this regeneration focus: {focus}",
+                        ["The regenerated outcome is covered by an observable acceptance check."],
+                        [],
+                        1,
+                        regenerationSourceIds)]
+                    : BuildRegeneratedLocalTestProposals(
+                        reviewed,
+                        focus,
+                        resolvedSummary,
+                        regenerationSourceIds);
+                outcome = WorkbenchAgentRunStates.Completed;
+                assistantMessage =
+                    $"I regenerated the proposal set from reviewed revision {reviewed.Revision}, including its edits and resolved input. No permanent ticket has been created.";
+                proposalSet = new TicketProposalSetOutput(
+                    resolvedSummary is null
+                        ? $"Regenerated from reviewed revision {reviewed.Revision}. Focus: {focus}"
+                        : $"Regenerated from reviewed revision {reviewed.Revision}. Focus: {focus}. Reviewed decisions: {resolvedSummary}",
+                    proposals,
+                    reviewed.OpenQuestions
+                        .Where(issue => issue.Status == TicketProposalIssueStatuses.Open)
+                        .Select(issue => new TicketProposalIssueOutput(
+                            TicketProposalIssueKinds.Question,
+                            issue.Text,
+                            regenerationSourceIds))
+                        .ToArray(),
+                    reviewed.PotentialConflicts
+                        .Where(issue => issue.Status == TicketProposalIssueStatuses.Open)
+                        .Select(issue => new TicketProposalIssueOutput(
+                            TicketProposalIssueKinds.Conflict,
+                            issue.Text,
+                            regenerationSourceIds))
+                        .ToArray(),
+                    regenerationSourceIds);
+            }
+            else if (!hasProductContext)
+            {
+                outcome = WorkbenchAgentRunStates.NeedsInput;
+                assistantMessage =
+                    "I need one product outcome before I can prepare a bounded ticket proposal. Describe who needs the change and what should improve for them.";
+                proposalSet = new TicketProposalSetOutput(
+                    null,
+                    [],
+                    [new TicketProposalIssueOutput(
+                        TicketProposalIssueKinds.Question,
+                        "Who is the primary user, and what observable outcome should this work deliver?",
+                        sourceIds)],
+                    [],
+                    sourceIds);
+            }
+            else
+            {
+                outcome = WorkbenchAgentRunStates.Completed;
+                var source = string.IsNullOrWhiteSpace(instruction)
+                    ? latestShaping!.Message.Trim()
+                    : instruction;
+                var compact = Compact(source!, 500);
+                assistantMessage =
+                    "I prepared one reviewable ticket proposal from the current project understanding. No permanent ticket has been created.";
+                proposalSet = new TicketProposalSetOutput(
+                    "The current input describes one bounded user-visible outcome with one acceptance boundary.",
+                    [new TicketProposalOutput(
+                        "proposal-1",
+                        BuildLocalTestTitle(compact),
+                        compact,
+                        $"Deliver a bounded change that addresses: {compact}",
+                        [
+                            "The intended user can complete the described outcome through the product.",
+                            "The outcome is covered by an observable acceptance check."
+                        ],
+                        [],
+                        1,
+                        sourceIds)],
+                    [],
+                    [],
+                    sourceIds);
+            }
+
+            var output = new WorkbenchBusinessAnalystOutput(
+                WorkbenchBusinessAnalystContract.OutputSchemaVersion3,
+                _context.ContextHash,
+                _context.UnderstandingRevision,
+                outcome,
+                assistantMessage,
+                UnderstandingPatch: null,
+                RenameProposal: null,
+                TicketProposalSet: proposalSet);
+            var json = WorkbenchBusinessAnalystOutputValidator.Serialize(output);
+            return new WorkbenchBusinessAnalystProviderResponse
+            {
+                Output = json,
+                SafeRequestId = _safeRequestId,
+                Usage = new AgentModelUsage
+                {
+                    InputTokens = _estimatedInputTokens,
+                    OutputTokens = EstimateTokens(json)
+                },
+                UsageReported = true,
+                DurationMilliseconds = 0
+            };
+        }
+
+        private static IReadOnlyList<TicketProposalOutput> BuildRegeneratedLocalTestProposals(
+            TicketProposalSetDocument reviewed,
+            string focus,
+            string? resolvedSummary,
+            IReadOnlyList<long> sourceIds)
+        {
+            var keys = reviewed.Proposals
+                .OrderBy(proposal => proposal.SuggestedOrder)
+                .Select((proposal, index) => (proposal.TicketProposalId, Key: $"proposal-{index + 1}"))
+                .ToDictionary(value => value.TicketProposalId, value => value.Key);
+            return reviewed.Proposals
+                .OrderBy(proposal => proposal.SuggestedOrder)
+                .Select(proposal => new TicketProposalOutput(
+                    keys[proposal.TicketProposalId],
+                    Compact(proposal.Title, 200),
+                    Compact(proposal.Problem, 2_000),
+                    Compact(
+                        resolvedSummary is null
+                            ? $"{proposal.ProposedChange} Regeneration focus: {focus}"
+                            : $"{proposal.ProposedChange} Reviewed decisions: {resolvedSummary}. Regeneration focus: {focus}",
+                        2_000),
+                    proposal.AcceptanceCriteria.Select(value => Compact(value, 1_000)).ToArray(),
+                    proposal.DependencyProposalIds.Select(id => keys[id]).ToArray(),
+                    proposal.SuggestedOrder,
+                    sourceIds))
+                .ToArray();
+        }
+
+        private static string Compact(string value, int maximumCharacters)
+        {
+            var compact = string.Join(
+                " ",
+                value.Split((char[]?)null,
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            return compact.Length <= maximumCharacters
+                ? compact
+                : compact[..maximumCharacters] + "...";
+        }
+
+        private static string BuildLocalTestTitle(string source)
+        {
+            var title = source.Trim().TrimEnd('.', '!', '?');
+            if (title.Length > 100)
+                title = title[..100].TrimEnd() + "...";
+            return title.Length == 0 ? "Clarify the requested product outcome" : title;
         }
 
         private string BuildLocalTestAssistantMessage(string latestUserMessage)
