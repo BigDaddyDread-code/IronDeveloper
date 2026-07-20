@@ -322,6 +322,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ba_invocation_audit.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_project_understanding.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_commands.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ticket_proposals.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -677,6 +678,15 @@ public abstract class ApiTestBase
             END
             IF OBJECT_ID('dbo.WorkbenchAgentRunAttempts', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRunAttempts;
             IF OBJECT_ID('dbo.WorkbenchCommandRejections', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchCommandRejections;
+            IF OBJECT_ID('dbo.TicketProposalSetRevisions', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.trg_TicketProposalSetRevisions_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.trg_TicketProposalSetRevisions_AppendOnly ON dbo.TicketProposalSetRevisions;
+                DELETE FROM dbo.TicketProposalSetRevisions;
+                IF OBJECT_ID('dbo.trg_TicketProposalSetRevisions_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.trg_TicketProposalSetRevisions_AppendOnly ON dbo.TicketProposalSetRevisions;
+            END
+            IF OBJECT_ID('dbo.TicketProposalSets', 'U') IS NOT NULL DELETE FROM dbo.TicketProposalSets;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
             IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL DELETE FROM dbo.ClientOperations;
             DELETE FROM dbo.ChatMessages;

@@ -24,6 +24,119 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         await DropAgentRunMigrationObjectsAsync();
         await ApplyMigrationAsync("migrate_workbench_agent_runs.sql");
         await ApplyMigrationAsync("migrate_workbench_project_understanding.sql");
+        await ApplyMigrationAsync("migrate_workbench_ticket_proposals.sql");
+    }
+
+    [TestMethod]
+    public async Task TicketProposalGeneration_MaterializesOneCanonicalSetRevisionAtomicallyWithoutPermanentTickets()
+    {
+        var fixture = await CreateFixtureAsync("Ticket proposal generation");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(new SubmitWorkbenchAgentRunCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            Guid.NewGuid(),
+            fixture.ChatSessionId,
+            "/ticket focus on volunteer scheduling",
+            WorkbenchAgentInvocationKinds.TicketProposalGeneration,
+            "focus on volunteer scheduling"));
+
+        Assert.AreEqual(WorkbenchAgentInvocationKinds.TicketProposalGeneration, submitted.InvocationKind);
+        Assert.IsNotNull(submitted.TicketProposalSetId);
+        var claim = await service.ClaimAsync(submitted.AgentRunId, "proposal-worker", TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(claim);
+        var context = await new WorkbenchAgentContextAssembler(ConnectionFactory()).AssembleAsync(claim);
+        Assert.AreEqual(WorkbenchBusinessAnalystContract.ContextSchemaVersion3, context.ContextSchemaVersion);
+        Assert.AreEqual(WorkbenchBusinessAnalystContract.OutputSchemaVersion3, context.OutputSchemaVersion);
+        Assert.AreEqual("focus on volunteer scheduling", context.TicketInstruction);
+
+        var output = new WorkbenchBusinessAnalystOutput(
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion3,
+            context.ContextHash,
+            context.UnderstandingRevision,
+            WorkbenchAgentRunStates.Completed,
+            "I prepared one proposal. No permanent ticket was created.",
+            UnderstandingPatch: null,
+            RenameProposal: null,
+            TicketProposalSet: new TicketProposalSetOutput(
+                "One independent user-visible outcome.",
+                [new TicketProposalOutput(
+                    "proposal-1",
+                    "Coordinate volunteer schedules",
+                    "Volunteer coordinators cannot see one shared schedule.",
+                    "Provide a bounded shared scheduling workflow.",
+                    ["A coordinator can publish a schedule visible to the intended volunteers."],
+                    [],
+                    1,
+                    [context.SourceUserMessageId])],
+                [],
+                [],
+                [context.SourceUserMessageId]));
+
+        var materialized = await service.MaterializeAsync(claim, context, output);
+        var replay = await service.MaterializeAsync(claim, context, output);
+        Assert.IsTrue(materialized.Materialized);
+        Assert.AreEqual(1L, materialized.TicketProposalRevision);
+        Assert.IsTrue(replay.IsReplay);
+        Assert.AreEqual(materialized.TicketProposalSetId, replay.TicketProposalSetId);
+        Assert.AreEqual(materialized.TicketProposalRevision, replay.TicketProposalRevision);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var counts = await connection.QuerySingleAsync<ProposalMaterializationCounts>("""
+            SELECT
+                (SELECT COUNT(1) FROM dbo.TicketProposalSets
+                 WHERE Id=@TicketProposalSetId AND ProjectId=@ProjectId
+                   AND CurrentRevision=1 AND Status=N'Ready') AS ProposalSets,
+                (SELECT COUNT(1) FROM dbo.TicketProposalSetRevisions
+                 WHERE TicketProposalSetId=@TicketProposalSetId AND Revision=1
+                   AND ChangeKind=N'Generated') AS ProposalRevisions,
+                (SELECT COUNT(1) FROM dbo.ChatMessages
+                 WHERE ProjectId=@ProjectId AND Role=N'assistant') AS AssistantMessages,
+                (SELECT COUNT(1) FROM dbo.ProjectTickets
+                 WHERE ProjectId=@ProjectId) AS PermanentTickets,
+                (SELECT COUNT(1) FROM dbo.WorkbenchOutboxEvents
+                 WHERE AgentRunId=@AgentRunId AND EventKind=N'AgentRunMaterialized') AS MaterializedEvents;
+            """, new
+        {
+            TicketProposalSetId = submitted.TicketProposalSetId,
+            fixture.ProjectId,
+            submitted.AgentRunId
+        });
+        Assert.AreEqual(1, counts.ProposalSets);
+        Assert.AreEqual(1, counts.ProposalRevisions);
+        Assert.AreEqual(1, counts.AssistantMessages);
+        Assert.AreEqual(0, counts.PermanentTickets);
+        Assert.AreEqual(1, counts.MaterializedEvents);
+
+        var regeneration = await service.SubmitAsync(new SubmitWorkbenchAgentRunCommand(
+            1,
+            fixture.ActorUserId,
+            fixture.ProjectId,
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            Guid.NewGuid(),
+            fixture.ChatSessionId,
+            "/ticket split the reviewed outcome into smaller boundaries",
+            WorkbenchAgentInvocationKinds.TicketProposalRegeneration,
+            "split the reviewed outcome into smaller boundaries",
+            submitted.TicketProposalSetId,
+            ExpectedTicketProposalRevision: 1));
+        var regenerationClaim = await service.ClaimAsync(
+            regeneration.AgentRunId,
+            "proposal-regeneration-worker",
+            TimeSpan.FromMinutes(5));
+        Assert.IsNotNull(regenerationClaim);
+        var regenerationContext = await new WorkbenchAgentContextAssembler(ConnectionFactory())
+            .AssembleAsync(regenerationClaim);
+        Assert.IsNotNull(regenerationContext.TicketProposalSnapshotJson);
+        var reviewedSnapshot = TicketProposalSetDocumentCodec.Deserialize(
+            regenerationContext.TicketProposalSnapshotJson);
+        Assert.AreEqual(submitted.TicketProposalSetId, reviewedSnapshot.TicketProposalSetId);
+        Assert.AreEqual(1L, reviewedSnapshot.Revision);
+        Assert.AreEqual("Coordinate volunteer schedules", reviewedSnapshot.Proposals.Single().Title);
     }
 
     [TestMethod]
@@ -1854,6 +1967,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystInvocationAudits;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystToolCallAudits;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystPreparations;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.TicketProposalSetRevisions;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.TicketProposalSets;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.ProjectRenameProposals;");
         await connection.ExecuteAsync("""
             IF EXISTS
@@ -1937,6 +2052,15 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         public int AssistantMessages { get; init; }
     }
 
+    private sealed class ProposalMaterializationCounts
+    {
+        public int ProposalSets { get; init; }
+        public int ProposalRevisions { get; init; }
+        public int AssistantMessages { get; init; }
+        public int PermanentTickets { get; init; }
+        public int MaterializedEvents { get; init; }
+    }
+
     private sealed record Version1ContextFixture(
         Guid AgentRunId,
         int TenantId,
@@ -2016,7 +2140,6 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
 
     private sealed class ValidSchemaAgent(string assistantMessage) : IWorkbenchBusinessAnalystAgent
     {
-        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
         private int _invocationCount;
 
         public string? ContextHash { get; private set; }
@@ -2031,9 +2154,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             return Task.FromResult<IWorkbenchBusinessAnalystPreparedInvocation>(new PreparedInvocation(_ =>
             {
                 Interlocked.Increment(ref _invocationCount);
-                return Task.FromResult(JsonSerializer.Serialize(
-                    ValidOutput(context, assistantMessage),
-                    JsonOptions));
+                return Task.FromResult(WorkbenchBusinessAnalystOutputValidator.Serialize(
+                    ValidOutput(context, assistantMessage)));
             }));
         }
     }

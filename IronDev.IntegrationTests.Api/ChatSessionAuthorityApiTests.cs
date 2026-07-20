@@ -219,6 +219,13 @@ public sealed class ChatSessionAuthorityApiTests : ApiTestBase
         Assert.AreEqual(HttpStatusCode.OK, messageResponse.StatusCode);
         var sourceMessageId = await messageResponse.Content.ReadFromJsonAsync<long>();
 
+        var sourceMessageRead = await client.GetAsync(
+            $"/api/projects/{sourceProjectId}/chat/messages/{sourceMessageId}");
+        Assert.AreEqual(HttpStatusCode.OK, sourceMessageRead.StatusCode);
+        var sourceMessage = await sourceMessageRead.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.AreEqual(sourceMessageId, sourceMessage.GetProperty("id").GetInt64());
+        Assert.AreEqual("Source-project message", sourceMessage.GetProperty("message").GetString());
+
         var routeList = await client.GetAsync($"/api/projects/{routeProjectId}/chat/sessions");
         Assert.AreEqual(HttpStatusCode.OK, routeList.StatusCode);
         var routeSessions = await routeList.Content.ReadFromJsonAsync<JsonElement>();
@@ -227,6 +234,10 @@ public sealed class ChatSessionAuthorityApiTests : ApiTestBase
         var wrongProjectRead = await client.GetAsync(
             $"/api/projects/{routeProjectId}/chat/sessions/{sourceSessionId}");
         Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectRead.StatusCode);
+
+        var wrongProjectMessage = await client.GetAsync(
+            $"/api/projects/{routeProjectId}/chat/messages/{sourceMessageId}");
+        Assert.AreEqual(HttpStatusCode.NotFound, wrongProjectMessage.StatusCode);
 
         var wrongProjectUpdate = await client.PostAsJsonAsync(
             $"/api/projects/{routeProjectId}/chat/sessions",
@@ -280,6 +291,10 @@ public sealed class ChatSessionAuthorityApiTests : ApiTestBase
         var removedMemberMessages = await client.GetAsync(
             $"/api/projects/{sourceProjectId}/chat/sessions/{sourceSessionId}/messages");
         Assert.AreEqual(HttpStatusCode.NotFound, removedMemberMessages.StatusCode);
+
+        var removedMemberMessage = await client.GetAsync(
+            $"/api/projects/{sourceProjectId}/chat/messages/{sourceMessageId}");
+        Assert.AreEqual(HttpStatusCode.NotFound, removedMemberMessage.StatusCode);
 
         var removedMemberAudit = await client.GetAsync(
             $"/api/projects/{sourceProjectId}/chat/sessions/{sourceSessionId}/messages/{sourceMessageId}/audit");

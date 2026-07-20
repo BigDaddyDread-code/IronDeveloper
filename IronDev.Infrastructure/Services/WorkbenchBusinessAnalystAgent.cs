@@ -134,7 +134,11 @@ public sealed class WorkbenchBusinessAnalystAgent : IWorkbenchBusinessAnalystAge
             !string.Equals(claim.ToolPolicyVersion, context.ToolPolicyVersion, StringComparison.Ordinal) ||
             claim.ContextSchemaVersion != context.ContextSchemaVersion ||
             claim.ContextCanonicalizationVersion != context.ContextCanonicalizationVersion ||
-            claim.OutputSchemaVersion != context.OutputSchemaVersion)
+            claim.OutputSchemaVersion != context.OutputSchemaVersion ||
+            claim.InvocationKind != context.InvocationKind ||
+            claim.TicketInstruction != context.TicketInstruction ||
+            claim.TicketProposalSetId != context.TicketProposalSetId ||
+            claim.TicketProposalRevision != context.TicketProposalRevision)
             throw new InvalidOperationException(
                 "The Business Analyst preparation claim does not match the immutable run context.");
     }

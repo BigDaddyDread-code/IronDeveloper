@@ -30,6 +30,9 @@ internal static class WorkbenchBusinessAnalystContextCodec
             (WorkbenchBusinessAnalystContract.ContextSchemaVersion2,
              WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2) =>
                 DeserializeVersion2(snapshotJson),
+            (WorkbenchBusinessAnalystContract.ContextSchemaVersion3,
+             WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion3) =>
+                DeserializeVersion3(snapshotJson),
             _ => throw Unsupported(contextSchemaVersion, contextCanonicalizationVersion)
         };
         EnsureComplete(context);
@@ -44,6 +47,9 @@ internal static class WorkbenchBusinessAnalystContextCodec
                 JsonSerializer.Serialize(ToVersion1(context), Version1CanonicalJsonOptions),
             (WorkbenchBusinessAnalystContract.ContextSchemaVersion2,
              WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2) =>
+                JsonSerializer.Serialize(ToVersion2(context), StrictJsonOptions),
+            (WorkbenchBusinessAnalystContract.ContextSchemaVersion3,
+             WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion3) =>
                 JsonSerializer.Serialize(context, StrictJsonOptions),
             _ => throw Unsupported(context.ContextSchemaVersion, context.ContextCanonicalizationVersion)
         };
@@ -58,6 +64,9 @@ internal static class WorkbenchBusinessAnalystContextCodec
                     Version1CanonicalJsonOptions),
             (WorkbenchBusinessAnalystContract.ContextSchemaVersion2,
              WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2) =>
+                JsonSerializer.Serialize(ToVersion2(context) with { ContextHash = string.Empty }, StrictJsonOptions),
+            (WorkbenchBusinessAnalystContract.ContextSchemaVersion3,
+             WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion3) =>
                 JsonSerializer.Serialize(context with { ContextHash = string.Empty }, StrictJsonOptions),
             _ => throw Unsupported(context.ContextSchemaVersion, context.ContextCanonicalizationVersion)
         };
@@ -92,11 +101,29 @@ internal static class WorkbenchBusinessAnalystContextCodec
 
     private static WorkbenchBusinessAnalystContext DeserializeVersion2(string snapshotJson)
     {
-        var context = JsonSerializer.Deserialize<WorkbenchBusinessAnalystContext>(snapshotJson, StrictJsonOptions)
+        var stored = JsonSerializer.Deserialize<Version2Context>(snapshotJson, StrictJsonOptions)
             ?? throw new InvalidOperationException("The stored Workbench agent context could not be read.");
+        var context = new WorkbenchBusinessAnalystContext(
+            stored.AgentRunId, stored.TenantId, stored.ProjectId, stored.ProjectName,
+            stored.WorkbenchSessionId, stored.LeaseEpoch, stored.ChatSessionId,
+            stored.SourceUserMessageId, stored.UnderstandingRevision, stored.UnderstandingJson,
+            stored.Messages, stored.AgentVersion, stored.PromptVersion, stored.ToolPolicyVersion,
+            stored.ContextSchemaVersion, stored.ContextCanonicalizationVersion,
+            stored.OutputSchemaVersion, stored.ContextHash);
         if (context.ContextSchemaVersion != WorkbenchBusinessAnalystContract.ContextSchemaVersion2 ||
             context.ContextCanonicalizationVersion != WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2)
             throw new InvalidOperationException("The stored Workbench agent context version does not match its run.");
+        return context;
+    }
+
+    private static WorkbenchBusinessAnalystContext DeserializeVersion3(string snapshotJson)
+    {
+        var context = JsonSerializer.Deserialize<WorkbenchBusinessAnalystContext>(snapshotJson, StrictJsonOptions)
+            ?? throw new InvalidOperationException("The stored Workbench agent context could not be read.");
+        if (context.ContextSchemaVersion != WorkbenchBusinessAnalystContract.ContextSchemaVersion3 ||
+            context.ContextCanonicalizationVersion != WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion3 ||
+            !WorkbenchAgentInvocationKinds.IsTicketProposal(context.InvocationKind))
+            throw new InvalidOperationException("The stored Workbench proposal context version does not match its run.");
         return context;
     }
 
@@ -118,6 +145,14 @@ internal static class WorkbenchBusinessAnalystContextCodec
         context.OutputSchemaVersion,
         context.ContextHash);
 
+    private static Version2Context ToVersion2(WorkbenchBusinessAnalystContext context) => new(
+        context.AgentRunId, context.TenantId, context.ProjectId, context.ProjectName,
+        context.WorkbenchSessionId, context.LeaseEpoch, context.ChatSessionId,
+        context.SourceUserMessageId, context.UnderstandingRevision, context.UnderstandingJson,
+        context.Messages, context.AgentVersion, context.PromptVersion, context.ToolPolicyVersion,
+        context.ContextSchemaVersion, context.ContextCanonicalizationVersion,
+        context.OutputSchemaVersion, context.ContextHash);
+
     private static void EnsureComplete(WorkbenchBusinessAnalystContext context)
     {
         if (context.AgentRunId == Guid.Empty || string.IsNullOrWhiteSpace(context.ProjectName) ||
@@ -125,6 +160,12 @@ internal static class WorkbenchBusinessAnalystContextCodec
             string.IsNullOrWhiteSpace(context.AgentVersion) || string.IsNullOrWhiteSpace(context.PromptVersion) ||
             string.IsNullOrWhiteSpace(context.ToolPolicyVersion) || string.IsNullOrWhiteSpace(context.ContextHash))
             throw new InvalidOperationException("The stored Workbench agent context is incomplete.");
+        if (context.InvocationKind == WorkbenchAgentInvocationKinds.TicketProposalRegeneration &&
+            string.IsNullOrWhiteSpace(context.TicketProposalSnapshotJson))
+            throw new InvalidOperationException("The stored Workbench regeneration context has no proposal snapshot.");
+        if (context.InvocationKind != WorkbenchAgentInvocationKinds.TicketProposalRegeneration &&
+            context.TicketProposalSnapshotJson is not null)
+            throw new InvalidOperationException("Only regeneration context may contain a proposal snapshot.");
     }
 
     private static InvalidOperationException Unsupported(
@@ -152,6 +193,26 @@ internal static class WorkbenchBusinessAnalystContextCodec
         string ToolPolicyVersion,
         int OutputSchemaVersion,
         string ContextHash);
+
+    private sealed record Version2Context(
+        Guid AgentRunId,
+        int TenantId,
+        int ProjectId,
+        string ProjectName,
+        long WorkbenchSessionId,
+        long LeaseEpoch,
+        long ChatSessionId,
+        long SourceUserMessageId,
+        long UnderstandingRevision,
+        string UnderstandingJson,
+        IReadOnlyList<WorkbenchAgentContextMessage> Messages,
+        string AgentVersion,
+        string PromptVersion,
+        string ToolPolicyVersion,
+        int ContextSchemaVersion,
+        int ContextCanonicalizationVersion,
+        int OutputSchemaVersion,
+        string ContextHash);
 }
 
 public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssembler
@@ -175,6 +236,7 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
                        ChatSessionId, SourceUserMessageId, Status, ClaimToken,
                        AgentVersion, PromptVersion, ToolPolicyVersion, ContextSchemaVersion,
                        ContextCanonicalizationVersion, OutputSchemaVersion,
+                       InvocationKind, TicketInstruction, TicketProposalSetId, TicketProposalRevision,
                        ContextSnapshotJson, ContextHash, BasedOnUnderstandingRevision
                 FROM dbo.WorkbenchAgentRuns WITH (UPDLOCK, HOLDLOCK)
                 WHERE AgentRunId=@AgentRunId;
@@ -223,6 +285,42 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
                 transaction,
                 cancellationToken: cancellationToken))
                 ?? throw new InvalidOperationException("The project understanding required for agent context is missing.");
+
+            string? ticketProposalSnapshotJson = null;
+            if (run.InvocationKind == WorkbenchAgentInvocationKinds.TicketProposalRegeneration)
+            {
+                var proposalRevision = await connection.QuerySingleOrDefaultAsync<ProposalSnapshotRow>(new CommandDefinition(
+                    """
+                    SELECT revision.SnapshotJson, revision.SnapshotHash
+                    FROM dbo.TicketProposalSets value
+                    INNER JOIN dbo.TicketProposalSetRevisions revision
+                       ON revision.TenantId=value.TenantId
+                      AND revision.TicketProposalSetId=value.Id
+                      AND revision.Revision=@TicketProposalRevision
+                    WHERE value.TenantId=@TenantId AND value.ProjectId=@ProjectId
+                      AND value.Id=@TicketProposalSetId
+                      AND value.WorkbenchSessionId=@WorkbenchSessionId
+                      AND value.LeaseEpoch=@LeaseEpoch;
+                    """,
+                    run,
+                    transaction,
+                    cancellationToken: cancellationToken));
+                if (proposalRevision is null || string.IsNullOrWhiteSpace(proposalRevision.SnapshotJson))
+                    throw new TicketProposalRevisionConflictException(run.TicketProposalRevision ?? 0);
+                var computedSnapshotHash = TicketProposalSetDocumentCodec.ComputeHash(proposalRevision.SnapshotJson);
+                if (!string.Equals(computedSnapshotHash, proposalRevision.SnapshotHash, StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        "The Workbench regeneration proposal snapshot failed its integrity check.");
+                ticketProposalSnapshotJson = proposalRevision.SnapshotJson;
+                var proposalSnapshot = TicketProposalSetDocumentCodec.Deserialize(ticketProposalSnapshotJson);
+                if (proposalSnapshot.TicketProposalSetId != run.TicketProposalSetId ||
+                    proposalSnapshot.ProjectId != run.ProjectId ||
+                    proposalSnapshot.WorkbenchSessionId != run.WorkbenchSessionId ||
+                    proposalSnapshot.LeaseEpoch != run.LeaseEpoch ||
+                    proposalSnapshot.Revision != run.TicketProposalRevision)
+                    throw new InvalidOperationException(
+                        "The Workbench regeneration proposal snapshot does not match its immutable run purpose.");
+            }
 
             var messages = (await connection.QueryAsync<WorkbenchAgentContextMessage>(new CommandDefinition(
                 """
@@ -274,7 +372,12 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
                 run.ContextSchemaVersion,
                 run.ContextCanonicalizationVersion,
                 run.OutputSchemaVersion,
-                ContextHash: string.Empty);
+                ContextHash: string.Empty,
+                run.InvocationKind,
+                run.TicketInstruction,
+                run.TicketProposalSetId,
+                run.TicketProposalRevision,
+                ticketProposalSnapshotJson);
             var contextHash = ComputeContextHash(contextWithoutHash);
             var context = contextWithoutHash with { ContextHash = contextHash };
             var snapshotJson = WorkbenchBusinessAnalystContextCodec.Serialize(context);
@@ -333,7 +436,11 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
             context.ToolPolicyVersion != run.ToolPolicyVersion ||
             context.ContextSchemaVersion != run.ContextSchemaVersion ||
             context.ContextCanonicalizationVersion != run.ContextCanonicalizationVersion ||
-            context.OutputSchemaVersion != run.OutputSchemaVersion)
+            context.OutputSchemaVersion != run.OutputSchemaVersion ||
+            context.InvocationKind != run.InvocationKind ||
+            context.TicketInstruction != run.TicketInstruction ||
+            context.TicketProposalSetId != run.TicketProposalSetId ||
+            context.TicketProposalRevision != run.TicketProposalRevision)
             throw new InvalidOperationException("The stored Workbench agent context failed its integrity check.");
     }
 
@@ -348,7 +455,11 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
             run.ToolPolicyVersion != claim.ToolPolicyVersion ||
             run.ContextSchemaVersion != claim.ContextSchemaVersion ||
             run.ContextCanonicalizationVersion != claim.ContextCanonicalizationVersion ||
-            run.OutputSchemaVersion != claim.OutputSchemaVersion)
+            run.OutputSchemaVersion != claim.OutputSchemaVersion ||
+            run.InvocationKind != claim.InvocationKind ||
+            run.TicketInstruction != claim.TicketInstruction ||
+            run.TicketProposalSetId != claim.TicketProposalSetId ||
+            run.TicketProposalRevision != claim.TicketProposalRevision)
             throw new WorkbenchLeaseFenceException();
     }
 
@@ -370,16 +481,27 @@ public sealed class WorkbenchAgentContextAssembler : IWorkbenchAgentContextAssem
         public int ContextSchemaVersion { get; init; }
         public int ContextCanonicalizationVersion { get; init; }
         public int OutputSchemaVersion { get; init; }
+        public string InvocationKind { get; init; } = WorkbenchAgentInvocationKinds.Conversation;
+        public string? TicketInstruction { get; init; }
+        public Guid? TicketProposalSetId { get; init; }
+        public long? TicketProposalRevision { get; init; }
         public string? ContextSnapshotJson { get; init; }
         public string? ContextHash { get; init; }
         public long? BasedOnUnderstandingRevision { get; init; }
     }
+
 
     private sealed class ProjectContextRow
     {
         public string ProjectName { get; init; } = string.Empty;
         public long UnderstandingRevision { get; init; }
         public string UnderstandingJson { get; init; } = "{}";
+    }
+
+    private sealed class ProposalSnapshotRow
+    {
+        public string SnapshotJson { get; init; } = string.Empty;
+        public string SnapshotHash { get; init; } = string.Empty;
     }
 }
 

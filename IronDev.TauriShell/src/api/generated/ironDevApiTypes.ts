@@ -2093,6 +2093,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{projectId}/chat/messages/{messageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    messageId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ChatMessage"];
+                        "application/json": components["schemas"]["ChatMessage"];
+                        "text/json": components["schemas"]["ChatMessage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{projectId}/chat/complete": {
         parameters: {
             query?: never;
@@ -11699,6 +11739,612 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    workbenchSessionId?: number;
+                    leaseEpoch?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketProposalSetReadModel"];
+                        "application/json": components["schemas"]["TicketProposalSetReadModel"];
+                        "text/json": components["schemas"]["TicketProposalSetReadModel"];
+                    };
+                };
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/{ticketProposalSetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    workbenchSessionId?: number;
+                    leaseEpoch?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketProposalSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketProposalSetReadModel"];
+                        "application/json": components["schemas"]["TicketProposalSetReadModel"];
+                        "text/json": components["schemas"]["TicketProposalSetReadModel"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/{ticketProposalSetId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    workbenchSessionId?: number;
+                    leaseEpoch?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketProposalSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketProposalSetHistoryEntry"][];
+                        "application/json": components["schemas"]["TicketProposalSetHistoryEntry"][];
+                        "text/json": components["schemas"]["TicketProposalSetHistoryEntry"][];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/{ticketProposalSetId}/proposals/{ticketProposalId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketProposalSetId: string;
+                    ticketProposalId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["EditTicketProposalRequest"];
+                    "text/json": components["schemas"]["EditTicketProposalRequest"];
+                    "application/*+json": components["schemas"]["EditTicketProposalRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketProposalSetMutationResult"];
+                        "application/json": components["schemas"]["TicketProposalSetMutationResult"];
+                        "text/json": components["schemas"]["TicketProposalSetMutationResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/{ticketProposalSetId}/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketProposalSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReorderTicketProposalsRequest"];
+                    "text/json": components["schemas"]["ReorderTicketProposalsRequest"];
+                    "application/*+json": components["schemas"]["ReorderTicketProposalsRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketProposalSetMutationResult"];
+                        "application/json": components["schemas"]["TicketProposalSetMutationResult"];
+                        "text/json": components["schemas"]["TicketProposalSetMutationResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/{ticketProposalSetId}/proposals/{ticketProposalId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketProposalSetId: string;
+                    ticketProposalId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["TicketProposalMutationRequest"];
+                    "text/json": components["schemas"]["TicketProposalMutationRequest"];
+                    "application/*+json": components["schemas"]["TicketProposalMutationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketProposalSetMutationResult"];
+                        "application/json": components["schemas"]["TicketProposalSetMutationResult"];
+                        "text/json": components["schemas"]["TicketProposalSetMutationResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/{ticketProposalSetId}/issues/{issueId}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketProposalSetId: string;
+                    issueId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ResolveTicketProposalIssueRequest"];
+                    "text/json": components["schemas"]["ResolveTicketProposalIssueRequest"];
+                    "application/*+json": components["schemas"]["ResolveTicketProposalIssueRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketProposalSetMutationResult"];
+                        "application/json": components["schemas"]["TicketProposalSetMutationResult"];
+                        "text/json": components["schemas"]["TicketProposalSetMutationResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/{ticketProposalSetId}/regenerations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketProposalSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RegenerateTicketProposalSetRequest"];
+                    "text/json": components["schemas"]["RegenerateTicketProposalSetRequest"];
+                    "application/*+json": components["schemas"]["RegenerateTicketProposalSetRequest"];
+                };
+            };
+            responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SubmitWorkbenchAgentRunResult"];
+                        "application/json": components["schemas"]["SubmitWorkbenchAgentRunResult"];
+                        "text/json": components["schemas"]["SubmitWorkbenchAgentRunResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workflow/runs": {
         parameters: {
             query?: never;
@@ -13865,6 +14511,20 @@ export interface components {
             sessionId?: number | null;
             /** Format: int64 */
             messageId?: number | null;
+        };
+        EditTicketProposalRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            expectedProposalSetRevision?: number;
+            title?: string | null;
+            problem?: string | null;
+            proposedChange?: string | null;
+            acceptanceCriteria?: string[] | null;
         };
         EffectiveSkeletonAgentProfile: {
             role: components["schemas"]["SkeletonAgentRole"];
@@ -16255,6 +16915,19 @@ export interface components {
             description?: string | null;
             actionType?: string | null;
         };
+        RegenerateTicketProposalSetRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            chatSessionId?: number;
+            /** Format: int64 */
+            expectedProposalSetRevision?: number;
+            instruction?: string | null;
+        };
         ReleaseReadinessDecisionReasonReadModel: {
             code: string | null;
             severity: string | null;
@@ -16458,6 +17131,28 @@ export interface components {
             severity: string | null;
             field: string | null;
             message: string | null;
+        };
+        ReorderTicketProposalsRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            expectedProposalSetRevision?: number;
+            orderedProposalIds?: string[] | null;
+        };
+        ResolveTicketProposalIssueRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            expectedProposalSetRevision?: number;
+            resolution?: string | null;
         };
         /**
          * Format: int32
@@ -17949,6 +18644,11 @@ export interface components {
             /** Format: date-time */
             createdAtUtc?: string;
             isReplay?: boolean;
+            invocationKind?: string | null;
+            /** Format: uuid */
+            ticketProposalSetId?: string | null;
+            /** Format: int64 */
+            ticketProposalRevision?: number | null;
         };
         SupersedeDecisionRequest: {
             replacement?: components["schemas"]["ProjectDecision"];
@@ -18074,6 +18774,81 @@ export interface components {
             hasBlockingWarnings?: boolean;
             blockedActions?: string[] | null;
             nextSafeAction?: string | null;
+        };
+        TicketProposalIssueReadModel: {
+            /** Format: uuid */
+            issueId?: string;
+            kind?: string | null;
+            text?: string | null;
+            status?: string | null;
+            resolution?: string | null;
+            sourceMessageIds?: number[] | null;
+        };
+        TicketProposalMutationRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            expectedProposalSetRevision?: number;
+        };
+        TicketProposalReadModel: {
+            /** Format: uuid */
+            ticketProposalId?: string;
+            title?: string | null;
+            problem?: string | null;
+            proposedChange?: string | null;
+            acceptanceCriteria?: string[] | null;
+            dependencyProposalIds?: string[] | null;
+            /** Format: int32 */
+            suggestedOrder?: number;
+            sourceMessageIds?: number[] | null;
+        };
+        TicketProposalSetHistoryEntry: {
+            /** Format: int64 */
+            revision?: number;
+            changeKind?: string | null;
+            /** Format: int32 */
+            actorUserId?: number;
+            /** Format: uuid */
+            agentRunId?: string | null;
+            /** Format: date-time */
+            createdAtUtc?: string;
+            proposalSet?: components["schemas"]["TicketProposalSetReadModel"];
+        };
+        TicketProposalSetMutationResult: {
+            proposalSet?: components["schemas"]["TicketProposalSetReadModel"];
+            /** Format: uuid */
+            clientOperationId?: string;
+            isReplay?: boolean;
+        };
+        TicketProposalSetReadModel: {
+            /** Format: uuid */
+            ticketProposalSetId?: string;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: int64 */
+            revision?: number;
+            /** Format: int64 */
+            basedOnUnderstandingRevision?: number;
+            status?: string | null;
+            splitReason?: string | null;
+            proposals?: components["schemas"]["TicketProposalReadModel"][] | null;
+            openQuestions?: components["schemas"]["TicketProposalIssueReadModel"][] | null;
+            potentialConflicts?: components["schemas"]["TicketProposalIssueReadModel"][] | null;
+            sourceMessageIds?: number[] | null;
+            /** Format: uuid */
+            createdByAgentRunId?: string;
+            /** Format: date-time */
+            createdAtUtc?: string;
+            /** Format: date-time */
+            updatedAtUtc?: string;
         };
         TicketProvenanceDto: {
             source?: string | null;
@@ -18409,6 +19184,11 @@ export interface components {
             cancellationRequestedAtUtc?: string | null;
             failureCategory?: string | null;
             retryable?: boolean;
+            invocationKind?: string | null;
+            /** Format: uuid */
+            ticketProposalSetId?: string | null;
+            /** Format: int64 */
+            ticketProposalRevision?: number | null;
         };
         WorkbenchProjectEntryContext: {
             /** Format: int32 */
