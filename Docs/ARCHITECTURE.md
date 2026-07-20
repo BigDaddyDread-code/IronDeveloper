@@ -100,6 +100,8 @@ PR-02C-B makes Project Understanding a typed, revisioned Workbench authority rat
 
 The Project Context read model combines those editable intent facts with authority-labelled, read-only lifecycle, execution-readiness, and repository projections. Direct fact decisions and rename acceptance are separate fenced and idempotent Workbench mutations. A fact edit is explicit user evidence and therefore becomes `Confirmed`; locking never grants the user authority to assert build, index, repository, or readiness evidence. Accepting a rename proposal updates only the canonical `Project.Name` inside the proposal transaction. Repository setup, ticket commands, and Builder authority remain outside this slice.
 
+PR-03 adds the server-authoritative Workbench input router. A slash is a command only at the first non-whitespace composer position; the exact case-insensitive allowlist is `/help` and `/ticket`, with no aliases or prefix matches. The input service classifies before any BA availability or AgentRun call. `/help` and the PR-03 `/ticket` handoff return deterministic results. Unknown commands atomically validate and renew the exact lease, complete an idempotent client operation, append a `WorkbenchCommandRejection` plus outbox/attribution evidence, and return a bounded rejection without writing a chat session, Workbench message, or AgentRun. The rejection persists only the raw token and a SHA-256 payload hash; the full composer text stays client-side. The compatibility AgentRun submit route rejects leading-slash input, so clients cannot bypass deterministic command routing. Prose such as `create tickets` and `We may use /ticket later` remains ordinary BA conversation and receives no artifact authority.
+
 Allowed transitions (only):
 
 ```text

@@ -2,6 +2,12 @@ import { useState } from 'react';
 import type { ChatDocumentSource } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
 import type { ChatAgentRunState } from './chatTypes';
+import {
+  shouldShowWorkbenchCommandMenu,
+  workbenchCommands,
+  type WorkbenchCommandNotice,
+  type WorkbenchCommandToken
+} from './workbenchCommands';
 
 interface ChatComposerProps {
   value: string;
@@ -16,7 +22,9 @@ interface ChatComposerProps {
   documentSourceLoadState: 'idle' | 'loading' | 'ready' | 'error';
   documentSourceError: string | null;
   selectedDocumentSource: ChatDocumentSource | null;
+  commandNotice: WorkbenchCommandNotice | null;
   onChange: (value: string) => void;
+  onSelectCommand: (token: WorkbenchCommandToken) => void;
   onSend: () => void;
   onCancelAgentRun: () => void;
   onLoadDocumentSources: () => void;
@@ -36,7 +44,9 @@ export function ChatComposer({
   documentSourceLoadState,
   documentSourceError,
   selectedDocumentSource,
+  commandNotice,
   onChange,
+  onSelectCommand,
   onSend,
   onCancelAgentRun,
   onLoadDocumentSources,
@@ -65,6 +75,16 @@ export function ChatComposer({
         <p className="chat-composer__authority-note" data-testid="chat.agentRun.boundary">
           Messages and replies are saved by the governed Business Analyst run. Document attachments are not available in this slice.
         </p>
+      ) : null}
+      {conversationAuthorityEnabled && commandNotice ? (
+        <section
+          className={`chat-command-notice chat-command-notice--${commandNotice.kind}`}
+          aria-live="polite"
+          data-testid={`chat.command.${commandNotice.kind}.result`}
+        >
+          <strong>{commandNotice.title}</strong>
+          <p>{commandNotice.message}</p>
+        </section>
       ) : null}
       {!conversationAuthorityEnabled && selectedDocumentSource ? (
         <div className="chat-composer__selected-source" data-testid="chat.documentSource.selected">
@@ -142,6 +162,27 @@ export function ChatComposer({
           }}
         />
       </label>
+      {conversationAuthorityEnabled && shouldShowWorkbenchCommandMenu(value) ? (
+        <section className="chat-command-menu" aria-label="Workbench commands" data-testid="chat.command.menu">
+          <div className="chat-command-menu__heading">
+            <strong>Commands</strong>
+            <small>Exact commands only</small>
+          </div>
+          <div className="chat-command-menu__items">
+            {workbenchCommands.map((command) => (
+              <button
+                type="button"
+                key={command.token}
+                data-testid={`chat.command.option.${command.token.slice(1)}`}
+                onClick={() => onSelectCommand(command.token)}
+              >
+                <code>{command.token}</code>
+                <span><strong>{command.label}</strong><small>{command.description}</small></span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <div className="chat-composer__actions">
         <div>
           {!conversationAuthorityEnabled ? (

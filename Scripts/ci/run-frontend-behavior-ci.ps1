@@ -34,6 +34,7 @@ $testFiles = @(
     "tests/board-ux.spec.ts",
     "tests/chat-conversation-first.spec.ts",
     "tests/workbench-agent-run.spec.ts",
+    "tests/workbench-slash-commands.spec.ts",
     "tests/project-understanding.spec.ts",
     "tests/chat-session-navigation.spec.ts",
     "tests/chat-ticket-draft-review.spec.ts",

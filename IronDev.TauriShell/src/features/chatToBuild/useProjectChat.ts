@@ -17,6 +17,11 @@ import { useSessionContext } from '../../state/useSessionContext';
 import { coerceChatGovernanceMode, getChatModeGate } from './chatGovernanceGate';
 import { buildAssistantTagEnvelope, parseAssistantTagMetadata } from './chatTurnEnvelope';
 import type { ChatAgentRunState, ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
+import {
+  classifyWorkbenchComposer,
+  type WorkbenchCommandNotice,
+  type WorkbenchCommandToken
+} from './workbenchCommands';
 
 const projectReviewPrompt = [
   'Review the current captured project understanding.',
@@ -37,7 +42,7 @@ interface DurableOperationAttempt {
 
 interface UnresolvedDurableOperation {
   prompt: string;
-  kind: 'CreateSession' | 'SubmitRun';
+  kind: 'CreateSession' | 'SubmitRun' | 'SubmitInput';
 }
 
 interface UnresolvedAgentCancellation {
@@ -45,7 +50,7 @@ interface UnresolvedAgentCancellation {
   cancellationKey: string;
 }
 
-type DurableMutationKind = 'CreateSession' | 'SubmitRun' | 'CancelRun';
+type DurableMutationKind = 'CreateSession' | 'SubmitRun' | 'SubmitInput' | 'CancelRun';
 
 class StaleWorkbenchSubmissionContextError extends Error {}
 
@@ -72,6 +77,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const [sessionLoadRequest, setSessionLoadRequest] = useState(0);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [commandNotice, setCommandNotice] = useState<WorkbenchCommandNotice | null>(null);
   const [documentSources, setDocumentSources] = useState<ChatDocumentSource[]>([]);
   const [documentSourceLoadState, setDocumentSourceLoadState] = useState<DocumentSourceLoadState>('idle');
   const [documentSourceError, setDocumentSourceError] = useState<string | null>(null);
@@ -81,6 +87,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const freshConversationRef = useRef(false);
   const errorSessionIdRef = useRef<number | null>(null);
   const agentSubmissionAttemptsRef = useRef(new Map<string, DurableOperationAttempt>());
+  const commandSubmissionAttemptsRef = useRef(new Map<string, DurableOperationAttempt>());
   const chatSessionCreationAttemptsRef = useRef(new Map<string, DurableOperationAttempt>());
   const agentCancellationAttemptsRef = useRef(new Map<string, DurableOperationAttempt>());
   const agentPollControllerRef = useRef<AbortController | null>(null);
@@ -118,6 +125,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     conversationAuthorityEnabled && (agentRunAvailability === 'unknown' || agentRunAvailability === 'checking') && !agentRunIsActive
       ? 'Business Analyst readiness is being checked.'
       : agentRunUnavailableReason;
+  const draftClassification = conversationAuthorityEnabled
+    ? classifyWorkbenchComposer(draft)
+    : { kind: 'conversation' as const };
   const disabledReason =
     getChatBlockedReason(session.tokenConfigured, projectId, workbenchSession !== null, session.apiStatus.status, project.accessStatus) ??
     (isHistoryLoading ? 'Workshop history is loading.' : null);
@@ -126,7 +136,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     (unresolvedAgentCancellation
       ? 'Cancellation delivery is unresolved. Retry cancellation before sending another message.'
       : null) ??
-    agentRunReadinessReason ??
+    (draftClassification.kind === 'conversation' ? agentRunReadinessReason : null) ??
     (unresolvedDurableOperation && draft.trim() !== unresolvedDurableOperation.prompt
       ? 'Delivery is unresolved. Restore the unchanged message to retry the same operation safely.'
       : null) ??
@@ -200,6 +210,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           : null
     );
     setSelectedDocumentSource(null);
+    setCommandNotice(null);
     setSending(false);
     setCancellingAgentRun(false);
     agentCancellationUiInvocationRef.current = null;
@@ -683,21 +694,86 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
 
   const sendMessage = useCallback(
     async (request?: ChatSendRequest) => {
-      const prompt = (request?.prompt ?? draft).trim();
+      const composerText = request?.prompt ?? draft;
+      const prompt = composerText.trim();
       const displayText = request?.displayText ?? prompt;
+      const inputClassification = conversationAuthorityEnabled && !request
+        ? classifyWorkbenchComposer(composerText)
+        : { kind: 'conversation' as const };
+      const durablePayload = inputClassification.kind === 'conversation' ? prompt : composerText;
       const unresolvedRetryBlocked = unresolvedDurableOperation &&
-        prompt !== unresolvedDurableOperation.prompt;
+        durablePayload !== unresolvedDurableOperation.prompt;
       const blockedReason = disabledReason ??
         (unresolvedAgentCancellation
           ? 'Cancellation delivery is unresolved. Retry cancellation before starting another operation.'
           : null) ??
-        agentRunReadinessReason ??
+        (inputClassification.kind === 'conversation' ? agentRunReadinessReason : null) ??
         (unresolvedRetryBlocked
           ? 'Delivery is unresolved. Retry the unchanged message before starting another operation.'
           : null) ??
         (request ? (isSending ? 'Workshop request is already sending.' : null) : getChatSendBlockedReason(draft, isSending));
 
       if (!projectId || !workbenchSession || blockedReason || !prompt) {
+        return;
+      }
+
+      if (conversationAuthorityEnabled && inputClassification.kind !== 'conversation') {
+        const submissionContextKey = authorityContextKey;
+        if (!submissionContextKey) {
+          return;
+        }
+        const submissionKey = `${submissionContextKey}:command:${composerText}`;
+        const operationAttempt = commandSubmissionAttemptsRef.current.get(submissionKey) ?? {
+          key: submissionKey,
+          clientOperationId: crypto.randomUUID()
+        };
+        commandSubmissionAttemptsRef.current.set(submissionKey, operationAttempt);
+        setSending(true);
+        setErrorMessage(null);
+        setCommandNotice(null);
+
+        try {
+          const result = await session.client.submitWorkbenchInput(projectId, {
+            workbenchSessionId: workbenchSession.workbenchSessionId,
+            leaseEpoch: workbenchSession.leaseEpoch,
+            clientOperationId: operationAttempt.clientOperationId,
+            chatSessionId: null,
+            composerText
+          });
+          if (result.kind === 'AgentRun') {
+            throw new Error('The deterministic command endpoint returned an unexpected AgentRun result.');
+          }
+          if (commandSubmissionAttemptsRef.current.get(submissionKey) === operationAttempt) {
+            commandSubmissionAttemptsRef.current.delete(submissionKey);
+          }
+          clearDurableOperationUnresolved(submissionContextKey, composerText);
+          setCommandNotice({
+            kind: result.kind === 'Help' ? 'help' : 'ticket',
+            title: result.title,
+            message: result.message,
+            clientOperationId: result.clientOperationId
+          });
+          setDraft('');
+        } catch (error) {
+          const definitiveRejection = isDefinitiveDurableMutationRejection(error, 'SubmitInput');
+          if (definitiveRejection) {
+            if (commandSubmissionAttemptsRef.current.get(submissionKey) === operationAttempt) {
+              commandSubmissionAttemptsRef.current.delete(submissionKey);
+            }
+            clearDurableOperationUnresolved(submissionContextKey, composerText);
+            const body = readCommandErrorBody(error.body);
+            setErrorMessage(
+              body.error === 'workbench_command_unknown'
+                ? `${body.rawCommandToken ?? 'That command'} is not available. Use /help or /ticket.`
+                : body.message ?? 'The Workbench command was rejected.'
+            );
+          } else {
+            markDurableOperationUnresolved(submissionContextKey, composerText, 'SubmitInput');
+            setErrorMessage('Command delivery could not be confirmed. Retry the unchanged command safely.');
+          }
+        } finally {
+          setSending(false);
+        }
         return;
       }
 
@@ -1231,6 +1307,13 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     [messages]
   );
 
+  const selectWorkbenchCommand = useCallback((token: WorkbenchCommandToken) => {
+    setCommandNotice(null);
+    setErrorMessage(null);
+    setDraft(token === '/ticket' ? `${token} ` : token);
+    window.setTimeout(() => document.getElementById('chat-composer-input')?.focus(), 0);
+  }, []);
+
   return {
     sessions,
     sessionId,
@@ -1250,6 +1333,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     disabledReason,
     sendDisabledReason,
     errorMessage,
+    commandNotice,
     latestResponse: latestResponse as ChatCompletionResponse | null,
     latestResponseText,
     documentSources,
@@ -1260,6 +1344,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     retrySessionLoad,
     startNewConversation,
     setDraft,
+    selectWorkbenchCommand,
     loadDocumentSources,
     setSelectedDocumentSource,
     sendMessage,
@@ -1597,6 +1682,12 @@ const definitiveDurableMutationConflictCodes: Record<DurableMutationKind, Readon
     'workbench_agent_run_active',
     'workbench_lease_fence_rejected'
   ]),
+  SubmitInput: new Set([
+    'operation_id_payload_mismatch',
+    'workbench_chat_session_mismatch',
+    'workbench_agent_run_active',
+    'workbench_lease_fence_rejected'
+  ]),
   CancelRun: new Set([
     'operation_id_payload_mismatch',
     'workbench_lease_fence_rejected'
@@ -1623,7 +1714,7 @@ function isDefinitiveDurableMutationRejection(
     return true;
   }
 
-  if (kind !== 'SubmitRun' || error.status !== 503) {
+  if ((kind !== 'SubmitRun' && kind !== 'SubmitInput') || error.status !== 503) {
     return false;
   }
 
@@ -1632,6 +1723,19 @@ function isDefinitiveDurableMutationRejection(
     Boolean(body.message?.trim()) &&
     Boolean(body.failureCategory?.trim()) &&
     body.retryable === false;
+}
+
+function readCommandErrorBody(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    return { error: null, message: null, rawCommandToken: null };
+  }
+
+  const value = body as Record<string, unknown>;
+  return {
+    error: typeof value.error === 'string' ? value.error : null,
+    message: typeof value.message === 'string' ? value.message : null,
+    rawCommandToken: typeof value.rawCommandToken === 'string' ? value.rawCommandToken : null
+  };
 }
 
 function readApiErrorCode(body: unknown) {

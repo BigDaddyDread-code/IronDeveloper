@@ -4343,6 +4343,99 @@ p {
   font-size: 12px;
 }
 
+.chat-command-notice {
+  display: grid;
+  gap: 3px;
+  border: 1px solid #b9d6e6;
+  border-radius: 6px;
+  background: #f3f9fc;
+  padding: 8px 10px;
+  color: var(--fl-ink2);
+  font-size: 13px;
+}
+
+.chat-command-notice p {
+  color: var(--fl-muted);
+  font-size: 12px;
+}
+
+.chat-command-notice--ticket {
+  border-color: #d4c6a1;
+  background: #fbf8ef;
+}
+
+.chat-command-menu {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--fl-line);
+  padding-top: 8px;
+}
+
+.chat-command-menu__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--fl-ink2);
+  font-size: 12px;
+}
+
+.chat-command-menu__heading small {
+  color: var(--fl-muted);
+}
+
+.chat-command-menu__items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.chat-command-menu__items button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border: 1px solid var(--fl-line2);
+  border-radius: 6px;
+  background: #f8fafb;
+  color: var(--fl-ink);
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-command-menu__items button:hover,
+.chat-command-menu__items button:focus-visible {
+  border-color: var(--fl-blue);
+  background: #f1f6f9;
+}
+
+.chat-command-menu__items code {
+  border-radius: 4px;
+  background: #e8eef2;
+  padding: 2px 5px;
+  color: var(--fl-ink2);
+  font-size: 12px;
+}
+
+.chat-command-menu__items span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.chat-command-menu__items strong,
+.chat-command-menu__items small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-command-menu__items small {
+  color: var(--fl-muted);
+  font-size: 11px;
+}
+
 .chat-message__delivery-state {
   margin-top: 6px;
 }

@@ -456,6 +456,48 @@ export interface SubmitWorkbenchAgentRunResult {
   isReplay: boolean;
 }
 
+export interface SubmitWorkbenchInputRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+  chatSessionId: number | null;
+  composerText: string;
+}
+
+export interface SubmitWorkbenchCommandResult {
+  kind: 'Help' | 'Ticket';
+  projectId: number;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+  normalizedCommand: '/help' | '/ticket';
+  instruction: string | null;
+  title: string;
+  message: string;
+  isReplay: boolean;
+  agentRun: null;
+  rawCommandToken: null;
+  reasonCode: null;
+}
+
+export interface SubmitWorkbenchAgentInputResult {
+  kind: 'AgentRun';
+  projectId: number;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+  normalizedCommand: null;
+  instruction: null;
+  title: null;
+  message: null;
+  isReplay: boolean;
+  agentRun: SubmitWorkbenchAgentRunResult;
+  rawCommandToken: null;
+  reasonCode: null;
+}
+
+export type SubmitWorkbenchInputResult = SubmitWorkbenchCommandResult | SubmitWorkbenchAgentInputResult;
+
 export interface WorkbenchAgentRunSnapshot {
   agentRunId: string;
   tenantId: number;

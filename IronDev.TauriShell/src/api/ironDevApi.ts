@@ -111,6 +111,8 @@ import type {
   StartProjectResponse,
   SubmitWorkbenchAgentRunRequest,
   SubmitWorkbenchAgentRunResult,
+  SubmitWorkbenchInputRequest,
+  SubmitWorkbenchInputResult,
   WorkbenchProjectEntryContext,
   WorkbenchAgentRunSnapshot,
   ProjectTicket,
@@ -941,6 +943,22 @@ class IronDevApiClient {
     });
     if (!isSubmitWorkbenchAgentRunResult(result, projectId, request)) {
       throw new IronDevApiProtocolError('AgentRun submission');
+    }
+    return result;
+  }
+
+  async submitWorkbenchInput(
+    projectId: number,
+    request: SubmitWorkbenchInputRequest,
+    signal?: AbortSignal
+  ): Promise<SubmitWorkbenchInputResult> {
+    const result = await this.request<unknown>(`/api/workbench/projects/${projectId}/inputs`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+    if (!isSubmitWorkbenchInputResult(result, projectId, request)) {
+      throw new IronDevApiProtocolError('Workbench input submission');
     }
     return result;
   }
@@ -1815,6 +1833,52 @@ function isSubmitWorkbenchAgentRunResult(
     value.clientOperationId === request.clientOperationId &&
     isTimestampString(value.createdAtUtc) &&
     typeof value.isReplay === 'boolean';
+}
+
+function isSubmitWorkbenchInputResult(
+  value: unknown,
+  projectId: number,
+  request: SubmitWorkbenchInputRequest
+): value is SubmitWorkbenchInputResult {
+  if (!isJsonRecord(value)) {
+    return false;
+  }
+
+  const commonMatches = value.projectId === projectId &&
+    value.workbenchSessionId === request.workbenchSessionId &&
+    value.leaseEpoch === request.leaseEpoch &&
+    value.clientOperationId === request.clientOperationId &&
+    typeof value.isReplay === 'boolean';
+  if (!commonMatches) {
+    return false;
+  }
+
+  if (value.kind === 'AgentRun') {
+    return value.normalizedCommand === null &&
+      value.instruction === null &&
+      value.title === null &&
+      value.message === null &&
+      value.rawCommandToken === null &&
+      value.reasonCode === null &&
+      isSubmitWorkbenchAgentRunResult(value.agentRun, projectId, {
+        workbenchSessionId: request.workbenchSessionId,
+        leaseEpoch: request.leaseEpoch,
+        clientOperationId: request.clientOperationId,
+        chatSessionId: request.chatSessionId ?? 0,
+        message: request.composerText.trim()
+      });
+  }
+
+  const commandMatchesKind =
+    (value.kind === 'Help' && value.normalizedCommand === '/help') ||
+    (value.kind === 'Ticket' && value.normalizedCommand === '/ticket');
+  return commandMatchesKind &&
+    (value.instruction === null || typeof value.instruction === 'string') &&
+    isNonEmptyString(value.title) &&
+    isNonEmptyString(value.message) &&
+    value.agentRun === null &&
+    value.rawCommandToken === null &&
+    value.reasonCode === null;
 }
 
 function isCancelWorkbenchAgentRunResult(
