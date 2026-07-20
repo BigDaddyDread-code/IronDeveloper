@@ -217,11 +217,14 @@ foreach ($sourceRoot in $sourceRoots) {
 Add-Check -Name "Deprecated active terminology" -Passed ($deprecatedHits.Count -eq 0) -Detail $(if ($deprecatedHits.Count) { ($deprecatedHits -join "; ") } else { "0 deprecated phrases in canonical docs or user-facing source" })
 
 $routeFailures = [System.Collections.Generic.List[string]]::new()
+$knownWorkbenchCommandTokens = @("/help", "/ticket")
 foreach ($entry in $entries | Where-Object { $_.Status -eq "Canonical" }) {
     $fullPath = Join-Path $repoRoot ($entry.Path.Replace("/", "\"))
     $text = Get-Content -LiteralPath $fullPath -Raw
     foreach ($match in [Regex]::Matches($text, '`(?<route>/[^`\s]+)`')) {
         $routeReference = $match.Groups["route"].Value
+        $normalizedSlashToken = $routeReference.Trim().TrimEnd(".", ",", ";").ToLowerInvariant()
+        if ($normalizedSlashToken -in $knownWorkbenchCommandTokens) { continue }
         if ($routeReference -match '^/api/' -or $routeReference -match '^/[A-Za-z]:') { continue }
         if (-not (Test-KnownProductRoute $routeReference)) {
             $routeFailures.Add("$($entry.Path) -> $routeReference")
