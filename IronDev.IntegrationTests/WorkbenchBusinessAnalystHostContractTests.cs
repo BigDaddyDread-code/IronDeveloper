@@ -318,6 +318,93 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
     }
 
     [TestMethod]
+    public async Task ModelGateway_LocalTestRegenerationUsesReviewedEditsResolutionsAndProvenance()
+    {
+        var setId = Guid.Parse("66666666-6666-4666-8666-666666666666");
+        var reviewed = new TicketProposalSetDocument(
+            setId,
+            ProjectId: 7,
+            WorkbenchSessionId: 70,
+            LeaseEpoch: 4,
+            Revision: 3,
+            BasedOnUnderstandingRevision: 3,
+            TicketProposalSetStatuses.Ready,
+            "Reviewed sign-in boundary.",
+            [new TicketProposalDocument(
+                Guid.Parse("77777777-7777-4777-8777-777777777777"),
+                "User-edited sign-in",
+                "Members cannot enter reliably.",
+                "Add the reviewed sign-in flow.",
+                ["A valid member can sign in."],
+                [],
+                1,
+                [7001])],
+            [new TicketProposalIssueDocument(
+                Guid.Parse("88888888-8888-4888-8888-888888888888"),
+                TicketProposalIssueKinds.Question,
+                "Which identity is in scope?",
+                TicketProposalIssueStatuses.Resolved,
+                "Use email-only identity for v0.1.",
+                [7001])],
+            [],
+            [7001],
+            Guid.Parse("99999999-9999-4999-8999-999999999999"),
+            DateTime.UnixEpoch,
+            DateTime.UnixEpoch.AddMinutes(1));
+        var context = Context() with
+        {
+            AgentRunId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            SourceUserMessageId = 7002,
+            Messages =
+            [
+                .. Context().Messages,
+                new WorkbenchAgentContextMessage(
+                    7002,
+                    "user",
+                    "/ticket keep recovery independent",
+                    DateTime.UnixEpoch.AddMinutes(2))
+            ],
+            PromptVersion = WorkbenchBusinessAnalystContract.PromptVersion3,
+            ContextSchemaVersion = WorkbenchBusinessAnalystContract.ContextSchemaVersion3,
+            ContextCanonicalizationVersion = WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion3,
+            OutputSchemaVersion = WorkbenchBusinessAnalystContract.OutputSchemaVersion3,
+            ContextHash = new string('c', 64),
+            InvocationKind = WorkbenchAgentInvocationKinds.TicketProposalRegeneration,
+            TicketInstruction = "keep recovery independent",
+            TicketProposalSetId = setId,
+            TicketProposalRevision = 3,
+            TicketProposalSnapshotJson = TicketProposalSetDocumentCodec.Serialize(reviewed)
+        };
+        var gateway = new WorkbenchBusinessAnalystModelGateway(
+            new RecordingResolver(new SkeletonAgentLlm
+            {
+                Role = SkeletonAgentRole.Analyst,
+                Llm = new RecordingLlmService("unused"),
+                Provider = "openai",
+                Model = "unused",
+                TimeoutSeconds = 60
+            }),
+            EffectiveProfileService(HostileEffectiveProfile()).Object,
+            Configuration(localTestDeterministicEnabled: true),
+            new TestHostEnvironment("LocalTest"));
+        var contract = new WorkbenchBusinessAnalystExecutableContractRegistry().Resolve(context);
+
+        var prepared = await gateway.PrepareAsync(context, contract, PromptParts());
+        var output = WorkbenchBusinessAnalystOutputValidator.DeserializeAndValidate(
+            (await prepared.Invocation.InvokeProviderAsync()).Output,
+            context);
+
+        Assert.AreEqual(WorkbenchAgentRunStates.Completed, output.Outcome);
+        Assert.IsNotNull(output.TicketProposalSet);
+        var proposal = output.TicketProposalSet.Proposals.Single();
+        Assert.AreEqual("User-edited sign-in", proposal.Title);
+        StringAssert.Contains(proposal.ProposedChange, "Use email-only identity for v0.1.");
+        StringAssert.Contains(proposal.ProposedChange, "keep recovery independent");
+        CollectionAssert.Contains(output.TicketProposalSet.SourceMessageIds.ToArray(), 7001L);
+        CollectionAssert.Contains(output.TicketProposalSet.SourceMessageIds.ToArray(), 7002L);
+    }
+
+    [TestMethod]
     public async Task ModelGateway_BindsPromptAndProviderProvenanceToOneEffectiveProfileSnapshot()
     {
         var context = Context();

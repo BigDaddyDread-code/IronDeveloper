@@ -247,6 +247,18 @@ public sealed class ChatController : ControllerBase
             snapshot.BaDraft));
     }
 
+    [HttpGet("api/projects/{projectId:int}/chat/messages/{messageId:long}")]
+    public async Task<ActionResult<ChatMessage>> GetMessage(
+        int projectId,
+        long messageId,
+        CancellationToken ct = default)
+    {
+        if (!await HasProjectAccessAsync(projectId, ct)) return ProjectNotFound();
+
+        var message = await _chat.GetMessageByIdAsync(messageId, projectId, ct).ConfigureAwait(false);
+        return message is null ? NotFound() : Ok(message);
+    }
+
     [HttpPost("api/projects/{projectId:int}/chat/sessions/{sessionId:long}/messages")]
     public async Task<ActionResult<long>> SaveMessage(int projectId, long sessionId, SaveProjectChatMessageRequest request, CancellationToken ct)
     {
