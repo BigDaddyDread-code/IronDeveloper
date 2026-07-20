@@ -472,6 +472,9 @@ try {
              ,@{ Name = "Project understanding one revision per AgentRun"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.ProjectUnderstandings') AND name=N'UX_ProjectUnderstandings_AgentRun' AND is_unique=1 AND has_filter=1" }
              ,@{ Name = "Project rename proposals table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.ProjectRenameProposals', N'U') IS NULL THEN 0 ELSE 1 END" }
              ,@{ Name = "Project rename proposal pending-project uniqueness"; Sql = "SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.ProjectRenameProposals') AND name=N'UX_ProjectRenameProposals_PendingProject' AND is_unique=1 AND has_filter=1" }
+             ,@{ Name = "Workbench command rejection table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.WorkbenchCommandRejections', N'U') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Workbench command rejection exact fence foreign key"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.WorkbenchCommandRejections') AND name=N'FK_WorkbenchCommandRejections_ExactFence' AND is_not_trusted=0" }
+             ,@{ Name = "Workbench command rejection operation uniqueness"; Sql = "SELECT COUNT(*) FROM sys.key_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.WorkbenchCommandRejections') AND name=N'UQ_WorkbenchCommandRejections_Operation'" }
              ,@{ Name = "Client operation agent-run result column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ClientOperations', N'ResultAgentRunId') IS NULL THEN 0 ELSE 1 END" }
              ,@{ Name = "Workbench outbox typed agent-run column"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.WorkbenchOutboxEvents', N'AgentRunId') IS NULL THEN 0 ELSE 1 END" }
              ,@{ Name = "Workbench outbox agent-run foreign key"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.WorkbenchOutboxEvents') AND name=N'FK_WorkbenchOutboxEvents_AgentRun' AND is_not_trusted=0" }

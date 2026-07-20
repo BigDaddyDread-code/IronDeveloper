@@ -118,6 +118,7 @@ export function ChatRoute({
         documentSourceLoadState={chat.documentSourceLoadState}
         documentSourceError={chat.documentSourceError}
         selectedDocumentSource={chat.selectedDocumentSource}
+        commandNotice={chat.commandNotice}
         errorMessage={chat.errorMessage}
         latestResponse={chat.latestResponse}
         latestResponseText={chat.latestResponseText}
@@ -132,6 +133,7 @@ export function ChatRoute({
           }
         }}
         onComposerChange={chat.setDraft}
+        onSelectCommand={chat.selectWorkbenchCommand}
         onSend={chat.sendMessage}
         onCancelAgentRun={chat.cancelAgentRun}
         onLoadDocumentSources={chat.loadDocumentSources}

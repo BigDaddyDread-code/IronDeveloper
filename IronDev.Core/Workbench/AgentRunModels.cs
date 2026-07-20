@@ -21,6 +21,7 @@ public static class WorkbenchAgentRunStates
 
 public static class WorkbenchAgentRunOperationKinds
 {
+    public const string DispatchInput = "DispatchWorkbenchInput";
     public const string Submit = "SubmitWorkbenchAgentRun";
     public const string Cancel = "CancelWorkbenchAgentRun";
 }

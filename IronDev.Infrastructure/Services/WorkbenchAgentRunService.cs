@@ -1284,6 +1284,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         if (command.Message.Length > WorkbenchBusinessAnalystProviderContract.MaximumConversationMessageCharacters)
             throw new WorkbenchAgentRunValidationException(
                 $"message exceeds the {WorkbenchBusinessAnalystProviderContract.MaximumConversationMessageCharacters} character limit.");
+        if (WorkbenchInputRouter.Parse(command.Message).IsCommand)
+            throw new WorkbenchCommandRoutingRequiredException();
     }
 
     private static async Task<bool> CanAccessProjectAsync(
@@ -2119,6 +2121,25 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
 
     internal static string ComputeHash(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
+    internal static string BuildInputResourceScope(int projectId, long workbenchSessionId) =>
+        $"project:{projectId}:workbench-session:{workbenchSessionId}:input";
+
+    internal static string ComputeInputPayloadHash(
+        int projectId,
+        long workbenchSessionId,
+        long leaseEpoch,
+        long? chatSessionId,
+        string composerText) =>
+        ComputeHash(JsonSerializer.Serialize(new
+        {
+            v = 1,
+            projectId,
+            workbenchSessionId,
+            leaseEpoch,
+            chatSessionId,
+            message = composerText
+        }, JsonOptions));
 
     private sealed class ClientOperationRow
     {

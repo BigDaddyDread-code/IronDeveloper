@@ -155,6 +155,8 @@ public sealed class WorkbenchAgentRunsController : ControllerBase
     {
         WorkbenchAgentRunValidationException validation =>
             BadRequest(new { error = "workbench_agent_run_invalid", message = validation.Message }),
+        WorkbenchCommandRoutingRequiredException routing =>
+            BadRequest(new { error = WorkbenchCommandRoutingRequiredException.ErrorCode, message = routing.Message }),
         ProjectStartOperationMismatchException mismatch =>
             Conflict(new { error = ProjectStartOperationMismatchException.ErrorCode, message = mismatch.Message }),
         WorkbenchChatSessionBindingException binding =>

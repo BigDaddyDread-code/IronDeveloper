@@ -89,18 +89,18 @@ The current Workshop conversation-authority preview can run beside the earlier p
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -EnableConversationAuthority -PreviewId workbench-pr02c-b `
-  -ApiBaseUrl http://127.0.0.1:5250 -UiPort 5231
+  -EnableConversationAuthority -PreviewId workbench-pr03 `
+  -ApiBaseUrl http://127.0.0.1:5280 -UiPort 5261
 ```
 
-Sign in, open or create a repository-free project, and send a Workshop message. The UI displays the durable Project Understanding beside the conversation, including fact confidence, provenance, user locks, explicit conflicts, pending project-name proposals, and read-only operational status. Conversation execution remains server-owned and fenced.
+Sign in, open or create a repository-free project, and use the Workshop composer. `/help` and `/ticket` are exact deterministic commands; command tokens are case-insensitive and may carry a plain-language instruction. Unknown slash tokens are rejected before any Business Analyst call, leave the full composer text client-side, and create only a hash-bound rejection audit. Ordinary phrases such as `create tickets` remain normal BA conversation. Project Understanding remains durable and repository-independent.
 
 To exercise the deterministic rename flow, send `Rename project to CalmPlan` as its own Workshop message and accept the proposal in Project Context.
 
 With that preview running, the lower-level submit/worker/stateless-host continuity proof is also available:
 
 ```powershell
-.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5250 -PreviewId workbench-pr02c-b
+.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5280 -PreviewId workbench-pr03
 ```
 
 The proof verifies the preview-scoped database's hash-only preparation record and exact three read-only snapshot-tool records, then prints the project and chat IDs plus a preview-pinned follow-up command. Restart the same preview without `-Reset`, run that follow-up, and the continuity marker must come from the durable Workbench context rather than provider-side conversation memory.
