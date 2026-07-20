@@ -644,6 +644,7 @@ public abstract class ApiTestBase
             IF COL_LENGTH('dbo.ClientOperations', 'ResultAgentRunId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations SET ResultAgentRunId=NULL;';
             IF OBJECT_ID('dbo.WorkbenchOutboxEvents', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchOutboxEvents;
+            IF OBJECT_ID('dbo.ProjectRenameProposals', 'U') IS NOT NULL DELETE FROM dbo.ProjectRenameProposals;
             IF OBJECT_ID('dbo.WorkbenchBusinessAnalystInvocationAudits', 'U') IS NOT NULL
             BEGIN
                 IF OBJECT_ID('dbo.TR_WorkbenchBusinessAnalystInvocationAudits_BlockUpdateDelete', 'TR') IS NOT NULL
