@@ -40,7 +40,10 @@ import type {
   ChatDocumentSource,
   ChatMessage,
   ChatTurnAuditResponse,
+  CancelWorkbenchAgentRunRequest,
+  CancelWorkbenchAgentRunResult,
   ConfirmBaWorkingDraftRequest,
+  CurrentWorkbenchAgentRunResponse,
   ControlledActionRequestCreateRequest,
   ControlledActionRequestCreateResponse,
   CreateTenantUserRequest,
@@ -99,7 +102,10 @@ import type {
   ProjectFileSummary,
   ProjectSummary,
   StartProjectResponse,
+  SubmitWorkbenchAgentRunRequest,
+  SubmitWorkbenchAgentRunResult,
   WorkbenchProjectEntryContext,
+  WorkbenchAgentRunSnapshot,
   ProjectTicket,
   RunReviewPackage,
   RunTicketReviewRequest,
@@ -149,6 +155,13 @@ export class IronDevApiError extends Error {
 
   get isAuthFailure() {
     return this.status === 401 || this.status === 403;
+  }
+}
+
+class IronDevApiProtocolError extends Error {
+  constructor(operation: string) {
+    super(`${operation} returned an invalid success response.`);
+    this.name = 'IronDevApiProtocolError';
   }
 }
 
@@ -862,6 +875,69 @@ class IronDevApiClient {
     });
   }
 
+  async submitWorkbenchAgentRun(
+    projectId: number,
+    request: SubmitWorkbenchAgentRunRequest,
+    signal?: AbortSignal
+  ): Promise<SubmitWorkbenchAgentRunResult> {
+    const result = await this.request<unknown>(`/api/workbench/projects/${projectId}/agent-runs`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+    if (!isSubmitWorkbenchAgentRunResult(result, projectId, request)) {
+      throw new IronDevApiProtocolError('AgentRun submission');
+    }
+    return result;
+  }
+
+  async getWorkbenchAgentRun(
+    projectId: number,
+    agentRunId: string,
+    signal?: AbortSignal
+  ): Promise<WorkbenchAgentRunSnapshot> {
+    return this.request<WorkbenchAgentRunSnapshot>(
+      `/api/workbench/projects/${projectId}/agent-runs/${encodeURIComponent(agentRunId)}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getCurrentWorkbenchAgentRun(
+    projectId: number,
+    workbenchSessionId: number,
+    leaseEpoch: number,
+    chatSessionId: number | null,
+    signal?: AbortSignal
+  ): Promise<CurrentWorkbenchAgentRunResponse> {
+    const query = new URLSearchParams({
+      workbenchSessionId: String(workbenchSessionId),
+      leaseEpoch: String(leaseEpoch)
+    });
+    if (chatSessionId !== null) {
+      query.set('chatSessionId', String(chatSessionId));
+    }
+    return this.request<CurrentWorkbenchAgentRunResponse>(
+      `/api/workbench/projects/${projectId}/agent-runs/current?${query.toString()}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async cancelWorkbenchAgentRun(
+    projectId: number,
+    agentRunId: string,
+    request: CancelWorkbenchAgentRunRequest,
+    signal?: AbortSignal
+  ): Promise<CancelWorkbenchAgentRunResult> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/agent-runs/${encodeURIComponent(agentRunId)}/cancel`,
+      { method: 'POST', body: request, signal }
+    );
+    if (!isCancelWorkbenchAgentRunResult(result, agentRunId, request.clientOperationId)) {
+      throw new IronDevApiProtocolError('AgentRun cancellation');
+    }
+    return result;
+  }
+
   async getProjectChatSessions(projectId: number, signal?: AbortSignal): Promise<ProjectChatSession[]> {
     return this.request<ProjectChatSession[]>(`/api/projects/${projectId}/chat/sessions`, {
       method: 'GET',
@@ -892,11 +968,15 @@ class IronDevApiClient {
     request: SaveProjectChatSessionRequest,
     signal?: AbortSignal
   ): Promise<number> {
-    return this.request<number>(`/api/projects/${projectId}/chat/sessions`, {
+    const result = await this.request<unknown>(`/api/projects/${projectId}/chat/sessions`, {
       method: 'POST',
       body: { ...request, projectId },
       signal
     });
+    if (!isPositiveInteger(result)) {
+      throw new IronDevApiProtocolError('Conversation creation');
+    }
+    return result;
   }
 
   async getProjectChatMessages(projectId: number, sessionId: number, signal?: AbortSignal): Promise<ChatMessage[]> {
@@ -1649,6 +1729,87 @@ class IronDevApiClient {
 
     return JSON.parse(text) as T;
   }
+}
+
+const workbenchAgentRunStatuses = new Set([
+  'Pending',
+  'Running',
+  'NeedsInput',
+  'Completed',
+  'Failed',
+  'Cancelled',
+  'Superseded',
+  'Stale'
+]);
+
+function isSubmitWorkbenchAgentRunResult(
+  value: unknown,
+  projectId: number,
+  request: SubmitWorkbenchAgentRunRequest
+): value is SubmitWorkbenchAgentRunResult {
+  if (!isJsonRecord(value)) {
+    return false;
+  }
+
+  return isNonEmptyUuidString(value.agentRunId) &&
+    value.projectId === projectId &&
+    value.workbenchSessionId === request.workbenchSessionId &&
+    value.leaseEpoch === request.leaseEpoch &&
+    value.chatSessionId === request.chatSessionId &&
+    isPositiveInteger(value.userMessageId) &&
+    value.status === 'Pending' &&
+    value.clientOperationId === request.clientOperationId &&
+    isTimestampString(value.createdAtUtc) &&
+    typeof value.isReplay === 'boolean';
+}
+
+function isCancelWorkbenchAgentRunResult(
+  value: unknown,
+  agentRunId: string,
+  clientOperationId: string
+): value is CancelWorkbenchAgentRunResult {
+  if (!isJsonRecord(value)) {
+    return false;
+  }
+
+  return isNonEmptyUuidString(value.agentRunId) &&
+    value.agentRunId === agentRunId &&
+    isWorkbenchAgentRunStatus(value.status) &&
+    value.status !== 'Pending' &&
+    value.status !== 'Running' &&
+    typeof value.cancellationRequested === 'boolean' &&
+    (!value.cancellationRequested || value.status === 'Cancelled') &&
+    value.clientOperationId === clientOperationId &&
+    typeof value.isReplay === 'boolean';
+}
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isUuidString(value: unknown): value is string {
+  return isNonEmptyString(value) &&
+    /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isNonEmptyUuidString(value: unknown): value is string {
+  return isUuidString(value) && value !== '00000000-0000-0000-0000-000000000000';
+}
+
+function isTimestampString(value: unknown): value is string {
+  return isNonEmptyString(value) && Number.isFinite(Date.parse(value));
+}
+
+function isWorkbenchAgentRunStatus(value: unknown): value is SubmitWorkbenchAgentRunResult['status'] {
+  return typeof value === 'string' && workbenchAgentRunStatuses.has(value);
 }
 
 type RawSkeletonAgentProfile = Omit<SkeletonAgentProfile, 'role' | 'provider'> & {

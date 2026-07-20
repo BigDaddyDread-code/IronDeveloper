@@ -6,7 +6,7 @@ namespace IronDev.Api.Services;
 
 public static partial class WorkbenchReleaseInfoFactory
 {
-    public const string DefaultVersion = "0.1.0-preview.6";
+    public const string DefaultVersion = "0.1.0-preview.7";
     public const string DefaultPreviewId = "default";
 
     public static WorkbenchReleaseInfoDto Create(
@@ -31,6 +31,8 @@ public static partial class WorkbenchReleaseInfoFactory
             Version = version,
             Mode = v2Enabled ? "V2" : "V1",
             V2Enabled = v2Enabled,
+            ConversationAuthorityEnabled = v2Enabled &&
+                configuration.GetValue("WorkbenchV2:ConversationAuthorityEnabled", false),
             V1FallbackEnabled = configuration.GetValue("WorkbenchV2:V1FallbackEnabled", true),
             PreviewId = previewId,
             ApiBuildIdentity = buildIdentity,

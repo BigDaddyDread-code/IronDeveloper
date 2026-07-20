@@ -95,6 +95,12 @@ export function ChatRoute({
         messages={chat.messages}
         composerValue={chat.draft}
         isSending={chat.isSending}
+        isCancellingAgentRun={chat.isCancellingAgentRun}
+        agentRun={chat.agentRun}
+        conversationAuthorityEnabled={chat.conversationAuthorityEnabled}
+        hasUnresolvedDurableOperation={chat.hasUnresolvedDurableOperation}
+        agentCancellationDeliveryUnresolved={chat.agentCancellationDeliveryUnresolved}
+        boundAgentRunChatSessionId={chat.boundAgentRunChatSessionId}
         disabledReason={chat.disabledReason}
         sendDisabledReason={chat.sendDisabledReason}
         documentSources={chat.documentSources}
@@ -110,11 +116,13 @@ export function ChatRoute({
         onCreateChannel={channels.createChannel}
         onRetryChannels={channels.retry}
         onStartNewConversation={() => {
-          chat.startNewConversation();
-          onOpenLanding();
+          if (chat.startNewConversation()) {
+            onOpenLanding();
+          }
         }}
         onComposerChange={chat.setDraft}
         onSend={chat.sendMessage}
+        onCancelAgentRun={chat.cancelAgentRun}
         onLoadDocumentSources={chat.loadDocumentSources}
         onSelectDocumentSource={chat.setSelectedDocumentSource}
         onReviewProjectState={chat.reviewProjectState}

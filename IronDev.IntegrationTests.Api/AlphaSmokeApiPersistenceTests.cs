@@ -606,7 +606,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
     }
 
     [TestMethod]
-    public async Task ConfirmDraft_WithChatFromDifferentProject_Fails()
+    public async Task ConfirmDraft_WithChatFromDifferentProject_IsConcealedAsMissing()
     {
         using var client = Factory.CreateClient();
         await AuthenticateAsync(client);
@@ -627,7 +627,7 @@ public sealed class AlphaSmokeApiPersistenceTests : ApiTestBase
             $"/api/projects/{project.Id}/tickets/draft/confirm",
             CreateRel5Draft(otherProvenance.SessionId, otherProvenance.MessageId));
 
-        await AssertDraftConfirmFailedAsync(response, "ChatSessionProjectMismatch");
+        await AssertDraftConfirmFailedAsync(response, "ChatSessionMissing");
     }
 
     private static async Task<Project> CreateProjectAsync(

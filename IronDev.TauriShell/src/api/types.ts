@@ -37,6 +37,7 @@ export interface WorkbenchReleaseInfo {
   mode: 'V1' | 'V2';
   v2Enabled: boolean;
   v1FallbackEnabled: boolean;
+  conversationAuthorityEnabled?: boolean;
   previewId: string;
   apiBuildIdentity: string;
   apiCommit: string;
@@ -330,6 +331,79 @@ export type SaveProjectChatMessageRequest = Omit<
   leaseEpoch: number;
   clientOperationId: string;
 };
+
+export type WorkbenchAgentRunStatus =
+  | 'Pending'
+  | 'Running'
+  | 'NeedsInput'
+  | 'Completed'
+  | 'Failed'
+  | 'Cancelled'
+  | 'Superseded'
+  | 'Stale';
+
+export interface SubmitWorkbenchAgentRunRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+  chatSessionId: number;
+  message: string;
+}
+
+export interface SubmitWorkbenchAgentRunResult {
+  agentRunId: string;
+  projectId: number;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  chatSessionId: number;
+  userMessageId: number;
+  status: WorkbenchAgentRunStatus;
+  clientOperationId: string;
+  createdAtUtc: string;
+  isReplay: boolean;
+}
+
+export interface WorkbenchAgentRunSnapshot {
+  agentRunId: string;
+  tenantId: number;
+  projectId: number;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  actorUserId: number;
+  chatSessionId: number;
+  sourceUserMessageId: number;
+  status: WorkbenchAgentRunStatus;
+  attemptCount: number;
+  assistantMessageId: number | null;
+  createdAtUtc: string;
+  startedAtUtc: string | null;
+  completedAtUtc: string | null;
+  cancellationRequestedAtUtc: string | null;
+  failureCategory: string | null;
+  retryable: boolean;
+}
+
+export interface CurrentWorkbenchAgentRunResponse {
+  submissionAvailable: boolean;
+  unavailableCategory: string | null;
+  boundChatSessionId: number | null;
+  activeRun: WorkbenchAgentRunSnapshot | null;
+  latestRun: WorkbenchAgentRunSnapshot | null;
+}
+
+export interface CancelWorkbenchAgentRunRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+}
+
+export interface CancelWorkbenchAgentRunResult {
+  agentRunId: string;
+  status: WorkbenchAgentRunStatus;
+  cancellationRequested: boolean;
+  clientOperationId: string;
+  isReplay: boolean;
+}
 
 export type TicketDetailLoadStatus = 'idle' | 'loading' | 'loaded' | 'error';
 export type TicketReadinessLoadStatus = 'idle' | 'loading' | 'loaded' | 'unavailable' | 'error';

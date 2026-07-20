@@ -6,7 +6,7 @@ import { ChatContextPanel } from './ChatContextPanel';
 import { ChatSessionRail } from './ChatSessionRail';
 import { ChatTicketDraftReview } from './ChatTicketDraftReview';
 import { ChatThread } from './ChatThread';
-import type { ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
+import type { ChatAgentRunState, ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 interface ChatWorkspaceProps {
   sessions: ProjectChatSession[];
@@ -18,6 +18,12 @@ interface ChatWorkspaceProps {
   messages: ChatWorkspaceMessage[];
   composerValue: string;
   isSending: boolean;
+  isCancellingAgentRun: boolean;
+  agentRun: ChatAgentRunState | null;
+  conversationAuthorityEnabled: boolean;
+  hasUnresolvedDurableOperation: boolean;
+  agentCancellationDeliveryUnresolved: boolean;
+  boundAgentRunChatSessionId: number | null;
   disabledReason: string | null;
   sendDisabledReason: string | null;
   documentSources: ChatDocumentSource[];
@@ -35,6 +41,7 @@ interface ChatWorkspaceProps {
   onStartNewConversation: () => void;
   onComposerChange: (value: string) => void;
   onSend: (request?: ChatSendRequest) => void;
+  onCancelAgentRun: () => void;
   onLoadDocumentSources: () => void;
   onSelectDocumentSource: (source: ChatDocumentSource | null) => void;
   onReviewProjectState: () => void;
@@ -56,6 +63,12 @@ export function ChatWorkspace({
   messages,
   composerValue,
   isSending,
+  isCancellingAgentRun,
+  agentRun,
+  conversationAuthorityEnabled,
+  hasUnresolvedDurableOperation,
+  agentCancellationDeliveryUnresolved,
+  boundAgentRunChatSessionId,
   disabledReason,
   sendDisabledReason,
   documentSources,
@@ -73,6 +86,7 @@ export function ChatWorkspace({
   onStartNewConversation,
   onComposerChange,
   onSend,
+  onCancelAgentRun,
   onLoadDocumentSources,
   onSelectDocumentSource,
   onReviewProjectState,
@@ -114,6 +128,13 @@ export function ChatWorkspace({
         canCreateChannels={canCreateChannels}
         channelLoadState={channelLoadState}
         channelError={channelError}
+        directNavigationDisabledReason={conversationAuthorityEnabled && hasUnresolvedDurableOperation
+          ? 'Delivery is unresolved. Replay the exact operation before changing conversations.'
+          : conversationAuthorityEnabled && isSending
+            ? 'A governed Business Analyst turn is being submitted or processed.'
+          : conversationAuthorityEnabled && boundAgentRunChatSessionId !== null
+            ? 'The active Workbench session is bound to this governed conversation.'
+            : null}
         isOpen={isSessionRailOpen}
         onClose={() => setIsSessionRailOpen(false)}
         onOpenSession={onOpenSession}
@@ -130,7 +151,7 @@ export function ChatWorkspace({
           <div>
             <h1>Workshop</h1>
             <p>
-              {projectLabel} <span aria-hidden="true">/</span> Direct with Workshop guide
+              {projectLabel} <span aria-hidden="true">/</span> Direct with Business Analyst
             </p>
           </div>
           <div className="chat-page-header__actions">
@@ -158,6 +179,7 @@ export function ChatWorkspace({
             <ChatThread
               messages={messages}
               isSending={isSending}
+              agentRun={agentRun}
               onSaveDiscussion={onSaveDiscussion}
               onViewSources={() => setIsContextOpen(true)}
               onReviewProjectState={onReviewProjectState}
@@ -167,6 +189,10 @@ export function ChatWorkspace({
             <ChatComposer
               value={composerValue}
               isSending={isSending}
+              isCancellingAgentRun={isCancellingAgentRun}
+              agentRun={agentRun}
+              conversationAuthorityEnabled={conversationAuthorityEnabled}
+              agentCancellationDeliveryUnresolved={agentCancellationDeliveryUnresolved}
               disabledReason={disabledReason}
               sendDisabledReason={sendDisabledReason}
               documentSources={documentSources}
@@ -175,6 +201,7 @@ export function ChatWorkspace({
               selectedDocumentSource={selectedDocumentSource}
               onChange={onComposerChange}
               onSend={() => onSend()}
+              onCancelAgentRun={onCancelAgentRun}
               onLoadDocumentSources={onLoadDocumentSources}
               onSelectDocumentSource={onSelectDocumentSource}
             />

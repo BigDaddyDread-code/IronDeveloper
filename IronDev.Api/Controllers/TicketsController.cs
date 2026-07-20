@@ -299,8 +299,8 @@ public sealed class TicketsController : ControllerBase
             });
         }
 
-        var session = await _chatHistory.GetSessionByIdAsync(request.SourceChatSessionId.Value, ct);
-        if (session is null || session.ProjectId != projectId)
+        var session = await _chatHistory.GetSessionByIdAsync(projectId, request.SourceChatSessionId.Value, ct);
+        if (session is null)
         {
             return BadRequest(new
             {
@@ -1033,19 +1033,12 @@ public sealed class TicketsController : ControllerBase
         var sessionId = draft.SourceChatSessionId;
         var messageId = draft.SourceMessageId;
 
-        var session = await _chatHistory.GetSessionByIdAsync(sessionId, ct);
+        var session = await _chatHistory.GetSessionByIdAsync(projectId, sessionId, ct);
         if (session is null)
         {
             return ChatProvenanceValidation.Invalid(
                 "ChatSessionMissing",
                 "The supplied source chat session was not found for the current tenant.");
-        }
-
-        if (session.ProjectId != projectId)
-        {
-            return ChatProvenanceValidation.Invalid(
-                "ChatSessionProjectMismatch",
-                "The supplied source chat session does not belong to this project.");
         }
 
         var message = await _chatHistory.GetMessageByIdAsync(messageId, projectId, ct);

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Dapper;
+using IronDev.Core.Agents;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Workbench;
 using IronDev.Data;
@@ -30,6 +31,7 @@ public sealed class WorkbenchBusinessAnalystPreparationAuditStoreTests : Integra
         await ApplyMigrationAsync("migrate_workbench_project_start.sql");
         await ApplyMigrationAsync("migrate_workbench_agent_runs.sql");
         await ApplyMigrationAsync("migrate_workbench_ba_preparation_audit.sql");
+        await ApplyMigrationAsync("migrate_workbench_ba_invocation_audit.sql");
     }
 
     [TestMethod]
@@ -191,6 +193,99 @@ public sealed class WorkbenchBusinessAnalystPreparationAuditStoreTests : Integra
             CreateStore().RecordAsync(provenance));
     }
 
+    [TestMethod]
+    public async Task InvocationAudit_RecordsOnlySafeMetadataAndIdenticalReplayIsIdempotent()
+    {
+        var claim = await CreateClaimAsync("Safe Analyst invocation audit");
+        await CreateStore().RecordAsync(CreateProvenance(claim));
+        var audit = new WorkbenchBusinessAnalystInvocationAudit
+        {
+            AgentRunId = claim.AgentRunId,
+            ClaimToken = claim.ClaimToken,
+            AttemptNumber = claim.AttemptCount,
+            SafeRequestId = $"ba-{claim.AgentRunId:N}",
+            ProviderRequestId = "req_safe_123",
+            UsageReported = true,
+            Usage = new AgentModelUsage { InputTokens = 321, OutputTokens = 45 },
+            DurationMilliseconds = 678,
+            Outcome = WorkbenchBusinessAnalystInvocationOutcome.Succeeded,
+            CompletedAtUtc = DateTimeOffset.UtcNow
+        };
+        var store = new SqlWorkbenchBusinessAnalystInvocationAuditStore(ConnectionFactory());
+
+        var first = await store.RecordAsync(audit);
+        var replay = await store.RecordAsync(audit);
+
+        Assert.AreEqual(WorkbenchBusinessAnalystInvocationAuditWriteStatus.Recorded, first.Status);
+        Assert.AreEqual(WorkbenchBusinessAnalystInvocationAuditWriteStatus.AlreadyExists, replay.Status);
+        Assert.AreEqual(first.InvocationHash, replay.InvocationHash);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var state = await connection.QuerySingleAsync<InvocationAuditState>("""
+            SELECT SafeRequestId, ProviderRequestId, UsageReported,
+                   InputTokens, OutputTokens, DurationMilliseconds,
+                   Outcome, FailureCategory
+            FROM dbo.WorkbenchBusinessAnalystInvocationAudits
+            WHERE AgentRunId=@AgentRunId
+              AND ClaimToken=@ClaimToken
+              AND AttemptNumber=@AttemptNumber;
+            """, new { claim.AgentRunId, claim.ClaimToken, AttemptNumber = claim.AttemptCount });
+        Assert.AreEqual(audit.SafeRequestId, state.SafeRequestId);
+        Assert.AreEqual("req_safe_123", state.ProviderRequestId);
+        Assert.IsTrue(state.UsageReported);
+        Assert.AreEqual(321, state.InputTokens);
+        Assert.AreEqual(45, state.OutputTokens);
+        Assert.AreEqual(678L, state.DurationMilliseconds);
+        Assert.AreEqual("Succeeded", state.Outcome);
+        Assert.IsNull(state.FailureCategory);
+
+        var forbiddenPayloadColumns = await connection.ExecuteScalarAsync<int>("""
+            SELECT COUNT(1)
+            FROM sys.columns
+            WHERE object_id=OBJECT_ID(N'dbo.WorkbenchBusinessAnalystInvocationAudits')
+              AND name IN
+                (N'RawPrompt', N'PromptText', N'RawModelOutput', N'CompletionText',
+                 N'ChainOfThought', N'ApiKey', N'Secret');
+            """);
+        Assert.AreEqual(0, forbiddenPayloadColumns);
+
+        var appendOnly = await Assert.ThrowsExactlyAsync<SqlException>(() => connection.ExecuteAsync("""
+            UPDATE dbo.WorkbenchBusinessAnalystInvocationAudits
+            SET DurationMilliseconds=1
+            WHERE AgentRunId=@AgentRunId;
+            """, new { claim.AgentRunId }));
+        StringAssert.Contains(appendOnly.Message, "append-only");
+    }
+
+    [TestMethod]
+    public async Task InvocationAudit_RejectsMismatchedAttemptUnsafeIdentifiersAndDifferentReplay()
+    {
+        var claim = await CreateClaimAsync("Fenced Analyst invocation audit");
+        await CreateStore().RecordAsync(CreateProvenance(claim));
+        var audit = new WorkbenchBusinessAnalystInvocationAudit
+        {
+            AgentRunId = claim.AgentRunId,
+            ClaimToken = claim.ClaimToken,
+            AttemptNumber = claim.AttemptCount,
+            SafeRequestId = $"ba-{claim.AgentRunId:N}",
+            UsageReported = false,
+            DurationMilliseconds = 50,
+            Outcome = WorkbenchBusinessAnalystInvocationOutcome.Failed,
+            FailureCategory = "agent_provider_timeout",
+            CompletedAtUtc = DateTimeOffset.UtcNow
+        };
+        var store = new SqlWorkbenchBusinessAnalystInvocationAuditStore(ConnectionFactory());
+
+        await Assert.ThrowsExactlyAsync<WorkbenchBusinessAnalystInvocationAuditConflictException>(() =>
+            store.RecordAsync(audit with { ClaimToken = Guid.NewGuid() }));
+        await Assert.ThrowsExactlyAsync<WorkbenchBusinessAnalystInvocationAuditValidationException>(() =>
+            store.RecordAsync(audit with { ProviderRequestId = "unsafe\r\nheader" }));
+
+        await store.RecordAsync(audit);
+        await Assert.ThrowsExactlyAsync<WorkbenchBusinessAnalystInvocationAuditConflictException>(() =>
+            store.RecordAsync(audit with { DurationMilliseconds = 51 }));
+    }
+
     private async Task<WorkbenchAgentRunClaim> CreateClaimAsync(string projectName)
     {
         var actorUserId = await SeedActorAsync();
@@ -204,7 +299,8 @@ public sealed class WorkbenchBusinessAnalystPreparationAuditStoreTests : Integra
             """, new { start.ProjectId });
         var runService = new WorkbenchAgentRunService(
             ConnectionFactory(),
-            ServiceProvider.GetRequiredService<IChatTurnPersistenceService>());
+            ServiceProvider.GetRequiredService<IChatTurnPersistenceService>(),
+            availability: new AlwaysAvailableWorkbenchAgentRunSubmissionAvailability());
         var submitted = await runService.SubmitAsync(new SubmitWorkbenchAgentRunCommand(
             1,
             actorUserId,
@@ -327,5 +423,17 @@ public sealed class WorkbenchBusinessAnalystPreparationAuditStoreTests : Integra
     {
         public int Preparations { get; init; }
         public int ToolCalls { get; init; }
+    }
+
+    private sealed class InvocationAuditState
+    {
+        public string SafeRequestId { get; init; } = string.Empty;
+        public string? ProviderRequestId { get; init; }
+        public bool UsageReported { get; init; }
+        public int? InputTokens { get; init; }
+        public int? OutputTokens { get; init; }
+        public long DurationMilliseconds { get; init; }
+        public string Outcome { get; init; } = string.Empty;
+        public string? FailureCategory { get; init; }
     }
 }

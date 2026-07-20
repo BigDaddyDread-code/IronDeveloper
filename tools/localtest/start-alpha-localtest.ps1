@@ -7,6 +7,7 @@ param(
     [switch]$FreshSession,
     [switch]$BrowserOnly,
     [switch]$EnableSandboxApply,
+    [switch]$EnableConversationAuthority,
     [switch]$UseV1
 )
 
@@ -42,8 +43,9 @@ $uiErr = Join-Path $sessionRoot "ui.stderr.log"
 $sessionManifestPath = Join-Path $sessionRoot "session-manifest.json"
 $previewArgument = if ($PreviewId -eq "default") { "" } else { " -PreviewId $PreviewId" }
 $v1Argument = if ($UseV1) { " -UseV1" } else { "" }
-$resetCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset$previewArgument$v1Argument"
-$sandboxApplyRestartCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply$previewArgument$v1Argument"
+$conversationAuthorityArgument = if ($EnableConversationAuthority) { " -EnableConversationAuthority" } else { "" }
+$resetCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset$previewArgument$conversationAuthorityArgument$v1Argument"
+$sandboxApplyRestartCommand = ".\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -EnableSandboxApply$previewArgument$conversationAuthorityArgument$v1Argument"
 $sessionMode = if ($EnableSandboxApply) { "ProjectFeatureWork" } else { "SmokeSimulation" }
 $sandboxApplyRequested = [bool]$EnableSandboxApply
 $sandboxApplyEnabled = $false
@@ -54,6 +56,12 @@ $sessionCapabilities = if ($EnableSandboxApply) {
     @("ProjectFeatureWork", "ControlledSandboxApply")
 } else {
     @("WorkflowSmokeSimulation")
+}
+if ($EnableConversationAuthority) {
+    if ($UseV1) {
+        throw "Conversation authority cannot be enabled while the V1 fallback is selected."
+    }
+    $sessionCapabilities += "WorkbenchConversationAuthority"
 }
 $configuredDatabaseName = [string]$seedContract.database.name
 $apiBuildIdentity = $null
@@ -424,6 +432,7 @@ try {
         LocalTest__WeaviatePrefix = if ($PreviewId -eq "default") { "irondev_test" } else { "irondev_test_$($PreviewId.Replace('-', '_'))" }
         WorkbenchV2__Version = $workbenchVersion
         WorkbenchV2__Enabled = (-not [bool]$UseV1).ToString().ToLowerInvariant()
+        WorkbenchV2__ConversationAuthorityEnabled = ([bool]$EnableConversationAuthority).ToString().ToLowerInvariant()
         WorkbenchV2__V1FallbackEnabled = "true"
         WorkbenchV2__PreviewId = $PreviewId
         SkeletonApply__Enabled = $sandboxApplyEnabled.ToString().ToLowerInvariant()

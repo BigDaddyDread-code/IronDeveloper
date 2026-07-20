@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Dapper;
 using IronDev.Core;
 using IronDev.Core.Agents.Concrete;
+using IronDev.Core.Workbench;
 using IronDev.Infrastructure.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -90,6 +91,9 @@ public abstract class ApiTestBase
                     {
                         services.RemoveAll<ILLMService>();
                         services.AddScoped<ILLMService, FakeLlmService>();
+                        services.RemoveAll<IWorkbenchAgentRunSubmissionAvailability>();
+                        services.AddSingleton<IWorkbenchAgentRunSubmissionAvailability,
+                            AlwaysAvailableWorkbenchAgentRunSubmissionAvailability>();
                         services.RemoveAll<IStoredManualIndependentCriticAgentService>();
                         services.AddScoped<IStoredManualIndependentCriticAgentService, StartupOnlyStoredCriticService>();
                     });
@@ -314,6 +318,8 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_user_mutation_attribution.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_project_start.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_agent_runs.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ba_preparation_audit.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ba_invocation_audit.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -636,6 +642,16 @@ public abstract class ApiTestBase
             IF COL_LENGTH('dbo.ClientOperations', 'ResultAgentRunId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations SET ResultAgentRunId=NULL;';
             IF OBJECT_ID('dbo.WorkbenchOutboxEvents', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchOutboxEvents;
+            IF OBJECT_ID('dbo.WorkbenchBusinessAnalystInvocationAudits', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_WorkbenchBusinessAnalystInvocationAudits_BlockUpdateDelete', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_WorkbenchBusinessAnalystInvocationAudits_BlockUpdateDelete
+                        ON dbo.WorkbenchBusinessAnalystInvocationAudits;
+                DELETE FROM dbo.WorkbenchBusinessAnalystInvocationAudits;
+                IF OBJECT_ID('dbo.TR_WorkbenchBusinessAnalystInvocationAudits_BlockUpdateDelete', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_WorkbenchBusinessAnalystInvocationAudits_BlockUpdateDelete
+                        ON dbo.WorkbenchBusinessAnalystInvocationAudits;
+            END
             IF OBJECT_ID('dbo.WorkbenchBusinessAnalystToolCallAudits', 'U') IS NOT NULL
             BEGIN
                 IF OBJECT_ID('dbo.TR_WorkbenchBusinessAnalystToolCallAudits_BlockUpdateDelete', 'TR') IS NOT NULL

@@ -41,11 +41,11 @@ public sealed class WorkbenchBusinessAnalystAgent : IWorkbenchBusinessAnalystAge
 
         var contract = _contracts.Resolve(context);
         var toolResults = _tools.ReadAll(context, contract);
-        var codeOwnedPrompt = _prompts.Build(context, contract, toolResults);
+        var promptParts = _prompts.Build(context, contract, toolResults);
         var prepared = await _models.PrepareAsync(
                 context,
                 contract,
-                codeOwnedPrompt,
+                promptParts,
                 cancellationToken)
             .ConfigureAwait(false);
 

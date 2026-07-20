@@ -85,16 +85,20 @@ Workbench previews carry a programme version from `workbench-version.json`, the 
 
 The example owns `IronDeveloper_Test_workbench_pr00a`, `C:\IronDevTestWorkspaces\workbench-pr00a`, and `C:\IronDevTestLogs\workbench-pr00a`. Reusing the command resets only those targets. Use different `-ApiBaseUrl` and `-UiPort` values when running two previews at the same time.
 
-The current stateless Business Analyst host preview can run beside the earlier previews:
+The current Workshop conversation-authority preview can run beside the earlier previews. The explicit switch enables the cutover only for this isolated LocalTest session; safe defaults elsewhere remain off:
 
 ```powershell
-.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset -PreviewId workbench-pr02b -ApiBaseUrl http://127.0.0.1:5230 -UiPort 5211
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
+  -EnableConversationAuthority -PreviewId workbench-pr02c-a `
+  -ApiBaseUrl http://127.0.0.1:5240 -UiPort 5221
 ```
 
-With that preview running, exercise the real PR-02B submit, worker, stateless host, and exactly-once materialization path:
+Sign in, open or create a repository-free project, and send a Workshop message. The UI verifies Business Analyst readiness before creating the first conversation, submits one durable AgentRun, shows its queued/running/terminal state, supports cancellation, recovers active or bounded terminal state after reload, and displays only server-owned persisted replies. It intentionally hides document attachment while that context contract is deferred.
+
+With that preview running, the lower-level submit/worker/stateless-host continuity proof is also available:
 
 ```powershell
-.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5230 -PreviewId workbench-pr02b
+.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5240 -PreviewId workbench-pr02c-a
 ```
 
 The proof verifies the preview-scoped database's hash-only preparation record and exact three read-only snapshot-tool records, then prints the project and chat IDs plus a preview-pinned follow-up command. Restart the same preview without `-Reset`, run that follow-up, and the continuity marker must come from the durable Workbench context rather than provider-side conversation memory.

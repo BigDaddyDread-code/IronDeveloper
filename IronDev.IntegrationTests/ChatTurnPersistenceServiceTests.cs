@@ -574,7 +574,7 @@ public sealed class ChatTurnPersistenceServiceTests : IntegrationTestBase
 
         Assert.IsNotNull(await turnPersistence.GetByMessageIdAsync(messageId));
 
-        await chat.DeleteSessionAsync(sessionId);
+        Assert.IsTrue(await chat.DeleteSessionAsync(projectId, sessionId));
 
         Assert.IsNull(await turnPersistence.GetByMessageIdAsync(messageId));
     }

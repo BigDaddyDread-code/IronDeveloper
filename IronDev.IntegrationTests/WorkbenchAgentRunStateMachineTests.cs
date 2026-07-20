@@ -426,7 +426,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
                 new WorkbenchAgentContextAssembler(ConnectionFactory()),
                 cancellation),
             new NeverInvokedAgent(),
-            outbox);
+            outbox,
+            new RecordingInvocationAuditStore());
 
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(() =>
             firstProcessor.ProcessAsync(
@@ -462,7 +463,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             service,
             new WorkbenchAgentContextAssembler(ConnectionFactory()),
             recoveryAgent,
-            outbox);
+            outbox,
+            new RecordingInvocationAuditStore());
 
         await recoveryProcessor.ProcessAsync(recoveryItem, "recovery-worker");
 
@@ -575,7 +577,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             service,
             new WorkbenchAgentContextAssembler(ConnectionFactory()),
             agent,
-            outbox);
+            outbox,
+            new RecordingInvocationAuditStore());
         var item = (await outbox.ReadPendingAsync(10))
             .Single(value => value.AgentRunId == submitted.AgentRunId);
 
@@ -610,11 +613,13 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             fixture.Submit(Guid.NewGuid(), "Time out this provider call safely."));
         var outbox = new WorkbenchAgentRunOutbox(ConnectionFactory());
         var agent = new NonCooperativeTimeoutAgent(TimeSpan.FromMilliseconds(25));
+        var invocationAudit = new RecordingInvocationAuditStore();
         var processor = new WorkbenchAgentRunProcessor(
             service,
             new WorkbenchAgentContextAssembler(ConnectionFactory()),
             agent,
-            outbox);
+            outbox,
+            invocationAudit);
         var item = (await outbox.ReadPendingAsync(10))
             .Single(value => value.AgentRunId == submitted.AgentRunId);
 
@@ -642,6 +647,143 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.AreEqual(0, state.AssistantMessages);
         Assert.AreEqual(0, state.UnfinishedAttempts);
         Assert.AreEqual(WorkbenchAgentRunStates.Failed, state.AttemptOutcome);
+        Assert.AreEqual(1, invocationAudit.Recorded.Count);
+        Assert.AreEqual(
+            WorkbenchBusinessAnalystInvocationOutcome.Failed,
+            invocationAudit.Recorded[0].Outcome);
+        Assert.AreEqual("agent_provider_timeout", invocationAudit.Recorded[0].FailureCategory);
+    }
+
+    [TestMethod]
+    public async Task WorkerCancellationAfterProviderResponse_CommitsAuditAndMaterializationWithoutRecovery()
+    {
+        var fixture = await CreateFixtureAsync("Post-provider cancellation");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Finish this response before shutdown recovery."));
+        var outbox = new WorkbenchAgentRunOutbox(ConnectionFactory());
+        using var workerCancellation = new CancellationTokenSource();
+        var invocationAudit = new CancellingInvocationAuditStore(workerCancellation);
+        var agent = new ValidSchemaAgent("Committed after provider completion.");
+        var processor = new WorkbenchAgentRunProcessor(
+            service,
+            new WorkbenchAgentContextAssembler(ConnectionFactory()),
+            agent,
+            outbox,
+            invocationAudit);
+        var item = (await outbox.ReadPendingAsync(10))
+            .Single(value => value.AgentRunId == submitted.AgentRunId);
+
+        await processor.ProcessAsync(
+            item,
+            "post-provider-cancellation-worker",
+            workerCancellation.Token);
+
+        Assert.IsTrue(workerCancellation.IsCancellationRequested);
+        Assert.IsFalse(invocationAudit.CancellationCanBeCanceled);
+        Assert.AreEqual(1, agent.InvocationCount);
+        Assert.AreEqual(1, invocationAudit.Recorded.Count);
+        Assert.AreEqual(
+            WorkbenchBusinessAnalystInvocationOutcome.Succeeded,
+            invocationAudit.Recorded[0].Outcome);
+        Assert.IsFalse((await outbox.ReadPendingAsync(10))
+            .Any(value => value.AgentRunId == submitted.AgentRunId));
+
+        await using var verify = new SqlConnection(ConnectionString);
+        var state = await verify.QuerySingleAsync<InvocationSafetyState>("""
+            SELECT run.Status, run.DiagnosticCode,
+                   (SELECT COUNT(1) FROM dbo.ChatMessages
+                    WHERE TenantId=run.TenantId AND ProjectId=run.ProjectId AND Role=N'assistant') AS AssistantMessages,
+                   (SELECT COUNT(1) FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=run.AgentRunId AND CompletedAtUtc IS NULL) AS UnfinishedAttempts,
+                   (SELECT TOP (1) Outcome FROM dbo.WorkbenchAgentRunAttempts
+                    WHERE AgentRunId=run.AgentRunId ORDER BY AttemptNumber DESC) AS AttemptOutcome
+            FROM dbo.WorkbenchAgentRuns run
+            WHERE run.AgentRunId=@AgentRunId;
+            """, new { submitted.AgentRunId });
+        Assert.AreEqual(WorkbenchAgentRunStates.Completed, state.Status);
+        Assert.AreEqual(1, state.AssistantMessages);
+        Assert.AreEqual(0, state.UnfinishedAttempts);
+        Assert.AreEqual(WorkbenchAgentRunStates.Completed, state.AttemptOutcome);
+    }
+
+    [TestMethod]
+    public async Task WorkerCancellationDuringProvider_AuditsAbandonedAttemptBeforeRecoveryInvokesAgain()
+    {
+        var fixture = await CreateFixtureAsync("In-provider cancellation recovery");
+        var service = CreateRunService();
+        var submitted = await service.SubmitAsync(
+            fixture.Submit(Guid.NewGuid(), "Recover only after auditing the abandoned call."));
+        var outbox = new WorkbenchAgentRunOutbox(ConnectionFactory());
+        var firstAgent = new NonCooperativeTimeoutAgent(TimeSpan.FromMinutes(1));
+        var invocationAudit = new RecordingInvocationAuditStore();
+        using var workerCancellation = new CancellationTokenSource();
+        var firstProcessor = new WorkbenchAgentRunProcessor(
+            service,
+            new WorkbenchAgentContextAssembler(ConnectionFactory()),
+            firstAgent,
+            outbox,
+            invocationAudit);
+        var item = (await outbox.ReadPendingAsync(10))
+            .Single(value => value.AgentRunId == submitted.AgentRunId);
+
+        var processing = firstProcessor.ProcessAsync(
+            item,
+            "cancelled-provider-worker",
+            workerCancellation.Token);
+        await firstAgent.InvocationStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        workerCancellation.Cancel();
+        try
+        {
+            await processing.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Fail("Worker cancellation must leave the unfinished claim recoverable.");
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        Assert.AreEqual(1, invocationAudit.Recorded.Count);
+        Assert.AreEqual(
+            WorkbenchBusinessAnalystInvocationOutcome.Failed,
+            invocationAudit.Recorded[0].Outcome);
+        Assert.AreEqual("agent_worker_cancelled", invocationAudit.Recorded[0].FailureCategory);
+        Assert.IsFalse(invocationAudit.CancellationCanBeCanceled[0]);
+        firstAgent.FaultAfterTimeout();
+
+        await using (var expire = new SqlConnection(ConnectionString))
+        {
+            await expire.ExecuteAsync("""
+                UPDATE dbo.WorkbenchAgentRuns
+                SET ClaimExpiresAtUtc=DATEADD(SECOND, -1, SYSUTCDATETIME())
+                WHERE AgentRunId=@AgentRunId;
+                """, new { submitted.AgentRunId });
+        }
+
+        var recoveryItem = (await outbox.ReadPendingAsync(10))
+            .Single(value => value.AgentRunId == submitted.AgentRunId);
+        var recoveryAgent = new ValidSchemaAgent("Recovered after an audited cancellation.");
+        var recoveryProcessor = new WorkbenchAgentRunProcessor(
+            service,
+            new WorkbenchAgentContextAssembler(ConnectionFactory()),
+            recoveryAgent,
+            outbox,
+            invocationAudit);
+
+        await recoveryProcessor.ProcessAsync(recoveryItem, "recovery-after-cancellation-worker");
+
+        Assert.AreEqual(1, firstAgent.InvocationCount);
+        Assert.AreEqual(1, recoveryAgent.InvocationCount);
+        Assert.AreEqual(2, invocationAudit.Recorded.Count);
+        CollectionAssert.AreEqual(
+            new[] { 1, 2 },
+            invocationAudit.Recorded.Select(value => value.AttemptNumber).ToArray());
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                WorkbenchBusinessAnalystInvocationOutcome.Failed,
+                WorkbenchBusinessAnalystInvocationOutcome.Succeeded
+            },
+            invocationAudit.Recorded.Select(value => value.Outcome).ToArray());
     }
 
     [TestMethod]
@@ -791,11 +933,13 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         var submitted = await service.SubmitAsync(fixture.Submit(Guid.NewGuid(), "Return a controlled invalid result."));
         var outbox = new WorkbenchAgentRunOutbox(ConnectionFactory());
         var invalidAgent = new InvalidSchemaAgent();
+        var invocationAudit = new RecordingInvocationAuditStore();
         var processor = new WorkbenchAgentRunProcessor(
             service,
             new WorkbenchAgentContextAssembler(ConnectionFactory()),
             invalidAgent,
-            outbox);
+            outbox,
+            invocationAudit);
         var item = (await outbox.ReadPendingAsync(10)).Single(value => value.AgentRunId == submitted.AgentRunId);
 
         await processor.ProcessAsync(item, "schema-test-worker");
@@ -820,6 +964,11 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         Assert.AreEqual(0, state.AssistantMessages);
         Assert.AreEqual(0, state.UnfinishedAttempts);
         Assert.AreEqual("Failed", state.AttemptOutcome);
+        Assert.AreEqual(1, invocationAudit.Recorded.Count);
+        Assert.AreEqual(
+            WorkbenchBusinessAnalystInvocationOutcome.Succeeded,
+            invocationAudit.Recorded[0].Outcome,
+            "Provider success is audited separately from strict output-schema failure.");
     }
 
     [TestMethod]
@@ -1130,7 +1279,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         new(
             ConnectionFactory(),
             ServiceProvider.GetRequiredService<IChatTurnPersistenceService>(),
-            injector);
+            injector,
+            new AlwaysAvailableWorkbenchAgentRunSubmissionAvailability());
 
     private IDbConnectionFactory ConnectionFactory() =>
         ServiceProvider.GetRequiredService<IDbConnectionFactory>();
@@ -1225,6 +1375,7 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
     private async Task DropAgentRunMigrationObjectsAsync()
     {
         await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
         await connection.ExecuteAsync("""
             IF EXISTS
             (
@@ -1233,11 +1384,16 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
                   AND name=N'FK_WorkbenchOutboxEvents_AgentRun'
             )
                 ALTER TABLE dbo.WorkbenchOutboxEvents DROP CONSTRAINT FK_WorkbenchOutboxEvents_AgentRun;
-            DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystToolCallAudits;
-            DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystPreparations;
-            DROP TABLE IF EXISTS dbo.WorkbenchAgentRunAttempts;
-            DROP TABLE IF EXISTS dbo.WorkbenchAgentRuns;
             """);
+
+        // Keep each dependency level in its own batch. SQL Server validates DROP TABLE
+        // references while compiling a batch, so combining child and parent drops can
+        // reject the parent after the provider-invocation audit adds another FK level.
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystInvocationAudits;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystToolCallAudits;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystPreparations;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchAgentRunAttempts;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchAgentRuns;");
     }
 
     private static string RepositoryRoot()
@@ -1382,7 +1538,10 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
     private sealed class ValidSchemaAgent(string assistantMessage) : IWorkbenchBusinessAnalystAgent
     {
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+        private int _invocationCount;
+
         public string? ContextHash { get; private set; }
+        public int InvocationCount => _invocationCount;
 
         public Task<IWorkbenchBusinessAnalystPreparedInvocation> PrepareAsync(
             WorkbenchAgentRunClaim claim,
@@ -1391,9 +1550,12 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         {
             ContextHash = context.ContextHash;
             return Task.FromResult<IWorkbenchBusinessAnalystPreparedInvocation>(new PreparedInvocation(_ =>
-                Task.FromResult(JsonSerializer.Serialize(
+            {
+                Interlocked.Increment(ref _invocationCount);
+                return Task.FromResult(JsonSerializer.Serialize(
                     ValidOutput(context, assistantMessage),
-                    JsonOptions))));
+                    JsonOptions));
+            }));
         }
     }
 
@@ -1402,9 +1564,16 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         TimeSpan? providerTimeout = null) : IWorkbenchBusinessAnalystPreparedInvocation
     {
         public TimeSpan ProviderTimeout { get; } = providerTimeout ?? TimeSpan.FromMinutes(1);
+        public string SafeRequestId { get; } = "ba-state-machine-test";
 
-        public Task<string> InvokeProviderAsync(CancellationToken cancellationToken = default) =>
-            invoke(cancellationToken);
+        public async Task<WorkbenchBusinessAnalystProviderResponse> InvokeProviderAsync(
+            CancellationToken cancellationToken = default) =>
+            new()
+            {
+                Output = await invoke(cancellationToken),
+                SafeRequestId = "ba-state-machine-test",
+                DurationMilliseconds = 0
+            };
     }
 
     private sealed class PreparationMutationAgent(Func<Task> mutateAuthority) : IWorkbenchBusinessAnalystAgent
@@ -1577,5 +1746,54 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         public int AssistantMessages { get; init; }
         public int UnfinishedAttempts { get; init; }
         public string? AttemptOutcome { get; init; }
+    }
+
+    private sealed class RecordingInvocationAuditStore
+        : IWorkbenchBusinessAnalystInvocationAuditStore
+    {
+        public List<WorkbenchBusinessAnalystInvocationAudit> Recorded { get; } = [];
+        public List<bool> CancellationCanBeCanceled { get; } = [];
+
+        public Task<WorkbenchBusinessAnalystInvocationAuditWriteResult> RecordAsync(
+            WorkbenchBusinessAnalystInvocationAudit audit,
+            CancellationToken cancellationToken = default)
+        {
+            CancellationCanBeCanceled.Add(cancellationToken.CanBeCanceled);
+            var normalized = WorkbenchBusinessAnalystInvocationAuditCanonicalizer
+                .NormalizeAndValidate(audit);
+            Recorded.Add(normalized);
+            return Task.FromResult(new WorkbenchBusinessAnalystInvocationAuditWriteResult
+            {
+                Status = WorkbenchBusinessAnalystInvocationAuditWriteStatus.Recorded,
+                InvocationHash = WorkbenchBusinessAnalystInvocationAuditCanonicalizer
+                    .ComputeHash(normalized)
+            });
+        }
+    }
+
+    private sealed class CancellingInvocationAuditStore(
+        CancellationTokenSource workerCancellation)
+        : IWorkbenchBusinessAnalystInvocationAuditStore
+    {
+        public List<WorkbenchBusinessAnalystInvocationAudit> Recorded { get; } = [];
+        public bool CancellationCanBeCanceled { get; private set; }
+
+        public Task<WorkbenchBusinessAnalystInvocationAuditWriteResult> RecordAsync(
+            WorkbenchBusinessAnalystInvocationAudit audit,
+            CancellationToken cancellationToken = default)
+        {
+            CancellationCanBeCanceled = cancellationToken.CanBeCanceled;
+            workerCancellation.Cancel();
+            cancellationToken.ThrowIfCancellationRequested();
+            var normalized = WorkbenchBusinessAnalystInvocationAuditCanonicalizer
+                .NormalizeAndValidate(audit);
+            Recorded.Add(normalized);
+            return Task.FromResult(new WorkbenchBusinessAnalystInvocationAuditWriteResult
+            {
+                Status = WorkbenchBusinessAnalystInvocationAuditWriteStatus.Recorded,
+                InvocationHash = WorkbenchBusinessAnalystInvocationAuditCanonicalizer
+                    .ComputeHash(normalized)
+            });
+        }
     }
 }

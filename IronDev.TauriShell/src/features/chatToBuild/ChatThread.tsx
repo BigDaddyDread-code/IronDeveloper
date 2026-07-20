@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import type { ChatWorkspaceMessage } from './chatTypes';
+import type { ChatAgentRunState, ChatWorkspaceMessage } from './chatTypes';
 import { ChatMessage } from './ChatMessage';
 
 interface ChatThreadProps {
   messages: ChatWorkspaceMessage[];
   isSending: boolean;
+  agentRun: ChatAgentRunState | null;
   onSaveDiscussion?: (messageId: string) => void;
   onViewSources?: (messageId: string) => void;
   onReviewProjectState: () => void;
@@ -20,6 +21,7 @@ const starters = [
 export function ChatThread({
   messages,
   isSending,
+  agentRun,
   onSaveDiscussion,
   onViewSources,
   onReviewProjectState,
@@ -41,7 +43,7 @@ export function ChatThread({
           <h2>What would you like to work on?</h2>
           <p>Start with the current project, or describe the work in your own words.</p>
           <div className="chat-empty-state__starters" aria-label="Conversation starters">
-            <button type="button" onClick={onReviewProjectState}>Review the current project</button>
+            <button type="button" onClick={onReviewProjectState}>Review current project understanding</button>
             {starters.map((starter) => (
               <button key={starter.label} type="button" onClick={() => onStartDraft(starter.prompt)}>
                 {starter.label}
@@ -62,7 +64,11 @@ export function ChatThread({
           <div ref={bottomRef} />
         </div>
       )}
-      {isSending ? <p className="chat-thread__sending" data-testid="chat.sending">Sending...</p> : null}
+      {isSending ? (
+        <p className="chat-thread__sending" data-testid="chat.sending">
+          {agentRun?.status === 'Pending' ? 'Business Analyst queued...' : agentRun?.status === 'Running' ? 'Business Analyst is working...' : 'Sending...'}
+        </p>
+      ) : null}
     </section>
   );
 }

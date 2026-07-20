@@ -2152,7 +2152,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    projectId: string;
+                    projectId: number;
                 };
                 cookie?: never;
             };
@@ -11129,8 +11129,91 @@ export interface paths {
                         "text/json": components["schemas"]["ProblemDetails"];
                     };
                 };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/agent-runs/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    workbenchSessionId?: number;
+                    leaseEpoch?: number;
+                    chatSessionId?: number;
+                };
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkbenchAgentRunRecoveryContext"];
+                        "application/json": components["schemas"]["WorkbenchAgentRunRecoveryContext"];
+                        "text/json": components["schemas"]["WorkbenchAgentRunRecoveryContext"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -17846,6 +17929,14 @@ export interface components {
         UpdateLocalPathRequest: {
             localPath?: string | null;
         };
+        WorkbenchAgentRunRecoveryContext: {
+            submissionAvailable?: boolean;
+            unavailableCategory?: string | null;
+            /** Format: int64 */
+            boundChatSessionId?: number | null;
+            activeRun?: components["schemas"]["WorkbenchAgentRunSnapshot"];
+            latestRun?: components["schemas"]["WorkbenchAgentRunSnapshot"];
+        };
         WorkbenchAgentRunSnapshot: {
             /** Format: uuid */
             agentRunId?: string;
@@ -17876,6 +17967,8 @@ export interface components {
             completedAtUtc?: string | null;
             /** Format: date-time */
             cancellationRequestedAtUtc?: string | null;
+            failureCategory?: string | null;
+            retryable?: boolean;
         };
         WorkbenchProjectEntryContext: {
             /** Format: int32 */

@@ -29,7 +29,8 @@ public sealed class WorkbenchBusinessAnalystExecutableContractRegistry
             WorkbenchAgentRunStates.Completed,
             WorkbenchAgentRunStates.NeedsInput
         ],
-        MaximumAssistantMessageCharacters = 100_000,
+        MaximumAssistantMessageCharacters =
+            WorkbenchBusinessAnalystProviderContract.MaximumAssistantMessageCharacters,
         AllowsAdditionalProperties = false
     };
 

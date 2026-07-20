@@ -2354,6 +2354,29 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Stores deterministic hashes and bounded safe summaries for the effective profile, actual model preparation, and fixed read-only snapshot tools. Raw prompts, tool payloads, model output, and chain-of-thought are deliberately excluded."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-ba-invocation-audit",
+                        "path":  "Database/migrate_workbench_ba_invocation_audit.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.WorkbenchBusinessAnalystInvocationAudits",
+                                               "exact invocation-to-preparation binding",
+                                               "append-only invocation audit trigger"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.WorkbenchAgentRuns",
+                                              "dbo.WorkbenchAgentRunAttempts",
+                                              "dbo.WorkbenchBusinessAnalystPreparations"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-02C-A role-aware Business Analyst provider boundary"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Stores only sanitized request identifiers, reported token counts, duration, and success/failure category. Raw prompts, completions, secrets, and private reasoning are deliberately excluded."
                     }
                 ]
 }
