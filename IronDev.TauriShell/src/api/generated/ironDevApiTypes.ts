@@ -11350,6 +11350,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/inputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DispatchWorkbenchInputRequest"];
+                    "text/json": components["schemas"]["DispatchWorkbenchInputRequest"];
+                    "application/*+json": components["schemas"]["DispatchWorkbenchInputRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["DispatchWorkbenchInputResult"];
+                        "application/json": components["schemas"]["DispatchWorkbenchInputResult"];
+                        "text/json": components["schemas"]["DispatchWorkbenchInputResult"];
+                    };
+                };
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["DispatchWorkbenchInputResult"];
+                        "application/json": components["schemas"]["DispatchWorkbenchInputResult"];
+                        "text/json": components["schemas"]["DispatchWorkbenchInputResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workbench/projects/{projectId}/open": {
         parameters: {
             query?: never;
@@ -13583,6 +13679,36 @@ export interface components {
             projectRoot?: string | null;
             /** Format: int32 */
             projectId?: number;
+        };
+        DispatchWorkbenchInputRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            chatSessionId?: number | null;
+            composerText?: string | null;
+        };
+        DispatchWorkbenchInputResult: {
+            kind?: string | null;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            normalizedCommand?: string | null;
+            instruction?: string | null;
+            title?: string | null;
+            message?: string | null;
+            isReplay?: boolean;
+            agentRun?: components["schemas"]["SubmitWorkbenchAgentRunResult"];
+            rawCommandToken?: string | null;
+            reasonCode?: string | null;
         };
         DogfoodLoopBoundaryStatusDto: {
             dogfoodReceiptIsReleaseApproval?: boolean;
