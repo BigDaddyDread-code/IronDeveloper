@@ -22,8 +22,9 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
 
         EnsureExactContract(context, contract, toolResults);
         var snapshotJson = BuildSnapshotJson(context, contract, toolResults);
-        var outputExample = contract.Output.SchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion1
-            ? $$"""
+        var outputExample = contract.Output.SchemaVersion switch
+        {
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion1 => $$"""
               {
                 "outputSchemaVersion": {{contract.Output.SchemaVersion}},
                 "contextHash": "{{context.ContextHash}}",
@@ -31,8 +32,8 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
                 "outcome": "Completed or NeedsInput",
                 "assistantMessage": "A non-empty user-facing shaping response"
               }
-              """
-            : $$"""
+              """,
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion2 => $$"""
               {
                 "outputSchemaVersion": {{contract.Output.SchemaVersion}},
                 "contextHash": "{{context.ContextHash}}",
@@ -53,17 +54,66 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
                 },
                 "renameProposal": null
               }
-              """;
-        var mutationPolicy = contract.Output.SchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion1
-            ? "This compatibility schema cannot propose project-understanding changes or a rename."
-            : """
+              """,
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion3 => $$"""
+              {
+                "outputSchemaVersion": {{contract.Output.SchemaVersion}},
+                "contextHash": "{{context.ContextHash}}",
+                "basedOnUnderstandingRevision": {{context.UnderstandingRevision}},
+                "outcome": "Completed or NeedsInput",
+                "assistantMessage": "A concise summary of the generated proposal set or required input",
+                "understandingPatch": null,
+                "renameProposal": null,
+                "ticketProposalSet": {
+                  "splitReason": "Why this is the appropriate user-outcome decomposition, or null",
+                  "proposals": [
+                    {
+                      "proposalKey": "proposal-1",
+                      "title": "User-visible outcome",
+                      "problem": "Problem and user impact",
+                      "proposedChange": "Bounded product change",
+                      "acceptanceCriteria": ["Observable acceptance result"],
+                      "dependencies": [],
+                      "suggestedOrder": 1,
+                      "sourceMessageIds": [{{context.SourceUserMessageId}}]
+                    }
+                  ],
+                  "openQuestions": [],
+                  "potentialConflicts": [],
+                  "sourceMessageIds": [{{context.SourceUserMessageId}}]
+                }
+              }
+              """,
+            _ => throw new InvalidOperationException("The executable Business Analyst output schema is unsupported.")
+        };
+        var mutationPolicy = contract.Output.SchemaVersion switch
+        {
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion1 =>
+                "This compatibility schema cannot propose project-understanding changes or a rename.",
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion2 => """
               understandingPatch.factChanges may contain only the listed product-intent keys. Cite only user
               message IDs present in the frozen snapshot. Mark a fact Confirmed only when a cited user message
               explicitly states it; otherwise use Inferred. Never emit Unknown, Conflicted, or userLocked: the
               server owns conflict and lock semantics. Use an empty factChanges array when nothing safe changed.
               renameProposal must be null or contain proposedName, sourceMessageIds, and evidenceSummary. It is
               only a proposal; the server will not rename the project without an explicit user acceptance.
-              """;
+              """,
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion3 => """
+              This is a trusted ticket-proposal-purpose invocation. understandingPatch and renameProposal must
+              both be null. Analyze only the frozen same-project discussion and captured understanding. Return
+              zero proposals with NeedsInput and at least one open question or potential conflict, or return one
+              to five proposals with Completed. Split by independent user-visible outcomes, acceptance boundaries,
+              dependencies, delivery order, and independent risk or validation; never split solely by technical
+              layer. proposalKey values are unique local tokens. Dependencies cite proposalKey values and must
+              precede dependants. suggestedOrder is contiguous from one. Every proposal and the set cite only user
+              message IDs present in the frozen snapshot. The server owns all durable IDs. These are pre-commit
+              proposals only: do not claim that permanent tickets were created. For a regeneration invocation,
+              CurrentTicketProposalSet is the exact immutable reviewed revision. Apply the user's regeneration
+              instruction to that snapshot, including resolved questions and conflicts, instead of reconstructing
+              or ignoring the reviewed state.
+              """,
+            _ => throw new InvalidOperationException("The executable Business Analyst output schema is unsupported.")
+        };
 
         var immutablePolicy = $$"""
             ## Immutable code-owned Workbench Business Analyst contract
@@ -128,6 +178,12 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
         WorkbenchBusinessAnalystExecutableContractDescriptor contract,
         IReadOnlyList<WorkbenchBusinessAnalystSnapshotToolResult> toolResults)
     {
+        JsonElement? currentTicketProposalSet = null;
+        if (context.TicketProposalSnapshotJson is not null)
+        {
+            using var proposalDocument = JsonDocument.Parse(context.TicketProposalSnapshotJson);
+            currentTicketProposalSet = proposalDocument.RootElement.Clone();
+        }
         var tools = toolResults.Select(result =>
         {
             using var payload = JsonDocument.Parse(result.PayloadJson);
@@ -149,6 +205,11 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
                 context.ChatSessionId,
                 context.SourceUserMessageId,
                 context.UnderstandingRevision,
+                context.InvocationKind,
+                context.TicketInstruction,
+                context.TicketProposalSetId,
+                context.TicketProposalRevision,
+                CurrentTicketProposalSet = currentTicketProposalSet,
                 Contract = new
                 {
                     contract.Key.AgentVersion,
@@ -184,6 +245,11 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
             {
                 "outputSchemaVersion", "contextHash", "basedOnUnderstandingRevision", "outcome", "assistantMessage",
                 "understandingPatch", "renameProposal"
+            },
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion3 => new[]
+            {
+                "outputSchemaVersion", "contextHash", "basedOnUnderstandingRevision", "outcome", "assistantMessage",
+                "understandingPatch", "renameProposal", "ticketProposalSet"
             },
             _ => throw new InvalidOperationException("The executable Business Analyst output schema is unsupported.")
         };

@@ -11,7 +11,7 @@ namespace IronDev.IntegrationTests.Api;
 public sealed class WorkbenchInputApiTests : ApiTestBase
 {
     [TestMethod]
-    public async Task Commands_AreDeterministicIdempotentPrivateAndNeverStartTheBusinessAnalyst()
+    public async Task Commands_AreDeterministicIdempotentPrivateAndOnlyTicketStartsTheBusinessAnalyst()
     {
         var token = await SelectTenantAsync(await LoginAsync());
         using var client = GetAuthedClient(token);
@@ -55,11 +55,14 @@ public sealed class WorkbenchInputApiTests : ApiTestBase
                 chatSessionId,
                 composerText = "/TiCkEt   focus on the login flow"
             });
-        Assert.AreEqual(HttpStatusCode.OK, ticketResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Accepted, ticketResponse.StatusCode);
         var ticket = await ticketResponse.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.AreEqual("Ticket", ticket.GetProperty("kind").GetString());
+        Assert.AreEqual("AgentRun", ticket.GetProperty("kind").GetString());
         Assert.AreEqual("/ticket", ticket.GetProperty("normalizedCommand").GetString());
         Assert.AreEqual("focus on the login flow", ticket.GetProperty("instruction").GetString());
+        Assert.AreEqual(
+            "TicketProposalGeneration",
+            ticket.GetProperty("agentRun").GetProperty("invocationKind").GetString());
 
         const string privateInstruction = "do-not-store-this-rejected-payload";
         var unknownOperationId = Guid.NewGuid();
@@ -121,11 +124,11 @@ public sealed class WorkbenchInputApiTests : ApiTestBase
                  WHERE ClientOperationId=@UnknownOperationId) AS PayloadHash,
                 (SELECT MAX(ReasonCode) FROM dbo.WorkbenchCommandRejections
                  WHERE ClientOperationId=@UnknownOperationId) AS ReasonCode,
-                (SELECT COUNT(1) FROM dbo.WorkbenchAgentRuns WHERE ProjectId=@ProjectId) AS AgentRuns,
-                (SELECT COUNT(1) FROM dbo.ChatMessages WHERE ProjectId=@ProjectId) AS ChatMessages,
-                (SELECT COUNT(1) FROM dbo.WorkbenchBusinessAnalystPreparations preparation
-                 INNER JOIN dbo.WorkbenchAgentRuns run ON run.AgentRunId=preparation.AgentRunId
-                 WHERE run.ProjectId=@ProjectId) AS Preparations,
+                (SELECT COUNT(1) FROM dbo.WorkbenchAgentRuns
+                 WHERE ProjectId=@ProjectId AND InvocationKind=N'TicketProposalGeneration') AS AgentRuns,
+                (SELECT COUNT(1) FROM dbo.ChatMessages
+                 WHERE ProjectId=@ProjectId AND Role=N'user'
+                   AND Message=N'/TiCkEt   focus on the login flow') AS ChatMessages,
                 (SELECT COUNT(1) FROM dbo.ClientOperations
                  WHERE ClientOperationId=@UnknownOperationId
                    AND CanonicalResultJson LIKE N'%' + @PrivateInstruction + N'%')
@@ -148,9 +151,8 @@ public sealed class WorkbenchInputApiTests : ApiTestBase
         Assert.AreEqual("/tickte", state.RawCommandToken);
         Assert.AreEqual(64, state.PayloadHash?.Length);
         Assert.AreEqual("UnknownCommand", state.ReasonCode);
-        Assert.AreEqual(0, state.AgentRuns);
-        Assert.AreEqual(0, state.ChatMessages);
-        Assert.AreEqual(0, state.Preparations);
+        Assert.AreEqual(1, state.AgentRuns);
+        Assert.AreEqual(1, state.ChatMessages);
         Assert.AreEqual(0, state.PrivatePayloadCopies);
     }
 
@@ -296,7 +298,6 @@ public sealed class WorkbenchInputApiTests : ApiTestBase
         public string? ReasonCode { get; init; }
         public int AgentRuns { get; init; }
         public int ChatMessages { get; init; }
-        public int Preparations { get; init; }
         public int PrivatePayloadCopies { get; init; }
     }
 

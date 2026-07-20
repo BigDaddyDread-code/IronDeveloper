@@ -55,15 +55,20 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
     {
         ValidateSubmit(command);
 
-        var resourceScope = $"project:{command.ProjectId}:workbench-session:{command.WorkbenchSessionId}:chat:{command.ChatSessionId}";
+        var resourceScope =
+            $"project:{command.ProjectId}:workbench-session:{command.WorkbenchSessionId}:chat:{command.ChatSessionId}:purpose:{command.InvocationKind}:proposal-set:{command.TicketProposalSetId?.ToString("D") ?? "new"}";
         var payloadHash = ComputeHash(JsonSerializer.Serialize(new
         {
-            v = 1,
+            v = 2,
             command.ProjectId,
             command.WorkbenchSessionId,
             command.LeaseEpoch,
             command.ChatSessionId,
-            message = command.Message
+            message = command.Message,
+            command.InvocationKind,
+            command.TicketInstruction,
+            command.TicketProposalSetId,
+            command.ExpectedTicketProposalRevision
         }, JsonOptions));
 
         using var connection = _connections.CreateConnection();
@@ -123,6 +128,24 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     cancellationToken))
                 throw new WorkbenchLeaseFenceException();
 
+            if (command.InvocationKind == WorkbenchAgentInvocationKinds.TicketProposalRegeneration)
+            {
+                var proposalSet = await connection.QuerySingleOrDefaultAsync<ExistingTicketProposalSetRow>(new CommandDefinition(
+                    """
+                    SELECT Id, CurrentRevision, CreatedByAgentRunId, CreatedAtUtc
+                    FROM dbo.TicketProposalSets WITH (UPDLOCK, HOLDLOCK)
+                    WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@TicketProposalSetId
+                      AND WorkbenchSessionId=@WorkbenchSessionId AND LeaseEpoch=@LeaseEpoch;
+                    """,
+                    command,
+                    transaction,
+                    cancellationToken: cancellationToken));
+                if (proposalSet is null)
+                    throw new WorkbenchProjectNotAccessibleException();
+                if (proposalSet.CurrentRevision != command.ExpectedTicketProposalRevision)
+                    throw new TicketProposalRevisionConflictException(proposalSet.CurrentRevision);
+            }
+
             var chatSessionExists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
                 """
                 SELECT COUNT(1)
@@ -164,6 +187,22 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
 
             var agentRunId = Guid.NewGuid();
             var createdAtUtc = DateTime.UtcNow;
+            var ticketProposalSetId = command.InvocationKind == WorkbenchAgentInvocationKinds.TicketProposalGeneration
+                ? Guid.NewGuid()
+                : command.TicketProposalSetId;
+            var proposalPurpose = WorkbenchAgentInvocationKinds.IsTicketProposal(command.InvocationKind);
+            var promptVersion = proposalPurpose
+                ? WorkbenchBusinessAnalystContract.PromptVersion3
+                : WorkbenchBusinessAnalystContract.PromptVersion2;
+            var contextSchemaVersion = proposalPurpose
+                ? WorkbenchBusinessAnalystContract.ContextSchemaVersion3
+                : WorkbenchBusinessAnalystContract.ContextSchemaVersion2;
+            var contextCanonicalizationVersion = proposalPurpose
+                ? WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion3
+                : WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2;
+            var outputSchemaVersion = proposalPurpose
+                ? WorkbenchBusinessAnalystContract.OutputSchemaVersion3
+                : WorkbenchBusinessAnalystContract.OutputSchemaVersion2;
 
             var clientOperationRecordId = await connection.QuerySingleAsync<long>(new CommandDefinition(
                 """
@@ -215,12 +254,16 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     (AgentRunId, TenantId, ProjectId, WorkbenchSessionId, LeaseEpoch, ActorUserId,
                      ChatSessionId, SourceUserMessageId, ClientOperationRecordId, ClientOperationId,
                      AgentVersion, PromptVersion, ToolPolicyVersion, ContextSchemaVersion,
-                     ContextCanonicalizationVersion, OutputSchemaVersion, Status, ActiveRunSlot, CreatedAtUtc)
+                     ContextCanonicalizationVersion, OutputSchemaVersion, InvocationKind,
+                     TicketInstruction, TicketProposalSetId, TicketProposalRevision,
+                     Status, ActiveRunSlot, CreatedAtUtc)
                 VALUES
                     (@AgentRunId, @TenantId, @ProjectId, @WorkbenchSessionId, @LeaseEpoch, @ActorUserId,
                      @ChatSessionId, @SourceUserMessageId, @ClientOperationRecordId, @ClientOperationId,
                      @AgentVersion, @PromptVersion, @ToolPolicyVersion, @ContextSchemaVersion,
-                     @ContextCanonicalizationVersion, @OutputSchemaVersion, N'Pending', 1, @CreatedAtUtc);
+                     @ContextCanonicalizationVersion, @OutputSchemaVersion, @InvocationKind,
+                     @TicketInstruction, @TicketProposalSetId, @TicketProposalRevision,
+                     N'Pending', 1, @CreatedAtUtc);
                 """,
                 new
                 {
@@ -235,11 +278,15 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     ClientOperationRecordId = clientOperationRecordId,
                     command.ClientOperationId,
                     AgentVersion = WorkbenchBusinessAnalystContract.AgentVersion,
-                    PromptVersion = WorkbenchBusinessAnalystContract.PromptVersion,
+                    PromptVersion = promptVersion,
                     ToolPolicyVersion = WorkbenchBusinessAnalystContract.ToolPolicyVersion,
-                    ContextSchemaVersion = WorkbenchBusinessAnalystContract.ContextSchemaVersion,
-                    ContextCanonicalizationVersion = WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion,
-                    OutputSchemaVersion = WorkbenchBusinessAnalystContract.OutputSchemaVersion,
+                    ContextSchemaVersion = contextSchemaVersion,
+                    ContextCanonicalizationVersion = contextCanonicalizationVersion,
+                    OutputSchemaVersion = outputSchemaVersion,
+                    command.InvocationKind,
+                    command.TicketInstruction,
+                    TicketProposalSetId = ticketProposalSetId,
+                    TicketProposalRevision = command.ExpectedTicketProposalRevision,
                     CreatedAtUtc = createdAtUtc
                 },
                 transaction,
@@ -256,7 +303,10 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 WorkbenchAgentRunStates.Pending,
                 command.ClientOperationId,
                 createdAtUtc,
-                IsReplay: false);
+                IsReplay: false,
+                command.InvocationKind,
+                ticketProposalSetId,
+                command.ExpectedTicketProposalRevision);
             var canonicalResultJson = JsonSerializer.Serialize(result, JsonOptions);
             var resultHash = ComputeHash(canonicalResultJson);
             var eventPayload = JsonSerializer.Serialize(new
@@ -266,6 +316,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 command.WorkbenchSessionId,
                 command.LeaseEpoch,
                 command.ClientOperationId
+                ,command.InvocationKind
+                ,ticketProposalSetId
             }, JsonOptions);
 
             await connection.ExecuteAsync(new CommandDefinition(
@@ -754,7 +806,11 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 run.ToolPolicyVersion,
                 run.ContextSchemaVersion,
                 run.ContextCanonicalizationVersion,
-                run.OutputSchemaVersion);
+                run.OutputSchemaVersion,
+                run.InvocationKind,
+                run.TicketInstruction,
+                run.TicketProposalSetId,
+                run.TicketProposalRevision);
         }
         catch
         {
@@ -940,7 +996,10 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     run.Status,
                     Materialized: true,
                     run.AssistantMessageId,
-                    IsReplay: true);
+                    IsReplay: true,
+                    RejectionReason: null,
+                    run.TicketProposalSetId,
+                    run.MaterializedTicketProposalRevision);
             }
 
             if (run.Status != WorkbenchAgentRunStates.Running)
@@ -1055,6 +1114,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     connection,
                     transaction,
                     run,
+                    storedContext!,
                     output,
                     cancellationToken))
             {
@@ -1078,6 +1138,14 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             }
 
             await ApplyUnderstandingOutputAsync(
+                connection,
+                transaction,
+                run,
+                storedContext!,
+                output,
+                cancellationToken);
+
+            var materializedTicketProposalRevision = await ApplyTicketProposalOutputAsync(
                 connection,
                 transaction,
                 run,
@@ -1140,6 +1208,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 UPDATE dbo.WorkbenchAgentRuns
                 SET Status=@Status, ValidatedOutputJson=@OutputJson, OutputHash=@OutputHash,
                     AssistantMessageId=@AssistantMessageId, MaterializedAtUtc=SYSUTCDATETIME(),
+                    MaterializedTicketProposalRevision=@MaterializedTicketProposalRevision,
                     CompletedAtUtc=SYSUTCDATETIME(), ClaimExpiresAtUtc=NULL, ActiveRunSlot=NULL
                 WHERE AgentRunId=@AgentRunId AND Status=N'Running' AND ClaimToken=@ClaimToken
                   AND AssistantMessageId IS NULL;
@@ -1151,7 +1220,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     Status = output.Outcome,
                     OutputJson = outputJson,
                     OutputHash = outputHash,
-                    AssistantMessageId = assistantMessageId
+                    AssistantMessageId = assistantMessageId,
+                    MaterializedTicketProposalRevision = materializedTicketProposalRevision
                 },
                 transaction,
                 cancellationToken: cancellationToken));
@@ -1172,7 +1242,10 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 output.Outcome,
                 Materialized: true,
                 assistantMessageId,
-                IsReplay: false);
+                IsReplay: false,
+                RejectionReason: null,
+                run.TicketProposalSetId,
+                materializedTicketProposalRevision);
         }
         catch
         {
@@ -1284,8 +1357,29 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         if (command.Message.Length > WorkbenchBusinessAnalystProviderContract.MaximumConversationMessageCharacters)
             throw new WorkbenchAgentRunValidationException(
                 $"message exceeds the {WorkbenchBusinessAnalystProviderContract.MaximumConversationMessageCharacters} character limit.");
-        if (WorkbenchInputRouter.Parse(command.Message).IsCommand)
-            throw new WorkbenchCommandRoutingRequiredException();
+        if (!WorkbenchAgentInvocationKinds.IsSupported(command.InvocationKind))
+            throw new WorkbenchAgentRunValidationException("invocationKind is not supported.");
+        var route = WorkbenchInputRouter.Parse(command.Message);
+        if (command.InvocationKind == WorkbenchAgentInvocationKinds.Conversation)
+        {
+            if (route.IsCommand || command.TicketProposalSetId is not null ||
+                command.ExpectedTicketProposalRevision is not null || command.TicketInstruction is not null)
+                throw new WorkbenchCommandRoutingRequiredException();
+            return;
+        }
+        if (route.Kind != WorkbenchInputKinds.Ticket ||
+            !string.Equals(route.Instruction, command.TicketInstruction, StringComparison.Ordinal))
+            throw new WorkbenchAgentRunValidationException(
+                "A proposal-purpose run requires the authoritative /ticket route and matching instruction.");
+        if (command.InvocationKind == WorkbenchAgentInvocationKinds.TicketProposalGeneration &&
+            (command.TicketProposalSetId is not null || command.ExpectedTicketProposalRevision is not null))
+            throw new WorkbenchAgentRunValidationException(
+                "Initial ticket proposal generation cannot target an existing set.");
+        if (command.InvocationKind == WorkbenchAgentInvocationKinds.TicketProposalRegeneration &&
+            (command.TicketProposalSetId is null || command.TicketProposalSetId == Guid.Empty ||
+             command.ExpectedTicketProposalRevision is not > 0))
+            throw new WorkbenchAgentRunValidationException(
+                "Ticket proposal regeneration requires an existing set and expected revision.");
     }
 
     private static async Task<bool> CanAccessProjectAsync(
@@ -1500,7 +1594,11 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         run.ToolPolicyVersion == claim.ToolPolicyVersion &&
         run.ContextSchemaVersion == claim.ContextSchemaVersion &&
         run.ContextCanonicalizationVersion == claim.ContextCanonicalizationVersion &&
-        run.OutputSchemaVersion == claim.OutputSchemaVersion;
+        run.OutputSchemaVersion == claim.OutputSchemaVersion &&
+        run.InvocationKind == claim.InvocationKind &&
+        run.TicketInstruction == claim.TicketInstruction &&
+        run.TicketProposalSetId == claim.TicketProposalSetId &&
+        run.TicketProposalRevision == claim.TicketProposalRevision;
 
     private static bool TryLoadAndValidateAuthoritativeContext(
         AgentRunRow run,
@@ -1541,6 +1639,14 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 storedContext.ContextCanonicalizationVersion != claim.ContextCanonicalizationVersion ||
                 storedContext.OutputSchemaVersion != run.OutputSchemaVersion ||
                 storedContext.OutputSchemaVersion != claim.OutputSchemaVersion ||
+                storedContext.InvocationKind != run.InvocationKind ||
+                storedContext.InvocationKind != claim.InvocationKind ||
+                storedContext.TicketInstruction != run.TicketInstruction ||
+                storedContext.TicketInstruction != claim.TicketInstruction ||
+                storedContext.TicketProposalSetId != run.TicketProposalSetId ||
+                storedContext.TicketProposalSetId != claim.TicketProposalSetId ||
+                storedContext.TicketProposalRevision != run.TicketProposalRevision ||
+                storedContext.TicketProposalRevision != claim.TicketProposalRevision ||
                 !string.Equals(storedContext.ContextHash, run.ContextHash, StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(
                     WorkbenchBusinessAnalystContextCodec.ComputeHash(storedContext),
@@ -1721,6 +1827,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         IDbConnection connection,
         IDbTransaction transaction,
         AgentRunRow run,
+        WorkbenchBusinessAnalystContext storedContext,
         WorkbenchBusinessAnalystOutput output,
         CancellationToken cancellationToken)
     {
@@ -1730,13 +1837,46 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         var sourceMessageIds = (output.UnderstandingPatch?.FactChanges ?? [])
             .SelectMany(change => change.SourceMessageIds)
             .Concat(output.RenameProposal?.SourceMessageIds ?? [])
+            .Concat(output.TicketProposalSet?.SourceMessageIds ?? [])
+            .Concat(output.TicketProposalSet?.Proposals.SelectMany(value => value.SourceMessageIds) ?? [])
+            .Concat(output.TicketProposalSet?.OpenQuestions.SelectMany(value => value.SourceMessageIds) ?? [])
+            .Concat(output.TicketProposalSet?.PotentialConflicts.SelectMany(value => value.SourceMessageIds) ?? [])
             .Distinct()
             .ToArray();
         if (sourceMessageIds.Length == 0)
             return true;
 
+        if (output.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion3)
+        {
+            var frozenSourceIds = storedContext.Messages
+                .Where(message => string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase))
+                .Select(message => message.MessageId)
+                .ToHashSet();
+            var understanding = ProjectUnderstandingDocumentCodec.Deserialize(storedContext.UnderstandingJson);
+            frozenSourceIds.UnionWith(understanding.Facts.SelectMany(fact => fact.SourceMessageIds));
+            frozenSourceIds.UnionWith(understanding.Conflicts.SelectMany(conflict => conflict.SourceMessageIds));
+            if (storedContext.TicketProposalSnapshotJson is not null)
+            {
+                var reviewed = TicketProposalSetDocumentCodec.Deserialize(
+                    storedContext.TicketProposalSnapshotJson);
+                frozenSourceIds.UnionWith(reviewed.SourceMessageIds);
+                frozenSourceIds.UnionWith(reviewed.Proposals.SelectMany(proposal => proposal.SourceMessageIds));
+                frozenSourceIds.UnionWith(reviewed.OpenQuestions.SelectMany(issue => issue.SourceMessageIds));
+                frozenSourceIds.UnionWith(reviewed.PotentialConflicts.SelectMany(issue => issue.SourceMessageIds));
+            }
+            if (sourceMessageIds.Any(id => !frozenSourceIds.Contains(id)))
+                return false;
+        }
+
         var count = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            output.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion3
+                ? """
+            SELECT COUNT(1)
+            FROM dbo.ChatMessages message WITH (HOLDLOCK)
+            WHERE message.TenantId=@TenantId AND message.ProjectId=@ProjectId
+              AND message.Role=N'user' AND message.Id IN @SourceMessageIds;
             """
+                : """
             SELECT COUNT(1)
             FROM dbo.ChatMessages message WITH (HOLDLOCK)
             WHERE message.TenantId=@TenantId AND message.ProjectId=@ProjectId
@@ -1763,7 +1903,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         WorkbenchBusinessAnalystOutput output,
         CancellationToken cancellationToken)
     {
-        if (output.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion1)
+        if (output.OutputSchemaVersion is WorkbenchBusinessAnalystContract.OutputSchemaVersion1 or
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion3)
             return;
 
         var current = await connection.QuerySingleOrDefaultAsync<UnderstandingMaterializationRow>(new CommandDefinition(
@@ -1995,6 +2136,167 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             cancellationToken);
     }
 
+    private static async Task<long?> ApplyTicketProposalOutputAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        AgentRunRow run,
+        WorkbenchBusinessAnalystContext storedContext,
+        WorkbenchBusinessAnalystOutput output,
+        CancellationToken cancellationToken)
+    {
+        if (!WorkbenchAgentInvocationKinds.IsTicketProposal(run.InvocationKind))
+            return null;
+        if (output.OutputSchemaVersion != WorkbenchBusinessAnalystContract.OutputSchemaVersion3 ||
+            output.TicketProposalSet is null || run.TicketProposalSetId is null)
+            throw new InvalidOperationException("The proposal-purpose run has no validated ticket proposal artifact.");
+
+        var now = DateTime.UtcNow;
+        ExistingTicketProposalSetRow? existing = null;
+        long revision;
+        DateTime createdAtUtc;
+        Guid createdByAgentRunId;
+        if (run.InvocationKind == WorkbenchAgentInvocationKinds.TicketProposalRegeneration)
+        {
+            existing = await connection.QuerySingleOrDefaultAsync<ExistingTicketProposalSetRow>(new CommandDefinition(
+                """
+                SELECT Id, CurrentRevision, CreatedByAgentRunId, CreatedAtUtc
+                FROM dbo.TicketProposalSets WITH (UPDLOCK, HOLDLOCK)
+                WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@TicketProposalSetId
+                  AND WorkbenchSessionId=@WorkbenchSessionId;
+                """,
+                run,
+                transaction,
+                cancellationToken: cancellationToken));
+            if (existing is null || existing.CurrentRevision != run.TicketProposalRevision)
+                throw new TicketProposalRevisionConflictException(existing?.CurrentRevision ?? 0);
+            revision = checked(existing.CurrentRevision + 1);
+            createdAtUtc = existing.CreatedAtUtc;
+            createdByAgentRunId = existing.CreatedByAgentRunId;
+        }
+        else
+        {
+            var duplicate = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                "SELECT COUNT(1) FROM dbo.TicketProposalSets WITH (UPDLOCK, HOLDLOCK) WHERE Id=@TicketProposalSetId;",
+                run,
+                transaction,
+                cancellationToken: cancellationToken));
+            if (duplicate != 0)
+                throw new InvalidOperationException("The server-owned ticket proposal set identifier is already in use.");
+            revision = 1;
+            createdAtUtc = now;
+            createdByAgentRunId = run.AgentRunId;
+        }
+
+        var document = TicketProposalSetDocumentCodec.Materialize(
+            output.TicketProposalSet,
+            run.ProjectId,
+            run.WorkbenchSessionId,
+            run.LeaseEpoch,
+            storedContext.UnderstandingRevision,
+            createdByAgentRunId,
+            run.TicketProposalSetId,
+            revision,
+            createdAtUtc,
+            now,
+            output.Outcome);
+        var snapshotJson = TicketProposalSetDocumentCodec.Serialize(document);
+        var snapshotHash = TicketProposalSetDocumentCodec.ComputeHash(snapshotJson);
+        var sourceMessageIdsJson = JsonSerializer.Serialize(document.SourceMessageIds, JsonOptions);
+
+        if (existing is null)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                """
+                INSERT dbo.TicketProposalSets
+                    (Id, TenantId, ProjectId, WorkbenchSessionId, LeaseEpoch, CurrentRevision,
+                     BasedOnUnderstandingRevision, Status, SplitReason, SourceMessageIdsJson,
+                     CreatedByAgentRunId, CreatedByActorUserId, CreatedAtUtc, UpdatedAtUtc)
+                VALUES
+                    (@TicketProposalSetId, @TenantId, @ProjectId, @WorkbenchSessionId, @LeaseEpoch,
+                     @Revision, @BasedOnUnderstandingRevision, @Status, @SplitReason,
+                     @SourceMessageIdsJson, @CreatedByAgentRunId, @ActorUserId, @CreatedAtUtc, @UpdatedAtUtc);
+                """,
+                new
+                {
+                    document.TicketProposalSetId,
+                    run.TenantId,
+                    run.ProjectId,
+                    run.WorkbenchSessionId,
+                    run.LeaseEpoch,
+                    document.Revision,
+                    document.BasedOnUnderstandingRevision,
+                    document.Status,
+                    document.SplitReason,
+                    SourceMessageIdsJson = sourceMessageIdsJson,
+                    document.CreatedByAgentRunId,
+                    run.ActorUserId,
+                    document.CreatedAtUtc,
+                    document.UpdatedAtUtc
+                },
+                transaction,
+                cancellationToken: cancellationToken));
+        }
+        else
+        {
+            var updated = await connection.ExecuteAsync(new CommandDefinition(
+                """
+                UPDATE dbo.TicketProposalSets
+                SET CurrentRevision=@Revision,
+                    BasedOnUnderstandingRevision=@BasedOnUnderstandingRevision,
+                    Status=@Status, SplitReason=@SplitReason,
+                    SourceMessageIdsJson=@SourceMessageIdsJson, UpdatedAtUtc=@UpdatedAtUtc
+                WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@TicketProposalSetId
+                  AND CurrentRevision=@ExpectedRevision;
+                """,
+                new
+                {
+                    run.TenantId,
+                    run.ProjectId,
+                    document.TicketProposalSetId,
+                    document.Revision,
+                    document.BasedOnUnderstandingRevision,
+                    document.Status,
+                    document.SplitReason,
+                    SourceMessageIdsJson = sourceMessageIdsJson,
+                    document.UpdatedAtUtc,
+                    ExpectedRevision = run.TicketProposalRevision
+                },
+                transaction,
+                cancellationToken: cancellationToken));
+            if (updated != 1)
+                throw new TicketProposalRevisionConflictException(existing.CurrentRevision);
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            INSERT dbo.TicketProposalSetRevisions
+                (TenantId, ProjectId, TicketProposalSetId, Revision, SnapshotJson, SnapshotHash,
+                 ActorUserId, AgentRunId, ChangeKind, CreatedAtUtc)
+            VALUES
+                (@TenantId, @ProjectId, @TicketProposalSetId, @Revision, @SnapshotJson, @SnapshotHash,
+                 @ActorUserId, @AgentRunId, @ChangeKind, @UpdatedAtUtc);
+            """,
+            new
+            {
+                run.TenantId,
+                run.ProjectId,
+                document.TicketProposalSetId,
+                document.Revision,
+                SnapshotJson = snapshotJson,
+                SnapshotHash = snapshotHash,
+                run.ActorUserId,
+                AgentRunId = run.AgentRunId,
+                ChangeKind = existing is null
+                    ? TicketProposalRevisionChangeKinds.Generated
+                    : TicketProposalRevisionChangeKinds.Regenerated,
+                document.UpdatedAtUtc
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+
+        return revision;
+    }
+
     private static ProjectUnderstandingFact AgentFact(
         string key,
         string value,
@@ -2096,7 +2398,10 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         run.CompletedAtUtc,
         run.CancellationRequestedAtUtc,
         MapFailureCategory(run),
-        Retryable: false);
+        Retryable: false,
+        run.InvocationKind,
+        run.TicketProposalSetId,
+        run.MaterializedTicketProposalRevision);
 
     private static string? MapFailureCategory(AgentRunRow run)
     {
@@ -2162,6 +2467,14 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         public string BasedOnProjectName { get; init; } = string.Empty;
     }
 
+    private sealed class ExistingTicketProposalSetRow
+    {
+        public Guid Id { get; init; }
+        public long CurrentRevision { get; init; }
+        public Guid CreatedByAgentRunId { get; init; }
+        public DateTime CreatedAtUtc { get; init; }
+    }
+
     private sealed class AgentRunRow
     {
         public Guid AgentRunId { get; init; }
@@ -2179,6 +2492,11 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         public int ContextSchemaVersion { get; init; }
         public int ContextCanonicalizationVersion { get; init; }
         public int OutputSchemaVersion { get; init; }
+        public string InvocationKind { get; init; } = WorkbenchAgentInvocationKinds.Conversation;
+        public string? TicketInstruction { get; init; }
+        public Guid? TicketProposalSetId { get; init; }
+        public long? TicketProposalRevision { get; init; }
+        public long? MaterializedTicketProposalRevision { get; init; }
         public string Status { get; init; } = string.Empty;
         public int AttemptCount { get; init; }
         public Guid? ClaimToken { get; init; }

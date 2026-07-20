@@ -57,6 +57,30 @@ public sealed class WorkbenchBusinessAnalystExecutableContractRegistry
         AllowsAdditionalProperties = false
     };
 
+    private static readonly WorkbenchBusinessAnalystOutputContractDescriptor OutputV3 = new()
+    {
+        SchemaVersion = WorkbenchBusinessAnalystContract.OutputSchemaVersion3,
+        RequiredProperties =
+        [
+            "outputSchemaVersion",
+            "contextHash",
+            "basedOnUnderstandingRevision",
+            "outcome",
+            "assistantMessage",
+            "understandingPatch",
+            "renameProposal",
+            "ticketProposalSet"
+        ],
+        AllowedOutcomes =
+        [
+            WorkbenchAgentRunStates.Completed,
+            WorkbenchAgentRunStates.NeedsInput
+        ],
+        MaximumAssistantMessageCharacters =
+            WorkbenchBusinessAnalystProviderContract.MaximumAssistantMessageCharacters,
+        AllowsAdditionalProperties = false
+    };
+
     private readonly IReadOnlyDictionary<WorkbenchBusinessAnalystContractKey,
         WorkbenchBusinessAnalystExecutableContractDescriptor> _contracts;
 
@@ -78,7 +102,12 @@ public sealed class WorkbenchBusinessAnalystExecutableContractRegistry
                 WorkbenchBusinessAnalystContract.ContextSchemaVersion2,
                 WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion2,
                 WorkbenchBusinessAnalystContract.PromptVersion2,
-                OutputV2)
+                OutputV2),
+            Descriptor(
+                WorkbenchBusinessAnalystContract.ContextSchemaVersion3,
+                WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion3,
+                WorkbenchBusinessAnalystContract.PromptVersion3,
+                OutputV3)
         };
         _contracts = descriptors.ToDictionary(descriptor => descriptor.Key);
     }

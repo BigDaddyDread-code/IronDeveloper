@@ -42,14 +42,18 @@ public static class WorkbenchBusinessAnalystContract
     public const string AgentVersion = "business-analyst-v0.1";
     public const string PromptVersion1 = "workbench-shaping-v1";
     public const string PromptVersion2 = "workbench-shaping-v2";
+    public const string PromptVersion3 = "workbench-ticket-proposals-v3";
     public const string PromptVersion = PromptVersion2;
     public const string ToolPolicyVersion = "workbench-ba-readonly-v1";
     public const int ContextSchemaVersion1 = 1;
     public const int ContextCanonicalizationVersion1 = 1;
     public const int ContextSchemaVersion2 = 2;
     public const int ContextCanonicalizationVersion2 = 2;
+    public const int ContextSchemaVersion3 = 3;
+    public const int ContextCanonicalizationVersion3 = 3;
     public const int OutputSchemaVersion1 = 1;
     public const int OutputSchemaVersion2 = 2;
+    public const int OutputSchemaVersion3 = 3;
     public const int ContextSchemaVersion = ContextSchemaVersion2;
     public const int ContextCanonicalizationVersion = ContextCanonicalizationVersion2;
     public const int OutputSchemaVersion = OutputSchemaVersion2;
@@ -82,7 +86,11 @@ public sealed record SubmitWorkbenchAgentRunCommand(
     long LeaseEpoch,
     Guid ClientOperationId,
     long ChatSessionId,
-    string Message);
+    string Message,
+    string InvocationKind = WorkbenchAgentInvocationKinds.Conversation,
+    string? TicketInstruction = null,
+    Guid? TicketProposalSetId = null,
+    long? ExpectedTicketProposalRevision = null);
 
 public sealed record SubmitWorkbenchAgentRunResult(
     Guid AgentRunId,
@@ -94,7 +102,10 @@ public sealed record SubmitWorkbenchAgentRunResult(
     string Status,
     Guid ClientOperationId,
     DateTime CreatedAtUtc,
-    bool IsReplay);
+    bool IsReplay,
+    string InvocationKind = WorkbenchAgentInvocationKinds.Conversation,
+    Guid? TicketProposalSetId = null,
+    long? TicketProposalRevision = null);
 
 public sealed record CancelWorkbenchAgentRunCommand(
     int TenantId,
@@ -129,7 +140,10 @@ public sealed record WorkbenchAgentRunSnapshot(
     DateTime? CompletedAtUtc,
     DateTime? CancellationRequestedAtUtc,
     string? FailureCategory,
-    bool Retryable);
+    bool Retryable,
+    string InvocationKind = WorkbenchAgentInvocationKinds.Conversation,
+    Guid? TicketProposalSetId = null,
+    long? TicketProposalRevision = null);
 
 public sealed record WorkbenchAgentRunRecoveryContext(
     bool SubmissionAvailable,
@@ -196,7 +210,11 @@ public sealed record WorkbenchAgentRunClaim(
     string ToolPolicyVersion,
     int ContextSchemaVersion,
     int ContextCanonicalizationVersion,
-    int OutputSchemaVersion);
+    int OutputSchemaVersion,
+    string InvocationKind = WorkbenchAgentInvocationKinds.Conversation,
+    string? TicketInstruction = null,
+    Guid? TicketProposalSetId = null,
+    long? TicketProposalRevision = null);
 
 public sealed record WorkbenchAgentContextMessage(
     long MessageId,
@@ -222,7 +240,12 @@ public sealed record WorkbenchBusinessAnalystContext(
     int ContextSchemaVersion,
     int ContextCanonicalizationVersion,
     int OutputSchemaVersion,
-    string ContextHash);
+    string ContextHash,
+    string InvocationKind = WorkbenchAgentInvocationKinds.Conversation,
+    string? TicketInstruction = null,
+    Guid? TicketProposalSetId = null,
+    long? TicketProposalRevision = null,
+    string? TicketProposalSnapshotJson = null);
 
 public sealed record WorkbenchBusinessAnalystOutput(
     int OutputSchemaVersion,
@@ -231,7 +254,8 @@ public sealed record WorkbenchBusinessAnalystOutput(
     string Outcome,
     string AssistantMessage,
     ProjectUnderstandingPatch? UnderstandingPatch = null,
-    WorkbenchProjectRenameProposalOutput? RenameProposal = null);
+    WorkbenchProjectRenameProposalOutput? RenameProposal = null,
+    TicketProposalSetOutput? TicketProposalSet = null);
 
 public sealed record WorkbenchAgentRunMaterializationResult(
     Guid AgentRunId,
@@ -239,7 +263,9 @@ public sealed record WorkbenchAgentRunMaterializationResult(
     bool Materialized,
     long? AssistantMessageId,
     bool IsReplay,
-    string? RejectionReason = null);
+    string? RejectionReason = null,
+    Guid? TicketProposalSetId = null,
+    long? TicketProposalRevision = null);
 
 public sealed record WorkbenchAgentRunOutboxItem(
     long OutboxEventId,
@@ -362,6 +388,12 @@ public static class WorkbenchBusinessAnalystOutputValidator
         "understandingPatch", "renameProposal"
     ];
 
+    private static readonly string[] Version3Properties =
+    [
+        "outputSchemaVersion", "contextHash", "basedOnUnderstandingRevision", "outcome", "assistantMessage",
+        "understandingPatch", "renameProposal", "ticketProposalSet"
+    ];
+
     public static WorkbenchBusinessAnalystOutput DeserializeAndValidate(
         string json,
         WorkbenchBusinessAnalystContext context)
@@ -381,6 +413,7 @@ public static class WorkbenchBusinessAnalystOutputValidator
             {
                 WorkbenchBusinessAnalystContract.OutputSchemaVersion1 => Version1Properties,
                 WorkbenchBusinessAnalystContract.OutputSchemaVersion2 => Version2Properties,
+                WorkbenchBusinessAnalystContract.OutputSchemaVersion3 => Version3Properties,
                 _ => throw new WorkbenchAgentOutputValidationException(
                     $"Unsupported Business Analyst output schema version {version}.")
             };
@@ -416,7 +449,17 @@ public static class WorkbenchBusinessAnalystOutputValidator
                 output.Outcome,
                 output.AssistantMessage
             }, StrictJsonOptions),
-            WorkbenchBusinessAnalystContract.OutputSchemaVersion2 => JsonSerializer.Serialize(output, StrictJsonOptions),
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion2 => JsonSerializer.Serialize(new
+            {
+                output.OutputSchemaVersion,
+                output.ContextHash,
+                output.BasedOnUnderstandingRevision,
+                output.Outcome,
+                output.AssistantMessage,
+                output.UnderstandingPatch,
+                output.RenameProposal
+            }, StrictJsonOptions),
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion3 => JsonSerializer.Serialize(output, StrictJsonOptions),
             _ => throw new WorkbenchAgentOutputValidationException(
                 $"Unsupported Business Analyst output schema version {output.OutputSchemaVersion}.")
         };
@@ -430,7 +473,8 @@ public static class WorkbenchBusinessAnalystOutputValidator
 
         if (context.OutputSchemaVersion is not (
             WorkbenchBusinessAnalystContract.OutputSchemaVersion1 or
-            WorkbenchBusinessAnalystContract.OutputSchemaVersion2))
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion2 or
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion3))
             throw new WorkbenchAgentOutputValidationException(
                 $"Unsupported output schema version {context.OutputSchemaVersion} for this agent run.");
 
@@ -467,12 +511,26 @@ public static class WorkbenchBusinessAnalystOutputValidator
 
         if (output.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion1)
         {
-            if (output.UnderstandingPatch is not null || output.RenameProposal is not null)
+            if (output.UnderstandingPatch is not null || output.RenameProposal is not null ||
+                output.TicketProposalSet is not null)
                 throw new WorkbenchAgentOutputValidationException(
                     "Schema version 1 cannot contain project-understanding mutations.");
             return;
         }
 
+        if (output.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion3)
+        {
+            if (!WorkbenchAgentInvocationKinds.IsTicketProposal(context.InvocationKind) ||
+                output.UnderstandingPatch is not null || output.RenameProposal is not null)
+                throw new WorkbenchAgentOutputValidationException(
+                    "Schema version 3 is reserved for proposal-purpose runs and cannot mutate project understanding.");
+            ValidateTicketProposalSet(output, context);
+            return;
+        }
+
+        if (output.TicketProposalSet is not null)
+            throw new WorkbenchAgentOutputValidationException(
+                "Schema version 2 cannot contain ticket proposals.");
         ValidateUnderstandingPatch(output.UnderstandingPatch, context);
         if (output.RenameProposal is not null)
         {
@@ -486,6 +544,127 @@ public static class WorkbenchBusinessAnalystOutputValidator
                 output.RenameProposal.EvidenceSummary,
                 context);
         }
+    }
+
+    private static void ValidateTicketProposalSet(
+        WorkbenchBusinessAnalystOutput output,
+        WorkbenchBusinessAnalystContext context)
+    {
+        var set = output.TicketProposalSet
+            ?? throw new WorkbenchAgentOutputValidationException("ticketProposalSet is required for schema version 3.");
+        if (set.Proposals is null || set.OpenQuestions is null || set.PotentialConflicts is null ||
+            set.SourceMessageIds is null)
+            throw new WorkbenchAgentOutputValidationException("ticketProposalSet collections are required.");
+        if (set.SplitReason?.Length > 2_000)
+            throw new WorkbenchAgentOutputValidationException("ticketProposalSet.splitReason is too long.");
+
+        var trustedIds = context.Messages
+            .Where(message => string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase))
+            .Select(message => message.MessageId)
+            .ToHashSet();
+        ProjectUnderstandingDocument understanding;
+        try
+        {
+            understanding = ProjectUnderstandingDocumentCodec.Deserialize(context.UnderstandingJson);
+        }
+        catch (ProjectUnderstandingValidationException exception)
+        {
+            throw new WorkbenchAgentOutputValidationException(
+                "The frozen project-understanding provenance is invalid.",
+                exception);
+        }
+        trustedIds.UnionWith(understanding.Facts.SelectMany(fact => fact.SourceMessageIds));
+        trustedIds.UnionWith(understanding.Conflicts.SelectMany(conflict => conflict.SourceMessageIds));
+        if (context.TicketProposalSnapshotJson is not null)
+        {
+            TicketProposalSetDocument reviewedSnapshot;
+            try
+            {
+                reviewedSnapshot = TicketProposalSetDocumentCodec.Deserialize(
+                    context.TicketProposalSnapshotJson);
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new WorkbenchAgentOutputValidationException(
+                    "The frozen reviewed proposal provenance is invalid.",
+                    exception);
+            }
+            trustedIds.UnionWith(reviewedSnapshot.SourceMessageIds);
+            trustedIds.UnionWith(reviewedSnapshot.Proposals.SelectMany(proposal => proposal.SourceMessageIds));
+            trustedIds.UnionWith(reviewedSnapshot.OpenQuestions.SelectMany(issue => issue.SourceMessageIds));
+            trustedIds.UnionWith(reviewedSnapshot.PotentialConflicts.SelectMany(issue => issue.SourceMessageIds));
+        }
+        ValidateSourceIds("ticketProposalSet", set.SourceMessageIds, trustedIds, required: true);
+
+        if (output.Outcome == WorkbenchAgentRunStates.NeedsInput)
+        {
+            if (set.Proposals.Count != 0 || set.OpenQuestions.Count + set.PotentialConflicts.Count == 0)
+                throw new WorkbenchAgentOutputValidationException(
+                    "NeedsInput must contain zero proposals and at least one open question or conflict.");
+        }
+        else if (set.Proposals.Count is < 1 or > 5)
+        {
+            throw new WorkbenchAgentOutputValidationException(
+                "Completed ticket proposal generation must contain one to five proposals.");
+        }
+
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        var orders = new HashSet<int>();
+        foreach (var proposal in set.Proposals)
+        {
+            if (string.IsNullOrWhiteSpace(proposal.ProposalKey) || proposal.ProposalKey.Length > 80 ||
+                proposal.ProposalKey.Any(char.IsWhiteSpace) || !keys.Add(proposal.ProposalKey))
+                throw new WorkbenchAgentOutputValidationException("Ticket proposal keys must be unique bounded tokens.");
+            if (string.IsNullOrWhiteSpace(proposal.Title) || proposal.Title.Length > 300 ||
+                string.IsNullOrWhiteSpace(proposal.Problem) || proposal.Problem.Length > 4_000 ||
+                string.IsNullOrWhiteSpace(proposal.ProposedChange) || proposal.ProposedChange.Length > 8_000 ||
+                proposal.AcceptanceCriteria is null || proposal.AcceptanceCriteria.Count is < 1 or > 20 ||
+                proposal.AcceptanceCriteria.Any(value => string.IsNullOrWhiteSpace(value) || value.Length > 2_000) ||
+                proposal.Dependencies is null || proposal.Dependencies.Count > 4 ||
+                proposal.SuggestedOrder <= 0 || !orders.Add(proposal.SuggestedOrder))
+                throw new WorkbenchAgentOutputValidationException("A ticket proposal is incomplete or exceeds its bounds.");
+            ValidateSourceIds($"ticketProposalSet.proposals[{proposal.ProposalKey}]", proposal.SourceMessageIds, trustedIds, required: true);
+        }
+        if (set.Proposals.Count > 0 && !orders.SetEquals(Enumerable.Range(1, set.Proposals.Count)))
+            throw new WorkbenchAgentOutputValidationException("Ticket proposal suggested order must be contiguous from one.");
+        foreach (var proposal in set.Proposals)
+        {
+            if (proposal.Dependencies.Distinct(StringComparer.Ordinal).Count() != proposal.Dependencies.Count ||
+                proposal.Dependencies.Any(key => key == proposal.ProposalKey || !keys.Contains(key)))
+                throw new WorkbenchAgentOutputValidationException("A ticket proposal dependency is unknown, duplicated, or self-referential.");
+            if (proposal.Dependencies.Any(key =>
+                    set.Proposals.Single(value => value.ProposalKey == key).SuggestedOrder >= proposal.SuggestedOrder))
+                throw new WorkbenchAgentOutputValidationException("Ticket proposal dependencies must precede their dependants.");
+        }
+
+        ValidateIssues(set.OpenQuestions, TicketProposalIssueKinds.Question, trustedIds);
+        ValidateIssues(set.PotentialConflicts, TicketProposalIssueKinds.Conflict, trustedIds);
+    }
+
+    private static void ValidateIssues(
+        IReadOnlyList<TicketProposalIssueOutput> issues,
+        string expectedKind,
+        IReadOnlySet<long> trustedIds)
+    {
+        if (issues.Count > 20)
+            throw new WorkbenchAgentOutputValidationException("A ticket proposal set contains too many issues.");
+        foreach (var issue in issues)
+        {
+            if (issue.Kind != expectedKind || string.IsNullOrWhiteSpace(issue.Text) || issue.Text.Length > 2_000)
+                throw new WorkbenchAgentOutputValidationException("A ticket proposal issue is invalid.");
+            ValidateSourceIds("ticketProposalSet.issue", issue.SourceMessageIds, trustedIds, required: true);
+        }
+    }
+
+    private static void ValidateSourceIds(
+        string field,
+        IReadOnlyList<long>? ids,
+        IReadOnlySet<long> trustedIds,
+        bool required)
+    {
+        if (ids is null || (required && ids.Count == 0) || ids.Count > 50 ||
+            ids.Any(id => id <= 0 || !trustedIds.Contains(id)) || ids.Distinct().Count() != ids.Count)
+            throw new WorkbenchAgentOutputValidationException($"{field} has invalid source-message provenance.");
     }
 
     private static void ValidateUnderstandingPatch(
