@@ -89,18 +89,18 @@ The current Workshop conversation-authority preview can run beside the earlier p
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -EnableConversationAuthority -PreviewId workbench-pr03 `
-  -ApiBaseUrl http://127.0.0.1:5280 -UiPort 5261
+  -EnableConversationAuthority -PreviewId workbench-pr04a `
+  -ApiBaseUrl http://127.0.0.1:5310 -UiPort 5291
 ```
 
-Sign in, open or create a repository-free project, and use the Workshop composer. `/help` and `/ticket` are exact deterministic commands; command tokens are case-insensitive and may carry a plain-language instruction. Unknown slash tokens are rejected before any Business Analyst call, leave the full composer text client-side, and create only a hash-bound rejection audit. Ordinary phrases such as `create tickets` remain normal BA conversation. Project Understanding remains durable and repository-independent.
+Sign in, open or create a repository-free project, shape the idea in Workshop, then use `/ticket` with an optional plain-language instruction. The command runs through the trusted Business Analyst path and opens a durable proposal review without creating permanent tickets. Review provenance and source messages, edit or reorder the bounded proposals, remove proposals only when their dependency graph permits it, resolve blocking questions, inspect immutable revision history, and regenerate against the exact current revision. `/help` remains deterministic; unknown slash tokens are rejected before any Business Analyst call and create only a hash-bound rejection audit. Project Understanding and the proposal workflow remain repository-independent.
 
 To exercise the deterministic rename flow, send `Rename project to CalmPlan` as its own Workshop message and accept the proposal in Project Context.
 
 With that preview running, the lower-level submit/worker/stateless-host continuity proof is also available:
 
 ```powershell
-.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5280 -PreviewId workbench-pr03
+.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5310 -PreviewId workbench-pr04a
 ```
 
 The proof verifies the preview-scoped database's hash-only preparation record and exact three read-only snapshot-tool records, then prints the project and chat IDs plus a preview-pinned follow-up command. Restart the same preview without `-Reset`, run that follow-up, and the continuity marker must come from the durable Workbench context rather than provider-side conversation memory.

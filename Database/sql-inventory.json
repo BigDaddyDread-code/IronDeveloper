@@ -2427,6 +2427,33 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Stores the raw unknown command token and SHA-256 payload hash, never the rejected composer payload or optional instruction."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-ticket-proposals",
+                        "path":  "Database/migrate_workbench_ticket_proposals.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.TicketProposalSets",
+                                               "dbo.TicketProposalSetRevisions",
+                                               "trusted WorkbenchAgentRuns invocation and artifact metadata",
+                                               "append-only ticket proposal revision trigger"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users",
+                                              "dbo.WorkbenchSessions",
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.WorkbenchAgentRuns",
+                                              "dbo.ProjectUnderstandings"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-04A ticket proposal generation and review"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Stores one current aggregate projection and canonical append-only full-document revisions; proposal-purpose runs remain explicitly distinct from conversation runs."
                     }
                 ]
 }
