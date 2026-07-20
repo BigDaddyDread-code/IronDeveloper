@@ -34,7 +34,12 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
   const routeChallenge = message.response?.routeChallenge;
 
   return (
-    <article className={`chat-message chat-message--${message.role}`} data-testid={`chat.message.${message.role}`}>
+    <article
+      className={`chat-message chat-message--${message.role}`}
+      data-testid={`chat.message.${message.role}`}
+      data-message-id={message.id}
+      tabIndex={-1}
+    >
       <header className="chat-message__header">
         <span>{message.role === 'user' ? 'You' : 'Business Analyst'}</span>
         <div className="chat-message__meta">

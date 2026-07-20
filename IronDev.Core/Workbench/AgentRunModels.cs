@@ -39,16 +39,19 @@ public static class WorkbenchAgentRunFailureCategories
 public static class WorkbenchBusinessAnalystContract
 {
     public const string AgentVersion = "business-analyst-v0.1";
-    public const string PromptVersion = "workbench-shaping-v1";
+    public const string PromptVersion1 = "workbench-shaping-v1";
+    public const string PromptVersion2 = "workbench-shaping-v2";
+    public const string PromptVersion = PromptVersion2;
     public const string ToolPolicyVersion = "workbench-ba-readonly-v1";
     public const int ContextSchemaVersion1 = 1;
     public const int ContextCanonicalizationVersion1 = 1;
     public const int ContextSchemaVersion2 = 2;
     public const int ContextCanonicalizationVersion2 = 2;
     public const int OutputSchemaVersion1 = 1;
+    public const int OutputSchemaVersion2 = 2;
     public const int ContextSchemaVersion = ContextSchemaVersion2;
     public const int ContextCanonicalizationVersion = ContextCanonicalizationVersion2;
-    public const int OutputSchemaVersion = OutputSchemaVersion1;
+    public const int OutputSchemaVersion = OutputSchemaVersion2;
 }
 
 public enum WorkbenchAgentRunFailurePoint
@@ -225,7 +228,9 @@ public sealed record WorkbenchBusinessAnalystOutput(
     string ContextHash,
     long BasedOnUnderstandingRevision,
     string Outcome,
-    string AssistantMessage);
+    string AssistantMessage,
+    ProjectUnderstandingPatch? UnderstandingPatch = null,
+    WorkbenchProjectRenameProposalOutput? RenameProposal = null);
 
 public sealed record WorkbenchAgentRunMaterializationResult(
     Guid AgentRunId,
@@ -341,8 +346,20 @@ public static class WorkbenchBusinessAnalystOutputValidator
 {
     private static readonly JsonSerializerOptions StrictJsonOptions = new(JsonSerializerDefaults.Web)
     {
+        PropertyNameCaseInsensitive = false,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
+
+    private static readonly string[] Version1Properties =
+    [
+        "outputSchemaVersion", "contextHash", "basedOnUnderstandingRevision", "outcome", "assistantMessage"
+    ];
+
+    private static readonly string[] Version2Properties =
+    [
+        "outputSchemaVersion", "contextHash", "basedOnUnderstandingRevision", "outcome", "assistantMessage",
+        "understandingPatch", "renameProposal"
+    ];
 
     public static WorkbenchBusinessAnalystOutput DeserializeAndValidate(
         string json,
@@ -353,6 +370,27 @@ public static class WorkbenchBusinessAnalystOutputValidator
 
         try
         {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("outputSchemaVersion", out var versionElement) ||
+                !versionElement.TryGetInt32(out var version))
+                throw new WorkbenchAgentOutputValidationException("outputSchemaVersion is required.");
+
+            var expectedProperties = version switch
+            {
+                WorkbenchBusinessAnalystContract.OutputSchemaVersion1 => Version1Properties,
+                WorkbenchBusinessAnalystContract.OutputSchemaVersion2 => Version2Properties,
+                _ => throw new WorkbenchAgentOutputValidationException(
+                    $"Unsupported Business Analyst output schema version {version}.")
+            };
+            var actualProperties = document.RootElement.EnumerateObject()
+                .Select(property => property.Name).ToArray();
+            if (actualProperties.Length != expectedProperties.Length ||
+                actualProperties.Except(expectedProperties, StringComparer.Ordinal).Any() ||
+                expectedProperties.Except(actualProperties, StringComparer.Ordinal).Any())
+                throw new WorkbenchAgentOutputValidationException(
+                    $"The Business Analyst output does not contain the exact schema version {version} properties.");
+
             var output = JsonSerializer.Deserialize<WorkbenchBusinessAnalystOutput>(json, StrictJsonOptions)
                 ?? throw new WorkbenchAgentOutputValidationException("The Business Analyst output is empty.");
             Validate(output, context);
@@ -361,10 +399,26 @@ public static class WorkbenchBusinessAnalystOutputValidator
         catch (JsonException exception)
         {
             throw new WorkbenchAgentOutputValidationException(
-                "The Business Analyst output does not match schema version 1.",
+                $"The Business Analyst output does not match schema version {context.OutputSchemaVersion}.",
                 exception);
         }
     }
+
+    public static string Serialize(WorkbenchBusinessAnalystOutput output) =>
+        output.OutputSchemaVersion switch
+        {
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion1 => JsonSerializer.Serialize(new
+            {
+                output.OutputSchemaVersion,
+                output.ContextHash,
+                output.BasedOnUnderstandingRevision,
+                output.Outcome,
+                output.AssistantMessage
+            }, StrictJsonOptions),
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion2 => JsonSerializer.Serialize(output, StrictJsonOptions),
+            _ => throw new WorkbenchAgentOutputValidationException(
+                $"Unsupported Business Analyst output schema version {output.OutputSchemaVersion}.")
+        };
 
     public static void Validate(
         WorkbenchBusinessAnalystOutput output,
@@ -373,13 +427,15 @@ public static class WorkbenchBusinessAnalystOutputValidator
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(context);
 
-        if (context.OutputSchemaVersion != WorkbenchBusinessAnalystContract.OutputSchemaVersion1)
+        if (context.OutputSchemaVersion is not (
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion1 or
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion2))
             throw new WorkbenchAgentOutputValidationException(
                 $"Unsupported output schema version {context.OutputSchemaVersion} for this agent run.");
 
-        if (output.OutputSchemaVersion != WorkbenchBusinessAnalystContract.OutputSchemaVersion1)
+        if (output.OutputSchemaVersion != context.OutputSchemaVersion)
             throw new WorkbenchAgentOutputValidationException(
-                $"outputSchemaVersion must be {WorkbenchBusinessAnalystContract.OutputSchemaVersion1} for this agent run.");
+                $"outputSchemaVersion must be {context.OutputSchemaVersion} for this agent run.");
 
         if (string.IsNullOrWhiteSpace(output.ContextHash) ||
             output.ContextHash.Length != 64 ||
@@ -407,6 +463,83 @@ public static class WorkbenchBusinessAnalystOutputValidator
             WorkbenchBusinessAnalystProviderContract.MaximumOutputUtf8Bytes)
             throw new WorkbenchAgentOutputValidationException(
                 "assistantMessage exceeds the reserved UTF-8 output budget.");
+
+        if (output.OutputSchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion1)
+        {
+            if (output.UnderstandingPatch is not null || output.RenameProposal is not null)
+                throw new WorkbenchAgentOutputValidationException(
+                    "Schema version 1 cannot contain project-understanding mutations.");
+            return;
+        }
+
+        ValidateUnderstandingPatch(output.UnderstandingPatch, context);
+        if (output.RenameProposal is not null)
+        {
+            var name = output.RenameProposal.ProposedName?.Trim() ?? string.Empty;
+            if (name.Length == 0 || name.Length > 200)
+                throw new WorkbenchAgentOutputValidationException(
+                    "renameProposal.proposedName must contain 1 to 200 characters.");
+            ValidateEvidence(
+                "renameProposal",
+                output.RenameProposal.SourceMessageIds,
+                output.RenameProposal.EvidenceSummary,
+                context);
+        }
+    }
+
+    private static void ValidateUnderstandingPatch(
+        ProjectUnderstandingPatch? patch,
+        WorkbenchBusinessAnalystContext context)
+    {
+        if (patch is null)
+            return;
+        if (patch.FactChanges is null)
+            throw new WorkbenchAgentOutputValidationException("understandingPatch.factChanges is required.");
+        if (patch.FactChanges.Count > ProjectUnderstandingContract.FactKeys.Count)
+            throw new WorkbenchAgentOutputValidationException("understandingPatch contains too many fact changes.");
+
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var change in patch.FactChanges)
+        {
+            if (!ProjectUnderstandingContract.IsKnownFactKey(change.Key) || !keys.Add(change.Key))
+                throw new WorkbenchAgentOutputValidationException(
+                    "understandingPatch contains an unknown or duplicate fact key.");
+            if (string.IsNullOrWhiteSpace(change.Value) ||
+                change.Value.Length > ProjectUnderstandingContract.MaximumFactValueCharacters)
+                throw new WorkbenchAgentOutputValidationException(
+                    $"Fact change '{change.Key}' has an invalid value.");
+            if (change.State is not (ProjectUnderstandingFactStates.Inferred or ProjectUnderstandingFactStates.Confirmed))
+                throw new WorkbenchAgentOutputValidationException(
+                    $"Fact change '{change.Key}' must be Inferred or Confirmed.");
+            ValidateEvidence(change.Key, change.SourceMessageIds, change.EvidenceSummary, context);
+        }
+
+        if (patch.OpenQuestions is { Count: > 10 } ||
+            patch.OpenQuestions?.Any(question => string.IsNullOrWhiteSpace(question) || question.Length > 1_000) == true)
+            throw new WorkbenchAgentOutputValidationException("understandingPatch contains invalid open questions.");
+    }
+
+    private static void ValidateEvidence(
+        string field,
+        IReadOnlyList<long>? sourceMessageIds,
+        string? evidenceSummary,
+        WorkbenchBusinessAnalystContext context)
+    {
+        if (sourceMessageIds is null || sourceMessageIds.Count == 0 ||
+            sourceMessageIds.Count > ProjectUnderstandingContract.MaximumSourceMessagesPerFact ||
+            sourceMessageIds.Any(value => value <= 0) ||
+            sourceMessageIds.Distinct().Count() != sourceMessageIds.Count ||
+            string.IsNullOrWhiteSpace(evidenceSummary) ||
+            evidenceSummary.Length > ProjectUnderstandingContract.MaximumEvidenceSummaryCharacters)
+            throw new WorkbenchAgentOutputValidationException($"{field} has invalid evidence provenance.");
+
+        var trustedUserMessageIds = context.Messages
+            .Where(message => string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase))
+            .Select(message => message.MessageId)
+            .ToHashSet();
+        if (sourceMessageIds.Any(messageId => !trustedUserMessageIds.Contains(messageId)))
+            throw new WorkbenchAgentOutputValidationException(
+                $"{field} cites a source outside the frozen trusted user-message context.");
     }
 }
 

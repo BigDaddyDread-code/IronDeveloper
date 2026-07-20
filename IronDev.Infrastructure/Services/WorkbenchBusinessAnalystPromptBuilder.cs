@@ -22,6 +22,48 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
 
         EnsureExactContract(context, contract, toolResults);
         var snapshotJson = BuildSnapshotJson(context, contract, toolResults);
+        var outputExample = contract.Output.SchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion1
+            ? $$"""
+              {
+                "outputSchemaVersion": {{contract.Output.SchemaVersion}},
+                "contextHash": "{{context.ContextHash}}",
+                "basedOnUnderstandingRevision": {{context.UnderstandingRevision}},
+                "outcome": "Completed or NeedsInput",
+                "assistantMessage": "A non-empty user-facing shaping response"
+              }
+              """
+            : $$"""
+              {
+                "outputSchemaVersion": {{contract.Output.SchemaVersion}},
+                "contextHash": "{{context.ContextHash}}",
+                "basedOnUnderstandingRevision": {{context.UnderstandingRevision}},
+                "outcome": "Completed or NeedsInput",
+                "assistantMessage": "A non-empty user-facing shaping response",
+                "understandingPatch": {
+                  "factChanges": [
+                    {
+                      "key": "One of: {{string.Join(", ", ProjectUnderstandingContract.FactKeys)}}",
+                      "value": "A concise product-intent value",
+                      "state": "Inferred or Confirmed",
+                      "sourceMessageIds": [{{context.SourceUserMessageId}}],
+                      "evidenceSummary": "Concise visible evidence summary"
+                    }
+                  ],
+                  "openQuestions": []
+                },
+                "renameProposal": null
+              }
+              """;
+        var mutationPolicy = contract.Output.SchemaVersion == WorkbenchBusinessAnalystContract.OutputSchemaVersion1
+            ? "This compatibility schema cannot propose project-understanding changes or a rename."
+            : """
+              understandingPatch.factChanges may contain only the listed product-intent keys. Cite only user
+              message IDs present in the frozen snapshot. Mark a fact Confirmed only when a cited user message
+              explicitly states it; otherwise use Inferred. Never emit Unknown, Conflicted, or userLocked: the
+              server owns conflict and lock semantics. Use an empty factChanges array when nothing safe changed.
+              renameProposal must be null or contain proposedName, sourceMessageIds, and evidenceSummary. It is
+              only a proposal; the server will not rename the project without an explicit user acceptance.
+              """;
 
         var immutablePolicy = $$"""
             ## Immutable code-owned Workbench Business Analyst contract
@@ -51,15 +93,11 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
             ## Exact output contract
 
             Return exactly one JSON object and no markdown fence, preface, suffix, or additional property.
-            It must contain these five properties with these exact JSON names:
+            It must contain exactly the properties shown for schema {{contract.Output.SchemaVersion}}:
 
-            {
-              "outputSchemaVersion": {{contract.Output.SchemaVersion}},
-              "contextHash": "{{context.ContextHash}}",
-              "basedOnUnderstandingRevision": {{context.UnderstandingRevision}},
-              "outcome": "Completed or NeedsInput",
-              "assistantMessage": "A non-empty user-facing shaping response"
-            }
+            {{outputExample}}
+
+            {{mutationPolicy}}
 
             Echo contextHash and basedOnUnderstandingRevision exactly. outcome must be Completed when a useful
             shaping response can be given, or NeedsInput when material project input is required. assistantMessage
@@ -136,15 +174,20 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
             throw new InvalidOperationException(
                 "The executable Business Analyst prompt contract does not match the immutable run context and Analyst role.");
 
-        var expectedOutputProperties = new[]
+        var expectedOutputProperties = contract.Output.SchemaVersion switch
         {
-            "outputSchemaVersion",
-            "contextHash",
-            "basedOnUnderstandingRevision",
-            "outcome",
-            "assistantMessage"
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion1 => new[]
+            {
+                "outputSchemaVersion", "contextHash", "basedOnUnderstandingRevision", "outcome", "assistantMessage"
+            },
+            WorkbenchBusinessAnalystContract.OutputSchemaVersion2 => new[]
+            {
+                "outputSchemaVersion", "contextHash", "basedOnUnderstandingRevision", "outcome", "assistantMessage",
+                "understandingPatch", "renameProposal"
+            },
+            _ => throw new InvalidOperationException("The executable Business Analyst output schema is unsupported.")
         };
-        if (contract.Output.SchemaVersion != WorkbenchBusinessAnalystContract.OutputSchemaVersion1 ||
+        if (
             contract.Output.AllowsAdditionalProperties ||
             contract.Output.MaximumAssistantMessageCharacters !=
                 WorkbenchBusinessAnalystProviderContract.MaximumAssistantMessageCharacters ||
@@ -153,7 +196,7 @@ public sealed class WorkbenchBusinessAnalystPromptBuilder : IWorkbenchBusinessAn
                 new[] { WorkbenchAgentRunStates.Completed, WorkbenchAgentRunStates.NeedsInput },
                 StringComparer.Ordinal))
             throw new InvalidOperationException(
-                "The executable Business Analyst output contract is not the pinned strict schema version 1.");
+                "The executable Business Analyst output contract is not a pinned strict schema.");
 
         var expectedTools = contract.SnapshotTools.Select(tool => (tool.Name, tool.Version)).ToArray();
         var actualTools = toolResults.Select(tool => (tool.Name, tool.Version)).ToArray();

@@ -26,6 +26,7 @@ interface ProjectContextState {
   selectTenantContext: (tenantId: number) => Promise<void>;
   selectProjectContext: (projectId: number, takeOver?: boolean) => Promise<void>;
   activateStartedProject: (started: StartProjectResponse) => void;
+  applySelectedProjectName: (projectId: number, name: string) => void;
   setProjectAccessStatus: (status: ProductAccessStatus) => void;
 }
 
@@ -272,6 +273,18 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         }, ...current]);
   }, []);
 
+  const applySelectedProjectName = useCallback((projectId: number, name: string) => {
+    const normalizedName = name.trim();
+    if (!Number.isSafeInteger(projectId) || projectId <= 0 || normalizedName.length === 0) {
+      return;
+    }
+
+    setProjects((current) => current.map((candidate) =>
+      candidate.id === projectId ? { ...candidate, name: normalizedName } : candidate
+    ));
+    setSelectedProjectName((current) => selectedProjectId === projectId ? normalizedName : current);
+  }, [selectedProjectId]);
+
   useEffect(() => {
     setSelectedTenantId(config.selectedTenantId ?? null);
     setSelectedProjectId(null);
@@ -296,10 +309,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       selectTenantContext,
       selectProjectContext,
       activateStartedProject,
+      applySelectedProjectName,
       setProjectAccessStatus: setAccessStatus
     }),
     [
       accessStatus,
+      applySelectedProjectName,
       activateStartedProject,
       isRefreshing,
       projectSelectionMode,

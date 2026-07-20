@@ -320,6 +320,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_agent_runs.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ba_preparation_audit.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ba_invocation_audit.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_project_understanding.sql");
     }
 
     private const string DropGovernanceSql = """

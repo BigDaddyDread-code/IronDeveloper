@@ -46,7 +46,9 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
                 "contextHash",
                 "basedOnUnderstandingRevision",
                 "outcome",
-                "assistantMessage"
+                "assistantMessage",
+                "understandingPatch",
+                "renameProposal"
             },
             current.Output.RequiredProperties.ToArray());
         Assert.IsFalse(current.Output.AllowsAdditionalProperties);
@@ -54,18 +56,20 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
         var legacy = Context() with
         {
             ContextSchemaVersion = WorkbenchBusinessAnalystContract.ContextSchemaVersion1,
-            ContextCanonicalizationVersion = WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion1
+            ContextCanonicalizationVersion = WorkbenchBusinessAnalystContract.ContextCanonicalizationVersion1,
+            PromptVersion = WorkbenchBusinessAnalystContract.PromptVersion1,
+            OutputSchemaVersion = WorkbenchBusinessAnalystContract.OutputSchemaVersion1
         };
         Assert.AreEqual(
             WorkbenchBusinessAnalystContract.ContextSchemaVersion1,
             registry.Resolve(legacy).Key.ContextSchemaVersion);
 
         Assert.ThrowsExactly<WorkbenchBusinessAnalystContractNotSupportedException>(() =>
-            registry.Resolve(Context() with { PromptVersion = "workbench-shaping-v2" }));
+            registry.Resolve(Context() with { PromptVersion = "workbench-shaping-v99" }));
         Assert.ThrowsExactly<WorkbenchBusinessAnalystContractNotSupportedException>(() =>
             registry.Resolve(Context() with { ToolPolicyVersion = "workbench-ba-write-v1" }));
         Assert.ThrowsExactly<WorkbenchBusinessAnalystContractNotSupportedException>(() =>
-            registry.Resolve(Context() with { OutputSchemaVersion = 2 }));
+            registry.Resolve(Context() with { OutputSchemaVersion = 99 }));
         Assert.ThrowsExactly<WorkbenchBusinessAnalystContractNotSupportedException>(() =>
             registry.Resolve(Context() with { ContextCanonicalizationVersion = 99 }));
     }
@@ -132,7 +136,7 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
         var context = Context();
         var claim = Claim(context);
         var raw = $$"""
-            {"outputSchemaVersion":1,"contextHash":"{{context.ContextHash}}","basedOnUnderstandingRevision":3,"outcome":"Completed","assistantMessage":"A raw provider result."}
+            {"outputSchemaVersion":2,"contextHash":"{{context.ContextHash}}","basedOnUnderstandingRevision":3,"outcome":"Completed","assistantMessage":"A raw provider result.","understandingPatch":null,"renameProposal":null}
             """;
         var gateway = new RecordingModelGateway(raw);
         var audit = new RecordingAuditStore();
@@ -242,6 +246,33 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
 
         StringAssert.Contains(followUpOutput.AssistantMessage, "prior-user-turns=1");
         StringAssert.Contains(followUpOutput.AssistantMessage, "fresh LocalTest host");
+
+        var renameContext = context with
+        {
+            AgentRunId = Guid.Parse("55555555-5555-5555-5555-555555555555"),
+            SourceUserMessageId = 7003,
+            Messages =
+            [
+                new WorkbenchAgentContextMessage(
+                    7003,
+                    "user",
+                    "Rename project to CalmPlan.",
+                    DateTime.UnixEpoch.AddMinutes(3))
+            ],
+            ContextHash = new string('e', 64)
+        };
+        var renamePrepared = await gateway.PrepareAsync(
+            renameContext,
+            new WorkbenchBusinessAnalystExecutableContractRegistry().Resolve(renameContext),
+            PromptParts());
+        var renameOutput = WorkbenchBusinessAnalystOutputValidator.DeserializeAndValidate(
+            (await renamePrepared.Invocation.InvokeProviderAsync()).Output,
+            renameContext);
+
+        Assert.IsNull(renameOutput.UnderstandingPatch);
+        Assert.IsNotNull(renameOutput.RenameProposal);
+        Assert.AreEqual("CalmPlan", renameOutput.RenameProposal.ProposedName);
+        CollectionAssert.AreEqual(new long[] { 7003 }, renameOutput.RenameProposal.SourceMessageIds.ToArray());
     }
 
     [TestMethod]

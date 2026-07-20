@@ -6,7 +6,9 @@ import { ChatContextPanel } from './ChatContextPanel';
 import { ChatSessionRail } from './ChatSessionRail';
 import { ChatTicketDraftReview } from './ChatTicketDraftReview';
 import { ChatThread } from './ChatThread';
+import { ProjectUnderstandingPanel } from './ProjectUnderstandingPanel';
 import type { ChatAgentRunState, ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
+import type { ProjectUnderstandingController } from './useProjectUnderstanding';
 
 interface ChatWorkspaceProps {
   sessions: ProjectChatSession[];
@@ -21,6 +23,7 @@ interface ChatWorkspaceProps {
   isCancellingAgentRun: boolean;
   agentRun: ChatAgentRunState | null;
   conversationAuthorityEnabled: boolean;
+  projectUnderstanding: ProjectUnderstandingController;
   hasUnresolvedDurableOperation: boolean;
   agentCancellationDeliveryUnresolved: boolean;
   boundAgentRunChatSessionId: number | null;
@@ -66,6 +69,7 @@ export function ChatWorkspace({
   isCancellingAgentRun,
   agentRun,
   conversationAuthorityEnabled,
+  projectUnderstanding,
   hasUnresolvedDurableOperation,
   agentCancellationDeliveryUnresolved,
   boundAgentRunChatSessionId,
@@ -170,7 +174,9 @@ export function ChatWorkspace({
               testId="chat.contextPanel.show"
               onClick={() => setIsContextOpen((current) => !current)}
             >
-              {isContextOpen ? 'Close details' : 'Conversation details'}
+              {conversationAuthorityEnabled
+                ? isContextOpen ? 'Close project context' : 'Project context'
+                : isContextOpen ? 'Close details' : 'Conversation details'}
             </CommandButton>
           </div>
         </header>
@@ -206,17 +212,26 @@ export function ChatWorkspace({
               onSelectDocumentSource={onSelectDocumentSource}
             />
           </div>
-          <ChatContextPanel
-            latestResponse={latestResponse}
-            latestResponseText={latestResponseText}
-            projectLabel={projectLabel}
-            isCollapsed={!isContextOpen}
-            onToggleCollapsed={() => setIsContextOpen((current) => !current)}
-            onKeepDiscussingBaDraft={onKeepDiscussingBaDraft}
-            onAskNextBaQuestion={onAskNextBaQuestion}
-            onEditBaDraft={onEditBaDraft}
-            onReviewBaDraft={setReviewedDraft}
-          />
+          {conversationAuthorityEnabled ? (
+            isContextOpen ? (
+              <ProjectUnderstandingPanel
+                controller={projectUnderstanding}
+                onClose={() => setIsContextOpen(false)}
+              />
+            ) : null
+          ) : (
+            <ChatContextPanel
+              latestResponse={latestResponse}
+              latestResponseText={latestResponseText}
+              projectLabel={projectLabel}
+              isCollapsed={!isContextOpen}
+              onToggleCollapsed={() => setIsContextOpen((current) => !current)}
+              onKeepDiscussingBaDraft={onKeepDiscussingBaDraft}
+              onAskNextBaQuestion={onAskNextBaQuestion}
+              onEditBaDraft={onEditBaDraft}
+              onReviewBaDraft={setReviewedDraft}
+            />
+          )}
         </div>
       </div>
       {reviewedDraft ? (

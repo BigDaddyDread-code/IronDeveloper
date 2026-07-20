@@ -1,6 +1,8 @@
 import type {
   AcceptedApprovalEnvelope,
   AcceptedApprovalReadModelUi,
+  AcceptProjectRenameProposalRequest,
+  AcceptProjectRenameProposalResult,
   AiConnectionCredentialMutationOutcome,
   AiConnectionCredentialRevokeRequest,
   AiConnectionCredentialWriteRequest,
@@ -101,6 +103,11 @@ import type {
   ProjectImplementationPlan,
   ProjectFileSummary,
   ProjectSummary,
+  ProjectRenameProposal,
+  ProjectUnderstandingConflict,
+  ProjectUnderstandingFact,
+  ProjectUnderstandingMutationResult,
+  ProjectUnderstandingReadModel,
   StartProjectResponse,
   SubmitWorkbenchAgentRunRequest,
   SubmitWorkbenchAgentRunResult,
@@ -124,6 +131,7 @@ import type {
   TicketLoadResult,
   TicketRunReview,
   UserProfile,
+  UpdateProjectUnderstandingFactRequest,
   WorkflowReadOnlyApiEnvelope,
   WorkflowRunDetailData,
   WorkflowRunListData,
@@ -393,6 +401,52 @@ class IronDevApiClient {
       body: { clientOperationId, takeOver },
       signal
     });
+  }
+
+  async getProjectUnderstanding(
+    projectId: number,
+    signal?: AbortSignal
+  ): Promise<ProjectUnderstandingReadModel> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/understanding`,
+      { method: 'GET', signal }
+    );
+    if (!isProjectUnderstandingReadModel(result, projectId)) {
+      throw new IronDevApiProtocolError('Project understanding read');
+    }
+    return result;
+  }
+
+  async updateProjectUnderstandingFact(
+    projectId: number,
+    factKey: string,
+    request: UpdateProjectUnderstandingFactRequest,
+    signal?: AbortSignal
+  ): Promise<ProjectUnderstandingMutationResult> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/understanding/facts/${encodeURIComponent(factKey)}`,
+      { method: 'PUT', body: request, signal }
+    );
+    if (!isProjectUnderstandingMutationResult(result, projectId, request.clientOperationId)) {
+      throw new IronDevApiProtocolError('Project understanding fact update');
+    }
+    return result;
+  }
+
+  async acceptProjectRenameProposal(
+    projectId: number,
+    proposalId: string,
+    request: AcceptProjectRenameProposalRequest,
+    signal?: AbortSignal
+  ): Promise<AcceptProjectRenameProposalResult> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/rename-proposals/${encodeURIComponent(proposalId)}/accept`,
+      { method: 'POST', body: request, signal }
+    );
+    if (!isAcceptProjectRenameProposalResult(result, projectId, proposalId, request.clientOperationId)) {
+      throw new IronDevApiProtocolError('Project rename acceptance');
+    }
+    return result;
   }
 
   /**
@@ -1781,6 +1835,164 @@ function isCancelWorkbenchAgentRunResult(
     (!value.cancellationRequested || value.status === 'Cancelled') &&
     value.clientOperationId === clientOperationId &&
     typeof value.isReplay === 'boolean';
+}
+
+function isProjectUnderstandingReadModel(
+  value: unknown,
+  projectId: number
+): value is ProjectUnderstandingReadModel {
+  if (!isJsonRecord(value) ||
+      value.projectId !== projectId ||
+      !isPositiveInteger(value.tenantId) ||
+      !isNonEmptyString(value.projectName) ||
+      !isPositiveInteger(value.revision) ||
+      !Array.isArray(value.facts) ||
+      !value.facts.every((fact) => isProjectUnderstandingFact(fact, value.revision as number)) ||
+      !Array.isArray(value.conflicts) ||
+      !value.conflicts.every((conflict) => isProjectUnderstandingConflict(conflict, value.revision as number)) ||
+      !Array.isArray(value.openQuestions) ||
+      !value.openQuestions.every(isNonEmptyString) ||
+      (value.pendingRenameProposal !== null &&
+        !isProjectRenameProposal(value.pendingRenameProposal, value.revision as number, value.projectName as string)) ||
+      !isJsonRecord(value.operationalProjections)) {
+    return false;
+  }
+
+  const facts = value.facts as ProjectUnderstandingFact[];
+  const conflicts = value.conflicts as ProjectUnderstandingConflict[];
+  if (new Set(facts.map((fact) => fact.key)).size !== facts.length ||
+      new Set(conflicts.map((conflict) => conflict.conflictId)).size !== conflicts.length ||
+      new Set(value.openQuestions).size !== value.openQuestions.length) {
+    return false;
+  }
+  const populatedFactKeys = new Set(facts.map((fact) => fact.key));
+  if (conflicts.some((conflict) => !populatedFactKeys.has(conflict.factKey))) {
+    return false;
+  }
+
+  return projectLifecyclePhases.has(value.operationalProjections.projectLifecyclePhase as string) &&
+    value.operationalProjections.projectLifecycleAuthority === 'ProjectLifecyclePhase' &&
+    executionReadinessStates.has(value.operationalProjections.executionReadiness as string) &&
+    value.operationalProjections.executionReadinessAuthority === 'ProjectReadinessAssessment' &&
+    Object.prototype.hasOwnProperty.call(value.operationalProjections, 'repositoryBinding') &&
+    (value.operationalProjections.repositoryBinding === null ||
+      isJsonRecord(value.operationalProjections.repositoryBinding));
+}
+
+const projectUnderstandingFactKeys = new Set([
+  'ProductSummary',
+  'PrimaryUsers',
+  'Goals',
+  'Constraints',
+  'ApplicationType',
+  'DesiredLanguage',
+  'DesiredFramework',
+  'DesiredDatabase',
+  'DesiredTestApproach',
+  'TargetPlatform',
+  'DeploymentIntent'
+]);
+const projectUnderstandingFactStates = new Set(['Inferred', 'Confirmed', 'Conflicted']);
+const projectLifecyclePhases = new Set(['Shaping', 'Delivery', 'Archived']);
+const executionReadinessStates = new Set(['NotConfigured', 'ValidationRequired', 'Ready']);
+
+function isProjectUnderstandingFact(value: unknown, understandingRevision: number): value is ProjectUnderstandingFact {
+  if (!isJsonRecord(value) ||
+      !projectUnderstandingFactKeys.has(value.key as string) ||
+      !isNonEmptyString(value.value) ||
+      !projectUnderstandingFactStates.has(value.state as string) ||
+      typeof value.userLocked !== 'boolean' ||
+      !isUniquePositiveIntegerArray(value.sourceMessageIds, true) ||
+      !isNonEmptyString(value.evidenceSummary) ||
+      !isPositiveInteger(value.revision) ||
+      value.revision > understandingRevision) {
+    return false;
+  }
+
+  const actorAuthored = value.authorKind === 'Actor' &&
+    isPositiveInteger(value.authorActorUserId) &&
+    value.authorAgentRunId === null;
+  const agentAuthored = value.authorKind === 'Agent' &&
+    value.authorActorUserId === null &&
+    isNonEmptyUuidString(value.authorAgentRunId);
+  return actorAuthored || agentAuthored;
+}
+
+function isProjectUnderstandingConflict(value: unknown, understandingRevision: number): value is ProjectUnderstandingConflict {
+  if (!isJsonRecord(value) ||
+      !isNonEmptyUuidString(value.conflictId) ||
+      !projectUnderstandingFactKeys.has(value.factKey as string) ||
+      !isNonEmptyString(value.currentValue) ||
+      !isNonEmptyString(value.proposedValue) ||
+      !isUniquePositiveIntegerArray(value.sourceMessageIds, false) ||
+      !isNonEmptyString(value.evidenceSummary) ||
+      !isNonEmptyUuidString(value.createdByAgentRunId) ||
+      !isPositiveInteger(value.createdAtRevision) ||
+      value.createdAtRevision > understandingRevision ||
+      (value.status !== 'Open' && value.status !== 'Resolved')) {
+    return false;
+  }
+
+  if (value.status === 'Open') {
+    return value.resolvedAtRevision === null && value.resolvedByActorUserId === null;
+  }
+  return isPositiveInteger(value.resolvedAtRevision) &&
+    value.resolvedAtRevision >= value.createdAtRevision &&
+    value.resolvedAtRevision <= understandingRevision &&
+    isPositiveInteger(value.resolvedByActorUserId);
+}
+
+function isProjectRenameProposal(
+  value: unknown,
+  understandingRevision: number,
+  currentProjectName: string
+): value is ProjectRenameProposal {
+  return isJsonRecord(value) &&
+    isNonEmptyUuidString(value.proposalId) &&
+    isNonEmptyString(value.proposedName) &&
+    value.proposedName !== currentProjectName &&
+    value.status === 'Pending' &&
+    isNonEmptyString(value.basedOnProjectName) &&
+    isPositiveInteger(value.basedOnUnderstandingRevision) &&
+    value.basedOnUnderstandingRevision <= understandingRevision &&
+    isNonEmptyUuidString(value.proposedByAgentRunId) &&
+    isPositiveInteger(value.initiatingActorUserId) &&
+    isUniquePositiveIntegerArray(value.sourceMessageIds, false) &&
+    isNonEmptyString(value.evidenceSummary) &&
+    isTimestampString(value.createdAtUtc);
+}
+
+function isProjectUnderstandingMutationResult(
+  value: unknown,
+  projectId: number,
+  clientOperationId: string
+): value is ProjectUnderstandingMutationResult {
+  return isJsonRecord(value) &&
+    value.clientOperationId === clientOperationId &&
+    typeof value.isReplay === 'boolean' &&
+    isProjectUnderstandingReadModel(value.snapshot, projectId);
+}
+
+function isAcceptProjectRenameProposalResult(
+  value: unknown,
+  projectId: number,
+  proposalId: string,
+  clientOperationId: string
+): value is AcceptProjectRenameProposalResult {
+  return isJsonRecord(value) &&
+    value.clientOperationId === clientOperationId &&
+    typeof value.isReplay === 'boolean' &&
+    isProjectUnderstandingReadModel(value.snapshot, projectId) &&
+    value.snapshot.pendingRenameProposal === null &&
+    isNonEmptyString(proposalId);
+}
+
+function isUniquePositiveIntegerArray(value: unknown, allowEmpty: boolean): value is number[] {
+  return Array.isArray(value) &&
+    (allowEmpty || value.length > 0) &&
+    value.length <= 20 &&
+    value.every(isPositiveInteger) &&
+    new Set(value).size === value.length;
 }
 
 function isJsonRecord(value: unknown): value is Record<string, unknown> {

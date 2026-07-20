@@ -33,6 +33,8 @@ $testFiles = @(
     "tests/flow-shell-smoke.spec.ts",
     "tests/board-ux.spec.ts",
     "tests/chat-conversation-first.spec.ts",
+    "tests/workbench-agent-run.spec.ts",
+    "tests/project-understanding.spec.ts",
     "tests/chat-session-navigation.spec.ts",
     "tests/chat-ticket-draft-review.spec.ts",
     "tests/library-documents.spec.ts",

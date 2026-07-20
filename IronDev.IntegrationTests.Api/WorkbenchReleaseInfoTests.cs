@@ -18,7 +18,7 @@ public sealed class WorkbenchReleaseInfoTests
             new ConfigurationBuilder().Build(),
             new StubHostEnvironment("Test"));
 
-        Assert.AreEqual("0.1.0-preview.7", info.Version);
+        Assert.AreEqual("0.1.0-preview.8", info.Version);
         Assert.AreEqual("V1", info.Mode);
         Assert.AreEqual("default", info.PreviewId);
         Assert.IsFalse(info.V2Enabled);

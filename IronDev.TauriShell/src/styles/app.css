@@ -4968,3 +4968,257 @@ p {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* PR-02C-B: durable project understanding inside the governed Workshop rail. */
+.project-understanding-panel {
+  gap: 14px;
+  align-content: start;
+}
+
+.project-understanding-panel h4,
+.project-understanding-panel h5,
+.project-understanding-panel p,
+.project-understanding-panel ul,
+.project-understanding-panel dl {
+  margin: 0;
+}
+
+.project-understanding-panel__state,
+.project-understanding-panel__delivery {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--fl-line);
+  border-radius: 7px;
+  background: #f7f9fa;
+  padding: 12px;
+  color: var(--fl-ink2);
+  font-size: 13px;
+}
+
+.project-understanding-panel__delivery {
+  border-color: color-mix(in srgb, var(--fl-red) 36%, var(--fl-line));
+  background: color-mix(in srgb, var(--fl-red) 5%, var(--fl-panel));
+}
+
+.project-understanding-panel__section {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--fl-line);
+  padding-top: 14px;
+}
+
+.project-understanding-panel__section-heading {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-understanding-panel__section-heading > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.project-understanding-panel__section-heading h4,
+.project-understanding-panel__rename h4 {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+}
+
+.project-understanding-panel__empty,
+.project-understanding-panel__boundary {
+  color: var(--fl-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.project-understanding-panel__fact-group {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.project-understanding-panel__fact-group > h5 {
+  color: var(--fl-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.project-understanding-fact,
+.project-understanding-conflict {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--fl-line);
+  border-radius: 7px;
+  background: #fbfcfc;
+  padding: 10px;
+}
+
+.project-understanding-fact > header {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.project-understanding-fact > header > strong,
+.project-understanding-fact__value,
+.project-understanding-conflict dd {
+  overflow-wrap: anywhere;
+}
+
+.project-understanding-fact--unknown {
+  border-style: dashed;
+  background: var(--fl-panel);
+}
+
+.project-understanding-fact__unknown-value {
+  color: var(--fl-muted);
+  font-style: italic;
+}
+
+.project-understanding-fact__badges,
+.project-understanding-fact__actions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.project-understanding-fact__badges {
+  justify-content: flex-end;
+}
+
+.project-understanding-fact__value,
+.project-understanding-conflict dd {
+  color: var(--fl-ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.project-understanding-fact__evidence,
+.project-understanding-conflict > p,
+.project-understanding-fact__author,
+.project-understanding-fact__sources {
+  color: var(--fl-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.project-understanding-fact__editor {
+  display: grid;
+  gap: 5px;
+  color: var(--fl-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.project-understanding-fact__editor textarea {
+  width: 100%;
+  min-height: 6rem;
+  border: 1px solid var(--fl-line2);
+  border-radius: 6px;
+  background: var(--fl-panel);
+  color: var(--fl-ink);
+  padding: 8px;
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+}
+
+.project-understanding-fact__sources button {
+  border: 0;
+  background: transparent;
+  color: var(--fl-blue);
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.project-understanding-conflict {
+  border-left: 3px solid var(--fl-red);
+}
+
+.project-understanding-conflict dl {
+  display: grid;
+  gap: 6px;
+}
+
+.project-understanding-conflict dl > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.project-understanding-conflict dt,
+.project-understanding-operational__row dt {
+  color: var(--fl-muted);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.project-understanding-panel__rename {
+  border: 1px solid color-mix(in srgb, var(--fl-blue) 26%, var(--fl-line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--fl-blue) 4%, var(--fl-panel));
+  padding: 12px;
+}
+
+.project-understanding-operational__row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.8fr) minmax(0, 1.2fr);
+  align-items: start;
+  gap: 8px;
+  border-top: 1px solid var(--fl-line);
+  padding-top: 8px;
+}
+
+.project-understanding-operational__row dd {
+  min-width: 0;
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.project-understanding-operational__row small {
+  color: var(--fl-muted);
+  font-size: 10.5px;
+}
+
+@media (max-width: 440px) {
+  .project-understanding-panel__section-heading,
+  .project-understanding-fact > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-understanding-fact__badges {
+    justify-content: flex-start;
+  }
+
+  .project-understanding-operational__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-understanding-operational__row dd {
+    justify-items: start;
+    text-align: left;
+  }
+}

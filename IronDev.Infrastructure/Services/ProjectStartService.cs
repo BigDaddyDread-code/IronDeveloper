@@ -121,14 +121,15 @@ public sealed class ProjectStartService : IProjectStartService
                 INSERT dbo.ProjectUnderstandings
                     (TenantId, ProjectId, Revision, Status, UnderstandingJson, CreatedByActorUserId)
                 VALUES
-                    (@TenantId, @ProjectId, 1, N'Draft', N'{}', @ActorUserId);
+                    (@TenantId, @ProjectId, 1, N'Draft', @UnderstandingJson, @ActorUserId);
                 """,
                 new
                 {
                     command.TenantId,
                     ProjectId = projectId,
                     command.ActorUserId,
-                    Phase = ProjectLifecyclePhases.Shaping
+                    Phase = ProjectLifecyclePhases.Shaping,
+                    UnderstandingJson = ProjectUnderstandingDocumentCodec.EmptyJson
                 },
                 transaction,
                 cancellationToken: cancellationToken));

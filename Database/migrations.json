@@ -205,10 +205,15 @@
                             "path":  "Database/migrate_workbench_ba_preparation_audit.sql",
                             "description":  "Adds sanitized append-only Analyst preparation and fixed read-only snapshot-tool provenance bound to exact Workbench agent-run attempts."
                        },
-                       {
-                            "id":  "2026-07-workbench-pr02c-a-ba-invocation-audit",
-                            "path":  "Database/migrate_workbench_ba_invocation_audit.sql",
-                            "description":  "Adds append-only safe provider invocation metadata bound to the exact Analyst preparation and run attempt, excluding prompts and completions."
-                       }
+                        {
+                             "id":  "2026-07-workbench-pr02c-a-ba-invocation-audit",
+                             "path":  "Database/migrate_workbench_ba_invocation_audit.sql",
+                             "description":  "Adds append-only safe provider invocation metadata bound to the exact Analyst preparation and run attempt, excluding prompts and completions."
+                        },
+                        {
+                             "id":  "2026-07-workbench-pr02c-b-project-understanding",
+                             "path":  "Database/migrate_workbench_project_understanding.sql",
+                             "description":  "Adds typed versioned project-understanding revisions, AgentRun provenance, explicit conflict materialization, and fenced project rename proposals."
+                        }
                    ]
 }

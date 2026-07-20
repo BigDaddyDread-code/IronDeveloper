@@ -11,8 +11,23 @@ The machine-readable current version is `workbench-version.json`. Each preview u
 | `0.1.0-preview.5` | PR-02A | `workbench-pr02a` | Durable BA run submission, immutable server context, retry claims, exactly-once materialization, cancellation, and takeover supersession |
 | `0.1.0-preview.6` | PR-02B | `workbench-pr02b` | Stateless Analyst host, executable version contracts, bounded read-only project tools, pre-invocation fencing, provider timeout, and fair recovery |
 | `0.1.0-preview.7` | PR-02C-A | `workbench-pr02c-a` | Workshop AgentRun authority, role-preserving provider requests, aggregate input/output budgets, pre-write readiness, active/terminal recovery, cancellation, and idempotent project-scoped chat entry |
+| `0.1.0-preview.8` | PR-02C-B | `workbench-pr02c-b` | Typed Project Understanding facts, provenance, locks, conflicts, explicit rename acceptance, and authority-labelled operational projections |
 
-Start the current PR-02C-A preview alongside the earlier previews:
+Start the current PR-02C-B preview alongside the earlier previews:
+
+```powershell
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
+  -EnableConversationAuthority -PreviewId workbench-pr02c-b `
+  -ApiBaseUrl http://127.0.0.1:5250 -UiPort 5231
+```
+
+The PR-02C-B preview owns database `IronDeveloper_Test_workbench_pr02c_b`, workspace `C:\IronDevTestWorkspaces\workbench-pr02c-b`, logs `C:\IronDevTestLogs\workbench-pr02c-b`, API `http://127.0.0.1:5250`, and UI `http://127.0.0.1:5231`.
+
+Project creation remains repository-independent. The Project Context panel makes intent durable as typed, revisioned facts with Unknown, Inferred, Confirmed, and Conflicted states. Users can edit, confirm, lock, unlock, and resolve facts while retaining source provenance. Business Analyst proposals merge only through fenced materialization, and confirmed or locked disagreements become explicit conflicts instead of silent overwrites. A suggested project name remains pending until the user explicitly accepts it. Lifecycle, readiness, and repository status are labelled read-only operational projections; repository setup, tickets, slash commands, and Builder execution authority remain outside PR-02C-B.
+
+For the deterministic LocalTest rename path, send `Rename project to CalmPlan` as its own Workshop message, then accept the pending proposal in Project Context.
+
+The earlier PR-02C-A preview remains available for comparison:
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `

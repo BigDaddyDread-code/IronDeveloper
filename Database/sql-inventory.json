@@ -2377,6 +2377,31 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Stores only sanitized request identifiers, reported token counts, duration, and success/failure category. Raw prompts, completions, secrets, and private reasoning are deliberately excluded."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-project-understanding",
+                        "path":  "Database/migrate_workbench_project_understanding.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "typed dbo.ProjectUnderstandings revision metadata",
+                                               "dbo.ProjectRenameProposals",
+                                               "exact AgentRun understanding provenance",
+                                               "one pending rename proposal per project"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users",
+                                              "dbo.WorkbenchAgentRuns",
+                                              "dbo.ClientOperations"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-02C-B durable project understanding and shaping UI"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Keeps product intent separate from operational truth, records actor or exact AgentRun provenance, and leaves canonical project rename under an explicit user operation."
                     }
                 ]
 }

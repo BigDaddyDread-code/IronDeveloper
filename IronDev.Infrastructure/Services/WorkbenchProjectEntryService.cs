@@ -117,7 +117,7 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                     VALUES (@TenantId, @ProjectId, 1, N'Shaping', @ActorUserId);
                 IF NOT EXISTS (SELECT 1 FROM dbo.ProjectUnderstandings WHERE TenantId=@TenantId AND ProjectId=@ProjectId)
                     INSERT dbo.ProjectUnderstandings (TenantId, ProjectId, Revision, Status, UnderstandingJson, CreatedByActorUserId)
-                    VALUES (@TenantId, @ProjectId, 1, N'Draft', N'{}', @ActorUserId);
+                    VALUES (@TenantId, @ProjectId, 1, N'Draft', @EmptyUnderstandingJson, @ActorUserId);
                 IF NOT EXISTS (SELECT 1 FROM dbo.ProjectReadinessAssessments WHERE TenantId=@TenantId AND ProjectId=@ProjectId)
                     INSERT dbo.ProjectReadinessAssessments
                         (TenantId, ProjectId, Revision, ExecutionReadiness, ReasonCode, Summary, AssessedByActorUserId)
@@ -125,7 +125,13 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                         (@TenantId, @ProjectId, 1, N'NotConfigured', N'RepositoryNotConfigured',
                          N'Repository and execution profile have not been configured.', @ActorUserId);
                 """,
-                command,
+                new
+                {
+                    command.TenantId,
+                    command.ProjectId,
+                    command.ActorUserId,
+                    EmptyUnderstandingJson = ProjectUnderstandingDocumentCodec.EmptyJson
+                },
                 transaction,
                 cancellationToken: cancellationToken));
 
