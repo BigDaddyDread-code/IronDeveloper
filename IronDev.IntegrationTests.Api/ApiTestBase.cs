@@ -321,6 +321,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ba_preparation_audit.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ba_invocation_audit.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_project_understanding.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_commands.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -643,6 +644,7 @@ public abstract class ApiTestBase
             IF COL_LENGTH('dbo.ClientOperations', 'ResultAgentRunId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations SET ResultAgentRunId=NULL;';
             IF OBJECT_ID('dbo.WorkbenchOutboxEvents', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchOutboxEvents;
+            IF OBJECT_ID('dbo.ProjectRenameProposals', 'U') IS NOT NULL DELETE FROM dbo.ProjectRenameProposals;
             IF OBJECT_ID('dbo.WorkbenchBusinessAnalystInvocationAudits', 'U') IS NOT NULL
             BEGIN
                 IF OBJECT_ID('dbo.TR_WorkbenchBusinessAnalystInvocationAudits_BlockUpdateDelete', 'TR') IS NOT NULL
@@ -674,6 +676,7 @@ public abstract class ApiTestBase
                         ON dbo.WorkbenchBusinessAnalystPreparations;
             END
             IF OBJECT_ID('dbo.WorkbenchAgentRunAttempts', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRunAttempts;
+            IF OBJECT_ID('dbo.WorkbenchCommandRejections', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchCommandRejections;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
             IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL DELETE FROM dbo.ClientOperations;
             DELETE FROM dbo.ChatMessages;

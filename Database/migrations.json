@@ -214,6 +214,11 @@
                              "id":  "2026-07-workbench-pr02c-b-project-understanding",
                              "path":  "Database/migrate_workbench_project_understanding.sql",
                              "description":  "Adds typed versioned project-understanding revisions, AgentRun provenance, explicit conflict materialization, and fenced project rename proposals."
+                        },
+                        {
+                             "id":  "2026-07-workbench-pr03-commands",
+                             "path":  "Database/migrate_workbench_commands.sql",
+                             "description":  "Adds durable privacy-preserving audit records for deterministic Workbench slash-command rejections."
                         }
                    ]
 }

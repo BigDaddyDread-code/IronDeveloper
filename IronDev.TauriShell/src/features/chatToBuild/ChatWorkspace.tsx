@@ -9,6 +9,7 @@ import { ChatThread } from './ChatThread';
 import { ProjectUnderstandingPanel } from './ProjectUnderstandingPanel';
 import type { ChatAgentRunState, ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 import type { ProjectUnderstandingController } from './useProjectUnderstanding';
+import type { WorkbenchCommandNotice, WorkbenchCommandToken } from './workbenchCommands';
 
 interface ChatWorkspaceProps {
   sessions: ProjectChatSession[];
@@ -33,6 +34,7 @@ interface ChatWorkspaceProps {
   documentSourceLoadState: 'idle' | 'loading' | 'ready' | 'error';
   documentSourceError: string | null;
   selectedDocumentSource: ChatDocumentSource | null;
+  commandNotice: WorkbenchCommandNotice | null;
   errorMessage: string | null;
   latestResponse: ChatCompletionResponse | null;
   latestResponseText: string | null;
@@ -43,6 +45,7 @@ interface ChatWorkspaceProps {
   onRetryChannels: () => void;
   onStartNewConversation: () => void;
   onComposerChange: (value: string) => void;
+  onSelectCommand: (token: WorkbenchCommandToken) => void;
   onSend: (request?: ChatSendRequest) => void;
   onCancelAgentRun: () => void;
   onLoadDocumentSources: () => void;
@@ -79,6 +82,7 @@ export function ChatWorkspace({
   documentSourceLoadState,
   documentSourceError,
   selectedDocumentSource,
+  commandNotice,
   errorMessage,
   latestResponse,
   latestResponseText,
@@ -89,6 +93,7 @@ export function ChatWorkspace({
   onRetryChannels,
   onStartNewConversation,
   onComposerChange,
+  onSelectCommand,
   onSend,
   onCancelAgentRun,
   onLoadDocumentSources,
@@ -205,7 +210,9 @@ export function ChatWorkspace({
               documentSourceLoadState={documentSourceLoadState}
               documentSourceError={documentSourceError}
               selectedDocumentSource={selectedDocumentSource}
+              commandNotice={commandNotice}
               onChange={onComposerChange}
+              onSelectCommand={onSelectCommand}
               onSend={() => onSend()}
               onCancelAgentRun={onCancelAgentRun}
               onLoadDocumentSources={onLoadDocumentSources}
