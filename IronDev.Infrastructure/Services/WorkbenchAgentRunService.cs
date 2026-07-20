@@ -21,15 +21,32 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
     private readonly IDbConnectionFactory _connections;
     private readonly IChatTurnPersistenceService _turnPersistence;
     private readonly IWorkbenchAgentRunFailureInjector _failureInjector;
+    private readonly IWorkbenchAgentRunSubmissionAvailability _availability;
 
     public WorkbenchAgentRunService(
         IDbConnectionFactory connections,
         IChatTurnPersistenceService turnPersistence,
-        IWorkbenchAgentRunFailureInjector? failureInjector = null)
+        IWorkbenchAgentRunFailureInjector? failureInjector = null,
+        IWorkbenchAgentRunSubmissionAvailability? availability = null)
     {
         _connections = connections;
         _turnPersistence = turnPersistence;
         _failureInjector = failureInjector ?? new NoOpWorkbenchAgentRunFailureInjector();
+        _availability = availability ?? new UnavailableWorkbenchAgentRunSubmissionAvailability();
+    }
+
+    public async Task<WorkbenchAgentRunSubmissionAvailability> GetSubmissionAvailabilityAsync(
+        int tenantId,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var availability = await _availability.CheckAsync(tenantId, projectId, cancellationToken)
+            .ConfigureAwait(false);
+        return availability.IsAvailable
+            ? WorkbenchAgentRunSubmissionAvailability.Available
+            : new WorkbenchAgentRunSubmissionAvailability(
+                false,
+                availability.FailureCategory ?? WorkbenchAgentRunFailureCategories.ServiceUnavailable);
     }
 
     public async Task<SubmitWorkbenchAgentRunResult> SubmitAsync(
@@ -76,6 +93,25 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 return replay;
             }
 
+            if (!await IsLeaseCurrentAsync(
+                    connection,
+                    transaction,
+                    command.TenantId,
+                    command.ActorUserId,
+                    command.ProjectId,
+                    command.WorkbenchSessionId,
+                    command.LeaseEpoch,
+                    cancellationToken))
+                throw new WorkbenchLeaseFenceException();
+
+            var availability = await GetSubmissionAvailabilityAsync(
+                command.TenantId,
+                command.ProjectId,
+                cancellationToken).ConfigureAwait(false);
+            if (!availability.IsAvailable)
+                throw new WorkbenchAgentRunUnavailableException(
+                    availability.FailureCategory ?? WorkbenchAgentRunFailureCategories.ServiceUnavailable);
+
             if (!await ValidateAndRenewLeaseAsync(
                     connection,
                     transaction,
@@ -113,9 +149,9 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             if (conversationBound != 1)
                 throw new WorkbenchChatSessionBindingException();
 
-            var activeRunExists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            var activeRunId = await connection.QuerySingleOrDefaultAsync<Guid?>(new CommandDefinition(
                 """
-                SELECT COUNT(1)
+                SELECT TOP (1) AgentRunId
                 FROM dbo.WorkbenchAgentRuns WITH (UPDLOCK, HOLDLOCK)
                 WHERE TenantId=@TenantId AND ProjectId=@ProjectId
                   AND WorkbenchSessionId=@WorkbenchSessionId AND ActiveRunSlot=1;
@@ -123,8 +159,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 command,
                 transaction,
                 cancellationToken: cancellationToken));
-            if (activeRunExists != 0)
-                throw new WorkbenchAgentRunAlreadyActiveException();
+            if (activeRunId.HasValue)
+                throw new WorkbenchAgentRunAlreadyActiveException(activeRunId.Value);
 
             var agentRunId = Guid.NewGuid();
             var createdAtUtc = DateTime.UtcNow;
@@ -486,6 +522,129 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         if (row is null)
             throw new WorkbenchAgentRunNotFoundException();
         return ToSnapshot(row);
+    }
+
+    public async Task<WorkbenchAgentRunCurrentState> GetCurrentActiveAsync(
+        int tenantId,
+        int actorUserId,
+        int projectId,
+        long workbenchSessionId,
+        long leaseEpoch,
+        long? chatSessionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (tenantId <= 0 || actorUserId <= 0 || projectId <= 0 ||
+            workbenchSessionId <= 0 || leaseEpoch <= 0 || chatSessionId < 0)
+            throw new WorkbenchAgentRunValidationException(
+                "A current project and Workbench lease are required.");
+
+        using var connection = _connections.CreateConnection();
+        connection.Open();
+        using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+        try
+        {
+            if (!await CanAccessProjectAsync(
+                    connection,
+                    transaction,
+                    tenantId,
+                    actorUserId,
+                    projectId,
+                    cancellationToken))
+                throw new WorkbenchProjectNotAccessibleException();
+
+            if (!await IsLeaseCurrentAsync(
+                    connection,
+                    transaction,
+                    tenantId,
+                    actorUserId,
+                    projectId,
+                    workbenchSessionId,
+                    leaseEpoch,
+                    cancellationToken))
+                throw new WorkbenchLeaseFenceException();
+
+            var chatBinding = await connection.QuerySingleOrDefaultAsync<WorkbenchSessionChatBindingRow>(new CommandDefinition(
+                """
+                SELECT session.ActiveChatSessionId
+                FROM dbo.WorkbenchSessions session WITH (HOLDLOCK)
+                WHERE session.TenantId=@TenantId AND session.ProjectId=@ProjectId
+                  AND session.Id=@WorkbenchSessionId AND session.Status=N'Active';
+                """,
+                new
+                {
+                    TenantId = tenantId,
+                    ProjectId = projectId,
+                    WorkbenchSessionId = workbenchSessionId
+                },
+                transaction,
+                cancellationToken: cancellationToken));
+            if (chatBinding is null)
+                throw new WorkbenchLeaseFenceException();
+
+            var requestedChatSessionId = chatSessionId is > 0 ? chatSessionId : null;
+            if (requestedChatSessionId.HasValue)
+            {
+                var chatExists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                    """
+                    SELECT COUNT(1)
+                    FROM dbo.ProjectChatSessions WITH (HOLDLOCK)
+                    WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@ChatSessionId;
+                    """,
+                    new
+                    {
+                        TenantId = tenantId,
+                        ProjectId = projectId,
+                        ChatSessionId = requestedChatSessionId.Value
+                    },
+                    transaction,
+                    cancellationToken: cancellationToken));
+                if (chatExists == 0)
+                    throw new WorkbenchChatSessionBindingException();
+            }
+
+            if (chatBinding.ActiveChatSessionId.HasValue && requestedChatSessionId.HasValue &&
+                chatBinding.ActiveChatSessionId.Value != requestedChatSessionId.Value)
+                throw new WorkbenchChatSessionBindingException();
+
+            var effectiveChatSessionId = chatBinding.ActiveChatSessionId ?? requestedChatSessionId;
+            AgentRunRow? latestRun = null;
+            if (effectiveChatSessionId.HasValue)
+            {
+                latestRun = await connection.QuerySingleOrDefaultAsync<AgentRunRow>(new CommandDefinition(
+                    """
+                    SELECT TOP (1) *
+                    FROM dbo.WorkbenchAgentRuns WITH (HOLDLOCK)
+                    WHERE TenantId=@TenantId AND ProjectId=@ProjectId
+                      AND WorkbenchSessionId=@WorkbenchSessionId AND LeaseEpoch=@LeaseEpoch
+                      AND ChatSessionId=@ChatSessionId
+                    ORDER BY CreatedAtUtc DESC, AgentRunId DESC;
+                    """,
+                    new
+                    {
+                        TenantId = tenantId,
+                        ProjectId = projectId,
+                        WorkbenchSessionId = workbenchSessionId,
+                        LeaseEpoch = leaseEpoch,
+                        ChatSessionId = effectiveChatSessionId.Value
+                    },
+                    transaction,
+                    cancellationToken: cancellationToken));
+            }
+
+            transaction.Commit();
+            var latestSnapshot = latestRun is null ? null : ToSnapshot(latestRun);
+            return new WorkbenchAgentRunCurrentState(
+                chatBinding.ActiveChatSessionId,
+                latestSnapshot is not null && !WorkbenchAgentRunStates.IsTerminal(latestSnapshot.Status)
+                    ? latestSnapshot
+                    : null,
+                latestSnapshot);
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
     }
 
     public async Task<WorkbenchAgentRunClaim?> ClaimAsync(
@@ -1108,8 +1267,9 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 "A current project, Workbench lease, chat session, and client operation ID are required.");
         if (string.IsNullOrWhiteSpace(command.Message))
             throw new WorkbenchAgentRunValidationException("message is required.");
-        if (command.Message.Length > 100_000)
-            throw new WorkbenchAgentRunValidationException("message exceeds the 100000 character limit.");
+        if (command.Message.Length > WorkbenchBusinessAnalystProviderContract.MaximumConversationMessageCharacters)
+            throw new WorkbenchAgentRunValidationException(
+                $"message exceeds the {WorkbenchBusinessAnalystProviderContract.MaximumConversationMessageCharacters} character limit.");
     }
 
     private static async Task<bool> CanAccessProjectAsync(
@@ -1149,6 +1309,44 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             UPDATE lease
             SET HeartbeatAtUtc=SYSUTCDATETIME(), ExpiresAtUtc=DATEADD(MINUTE, 30, SYSUTCDATETIME())
             FROM dbo.WorkbenchWriteLeases lease WITH (UPDLOCK, HOLDLOCK)
+            INNER JOIN dbo.WorkbenchSessions session
+                ON session.TenantId=lease.TenantId AND session.ProjectId=lease.ProjectId
+               AND session.Id=lease.WorkbenchSessionId AND session.Status=N'Active'
+            INNER JOIN dbo.ProjectMembers member
+                ON member.TenantId=lease.TenantId AND member.ProjectId=lease.ProjectId
+               AND member.UserId=@ActorUserId AND member.Status=N'Active'
+            INNER JOIN dbo.TenantUsers tenantMember
+                ON tenantMember.TenantId=lease.TenantId AND tenantMember.UserId=@ActorUserId
+            INNER JOIN dbo.Users actor ON actor.Id=@ActorUserId AND actor.IsActive=1
+            WHERE lease.TenantId=@TenantId AND lease.ProjectId=@ProjectId
+              AND lease.WorkbenchSessionId=@WorkbenchSessionId AND lease.LeaseEpoch=@LeaseEpoch
+              AND lease.HolderActorUserId=@ActorUserId AND lease.RevokedAtUtc IS NULL
+              AND lease.ExpiresAtUtc > SYSUTCDATETIME();
+            """,
+            new
+            {
+                TenantId = tenantId,
+                ActorUserId = actorUserId,
+                ProjectId = projectId,
+                WorkbenchSessionId = workbenchSessionId,
+                LeaseEpoch = leaseEpoch
+            },
+            transaction,
+            cancellationToken: cancellationToken)) > 0;
+
+    private static async Task<bool> IsLeaseCurrentAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        int tenantId,
+        int actorUserId,
+        int projectId,
+        long workbenchSessionId,
+        long leaseEpoch,
+        CancellationToken cancellationToken) =>
+        await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            """
+            SELECT COUNT(1)
+            FROM dbo.WorkbenchWriteLeases lease WITH (HOLDLOCK)
             INNER JOIN dbo.WorkbenchSessions session
                 ON session.TenantId=lease.TenantId AND session.ProjectId=lease.ProjectId
                AND session.Id=lease.WorkbenchSessionId AND session.Status=N'Active'
@@ -1557,6 +1755,9 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             transaction,
             cancellationToken: cancellationToken));
 
+    // PR-02C-A deliberately has no failed-run retry mutation. The durable run is uniquely
+    // bound to its source user message and audited attempts; only the original submit
+    // operation may be replayed to recover its receipt. A new user turn is a new message.
     private static WorkbenchAgentRunSnapshot ToSnapshot(AgentRunRow run) => new(
         run.AgentRunId,
         run.TenantId,
@@ -1572,7 +1773,30 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         run.CreatedAtUtc,
         run.StartedAtUtc,
         run.CompletedAtUtc,
-        run.CancellationRequestedAtUtc);
+        run.CancellationRequestedAtUtc,
+        MapFailureCategory(run),
+        Retryable: false);
+
+    private static string? MapFailureCategory(AgentRunRow run)
+    {
+        if (run.Status is WorkbenchAgentRunStates.Stale or WorkbenchAgentRunStates.Superseded)
+            return WorkbenchAgentRunFailureCategories.AuthorityChanged;
+        if (run.Status != WorkbenchAgentRunStates.Failed)
+            return null;
+
+        return run.DiagnosticCode switch
+        {
+            "agent_provider_timeout" => WorkbenchAgentRunFailureCategories.ProviderTimeout,
+            "agent_output_schema_invalid" => WorkbenchAgentRunFailureCategories.InvalidResponse,
+            "agent_context_too_large" => WorkbenchAgentRunFailureCategories.ContextTooLarge,
+            "agent_contract_version_unsupported" or
+            "agent_provider_timeout_invalid" or
+            "agent_provider_role_hierarchy_unsupported" or
+            "agent_provider_envelope_invalid" =>
+                WorkbenchAgentRunFailureCategories.Configuration,
+            _ => WorkbenchAgentRunFailureCategories.ExecutionFailed
+        };
+    }
 
     internal static string ComputeHash(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
@@ -1614,11 +1838,17 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         public string? ContextHash { get; init; }
         public long? BasedOnUnderstandingRevision { get; init; }
         public string? OutputHash { get; init; }
+        public string? DiagnosticCode { get; init; }
     }
 
     private sealed class SuccessorFenceRow
     {
         public long WorkbenchSessionId { get; init; }
         public long LeaseEpoch { get; init; }
+    }
+
+    private sealed class WorkbenchSessionChatBindingRow
+    {
+        public long? ActiveChatSessionId { get; init; }
     }
 }

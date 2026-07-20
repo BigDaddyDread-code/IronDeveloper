@@ -25,6 +25,7 @@ public sealed class WorkbenchAgentRunsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<SubmitWorkbenchAgentRunResult>> Submit(
         int projectId,
         SubmitWorkbenchAgentRunRequest request,
@@ -45,6 +46,46 @@ public sealed class WorkbenchAgentRunsController : ControllerBase
                     request.Message),
                 cancellationToken);
             return AcceptedAtAction(nameof(Get), new { projectId, agentRunId = result.AgentRunId }, result);
+        }
+        catch (Exception exception)
+        {
+            return MapFailure(exception);
+        }
+    }
+
+    [HttpGet("current")]
+    [ProducesResponseType(typeof(WorkbenchAgentRunRecoveryContext), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<WorkbenchAgentRunRecoveryContext>> GetCurrent(
+        int projectId,
+        [FromQuery] long workbenchSessionId,
+        [FromQuery] long leaseEpoch,
+        [FromQuery] long? chatSessionId,
+        CancellationToken cancellationToken)
+    {
+        var actor = CurrentActor();
+        try
+        {
+            var current = await _runs.GetCurrentActiveAsync(
+                _tenant.TenantId,
+                actor.UserId,
+                projectId,
+                workbenchSessionId,
+                leaseEpoch,
+                chatSessionId,
+                cancellationToken);
+            var availability = await _runs.GetSubmissionAvailabilityAsync(
+                _tenant.TenantId,
+                projectId,
+                cancellationToken);
+            return Ok(new WorkbenchAgentRunRecoveryContext(
+                availability.IsAvailable,
+                availability.IsAvailable ? null : availability.FailureCategory,
+                current.BoundChatSessionId,
+                current.ActiveRun,
+                current.LatestRun));
         }
         catch (Exception exception)
         {
@@ -119,7 +160,20 @@ public sealed class WorkbenchAgentRunsController : ControllerBase
         WorkbenchChatSessionBindingException binding =>
             Conflict(new { error = WorkbenchChatSessionBindingException.ErrorCode, message = binding.Message }),
         WorkbenchAgentRunAlreadyActiveException active =>
-            Conflict(new { error = WorkbenchAgentRunAlreadyActiveException.ErrorCode, message = active.Message }),
+            Conflict(new
+            {
+                error = WorkbenchAgentRunAlreadyActiveException.ErrorCode,
+                message = active.Message,
+                agentRunId = active.AgentRunId
+            }),
+        WorkbenchAgentRunUnavailableException unavailable =>
+            StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = WorkbenchAgentRunUnavailableException.ErrorCode,
+                message = unavailable.Message,
+                failureCategory = unavailable.FailureCategory,
+                retryable = false
+            }),
         WorkbenchLeaseFenceException fence =>
             Conflict(new { error = WorkbenchLeaseFenceException.ErrorCode, message = fence.Message }),
         WorkbenchProjectNotAccessibleException or WorkbenchAgentRunNotFoundException =>

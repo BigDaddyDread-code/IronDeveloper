@@ -176,6 +176,15 @@ builder.Services.AddSingleton<IProjectStartFailureInjector, NoOpProjectStartFail
 builder.Services.AddScoped<IProjectStartService, ProjectStartService>();
 builder.Services.AddScoped<IWorkbenchProjectEntryService, WorkbenchProjectEntryService>();
 builder.Services.AddSingleton<IWorkbenchAgentRunFailureInjector, NoOpWorkbenchAgentRunFailureInjector>();
+var workbenchAgentRunWorkerEnabled =
+    builder.Configuration.GetValue<bool>("Features:WorkbenchAgentRunWorker");
+builder.Services.AddScoped<IWorkbenchAgentRunSubmissionAvailability>(services =>
+    new ConfigurationWorkbenchAgentRunSubmissionAvailability(
+        workbenchAgentRunWorkerEnabled,
+        services.GetRequiredService<ISkeletonAgentProfileService>(),
+        services.GetRequiredService<IAgentLlmResolver>(),
+        services.GetRequiredService<IConfiguration>(),
+        services.GetRequiredService<IHostEnvironment>()));
 builder.Services.AddScoped<IWorkbenchAgentRunService, WorkbenchAgentRunService>();
 builder.Services.AddScoped<IWorkbenchAgentContextAssembler, WorkbenchAgentContextAssembler>();
 builder.Services.AddScoped<IWorkbenchAgentRunOutbox, WorkbenchAgentRunOutbox>();
@@ -190,9 +199,11 @@ builder.Services.AddScoped<IWorkbenchBusinessAnalystModelGateway,
     WorkbenchBusinessAnalystModelGateway>();
 builder.Services.AddScoped<IWorkbenchBusinessAnalystPreparationAuditStore,
     SqlWorkbenchBusinessAnalystPreparationAuditStore>();
+builder.Services.AddScoped<IWorkbenchBusinessAnalystInvocationAuditStore,
+    SqlWorkbenchBusinessAnalystInvocationAuditStore>();
 builder.Services.AddScoped<IWorkbenchBusinessAnalystAgent,
     WorkbenchBusinessAnalystAgent>();
-if (builder.Configuration.GetValue<bool>("Features:WorkbenchAgentRunWorker"))
+if (workbenchAgentRunWorkerEnabled)
     builder.Services.AddHostedService<WorkbenchAgentRunOutboxWorker>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IProjectChatDocumentSourceService, ProjectChatDocumentSourceService>();

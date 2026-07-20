@@ -42,6 +42,11 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
         </div>
       </header>
       <MarkdownRenderer markdown={message.content} testId={`chat.message.${message.role}.markdown`} />
+      {message.deliveryState === 'uncertain' ? (
+        <p className="chat-message__delivery-state" data-testid="chat.message.deliveryUncertain">
+          Delivery not confirmed. Retry the unchanged message to reuse the same operation.
+        </p>
+      ) : null}
       {documentSources.length > 0 ? (
         <div className="chat-message__document-sources" data-testid="chat.message.documentSources">
           {documentSources.map((source) => (

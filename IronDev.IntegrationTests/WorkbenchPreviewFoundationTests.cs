@@ -16,7 +16,7 @@ public sealed class WorkbenchPreviewFoundationTests
 
         var version = manifest.RootElement.GetProperty("version").GetString();
         Assert.AreEqual(1, manifest.RootElement.GetProperty("schemaVersion").GetInt32());
-        Assert.AreEqual("PR-02A", manifest.RootElement.GetProperty("programmePr").GetString());
+        Assert.AreEqual("PR-02C-A", manifest.RootElement.GetProperty("programmePr").GetString());
         Assert.AreEqual(version, defaults.RootElement.GetProperty("WorkbenchV2").GetProperty("Version").GetString());
         Assert.AreEqual(version, localTest.RootElement.GetProperty("WorkbenchV2").GetProperty("Version").GetString());
         Assert.IsFalse(defaults.RootElement.GetProperty("WorkbenchV2").GetProperty("Enabled").GetBoolean());
@@ -34,9 +34,13 @@ public sealed class WorkbenchPreviewFoundationTests
 
         StringAssert.Contains(wrapper, "[string]$PreviewId");
         StringAssert.Contains(wrapper, "[switch]$UseV1");
+        StringAssert.Contains(wrapper, "[switch]$EnableConversationAuthority");
+        StringAssert.Contains(wrapper, "$arguments += \"-EnableConversationAuthority\"");
         StringAssert.Contains(launcher, "ASPNETCORE_URLS = $ApiBaseUrl");
         StringAssert.Contains(launcher, "Cors__AllowedOrigins__0 = \"http://127.0.0.1:$UiPort\"");
         StringAssert.Contains(launcher, "WorkbenchV2__PreviewId = $PreviewId");
+        StringAssert.Contains(launcher, "WorkbenchV2__ConversationAuthorityEnabled = ([bool]$EnableConversationAuthority).ToString().ToLowerInvariant()");
+        StringAssert.Contains(launcher, "Conversation authority cannot be enabled while the V1 fallback is selected.");
         StringAssert.Contains(launcher, "-PreviewId $PreviewId");
         StringAssert.Contains(reset, "Get-LocalTestSeedContract -PreviewId $PreviewId");
         StringAssert.Contains(contract, "IronDeveloper_Test_$databaseSuffix");

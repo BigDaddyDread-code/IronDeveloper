@@ -329,6 +329,7 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
             IF COL_LENGTH('dbo.ClientOperations', 'ResultAgentRunId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations SET ResultAgentRunId=NULL;';
             DROP TABLE IF EXISTS dbo.WorkbenchOutboxEvents;
+            DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystInvocationAudits;
             DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystToolCallAudits;
             DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystPreparations;
             DROP TABLE IF EXISTS dbo.WorkbenchAgentRunAttempts;

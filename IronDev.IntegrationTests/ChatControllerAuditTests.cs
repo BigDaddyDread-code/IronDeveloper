@@ -1,12 +1,15 @@
 using System.Data;
+using System.Security.Claims;
 using System.Text.Json;
 using IronDev.Api.Controllers;
+using IronDev.Core.Auth;
 using IronDev.Core.Chat;
 using IronDev.Core.Interfaces;
 using IronDev.Core.Models;
 using IronDev.Data.Models;
 using IronDev.Infrastructure.Services;
 using IronDev.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -19,13 +22,7 @@ public sealed class ChatControllerAuditTests
     public async Task GetMessageAudit_ReturnsDurableAudit_WhenScopedSnapshotExists()
     {
         var snapshot = BuildSnapshot(messageId: 9001);
-        var controller = new ChatController(
-            new UnusedChatHistoryService(),
-            new UnusedChatFeedbackService(),
-            new ScopedTurnPersistenceService(7, 9701, 9001, snapshot),
-            new UnusedProjectChatResponseService(),
-            new UnusedProjectStateReviewService(),
-            new UnusedProjectChatDocumentSourceService());
+        var controller = CreateController(new ScopedTurnPersistenceService(7, 9701, 9001, snapshot));
 
         var result = await controller.GetMessageAudit(7, 9701, 9001);
 
@@ -49,13 +46,7 @@ public sealed class ChatControllerAuditTests
     public async Task GetMessageAudit_LabelsTagsFallback_WhenSnapshotIsFallbackEvidence()
     {
         var snapshot = BuildSnapshot(messageId: 9001, isFallbackEvidence: true);
-        var controller = new ChatController(
-            new UnusedChatHistoryService(),
-            new UnusedChatFeedbackService(),
-            new ScopedTurnPersistenceService(7, 9701, 9001, snapshot),
-            new UnusedProjectChatResponseService(),
-            new UnusedProjectStateReviewService(),
-            new UnusedProjectChatDocumentSourceService());
+        var controller = CreateController(new ScopedTurnPersistenceService(7, 9701, 9001, snapshot));
 
         var result = await controller.GetMessageAudit(7, 9701, 9001);
 
@@ -71,13 +62,7 @@ public sealed class ChatControllerAuditTests
     public async Task GetMessageAudit_SerializesAuditEnumsAsStrings()
     {
         var snapshot = BuildSnapshot(messageId: 9001);
-        var controller = new ChatController(
-            new UnusedChatHistoryService(),
-            new UnusedChatFeedbackService(),
-            new ScopedTurnPersistenceService(7, 9701, 9001, snapshot),
-            new UnusedProjectChatResponseService(),
-            new UnusedProjectStateReviewService(),
-            new UnusedProjectChatDocumentSourceService());
+        var controller = CreateController(new ScopedTurnPersistenceService(7, 9701, 9001, snapshot));
 
         var result = await controller.GetMessageAudit(7, 9701, 9001);
         var ok = result.Result as OkObjectResult;
@@ -100,13 +85,11 @@ public sealed class ChatControllerAuditTests
     [TestMethod]
     public async Task GetMessageAudit_ReturnsNotFound_WhenScopedAuditIsMissing()
     {
-        var controller = new ChatController(
-            new UnusedChatHistoryService(),
-            new UnusedChatFeedbackService(),
-            new ScopedTurnPersistenceService(7, 9701, 9001, BuildSnapshot(messageId: 9001)),
-            new UnusedProjectChatResponseService(),
-            new UnusedProjectStateReviewService(),
-            new UnusedProjectChatDocumentSourceService());
+        var controller = CreateController(new ScopedTurnPersistenceService(
+            7,
+            9701,
+            9001,
+            BuildSnapshot(messageId: 9001)));
 
         var wrongProject = await controller.GetMessageAudit(8, 9701, 9001);
         var wrongSession = await controller.GetMessageAudit(7, 9702, 9001);
@@ -115,6 +98,29 @@ public sealed class ChatControllerAuditTests
         Assert.IsInstanceOfType(wrongProject.Result, typeof(NotFoundResult));
         Assert.IsInstanceOfType(wrongSession.Result, typeof(NotFoundResult));
         Assert.IsInstanceOfType(wrongMessage.Result, typeof(NotFoundResult));
+    }
+
+    private static ChatController CreateController(IChatTurnPersistenceService turnPersistence)
+    {
+        var controller = new ChatController(
+            new UnusedChatHistoryService(),
+            new UnusedChatFeedbackService(),
+            turnPersistence,
+            new UnusedProjectChatResponseService(),
+            new UnusedProjectStateReviewService(),
+            new UnusedProjectChatDocumentSourceService(),
+            tenant: new StubTenantContext(),
+            memberships: new AllowProjectMembershipService());
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(ClaimTypes.NameIdentifier, "7")],
+                    "ChatControllerAuditTests"))
+            }
+        };
+        return controller;
     }
 
     private static ChatTurnPersistenceSnapshot BuildSnapshot(long messageId, bool isFallbackEvidence = false) =>
@@ -195,18 +201,53 @@ public sealed class ChatControllerAuditTests
                     : null);
     }
 
+    private sealed class StubTenantContext : ICurrentTenantContext
+    {
+        public int TenantId => 1;
+    }
+
+    private sealed class AllowProjectMembershipService : IProjectMembershipService
+    {
+        public Task<bool> HasAccessAsync(int tenantId, int projectId, int userId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(tenantId == 1 && projectId > 0 && userId == 7);
+
+        public Task<IReadOnlySet<int>> GetAccessibleProjectIdsAsync(int tenantId, int userId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlySet<int>>(new HashSet<int>());
+
+        public Task<IReadOnlyList<ProjectMembershipEntry>> GetMembersAsync(int tenantId, int projectId, int currentUserId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ProjectMembershipEntry>>([]);
+
+        public Task<ProjectMembershipMutationStatus> SetMemberAsync(int tenantId, int projectId, int userId, int actorUserId, string projectRole, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ProjectMembershipMutationStatus.Succeeded);
+
+        public Task<ProjectMembershipMutationStatus> RemoveMemberAsync(int tenantId, int projectId, int userId, int actorUserId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ProjectMembershipMutationStatus.Succeeded);
+    }
+
     private sealed class UnusedChatHistoryService : IChatHistoryService
     {
         public Task<IReadOnlyList<ProjectChatSession>> GetRecentSessionsAsync(int projectId, int take = 50, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<ProjectChatSession?> GetSessionByIdAsync(long sessionId, CancellationToken cancellationToken = default) =>
+        public Task<ProjectChatSession?> GetSessionByIdAsync(int projectId, long sessionId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<long?> TryReplaySessionCreateAsync(ProjectChatSession session, int actorUserId, Guid clientOperationId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<long> CreateSessionIdempotentlyAsync(
+            ProjectChatSession session,
+            int actorUserId,
+            Guid clientOperationId,
+            long workbenchSessionId,
+            long leaseEpoch,
+            CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<long> SaveSessionAsync(ProjectChatSession session, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task DeleteSessionAsync(long sessionId, CancellationToken cancellationToken = default) =>
+        public Task<bool> DeleteSessionAsync(int projectId, long sessionId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<long> SaveMessageAsync(ChatMessage message, CancellationToken cancellationToken = default) =>

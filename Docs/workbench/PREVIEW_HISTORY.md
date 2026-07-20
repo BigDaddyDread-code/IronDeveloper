@@ -10,22 +10,31 @@ The machine-readable current version is `workbench-version.json`. Each preview u
 | `0.1.0-preview.4` | PR-01 acceptance correction | `workbench-pr01` | Legacy-route membership enforcement, mutation-driven lease renewal, and replayable project-open retries |
 | `0.1.0-preview.5` | PR-02A | `workbench-pr02a` | Durable BA run submission, immutable server context, retry claims, exactly-once materialization, cancellation, and takeover supersession |
 | `0.1.0-preview.6` | PR-02B | `workbench-pr02b` | Stateless Analyst host, executable version contracts, bounded read-only project tools, pre-invocation fencing, provider timeout, and fair recovery |
+| `0.1.0-preview.7` | PR-02C-A | `workbench-pr02c-a` | Workshop AgentRun authority, role-preserving provider requests, aggregate input/output budgets, pre-write readiness, active/terminal recovery, cancellation, and idempotent project-scoped chat entry |
 
-Start the current PR-02B preview alongside the earlier previews:
+Start the current PR-02C-A preview alongside the earlier previews:
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -PreviewId workbench-pr02b -ApiBaseUrl http://127.0.0.1:5230 -UiPort 5211
+  -EnableConversationAuthority -PreviewId workbench-pr02c-a `
+  -ApiBaseUrl http://127.0.0.1:5240 -UiPort 5221
 ```
 
-The PR-02B preview owns:
+The PR-02C-A preview owns:
 
-- database `IronDeveloper_Test_workbench_pr02b`;
-- workspace `C:\IronDevTestWorkspaces\workbench-pr02b`;
-- logs `C:\IronDevTestLogs\workbench-pr02b`;
-- API `http://127.0.0.1:5230`;
-- UI `http://127.0.0.1:5211`.
+- database `IronDeveloper_Test_workbench_pr02c_a`;
+- workspace `C:\IronDevTestWorkspaces\workbench-pr02c-a`;
+- logs `C:\IronDevTestLogs\workbench-pr02c-a`;
+- API `http://127.0.0.1:5240`;
+- UI `http://127.0.0.1:5221`.
 
-Project creation remains repository-independent. PR-02B executes durable BA turns through the existing Analyst role with no agent-owned memory and no repository, filesystem, Builder, or write tools. The existing Workshop conversation UI stays on its compatibility path until the later conversation slice wires submission and polling.
+Project creation remains repository-independent. In this preview, Workshop checks project-scoped BA readiness before creating the first conversation, creates that session with an atomic lease fence and durable operation, submits a fenced durable run, reports queued/running/terminal state, can cancel the active run, recovers active or terminal state after reload, and renders only backend-persisted messages. Ambiguous create or submit delivery retains the exact operation receipt, disables conversation navigation and altered sends, and permits only the unchanged authoritative replay. The browser does not call legacy completion or direct message writes while conversation authority is active. One Workbench session remains bound to one direct conversation; this preview has no close/new-session action. Document attachments, structured BA draft metadata, durable understanding updates, and `/ticket` formalization remain outside PR-02C-A.
 
-Run `tools/localtest/test-workbench-ba-host.ps1` against the preview for the backend BA proof. It returns a follow-up command that reopens the same project and chat after a host restart, demonstrating that the new host reconstructs each turn from durable server-owned state.
+The lower-level backend continuity proof remains available:
+
+```powershell
+.\tools\localtest\test-workbench-ba-host.ps1 `
+  -ApiBaseUrl http://127.0.0.1:5240 -PreviewId workbench-pr02c-a
+```
+
+It returns a follow-up command that reopens the same project and chat after a host restart, demonstrating that the host reconstructs each turn from durable server-owned state rather than provider-side conversation memory.

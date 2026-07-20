@@ -106,7 +106,7 @@ public interface IWorkbenchBusinessAnalystSnapshotToolCatalogue
 
 public interface IWorkbenchBusinessAnalystPromptBuilder
 {
-    string Build(
+    WorkbenchBusinessAnalystPromptParts Build(
         WorkbenchBusinessAnalystContext context,
         WorkbenchBusinessAnalystExecutableContractDescriptor contract,
         IReadOnlyList<WorkbenchBusinessAnalystSnapshotToolResult> toolResults);
@@ -117,7 +117,7 @@ public interface IWorkbenchBusinessAnalystModelGateway
     Task<WorkbenchBusinessAnalystPreparedModel> PrepareAsync(
         WorkbenchBusinessAnalystContext context,
         WorkbenchBusinessAnalystExecutableContractDescriptor contract,
-        string codeOwnedPrompt,
+        WorkbenchBusinessAnalystPromptParts promptParts,
         CancellationToken cancellationToken = default);
 }
 
@@ -129,6 +129,7 @@ public sealed record WorkbenchBusinessAnalystPreparedModel
     public required string ActualProvider { get; init; }
     public required string ActualModel { get; init; }
     public required string PromptHash { get; init; }
+    public required WorkbenchBusinessAnalystContextBudgetMeasurement ContextBudget { get; init; }
 }
 
 public sealed class WorkbenchBusinessAnalystContractNotSupportedException : Exception

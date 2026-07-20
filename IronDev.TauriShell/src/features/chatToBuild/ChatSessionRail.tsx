@@ -10,6 +10,7 @@ interface ChatSessionRailProps {
   canCreateChannels: boolean;
   channelLoadState: 'loading' | 'ready' | 'error';
   channelError: string | null;
+  directNavigationDisabledReason?: string | null;
   isOpen: boolean;
   onClose: () => void;
   onOpenSession: (sessionId: number) => void;
@@ -29,6 +30,7 @@ export function ChatSessionRail({
   canCreateChannels,
   channelLoadState,
   channelError,
+  directNavigationDisabledReason = null,
   isOpen,
   onClose,
   onOpenSession,
@@ -93,6 +95,8 @@ export function ChatSessionRail({
             aria-label="Start new conversation"
             title="Start new conversation"
             data-testid="chat.sessions.new"
+            disabled={Boolean(directNavigationDisabledReason)}
+            aria-describedby={directNavigationDisabledReason ? 'chat-direct-navigation-blocked' : undefined}
             onClick={onStartNewConversation}
           >
             <span aria-hidden="true">+</span>
@@ -213,6 +217,11 @@ export function ChatSessionRail({
 
           <section className="chat-session-rail__section">
             <h3>Direct with Workshop guide</h3>
+            {directNavigationDisabledReason ? (
+              <p id="chat-direct-navigation-blocked" className="chat-session-rail__empty" data-testid="chat.sessions.boundReason">
+                {directNavigationDisabledReason}
+              </p>
+            ) : null}
             {sessions.length === 0 ? (
               <p className="chat-session-rail__empty">No saved direct conversations yet.</p>
             ) : (
@@ -227,6 +236,7 @@ export function ChatSessionRail({
                     type="button"
                     aria-current={item.id === activeSessionId ? 'page' : undefined}
                     data-testid={`chat.sessions.item.${item.id}`}
+                    disabled={Boolean(directNavigationDisabledReason && item.id !== activeSessionId)}
                     onClick={() => {
                       if (item.id) {
                         onOpenSession(item.id);

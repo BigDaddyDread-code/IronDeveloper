@@ -3141,7 +3141,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -14776,6 +14777,133 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SubmitWorkbenchAgentRunResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/workbench/projects/{projectId}/agent-runs/current": {
+      "get": {
+        "tags": [
+          "WorkbenchAgentRuns"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "workbenchSessionId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "leaseEpoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "chatSessionId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchAgentRunRecoveryContext"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchAgentRunRecoveryContext"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchAgentRunRecoveryContext"
                 }
               }
             }
@@ -37860,6 +37988,30 @@
         },
         "additionalProperties": false
       },
+      "WorkbenchAgentRunRecoveryContext": {
+        "type": "object",
+        "properties": {
+          "submissionAvailable": {
+            "type": "boolean"
+          },
+          "unavailableCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "boundChatSessionId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "activeRun": {
+            "$ref": "#/components/schemas/WorkbenchAgentRunSnapshot"
+          },
+          "latestRun": {
+            "$ref": "#/components/schemas/WorkbenchAgentRunSnapshot"
+          }
+        },
+        "additionalProperties": false
+      },
       "WorkbenchAgentRunSnapshot": {
         "type": "object",
         "properties": {
@@ -37926,6 +38078,13 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "failureCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "retryable": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

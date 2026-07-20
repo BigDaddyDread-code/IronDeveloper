@@ -1,14 +1,18 @@
 using IronDev.Core;
+using IronDev.Core.Agents;
 using IronDev.Core.Models;
+using IronDev.Core.Workbench;
 using OpenAI;
 using OpenAI.Chat;
 using System;
 using System.ClientModel;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace IronDev.Infrastructure.Services;
 
-public sealed class LocalOpenAiCompatibleLlmService : ILLMService
+public sealed class LocalOpenAiCompatibleLlmService
+    : ILLMService, IWorkbenchBusinessAnalystRoleAwareLlmService
 {
     private readonly ChatClient _chatClient;
 
@@ -43,4 +47,58 @@ public sealed class LocalOpenAiCompatibleLlmService : ILLMService
             throw new InvalidOperationException($"Local OpenAI compatible call failed: {ex.Message}", ex);
         }
     }
+
+    public async Task<WorkbenchBusinessAnalystProviderResponse> GetResponseAsync(
+        WorkbenchBusinessAnalystProviderEnvelope envelope,
+        CancellationToken cancellationToken = default)
+    {
+        // OpenAI-compatible servers do not uniformly implement the developer role.
+        // Demote the advisory profile to user authority; the immutable policy remains system.
+        var messages = WorkbenchBusinessAnalystProviderMessageMapper
+            .ForSystemUserProvider(envelope)
+            .Select(ToChatMessage)
+            .ToArray();
+        var started = Stopwatch.GetTimestamp();
+        try
+        {
+            var completion = await _chatClient.CompleteChatAsync(
+                messages,
+                new ChatCompletionOptions
+                {
+                    MaxOutputTokenCount = envelope.ReservedOutputTokens
+                },
+                cancellationToken);
+            completion.GetRawResponse().Headers.TryGetValue(
+                "x-request-id",
+                out var providerRequestId);
+            return new WorkbenchBusinessAnalystProviderResponse
+            {
+                Output = string.Concat(completion.Value.Content.Select(part => part.Text)),
+                SafeRequestId = envelope.SafeRequestId,
+                ProviderRequestId = string.IsNullOrWhiteSpace(providerRequestId)
+                    ? null
+                    : providerRequestId,
+                Usage = new AgentModelUsage
+                {
+                    InputTokens = completion.Value.Usage?.InputTokenCount ?? 0,
+                    OutputTokens = completion.Value.Usage?.OutputTokenCount ?? 0
+                },
+                UsageReported = completion.Value.Usage is not null,
+                DurationMilliseconds = Stopwatch.GetElapsedTime(started).Ticks / TimeSpan.TicksPerMillisecond
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"Local OpenAI compatible call failed: {ex.Message}", ex);
+        }
+    }
+
+    private static ChatMessage ToChatMessage(WorkbenchBusinessAnalystProviderMessage message) =>
+        message.Role switch
+        {
+            AgentModelRole.System => new SystemChatMessage(message.Content),
+            AgentModelRole.User => new UserChatMessage(message.Content),
+            _ => throw new WorkbenchBusinessAnalystProviderEnvelopeException(
+                $"Local OpenAI compatibility mode cannot safely map Business Analyst role '{message.Role}'.")
+        };
 }

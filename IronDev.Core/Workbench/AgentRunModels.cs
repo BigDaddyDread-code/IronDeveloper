@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -22,6 +23,17 @@ public static class WorkbenchAgentRunOperationKinds
 {
     public const string Submit = "SubmitWorkbenchAgentRun";
     public const string Cancel = "CancelWorkbenchAgentRun";
+}
+
+public static class WorkbenchAgentRunFailureCategories
+{
+    public const string ServiceUnavailable = "service_unavailable";
+    public const string ProviderTimeout = "provider_timeout";
+    public const string InvalidResponse = "invalid_response";
+    public const string ContextTooLarge = "context_too_large";
+    public const string Configuration = "configuration_error";
+    public const string AuthorityChanged = "authority_changed";
+    public const string ExecutionFailed = "execution_failed";
 }
 
 public static class WorkbenchBusinessAnalystContract
@@ -111,7 +123,58 @@ public sealed record WorkbenchAgentRunSnapshot(
     DateTime CreatedAtUtc,
     DateTime? StartedAtUtc,
     DateTime? CompletedAtUtc,
-    DateTime? CancellationRequestedAtUtc);
+    DateTime? CancellationRequestedAtUtc,
+    string? FailureCategory,
+    bool Retryable);
+
+public sealed record WorkbenchAgentRunRecoveryContext(
+    bool SubmissionAvailable,
+    string? UnavailableCategory,
+    long? BoundChatSessionId,
+    WorkbenchAgentRunSnapshot? ActiveRun,
+    WorkbenchAgentRunSnapshot? LatestRun);
+
+public sealed record WorkbenchAgentRunCurrentState(
+    long? BoundChatSessionId,
+    WorkbenchAgentRunSnapshot? ActiveRun,
+    WorkbenchAgentRunSnapshot? LatestRun);
+
+public sealed record WorkbenchAgentRunSubmissionAvailability(
+    bool IsAvailable,
+    string? FailureCategory)
+{
+    public static WorkbenchAgentRunSubmissionAvailability Available { get; } = new(true, null);
+}
+
+public interface IWorkbenchAgentRunSubmissionAvailability
+{
+    Task<WorkbenchAgentRunSubmissionAvailability> CheckAsync(
+        int tenantId,
+        int projectId,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class AlwaysAvailableWorkbenchAgentRunSubmissionAvailability
+    : IWorkbenchAgentRunSubmissionAvailability
+{
+    public Task<WorkbenchAgentRunSubmissionAvailability> CheckAsync(
+        int tenantId,
+        int projectId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(WorkbenchAgentRunSubmissionAvailability.Available);
+}
+
+public sealed class UnavailableWorkbenchAgentRunSubmissionAvailability
+    : IWorkbenchAgentRunSubmissionAvailability
+{
+    public Task<WorkbenchAgentRunSubmissionAvailability> CheckAsync(
+        int tenantId,
+        int projectId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new WorkbenchAgentRunSubmissionAvailability(
+            false,
+            WorkbenchAgentRunFailureCategories.ServiceUnavailable));
+}
 
 public sealed record WorkbenchAgentRunClaim(
     Guid AgentRunId,
@@ -178,6 +241,11 @@ public sealed record WorkbenchAgentRunOutboxItem(
 
 public interface IWorkbenchAgentRunService
 {
+    Task<WorkbenchAgentRunSubmissionAvailability> GetSubmissionAvailabilityAsync(
+        int tenantId,
+        int projectId,
+        CancellationToken cancellationToken = default);
+
     Task<SubmitWorkbenchAgentRunResult> SubmitAsync(
         SubmitWorkbenchAgentRunCommand command,
         CancellationToken cancellationToken = default);
@@ -191,6 +259,15 @@ public interface IWorkbenchAgentRunService
         int actorUserId,
         int projectId,
         Guid agentRunId,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkbenchAgentRunCurrentState> GetCurrentActiveAsync(
+        int tenantId,
+        int actorUserId,
+        int projectId,
+        long workbenchSessionId,
+        long leaseEpoch,
+        long? chatSessionId,
         CancellationToken cancellationToken = default);
 
     Task<WorkbenchAgentRunClaim?> ClaimAsync(
@@ -235,8 +312,10 @@ public interface IWorkbenchBusinessAnalystAgent
 public interface IWorkbenchBusinessAnalystPreparedInvocation
 {
     TimeSpan ProviderTimeout { get; }
+    string SafeRequestId { get; }
 
-    Task<string> InvokeProviderAsync(CancellationToken cancellationToken = default);
+    Task<WorkbenchBusinessAnalystProviderResponse> InvokeProviderAsync(
+        CancellationToken cancellationToken = default);
 }
 
 public interface IWorkbenchAgentRunOutbox
@@ -318,8 +397,16 @@ public static class WorkbenchBusinessAnalystOutputValidator
         if (string.IsNullOrWhiteSpace(output.AssistantMessage))
             throw new WorkbenchAgentOutputValidationException("assistantMessage is required.");
 
-        if (output.AssistantMessage.Length > 100_000)
-            throw new WorkbenchAgentOutputValidationException("assistantMessage exceeds the 100000 character limit.");
+        if (output.AssistantMessage.Length >
+            WorkbenchBusinessAnalystProviderContract.MaximumAssistantMessageCharacters)
+            throw new WorkbenchAgentOutputValidationException(
+                $"assistantMessage exceeds the " +
+                $"{WorkbenchBusinessAnalystProviderContract.MaximumAssistantMessageCharacters} character limit.");
+
+        if (Encoding.UTF8.GetByteCount(output.AssistantMessage) >
+            WorkbenchBusinessAnalystProviderContract.MaximumOutputUtf8Bytes)
+            throw new WorkbenchAgentOutputValidationException(
+                "assistantMessage exceeds the reserved UTF-8 output budget.");
     }
 }
 
@@ -339,10 +426,26 @@ public sealed class WorkbenchAgentRunAlreadyActiveException : Exception
 {
     public const string ErrorCode = "workbench_agent_run_active";
 
-    public WorkbenchAgentRunAlreadyActiveException()
+    public WorkbenchAgentRunAlreadyActiveException(Guid agentRunId)
         : base("This Workbench session already has a pending or running Business Analyst turn.")
     {
+        AgentRunId = agentRunId;
     }
+
+    public Guid AgentRunId { get; }
+}
+
+public sealed class WorkbenchAgentRunUnavailableException : Exception
+{
+    public const string ErrorCode = "workbench_agent_run_unavailable";
+
+    public WorkbenchAgentRunUnavailableException(string failureCategory)
+        : base("The Workbench Business Analyst is not available in this environment.")
+    {
+        FailureCategory = failureCategory;
+    }
+
+    public string FailureCategory { get; }
 }
 
 public sealed class WorkbenchAgentRunNotFoundException : Exception;

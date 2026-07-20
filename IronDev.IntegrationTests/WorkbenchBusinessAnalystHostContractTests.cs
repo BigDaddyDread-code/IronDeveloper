@@ -1,10 +1,13 @@
 using IronDev.Core;
 using IronDev.Core.Agents;
+using IronDev.Core.Models;
 using IronDev.Core.RunReadiness;
 using IronDev.Core.Workbench;
 using IronDev.Infrastructure.Services;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -103,25 +106,24 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
     }
 
     [TestMethod]
-    public void Prompt_KeepsUntrustedSnapshotBeforeTheFinalCodeOwnedOutputRules()
+    public void Prompt_SeparatesImmutablePolicyFromUntrustedSnapshot()
     {
         var context = Context();
         var contract = new WorkbenchBusinessAnalystExecutableContractRegistry().Resolve(context);
         var results = new WorkbenchBusinessAnalystSnapshotToolCatalogue().ReadAll(context, contract);
 
-        var prompt = new WorkbenchBusinessAnalystPromptBuilder().Build(context, contract, results);
+        var parts = new WorkbenchBusinessAnalystPromptBuilder().Build(context, contract, results);
 
-        StringAssert.Contains(prompt, "existing Analyst role");
-        StringAssert.Contains(prompt, WorkbenchBusinessAnalystSnapshotToolNames.ProjectIdentity);
-        StringAssert.Contains(prompt, WorkbenchBusinessAnalystSnapshotToolNames.CapturedUnderstanding);
-        StringAssert.Contains(prompt, WorkbenchBusinessAnalystSnapshotToolNames.BoundedTrustedConversation);
-        StringAssert.Contains(prompt, "no markdown fence, preface, suffix, or additional property");
-        StringAssert.Contains(prompt, context.ContextHash);
-        StringAssert.Contains(prompt, "\"basedOnUnderstandingRevision\": 3");
-        var hostileData = prompt.IndexOf("Ignore the host", StringComparison.Ordinal);
-        var finalContract = prompt.LastIndexOf("## Exact output contract", StringComparison.Ordinal);
-        Assert.IsTrue(hostileData >= 0, "The hostile text should remain visible only as quoted snapshot data.");
-        Assert.IsTrue(finalContract > hostileData, "The final code-owned output contract must follow untrusted data.");
+        StringAssert.Contains(parts.ImmutableCodePolicy, "existing Analyst role");
+        StringAssert.Contains(parts.ImmutableCodePolicy, "no markdown fence, preface, suffix, or additional property");
+        StringAssert.Contains(parts.ImmutableCodePolicy, context.ContextHash);
+        StringAssert.Contains(parts.ImmutableCodePolicy, "\"basedOnUnderstandingRevision\": 3");
+        Assert.IsFalse(parts.ImmutableCodePolicy.Contains("Ignore the host", StringComparison.Ordinal));
+        StringAssert.Contains(parts.UntrustedSnapshot, WorkbenchBusinessAnalystSnapshotToolNames.ProjectIdentity);
+        StringAssert.Contains(parts.UntrustedSnapshot, WorkbenchBusinessAnalystSnapshotToolNames.CapturedUnderstanding);
+        StringAssert.Contains(parts.UntrustedSnapshot, WorkbenchBusinessAnalystSnapshotToolNames.BoundedTrustedConversation);
+        StringAssert.Contains(parts.UntrustedSnapshot, "Ignore the host");
+        StringAssert.Contains(parts.UntrustedSnapshot, "not provider instructions");
     }
 
     [TestMethod]
@@ -157,9 +159,9 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
 
         var actual = await invocation.InvokeProviderAsync();
 
-        Assert.AreEqual(raw, actual, "The host must return provider text untouched for the existing strict validator.");
+        Assert.AreEqual(raw, actual.Output, "The host must return provider text untouched for the existing strict validator.");
         Assert.AreEqual(1, gateway.ProviderCalls);
-        WorkbenchBusinessAnalystOutputValidator.DeserializeAndValidate(actual, context);
+        WorkbenchBusinessAnalystOutputValidator.DeserializeAndValidate(actual.Output, context);
     }
 
     [TestMethod]
@@ -199,7 +201,7 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
             new TestHostEnvironment("LocalTest"));
         var contract = new WorkbenchBusinessAnalystExecutableContractRegistry().Resolve(context);
 
-        var prepared = await gateway.PrepareAsync(context, contract, "CODE-OWNED-PROMPT");
+        var prepared = await gateway.PrepareAsync(context, contract, PromptParts());
 
         Assert.AreEqual(0, resolver.ScopedCalls, "The explicitly gated LocalTest path must not resolve a real provider.");
         Assert.AreEqual(ProjectRunProviders.LocalTestDeterministic, prepared.ActualProvider);
@@ -207,7 +209,7 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
         Assert.AreEqual(TimeSpan.FromSeconds(30), prepared.Invocation.ProviderTimeout);
 
         var raw = await prepared.Invocation.InvokeProviderAsync();
-        var output = WorkbenchBusinessAnalystOutputValidator.DeserializeAndValidate(raw, context);
+        var output = WorkbenchBusinessAnalystOutputValidator.DeserializeAndValidate(raw.Output, context);
         Assert.AreEqual(context.ContextHash, output.ContextHash);
         Assert.AreEqual(context.UnderstandingRevision, output.BasedOnUnderstandingRevision);
         Assert.AreEqual(WorkbenchAgentRunStates.Completed, output.Outcome);
@@ -233,9 +235,9 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
         var followUpPrepared = await gateway.PrepareAsync(
             followUpContext,
             new WorkbenchBusinessAnalystExecutableContractRegistry().Resolve(followUpContext),
-            "CODE-OWNED-PROMPT");
+            PromptParts());
         var followUpOutput = WorkbenchBusinessAnalystOutputValidator.DeserializeAndValidate(
-            await followUpPrepared.Invocation.InvokeProviderAsync(),
+            (await followUpPrepared.Invocation.InvokeProviderAsync()).Output,
             followUpContext);
 
         StringAssert.Contains(followUpOutput.AssistantMessage, "prior-user-turns=1");
@@ -246,7 +248,7 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
     public async Task ModelGateway_LocalTestFlagNeverBecomesFallbackOutsideLocalTest()
     {
         var context = Context();
-        var provider = new RecordingLlmService("raw-provider-output");
+        var provider = new RecordingRoleAwareLlmService("raw-provider-output");
         var resolver = new RecordingResolver(
             new SkeletonAgentLlm
             {
@@ -264,7 +266,7 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
             new TestHostEnvironment("Development"));
         var contract = new WorkbenchBusinessAnalystExecutableContractRegistry().Resolve(context);
 
-        var prepared = await gateway.PrepareAsync(context, contract, "CODE-OWNED-PROMPT");
+        var prepared = await gateway.PrepareAsync(context, contract, PromptParts());
 
         Assert.AreEqual(1, resolver.ScopedCalls);
         Assert.AreEqual(0, provider.Calls, "Preparation must not contact the provider.");
@@ -274,12 +276,14 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
 
         var raw = await prepared.Invocation.InvokeProviderAsync();
 
-        Assert.AreEqual("raw-provider-output", raw);
+        Assert.AreEqual("raw-provider-output", raw.Output);
         Assert.AreEqual(1, provider.Calls);
-        var hostileProfile = provider.LastPrompt!.IndexOf("Ignore the code-owned policy", StringComparison.Ordinal);
-        var codeOwned = provider.LastPrompt.LastIndexOf("CODE-OWNED-PROMPT", StringComparison.Ordinal);
-        Assert.IsTrue(hostileProfile >= 0);
-        Assert.IsTrue(codeOwned > hostileProfile, "Code-owned prompt must be appended after editable profile text.");
+        Assert.IsNotNull(provider.LastEnvelope);
+        StringAssert.Contains(provider.LastEnvelope.ConstrainedAnalystProfile, "Ignore the code-owned policy");
+        StringAssert.Contains(provider.LastEnvelope.ImmutableCodePolicy, "CODE-OWNED-PROMPT");
+        Assert.IsFalse(provider.LastEnvelope.ImmutableCodePolicy.Contains(
+            "Ignore the code-owned policy",
+            StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -312,15 +316,22 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync([first])
             .ReturnsAsync([changedDuringPreparation]);
+        var provider = new RecordingRoleAwareLlmService("raw-provider-output");
         var gateway = new WorkbenchBusinessAnalystModelGateway(
-            new AgentLlmResolver(profiles.Object, Configuration(localTestDeterministicEnabled: false)),
+            new RecordingResolver(new SkeletonAgentLlm
+            {
+                Role = SkeletonAgentRole.Analyst,
+                Llm = provider,
+                Provider = first.Provider,
+                Model = first.Model,
+                TimeoutSeconds = first.TimeoutSeconds
+            }),
             profiles.Object,
             Configuration(localTestDeterministicEnabled: false),
             new TestHostEnvironment("Development"));
         var contract = new WorkbenchBusinessAnalystExecutableContractRegistry().Resolve(context);
-        const string codeOwnedPrompt = "CODE-OWNED-PROMPT";
 
-        var prepared = await gateway.PrepareAsync(context, contract, codeOwnedPrompt);
+        var prepared = await gateway.PrepareAsync(context, contract, PromptParts());
 
         profiles.Verify(value => value.ListEffectiveAsync(
             context.TenantId,
@@ -331,9 +342,15 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
         Assert.AreEqual(first.Provider, prepared.ActualProvider);
         Assert.AreEqual(first.Model, prepared.ActualModel);
         Assert.AreEqual(TimeSpan.FromSeconds(first.TimeoutSeconds), prepared.Invocation.ProviderTimeout);
+        Assert.AreEqual(64, prepared.PromptHash.Length);
         Assert.AreEqual(
-            Hash(SkeletonAgentPromptComposer.Compose(first, codeOwnedPrompt)),
-            prepared.PromptHash);
+            WorkbenchBusinessAnalystProviderContract.ContextBudgetPolicyVersion,
+            prepared.ContextBudget.PolicyVersion);
+        await prepared.Invocation.InvokeProviderAsync();
+        StringAssert.Contains(provider.LastEnvelope!.ConstrainedAnalystProfile, "SNAPSHOT_ONE_SKILL");
+        Assert.IsFalse(provider.LastEnvelope.ConstrainedAnalystProfile.Contains(
+            "SNAPSHOT_TWO_SKILL",
+            StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -349,10 +366,12 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
         await firstInvocation.InvokeProviderAsync();
         await secondInvocation.InvokeProviderAsync();
 
-        Assert.AreEqual(first.Provider.LastPrompt, second.Provider.LastPrompt);
+        Assert.AreEqual(
+            first.Provider.LastEnvelope!.UntrustedSnapshot,
+            second.Provider.LastEnvelope!.UntrustedSnapshot);
         Assert.AreEqual(first.Audit.Recorded!.PromptHash, second.Audit.Recorded!.PromptHash);
         Assert.AreEqual(first.Audit.Recorded.ToolManifestHash, second.Audit.Recorded.ToolManifestHash);
-        Assert.IsFalse(first.Provider.LastPrompt!.Contains(followUpMarker, StringComparison.Ordinal));
+        Assert.IsFalse(first.Provider.LastEnvelope.UntrustedSnapshot.Contains(followUpMarker, StringComparison.Ordinal));
 
         var followUpContext = context with
         {
@@ -376,12 +395,194 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
             followUpContext);
         await followUpInvocation.InvokeProviderAsync();
 
-        StringAssert.Contains(followUp.Provider.LastPrompt, followUpMarker);
-        Assert.AreNotEqual(first.Provider.LastPrompt, followUp.Provider.LastPrompt);
+        StringAssert.Contains(followUp.Provider.LastEnvelope!.UntrustedSnapshot, followUpMarker);
+        Assert.AreNotEqual(first.Provider.LastEnvelope.UntrustedSnapshot, followUp.Provider.LastEnvelope.UntrustedSnapshot);
         Assert.AreEqual(first.Audit.Recorded.ToolManifestHash, followUp.Audit.Recorded!.ToolManifestHash);
         Assert.AreEqual(1, first.Provider.Calls);
         Assert.AreEqual(1, second.Provider.Calls);
         Assert.AreEqual(1, followUp.Provider.Calls);
+    }
+
+    [TestMethod]
+    public void ProviderEnvelope_PreservesAuthorityForOpenAiAndSafelyDemotesForSystemUserProviders()
+    {
+        var envelope = new WorkbenchBusinessAnalystProviderEnvelope
+        {
+            EnvelopeVersion = WorkbenchBusinessAnalystProviderContract.EnvelopeVersion,
+            SafeRequestId = "ba-11111111111111111111111111111111",
+            ImmutableCodePolicy = "IMMUTABLE_POLICY",
+            ConstrainedAnalystProfile = "ADVISORY_PROFILE",
+            UntrustedSnapshot = "UNTRUSTED_SNAPSHOT",
+            ContextBudgetPolicyVersion =
+                WorkbenchBusinessAnalystProviderContract.ContextBudgetPolicyVersion,
+            ReservedOutputTokens = WorkbenchBusinessAnalystProviderContract.ReservedOutputTokens
+        };
+
+        var openAi = WorkbenchBusinessAnalystProviderMessageMapper.ForOpenAi(envelope);
+        CollectionAssert.AreEqual(
+            new[] { AgentModelRole.System, AgentModelRole.Developer, AgentModelRole.User },
+            openAi.Select(message => message.Role).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "IMMUTABLE_POLICY", "ADVISORY_PROFILE", "UNTRUSTED_SNAPSHOT" },
+            openAi.Select(message => message.Content).ToArray());
+
+        var systemUser = WorkbenchBusinessAnalystProviderMessageMapper
+            .ForSystemUserProvider(envelope);
+        CollectionAssert.AreEqual(
+            new[] { AgentModelRole.System, AgentModelRole.User, AgentModelRole.User },
+            systemUser.Select(message => message.Role).ToArray());
+        Assert.AreEqual("IMMUTABLE_POLICY", systemUser[0].Content);
+        Assert.AreEqual("ADVISORY_PROFILE", systemUser[1].Content);
+        Assert.AreEqual("UNTRUSTED_SNAPSHOT", systemUser[2].Content);
+    }
+
+    [TestMethod]
+    public async Task OllamaAdapter_MapsSafeRolesAndEnforcesReservedOutputTokens()
+    {
+        var handler = new RecordingOllamaHandler();
+        using var httpClient = new HttpClient(handler);
+        var provider = new OllamaLlmService(
+            new LlmOptions
+            {
+                Provider = "Ollama",
+                BaseUrl = "http://127.0.0.1:11434",
+                Model = "analyst-test",
+                TimeoutSeconds = 30
+            },
+            httpClient);
+        var envelope = new WorkbenchBusinessAnalystProviderEnvelope
+        {
+            EnvelopeVersion = WorkbenchBusinessAnalystProviderContract.EnvelopeVersion,
+            SafeRequestId = "ba-11111111111111111111111111111111",
+            ImmutableCodePolicy = "IMMUTABLE_POLICY",
+            ConstrainedAnalystProfile = "ADVISORY_PROFILE",
+            UntrustedSnapshot = "UNTRUSTED_SNAPSHOT",
+            ContextBudgetPolicyVersion =
+                WorkbenchBusinessAnalystProviderContract.ContextBudgetPolicyVersion,
+            ReservedOutputTokens = WorkbenchBusinessAnalystProviderContract.ReservedOutputTokens
+        };
+
+        var response = await provider.GetResponseAsync(envelope);
+
+        Assert.AreEqual("{}", response.Output);
+        using var payload = JsonDocument.Parse(handler.RequestJson!);
+        Assert.AreEqual(
+            WorkbenchBusinessAnalystProviderContract.ReservedOutputTokens,
+            payload.RootElement.GetProperty("options").GetProperty("num_predict").GetInt32());
+        CollectionAssert.AreEqual(
+            new[] { "system", "user", "user" },
+            payload.RootElement.GetProperty("messages")
+                .EnumerateArray()
+                .Select(message => message.GetProperty("role").GetString())
+                .ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "IMMUTABLE_POLICY", "ADVISORY_PROFILE", "UNTRUSTED_SNAPSHOT" },
+            payload.RootElement.GetProperty("messages")
+                .EnumerateArray()
+                .Select(message => message.GetProperty("content").GetString())
+                .ToArray());
+    }
+
+    [TestMethod]
+    public async Task ProviderResponse_RejectsReportedUsageBeyondReservedOutputTokens()
+    {
+        var graph = RealHostGraph(new RecordingRoleAwareLlmService(
+            "{}",
+            outputTokens: WorkbenchBusinessAnalystProviderContract.ReservedOutputTokens + 1));
+        var context = Context();
+        var invocation = await graph.Host.PrepareAsync(Claim(context), context);
+
+        await Assert.ThrowsExactlyAsync<WorkbenchBusinessAnalystProviderEnvelopeException>(() =>
+            invocation.InvokeProviderAsync());
+        Assert.AreEqual(1, graph.Provider.Calls);
+    }
+
+    [TestMethod]
+    public async Task ProviderResponse_RejectsEncodedOutputBeyondReservedOutputBudget()
+    {
+        var graph = RealHostGraph(new RecordingRoleAwareLlmService(
+            new string(
+                'x',
+                WorkbenchBusinessAnalystProviderContract.MaximumOutputUtf8Bytes + 1),
+            outputTokens: 1));
+        var context = Context();
+        var invocation = await graph.Host.PrepareAsync(Claim(context), context);
+
+        await Assert.ThrowsExactlyAsync<WorkbenchBusinessAnalystProviderEnvelopeException>(() =>
+            invocation.InvokeProviderAsync());
+        Assert.AreEqual(1, graph.Provider.Calls);
+    }
+
+    [TestMethod]
+    public async Task ModelGateway_ContextTooLargeFailsBeforeResolverOrProviderCall()
+    {
+        var context = Context() with
+        {
+            Messages =
+            [
+                new WorkbenchAgentContextMessage(
+                    7001,
+                    "user",
+                    new string(
+                        'x',
+                        WorkbenchBusinessAnalystProviderContract.MaximumConversationMessageCharacters + 1),
+                    DateTime.UnixEpoch)
+            ]
+        };
+        var provider = new RecordingRoleAwareLlmService("must-not-run");
+        var resolver = new RecordingResolver(new SkeletonAgentLlm
+        {
+            Role = SkeletonAgentRole.Analyst,
+            Llm = provider,
+            Provider = "openai",
+            Model = "gpt-test",
+            TimeoutSeconds = 47
+        });
+        var gateway = new WorkbenchBusinessAnalystModelGateway(
+            resolver,
+            EffectiveProfileService(HostileEffectiveProfile()).Object,
+            Configuration(localTestDeterministicEnabled: false),
+            new TestHostEnvironment("Development"));
+
+        var exception = await Assert.ThrowsExactlyAsync<WorkbenchBusinessAnalystContextTooLargeException>(() =>
+            gateway.PrepareAsync(
+                context,
+                new WorkbenchBusinessAnalystExecutableContractRegistry().Resolve(context),
+                PromptParts()));
+
+        Assert.AreEqual(WorkbenchBusinessAnalystContextTooLargeException.ErrorCode, "agent_context_too_large");
+        Assert.AreEqual("conversation_message_characters", exception.Dimension);
+        Assert.AreEqual(0, resolver.ScopedCalls);
+        Assert.AreEqual(0, provider.Calls);
+    }
+
+    [TestMethod]
+    public async Task ModelGateway_RejectsLegacyStringOnlyProviderBeforeInvocation()
+    {
+        var context = Context();
+        var legacyProvider = new RecordingLlmService("must-not-run");
+        var resolver = new RecordingResolver(new SkeletonAgentLlm
+        {
+            Role = SkeletonAgentRole.Analyst,
+            Llm = legacyProvider,
+            Provider = "legacy-string-provider",
+            Model = "legacy-model",
+            TimeoutSeconds = 47
+        });
+        var gateway = new WorkbenchBusinessAnalystModelGateway(
+            resolver,
+            EffectiveProfileService(HostileEffectiveProfile()).Object,
+            Configuration(localTestDeterministicEnabled: false),
+            new TestHostEnvironment("Development"));
+
+        await Assert.ThrowsExactlyAsync<WorkbenchBusinessAnalystRoleAwareProviderRequiredException>(() =>
+            gateway.PrepareAsync(
+                context,
+                new WorkbenchBusinessAnalystExecutableContractRegistry().Resolve(context),
+                PromptParts()));
+
+        Assert.AreEqual(1, resolver.ScopedCalls);
+        Assert.AreEqual(0, legacyProvider.Calls);
     }
 
     [TestMethod]
@@ -500,10 +701,11 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
 
     private static (
         WorkbenchBusinessAnalystAgent Host,
-        RecordingLlmService Provider,
-        RecordingAuditStore Audit) RealHostGraph()
+        RecordingRoleAwareLlmService Provider,
+        RecordingAuditStore Audit) RealHostGraph(
+            RecordingRoleAwareLlmService? provider = null)
     {
-        var provider = new RecordingLlmService("raw-provider-output");
+        provider ??= new RecordingRoleAwareLlmService("raw-provider-output");
         var gateway = new WorkbenchBusinessAnalystModelGateway(
             new RecordingResolver(
                 new SkeletonAgentLlm
@@ -608,6 +810,31 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
             })
             .Build();
 
+    private static WorkbenchBusinessAnalystPromptParts PromptParts(
+        string immutablePolicy = "CODE-OWNED-PROMPT",
+        string untrustedSnapshot = "UNTRUSTED-SNAPSHOT") =>
+        new()
+        {
+            ImmutableCodePolicy = immutablePolicy,
+            UntrustedSnapshot = untrustedSnapshot
+        };
+
+    private static WorkbenchBusinessAnalystContextBudgetMeasurement BudgetMeasurement() =>
+        new()
+        {
+            PolicyVersion = WorkbenchBusinessAnalystProviderContract.ContextBudgetPolicyVersion,
+            ConversationCharacters = 1,
+            MaximumConversationMessageCharacters = 1,
+            ImmutablePolicyUtf8Bytes = 1,
+            AnalystProfileUtf8Bytes = 1,
+            SnapshotUtf8Bytes = 1,
+            CompleteRequestUtf8Bytes = 3,
+            EstimatedInputTokens = 1,
+            ReservedOutputTokens = WorkbenchBusinessAnalystProviderContract.ReservedOutputTokens,
+            SafetyMarginTokens = WorkbenchBusinessAnalystProviderContract.SafetyMarginTokens,
+            MaximumContextWindowTokens = WorkbenchBusinessAnalystProviderContract.MaximumContextWindowTokens
+        };
+
     private static string Hash(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
             .ToLowerInvariant();
@@ -621,7 +848,7 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
         public Task<WorkbenchBusinessAnalystPreparedModel> PrepareAsync(
             WorkbenchBusinessAnalystContext context,
             WorkbenchBusinessAnalystExecutableContractDescriptor contract,
-            string codeOwnedPrompt,
+            WorkbenchBusinessAnalystPromptParts promptParts,
             CancellationToken cancellationToken = default)
         {
             Preparations++;
@@ -638,7 +865,8 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
                 AnalystProfilePublishedVersion = 5,
                 ActualProvider = "test-provider",
                 ActualModel = "test-model",
-                PromptHash = new string('d', 64)
+                PromptHash = new string('d', 64),
+                ContextBudget = BudgetMeasurement()
             });
         }
     }
@@ -648,11 +876,19 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
         Func<string> invoke) : IWorkbenchBusinessAnalystPreparedInvocation
     {
         public TimeSpan ProviderTimeout { get; } = providerTimeout;
+        public string SafeRequestId { get; } = "ba-test";
 
-        public Task<string> InvokeProviderAsync(CancellationToken cancellationToken = default)
+        public Task<WorkbenchBusinessAnalystProviderResponse> InvokeProviderAsync(
+            CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(invoke());
+            return Task.FromResult(new WorkbenchBusinessAnalystProviderResponse
+            {
+                Output = invoke(),
+                SafeRequestId = "ba-test",
+                Usage = new AgentModelUsage(),
+                DurationMilliseconds = 0
+            });
         }
     }
 
@@ -721,6 +957,59 @@ public sealed class WorkbenchBusinessAnalystHostContractTests
             Calls++;
             LastPrompt = prompt;
             return Task.FromResult(response);
+        }
+    }
+
+    private sealed class RecordingRoleAwareLlmService(
+        string response,
+        int outputTokens = 3)
+        : ILLMService, IWorkbenchBusinessAnalystRoleAwareLlmService
+    {
+        public int Calls { get; private set; }
+        public WorkbenchBusinessAnalystProviderEnvelope? LastEnvelope { get; private set; }
+
+        public Task<string> GetResponseAsync(
+            string prompt,
+            CancellationToken ct = default) =>
+            throw new AssertFailedException(
+                "The Workbench BA must never use the legacy string-only provider method.");
+
+        public Task<WorkbenchBusinessAnalystProviderResponse> GetResponseAsync(
+            WorkbenchBusinessAnalystProviderEnvelope envelope,
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            LastEnvelope = envelope;
+            return Task.FromResult(new WorkbenchBusinessAnalystProviderResponse
+            {
+                Output = response,
+                SafeRequestId = envelope.SafeRequestId,
+                ProviderRequestId = "provider-request-test",
+                Usage = new AgentModelUsage { InputTokens = 12, OutputTokens = outputTokens },
+                UsageReported = true,
+                DurationMilliseconds = 4
+            });
+        }
+    }
+
+    private sealed class RecordingOllamaHandler : HttpMessageHandler
+    {
+        public string? RequestJson { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Assert.AreEqual("/api/chat", request.RequestUri!.AbsolutePath);
+            RequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    "{\"message\":{\"role\":\"assistant\",\"content\":\"{}\"}," +
+                    "\"prompt_eval_count\":12,\"eval_count\":2}",
+                    Encoding.UTF8,
+                    "application/json")
+            };
         }
     }
 

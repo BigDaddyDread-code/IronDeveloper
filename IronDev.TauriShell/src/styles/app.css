@@ -4318,6 +4318,35 @@ p {
   padding: 10px 12px;
 }
 
+.chat-composer__agent-run {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--fl-line);
+  padding: 0 2px 8px;
+  color: var(--fl-ink2);
+  font-size: 12px;
+}
+
+.chat-composer__agent-run small {
+  overflow: hidden;
+  color: var(--fl-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-composer__authority-note,
+.chat-message__delivery-state {
+  color: var(--fl-muted);
+  font-size: 12px;
+}
+
+.chat-message__delivery-state {
+  margin-top: 6px;
+}
+
 .chat-composer__field {
   display: block;
   color: var(--fl-ink);

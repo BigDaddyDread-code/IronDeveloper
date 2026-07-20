@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import type { ChatDocumentSource } from '../../api/types';
 import { CommandButton } from '../../components/CommandButton';
+import type { ChatAgentRunState } from './chatTypes';
 
 interface ChatComposerProps {
   value: string;
   isSending: boolean;
+  isCancellingAgentRun: boolean;
+  agentRun: ChatAgentRunState | null;
+  conversationAuthorityEnabled: boolean;
   disabledReason: string | null;
   sendDisabledReason: string | null;
   documentSources: ChatDocumentSource[];
@@ -13,6 +17,7 @@ interface ChatComposerProps {
   selectedDocumentSource: ChatDocumentSource | null;
   onChange: (value: string) => void;
   onSend: () => void;
+  onCancelAgentRun: () => void;
   onLoadDocumentSources: () => void;
   onSelectDocumentSource: (source: ChatDocumentSource | null) => void;
 }
@@ -20,6 +25,9 @@ interface ChatComposerProps {
 export function ChatComposer({
   value,
   isSending,
+  isCancellingAgentRun,
+  agentRun,
+  conversationAuthorityEnabled,
   disabledReason,
   sendDisabledReason,
   documentSources,
@@ -28,6 +36,7 @@ export function ChatComposer({
   selectedDocumentSource,
   onChange,
   onSend,
+  onCancelAgentRun,
   onLoadDocumentSources,
   onSelectDocumentSource
 }: ChatComposerProps) {
@@ -44,7 +53,18 @@ export function ChatComposer({
 
   return (
     <section className="chat-composer" data-testid="chat.composer">
-      {selectedDocumentSource ? (
+      {conversationAuthorityEnabled && agentRun ? (
+        <div className="chat-composer__agent-run" role="status" data-testid="chat.agentRun.status">
+          <strong>{agentRunStatusLabel(agentRun)}</strong>
+          <small>Run {agentRun.agentRunId}</small>
+        </div>
+      ) : null}
+      {conversationAuthorityEnabled ? (
+        <p className="chat-composer__authority-note" data-testid="chat.agentRun.boundary">
+          Messages and replies are saved by the governed Business Analyst run. Document attachments are not available in this slice.
+        </p>
+      ) : null}
+      {!conversationAuthorityEnabled && selectedDocumentSource ? (
         <div className="chat-composer__selected-source" data-testid="chat.documentSource.selected">
           <span>
             <strong>{selectedDocumentSource.title}</strong>
@@ -59,7 +79,7 @@ export function ChatComposer({
           </button>
         </div>
       ) : null}
-      {isSourcePickerOpen ? (
+      {!conversationAuthorityEnabled && isSourcePickerOpen ? (
         <section className="chat-document-picker" data-testid="chat.documentSource.picker" aria-label="Project document context">
           <header>
             <div>
@@ -104,6 +124,7 @@ export function ChatComposer({
         <textarea
           id="chat-composer-input"
           value={value}
+          maxLength={conversationAuthorityEnabled ? 20_000 : undefined}
           placeholder="Ask about this project or describe work..."
           disabled={Boolean(disabledReason)}
           aria-describedby={disabledReason ? 'chat-composer-blocked' : undefined}
@@ -121,15 +142,28 @@ export function ChatComposer({
       </label>
       <div className="chat-composer__actions">
         <div>
-          <CommandButton
-            type="button"
-            variant="subtle"
-            testId="chat.documentSource.open"
-            disabled={Boolean(disabledReason)}
-            onClick={toggleSourcePicker}
-          >
-            Attach document
-          </CommandButton>
+          {!conversationAuthorityEnabled ? (
+            <CommandButton
+              type="button"
+              variant="subtle"
+              testId="chat.documentSource.open"
+              disabled={Boolean(disabledReason)}
+              onClick={toggleSourcePicker}
+            >
+              Attach document
+            </CommandButton>
+          ) : null}
+          {conversationAuthorityEnabled && agentRun && (agentRun.status === 'Pending' || agentRun.status === 'Running') ? (
+            <CommandButton
+              type="button"
+              variant="subtle"
+              testId="chat.agentRun.cancel"
+              disabled={isCancellingAgentRun || agentRun.cancellationRequested}
+              onClick={onCancelAgentRun}
+            >
+              {isCancellingAgentRun ? 'Cancelling' : agentRun.cancellationRequested ? 'Cancellation requested' : 'Cancel run'}
+            </CommandButton>
+          ) : null}
           {disabledReason ? (
             <p id="chat-composer-blocked" data-testid="chat.composer.disabledReason">{disabledReason}</p>
           ) : null}
@@ -142,11 +176,38 @@ export function ChatComposer({
           title={sendBlockedReason ?? undefined}
           testId="chat.command.send"
         >
-          {isSending ? 'Sending' : 'Send'}
+          {conversationAuthorityEnabled && isSending
+            ? agentRun?.status === 'Pending' ? 'Queued' : 'Working'
+            : isSending ? 'Sending' : 'Send'}
         </CommandButton>
       </div>
     </section>
   );
+}
+
+function agentRunStatusLabel(run: ChatAgentRunState) {
+  if (run.cancellationRequested && (run.status === 'Pending' || run.status === 'Running')) {
+    return 'Business Analyst cancellation requested';
+  }
+
+  switch (run.status) {
+    case 'Pending':
+      return 'Business Analyst queued';
+    case 'Running':
+      return 'Business Analyst working';
+    case 'NeedsInput':
+      return 'Business Analyst needs input';
+    case 'Completed':
+      return 'Business Analyst response saved';
+    case 'Cancelled':
+      return 'Business Analyst run cancelled';
+    case 'Failed':
+      return 'Business Analyst run failed safely';
+    case 'Superseded':
+      return 'Business Analyst run superseded';
+    case 'Stale':
+      return 'Business Analyst run is stale';
+  }
 }
 
 function formatDocumentType(value: string) {

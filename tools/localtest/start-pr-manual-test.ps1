@@ -8,6 +8,7 @@ param(
     [switch]$FreshSession,
     [switch]$BrowserOnly,
     [switch]$EnableSandboxApply,
+    [switch]$EnableConversationAuthority,
     [switch]$UseV1
 )
 
@@ -31,6 +32,7 @@ if ($Reset) { $arguments += "-Reset" }
 if ($FreshSession) { $arguments += "-FreshSession" }
 if ($BrowserOnly) { $arguments += "-BrowserOnly" }
 if ($EnableSandboxApply) { $arguments += "-EnableSandboxApply" }
+if ($EnableConversationAuthority) { $arguments += "-EnableConversationAuthority" }
 if ($UseV1) { $arguments += "-UseV1" }
 
 & $pwsh @arguments

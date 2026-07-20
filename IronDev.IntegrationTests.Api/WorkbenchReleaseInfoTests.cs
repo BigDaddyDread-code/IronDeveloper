@@ -1,4 +1,6 @@
 using IronDev.Api.Services;
+using IronDev.Core.Workbench;
+using IronDev.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -16,10 +18,11 @@ public sealed class WorkbenchReleaseInfoTests
             new ConfigurationBuilder().Build(),
             new StubHostEnvironment("Test"));
 
-        Assert.AreEqual("0.1.0-preview.6", info.Version);
+        Assert.AreEqual("0.1.0-preview.7", info.Version);
         Assert.AreEqual("V1", info.Mode);
         Assert.AreEqual("default", info.PreviewId);
         Assert.IsFalse(info.V2Enabled);
+        Assert.IsFalse(info.ConversationAuthorityEnabled);
         Assert.IsTrue(info.V1FallbackEnabled);
         Assert.IsFalse(info.ResetSupported);
         Assert.IsFalse(string.IsNullOrWhiteSpace(info.ApiCommit));
@@ -33,6 +36,7 @@ public sealed class WorkbenchReleaseInfoTests
             {
                 ["WorkbenchV2:Version"] = "0.1.0-preview.6",
                 ["WorkbenchV2:Enabled"] = "true",
+                ["WorkbenchV2:ConversationAuthorityEnabled"] = "true",
                 ["WorkbenchV2:V1FallbackEnabled"] = "true",
                 ["WorkbenchV2:PreviewId"] = "workbench-pr00a",
                 ["LocalTest:ResetAllowed"] = "true"
@@ -44,6 +48,7 @@ public sealed class WorkbenchReleaseInfoTests
         Assert.AreEqual("V2", info.Mode);
         Assert.AreEqual("workbench-pr00a", info.PreviewId);
         Assert.IsTrue(info.V2Enabled);
+        Assert.IsTrue(info.ConversationAuthorityEnabled);
         Assert.IsTrue(info.V1FallbackEnabled);
         Assert.IsTrue(info.ResetSupported);
     }
@@ -60,6 +65,25 @@ public sealed class WorkbenchReleaseInfoTests
 
         Assert.ThrowsException<InvalidOperationException>(() =>
             WorkbenchReleaseInfoFactory.Create(configuration, new StubHostEnvironment("LocalTest")));
+    }
+
+    [TestMethod]
+    public async Task AgentRunSubmissionAvailability_FailsClosedUnlessWorkerAndProviderAreConfigured()
+    {
+        var unavailable = await new ConfigurationWorkbenchAgentRunSubmissionAvailability(false)
+            .CheckAsync(tenantId: 3, projectId: 7);
+        Assert.IsFalse(unavailable.IsAvailable);
+        Assert.AreEqual(WorkbenchAgentRunFailureCategories.ServiceUnavailable, unavailable.FailureCategory);
+
+        var missingProvider = await new ConfigurationWorkbenchAgentRunSubmissionAvailability(true)
+            .CheckAsync(tenantId: 3, projectId: 7);
+        Assert.IsFalse(missingProvider.IsAvailable);
+        Assert.AreEqual(WorkbenchAgentRunFailureCategories.Configuration, missingProvider.FailureCategory);
+
+        var testOverride = await new AlwaysAvailableWorkbenchAgentRunSubmissionAvailability()
+            .CheckAsync(tenantId: 3, projectId: 7);
+        Assert.IsTrue(testOverride.IsAvailable);
+        Assert.IsNull(testOverride.FailureCategory);
     }
 
     private sealed class StubHostEnvironment(string environmentName) : IHostEnvironment

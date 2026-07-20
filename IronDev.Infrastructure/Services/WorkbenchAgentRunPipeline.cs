@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Dapper;
@@ -453,17 +454,20 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
     private readonly IWorkbenchAgentContextAssembler _contexts;
     private readonly IWorkbenchBusinessAnalystAgent _agent;
     private readonly IWorkbenchAgentRunOutbox _outbox;
+    private readonly IWorkbenchBusinessAnalystInvocationAuditStore _invocationAudit;
 
     public WorkbenchAgentRunProcessor(
         IWorkbenchAgentRunService runs,
         IWorkbenchAgentContextAssembler contexts,
         IWorkbenchBusinessAnalystAgent agent,
-        IWorkbenchAgentRunOutbox outbox)
+        IWorkbenchAgentRunOutbox outbox,
+        IWorkbenchBusinessAnalystInvocationAuditStore invocationAudit)
     {
         _runs = runs;
         _contexts = contexts;
         _agent = agent;
         _outbox = outbox;
+        _invocationAudit = invocationAudit;
     }
 
     public async Task ProcessAsync(
@@ -482,6 +486,7 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
         await _outbox.MarkPublishedAsync(item.OutboxEventId, cancellationToken);
 
         string? rawOutput = null;
+        var providerInvocationTerminal = false;
         try
         {
             var context = await _contexts.AssembleAsync(claim, cancellationToken);
@@ -500,16 +505,27 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
 
             using var providerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             providerCancellation.CancelAfter(invocation.ProviderTimeout);
-            Task<string>? providerTask = null;
+            Task<WorkbenchBusinessAnalystProviderResponse>? providerTask = null;
+            WorkbenchBusinessAnalystProviderResponse providerResponse;
+            var providerStarted = Stopwatch.GetTimestamp();
             try
             {
                 providerTask = invocation.InvokeProviderAsync(providerCancellation.Token);
-                rawOutput = await providerTask.WaitAsync(invocation.ProviderTimeout, cancellationToken);
+                providerResponse = await providerTask.WaitAsync(
+                    invocation.ProviderTimeout,
+                    cancellationToken);
             }
             catch (TimeoutException) when (!cancellationToken.IsCancellationRequested)
             {
                 providerCancellation.Cancel();
                 ObserveLateProviderFault(providerTask);
+                providerInvocationTerminal = true;
+                await RecordFailedInvocationAsync(
+                    claim,
+                    invocation.SafeRequestId,
+                    "agent_provider_timeout",
+                    ElapsedMilliseconds(providerStarted),
+                    CancellationToken.None);
                 throw new WorkbenchAgentProviderTimeoutException();
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -518,17 +534,78 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
                 // Some provider clients enforce their own timeout and may throw before the linked
                 // timeout token observes cancellation. Any provider-side cancellation that is not
                 // the worker shutdown token is the same bounded provider-timeout outcome.
+                providerInvocationTerminal = true;
+                await RecordFailedInvocationAsync(
+                    claim,
+                    invocation.SafeRequestId,
+                    "agent_provider_timeout",
+                    ElapsedMilliseconds(providerStarted),
+                    CancellationToken.None);
                 throw new WorkbenchAgentProviderTimeoutException();
             }
             catch (OperationCanceledException)
             {
-                ObserveLateProviderFault(providerTask);
+                providerCancellation.Cancel();
+                if (providerTask?.IsCompletedSuccessfully == true)
+                {
+                    // Completion and worker cancellation can race. Once the provider has
+                    // produced a response, enter the non-cancellable audit/materialization
+                    // commit phase so recovery cannot invoke the same attempt again.
+                    providerResponse = await providerTask.ConfigureAwait(false);
+                    providerInvocationTerminal = true;
+                }
+                else
+                {
+                    ObserveLateProviderFault(providerTask);
+                    // Record the abandoned invocation independently of worker shutdown
+                    // before leaving the claim recoverable. A later attempt then has an
+                    // explicit, distinct predecessor rather than a hidden provider call.
+                    providerInvocationTerminal = true;
+                    await RecordFailedInvocationAsync(
+                        claim,
+                        invocation.SafeRequestId,
+                        "agent_worker_cancelled",
+                        ElapsedMilliseconds(providerStarted),
+                        CancellationToken.None);
+                    providerInvocationTerminal = false;
+                    throw;
+                }
+            }
+            catch (Exception)
+            {
+                providerInvocationTerminal = true;
+                await RecordFailedInvocationAsync(
+                    claim,
+                    invocation.SafeRequestId,
+                    "agent_provider_failed",
+                    ElapsedMilliseconds(providerStarted),
+                    CancellationToken.None);
                 throw;
             }
+
+            providerInvocationTerminal = true;
+            await _invocationAudit.RecordAsync(
+                new WorkbenchBusinessAnalystInvocationAudit
+                {
+                    AgentRunId = claim.AgentRunId,
+                    ClaimToken = claim.ClaimToken,
+                    AttemptNumber = claim.AttemptCount,
+                    SafeRequestId = providerResponse.SafeRequestId,
+                    ProviderRequestId = providerResponse.ProviderRequestId,
+                    UsageReported = providerResponse.UsageReported,
+                    Usage = providerResponse.Usage,
+                    DurationMilliseconds = providerResponse.DurationMilliseconds,
+                    Outcome = WorkbenchBusinessAnalystInvocationOutcome.Succeeded,
+                    CompletedAtUtc = DateTimeOffset.UtcNow
+                },
+                CancellationToken.None);
+            rawOutput = providerResponse.Output;
             var output = WorkbenchBusinessAnalystOutputValidator.DeserializeAndValidate(rawOutput, context);
-            await _runs.MaterializeAsync(claim, context, output, cancellationToken);
+            await _runs.MaterializeAsync(claim, context, output, CancellationToken.None);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (
+            cancellationToken.IsCancellationRequested &&
+            !providerInvocationTerminal)
         {
             // Leave the durable Running claim to expire so another worker can recover it.
             throw;
@@ -539,6 +616,12 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
             {
                 WorkbenchAgentOutputValidationException => "agent_output_schema_invalid",
                 WorkbenchBusinessAnalystContractNotSupportedException => "agent_contract_version_unsupported",
+                WorkbenchBusinessAnalystContextTooLargeException =>
+                    WorkbenchBusinessAnalystContextTooLargeException.ErrorCode,
+                WorkbenchBusinessAnalystRoleAwareProviderRequiredException =>
+                    WorkbenchBusinessAnalystRoleAwareProviderRequiredException.ErrorCode,
+                WorkbenchBusinessAnalystProviderEnvelopeException =>
+                    "agent_provider_envelope_invalid",
                 WorkbenchAgentProviderTimeoutException => "agent_provider_timeout",
                 WorkbenchAgentProviderTimeoutConfigurationException => "agent_provider_timeout_invalid",
                 _ => "agent_execution_failed"
@@ -547,9 +630,42 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
                 ? WorkbenchAgentRunService.ComputeHash(rawOutput)
                 : WorkbenchAgentRunService.ComputeHash(
                     $"{exception.GetType().FullName}\n{exception.Message}");
-            await _runs.MarkFailedAsync(claim, code, diagnosticHash, cancellationToken);
+            await _runs.MarkFailedAsync(
+                claim,
+                code,
+                diagnosticHash,
+                providerInvocationTerminal ? CancellationToken.None : cancellationToken);
         }
     }
+
+    private async Task RecordFailedInvocationAsync(
+        WorkbenchAgentRunClaim claim,
+        string safeRequestId,
+        string failureCategory,
+        long durationMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        _ = await _invocationAudit.RecordAsync(
+            new WorkbenchBusinessAnalystInvocationAudit
+            {
+                AgentRunId = claim.AgentRunId,
+                ClaimToken = claim.ClaimToken,
+                AttemptNumber = claim.AttemptCount,
+                SafeRequestId = safeRequestId,
+                UsageReported = false,
+                DurationMilliseconds = durationMilliseconds,
+                Outcome = WorkbenchBusinessAnalystInvocationOutcome.Failed,
+                FailureCategory = failureCategory,
+                CompletedAtUtc = DateTimeOffset.UtcNow
+            },
+            cancellationToken);
+    }
+
+    private static long ElapsedMilliseconds(long startedTimestamp) =>
+        Math.Max(
+            0,
+            Stopwatch.GetElapsedTime(startedTimestamp).Ticks /
+            TimeSpan.TicksPerMillisecond);
 
     private static void ObserveLateProviderFault(Task? providerTask)
     {
@@ -568,4 +684,5 @@ public sealed class WorkbenchAgentRunProcessor : IWorkbenchAgentRunProcessor
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
     }
+
 }

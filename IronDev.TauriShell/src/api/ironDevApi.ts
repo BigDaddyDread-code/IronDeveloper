@@ -40,7 +40,10 @@ import type {
   ChatDocumentSource,
   ChatMessage,
   ChatTurnAuditResponse,
+  CancelWorkbenchAgentRunRequest,
+  CancelWorkbenchAgentRunResult,
   ConfirmBaWorkingDraftRequest,
+  CurrentWorkbenchAgentRunResponse,
   ControlledActionRequestCreateRequest,
   ControlledActionRequestCreateResponse,
   CreateTenantUserRequest,
@@ -99,7 +102,10 @@ import type {
   ProjectFileSummary,
   ProjectSummary,
   StartProjectResponse,
+  SubmitWorkbenchAgentRunRequest,
+  SubmitWorkbenchAgentRunResult,
   WorkbenchProjectEntryContext,
+  WorkbenchAgentRunSnapshot,
   ProjectTicket,
   RunReviewPackage,
   RunTicketReviewRequest,
@@ -860,6 +866,61 @@ class IronDevApiClient {
       body: { ...request, projectId },
       signal
     });
+  }
+
+  async submitWorkbenchAgentRun(
+    projectId: number,
+    request: SubmitWorkbenchAgentRunRequest,
+    signal?: AbortSignal
+  ): Promise<SubmitWorkbenchAgentRunResult> {
+    return this.request<SubmitWorkbenchAgentRunResult>(`/api/workbench/projects/${projectId}/agent-runs`, {
+      method: 'POST',
+      body: request,
+      signal
+    });
+  }
+
+  async getWorkbenchAgentRun(
+    projectId: number,
+    agentRunId: string,
+    signal?: AbortSignal
+  ): Promise<WorkbenchAgentRunSnapshot> {
+    return this.request<WorkbenchAgentRunSnapshot>(
+      `/api/workbench/projects/${projectId}/agent-runs/${encodeURIComponent(agentRunId)}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getCurrentWorkbenchAgentRun(
+    projectId: number,
+    workbenchSessionId: number,
+    leaseEpoch: number,
+    chatSessionId: number | null,
+    signal?: AbortSignal
+  ): Promise<CurrentWorkbenchAgentRunResponse> {
+    const query = new URLSearchParams({
+      workbenchSessionId: String(workbenchSessionId),
+      leaseEpoch: String(leaseEpoch)
+    });
+    if (chatSessionId !== null) {
+      query.set('chatSessionId', String(chatSessionId));
+    }
+    return this.request<CurrentWorkbenchAgentRunResponse>(
+      `/api/workbench/projects/${projectId}/agent-runs/current?${query.toString()}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async cancelWorkbenchAgentRun(
+    projectId: number,
+    agentRunId: string,
+    request: CancelWorkbenchAgentRunRequest,
+    signal?: AbortSignal
+  ): Promise<CancelWorkbenchAgentRunResult> {
+    return this.request<CancelWorkbenchAgentRunResult>(
+      `/api/workbench/projects/${projectId}/agent-runs/${encodeURIComponent(agentRunId)}/cancel`,
+      { method: 'POST', body: request, signal }
+    );
   }
 
   async getProjectChatSessions(projectId: number, signal?: AbortSignal): Promise<ProjectChatSession[]> {
