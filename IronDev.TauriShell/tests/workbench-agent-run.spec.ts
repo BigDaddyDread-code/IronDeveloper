@@ -15,6 +15,12 @@ interface AgentRunMockOptions {
   transientPollFailureStatuses?: Array<408 | 429>;
   sessionTransportFailures?: number;
   submitTransportFailures?: number;
+  sessionPostCommitHttpStatus?: 504;
+  submitPostCommitHttpStatus?: 502;
+  submitPostCommitInvalidSuccess?: boolean;
+  malformedSubmitUnavailable?: boolean;
+  structuredSubmitUnavailable?: boolean;
+  cancelPostCommitHttpStatus?: 500;
   terminalStatus?: 'Completed' | 'NeedsInput' | 'Failed' | 'Cancelled';
   terminalAppearsDuringRecovery?: boolean;
 }
@@ -22,11 +28,20 @@ interface AgentRunMockOptions {
 interface AgentRunMockState {
   submitRequests: number;
   submitOperationIds: string[];
+  submitBodies: Array<Record<string, unknown>>;
+  submitReplayResponses: number;
   sessionWrites: number;
   sessionOperationIds: string[];
+  sessionBodies: Array<Record<string, unknown>>;
+  sessionRows: number;
+  agentRunRows: number;
   directMessageWrites: number;
   legacyCompletions: number;
   cancelRequests: number;
+  cancelOperationIds: string[];
+  cancelBodies: Array<Record<string, unknown>>;
+  cancellationCommits: number;
+  deliveredCancelReceipts: Array<{ clientOperationId: string; isReplay: boolean }>;
   pollRequests: number;
   recoveryRequests: number;
   history: Array<Record<string, unknown>>;
@@ -40,6 +55,7 @@ test('V2 composer delegates the whole turn to AgentRun and renders the server-ow
   await page.goto('/projects/7/workshop');
 
   await expect(page.getByTestId('chat.agentRun.boundary')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Review current project understanding' })).toBeVisible();
   await expect(page.getByTestId('chat.documentSource.open')).toHaveCount(0);
   await page.getByTestId('chat.composer.input').fill('Help me shape a calm login flow.');
   await page.getByTestId('chat.command.send').click();
@@ -47,6 +63,7 @@ test('V2 composer delegates the whole turn to AgentRun and renders the server-ow
   await expect.poll(() => state.submitRequests).toBe(1);
   await expect(page.getByTestId('chat.agentRun.status')).toContainText(/Business Analyst (queued|working)/);
   await expect(page.getByTestId('chat.message.assistant')).toContainText('Start with the login outcome and the people who need it.');
+  await expect(page.getByTestId('chat.message.assistant').getByText('Business Analyst', { exact: true })).toBeVisible();
   expect(state.directMessageWrites).toBe(0);
   expect(state.legacyCompletions).toBe(0);
   expect(state.submitOperationIds).toHaveLength(1);
@@ -141,6 +158,194 @@ test('an ambiguous first-session create is fenced and replays its exact operatio
   expect(state.sessionOperationIds).toHaveLength(2);
   expect(state.sessionOperationIds[1]).toBe(state.sessionOperationIds[0]);
   expect(state.sessionWrites).toBe(2);
+});
+
+test('a session committed before HTTP 504 replays its exact receipt and creates one conversation', async ({ page }) => {
+  const state = await mockAgentRunWorkspace(page, { sessionPostCommitHttpStatus: 504 });
+  await page.goto('/projects/7/workshop');
+
+  const prompt = 'Shape one durable conversation after a gateway timeout.';
+  await page.getByTestId('chat.composer.input').fill(prompt);
+  await page.getByTestId('chat.command.send').click();
+
+  await expect.poll(() => state.sessionOperationIds.length).toBe(1);
+  await expect(page.getByTestId('chat.error')).toContainText('Delivery could not be confirmed');
+  await expect(page.getByTestId('chat.sessions.boundReason')).toContainText('Delivery is unresolved');
+  await expect(page.getByTestId('chat.sessions.new')).toBeDisabled();
+  await expect(page.getByTestId('chat.composer.input')).toHaveValue(prompt);
+  expect(state.sessionRows).toBe(1);
+  expect(state.submitRequests).toBe(0);
+
+  await page.getByTestId('chat.composer.input').fill(`${prompt} Changed`);
+  await expect(page.getByTestId('chat.command.send')).toBeDisabled();
+  await page.getByTestId('chat.composer.input').fill(prompt);
+  await expect(page.getByTestId('chat.command.send')).toBeEnabled();
+  await page.getByTestId('chat.command.send').click();
+
+  await expect(page.getByTestId('chat.message.assistant')).toContainText('Start with the login outcome and the people who need it.');
+  expect(state.sessionWrites).toBe(2);
+  expect(state.sessionOperationIds[1]).toBe(state.sessionOperationIds[0]);
+  expect(state.sessionBodies[1]).toEqual(state.sessionBodies[0]);
+  expect(state.sessionRows).toBe(1);
+  expect(state.agentRunRows).toBe(1);
+  expect(state.history.filter((message) => message.role === 'user')).toHaveLength(1);
+  expect(state.history.filter((message) => message.role === 'assistant')).toHaveLength(1);
+  expect(state.directMessageWrites).toBe(0);
+  expect(state.legacyCompletions).toBe(0);
+  await expect(page.getByTestId('chat.sessions.boundReason')).toContainText('bound to this governed conversation');
+});
+
+test('an AgentRun completed before HTTP 502 replays its exact receipt without duplicating the turn', async ({ page }) => {
+  const state = await mockAgentRunWorkspace(page, {
+    initialSession: true,
+    multipleSessions: true,
+    submitPostCommitHttpStatus: 502
+  });
+  await page.goto('/projects/7/workshop/sessions/9007');
+
+  const prompt = 'Keep one completed turn after an upstream response failure.';
+  await page.getByTestId('chat.composer.input').fill(prompt);
+  await page.getByTestId('chat.command.send').click();
+
+  await expect.poll(() => state.submitOperationIds.length).toBe(1);
+  await expect(page.getByTestId('chat.message.assistant')).toContainText('Start with the login outcome and the people who need it.');
+  await expect(page.getByTestId('chat.sessions.boundReason')).toContainText('Delivery is unresolved');
+  await expect(page.getByTestId('chat.sessions.new')).toBeDisabled();
+  await expect(page.getByTestId('chat.sessions.item.9008')).toBeDisabled();
+  await expect(page.getByTestId('chat.composer.input')).toHaveValue(prompt);
+  expect(state.sessionRows).toBe(1);
+  expect(state.agentRunRows).toBe(1);
+  expect(state.history.filter((message) => message.role === 'user')).toHaveLength(1);
+  expect(state.history.filter((message) => message.role === 'assistant')).toHaveLength(1);
+
+  await page.getByTestId('chat.composer.input').fill(`${prompt} Changed`);
+  await expect(page.getByTestId('chat.command.send')).toBeDisabled();
+  await page.getByTestId('chat.composer.input').fill(prompt);
+  await expect(page.getByTestId('chat.command.send')).toBeEnabled();
+  await page.getByTestId('chat.command.send').click();
+
+  await expect.poll(() => state.submitOperationIds.length).toBe(2);
+  await expect.poll(() => state.submitReplayResponses).toBe(1);
+  expect(state.submitOperationIds[1]).toBe(state.submitOperationIds[0]);
+  expect(state.submitBodies[1]).toEqual(state.submitBodies[0]);
+  expect(state.sessionRows).toBe(1);
+  expect(state.agentRunRows).toBe(1);
+  expect(state.history.filter((message) => message.role === 'user')).toHaveLength(1);
+  expect(state.history.filter((message) => message.role === 'assistant')).toHaveLength(1);
+  expect(state.directMessageWrites).toBe(0);
+  expect(state.legacyCompletions).toBe(0);
+  await expect(page.getByTestId('chat.sessions.boundReason')).toContainText('bound to this governed conversation');
+});
+
+test('a committed AgentRun with an invalid success payload retains and replays its exact receipt', async ({ page }) => {
+  const state = await mockAgentRunWorkspace(page, {
+    initialSession: true,
+    submitPostCommitInvalidSuccess: true
+  });
+  await page.goto('/projects/7/workshop/sessions/9007');
+
+  const prompt = 'Keep the durable turn when its success response is malformed.';
+  await page.getByTestId('chat.composer.input').fill(prompt);
+  await page.getByTestId('chat.command.send').click();
+
+  await expect.poll(() => state.submitOperationIds.length).toBe(1);
+  await expect(page.getByTestId('chat.error')).toContainText('Delivery could not be confirmed');
+  await expect(page.getByTestId('chat.composer.input')).toHaveValue(prompt);
+  await expect(page.getByTestId('chat.message.assistant')).toContainText('Start with the login outcome and the people who need it.');
+  expect(state.agentRunRows).toBe(1);
+
+  await page.getByTestId('chat.command.send').click();
+
+  await expect.poll(() => state.submitOperationIds.length).toBe(2);
+  await expect.poll(() => state.submitReplayResponses).toBe(1);
+  expect(state.submitOperationIds[1]).toBe(state.submitOperationIds[0]);
+  expect(state.submitBodies[1]).toEqual(state.submitBodies[0]);
+  expect(state.agentRunRows).toBe(1);
+  expect(state.history.filter((message) => message.role === 'user')).toHaveLength(1);
+});
+
+test('a malformed service-unavailable 503 remains ambiguous and preserves the exact submit attempt', async ({ page }) => {
+  const state = await mockAgentRunWorkspace(page, {
+    initialSession: true,
+    malformedSubmitUnavailable: true
+  });
+  await page.goto('/projects/7/workshop/sessions/9007');
+
+  const prompt = 'Preserve this operation when the 503 envelope is incomplete.';
+  await page.getByTestId('chat.composer.input').fill(prompt);
+  await page.getByTestId('chat.command.send').click();
+
+  await expect.poll(() => state.submitOperationIds.length).toBe(1);
+  await expect(page.getByTestId('chat.error')).toContainText('Delivery could not be confirmed');
+  await expect(page.getByTestId('chat.composer.input')).toHaveValue(prompt);
+
+  await page.getByTestId('chat.command.send').click();
+
+  await expect.poll(() => state.submitOperationIds.length).toBe(2);
+  expect(state.submitOperationIds[1]).toBe(state.submitOperationIds[0]);
+  expect(state.submitBodies[1]).toEqual(state.submitBodies[0]);
+  expect(state.agentRunRows).toBe(0);
+  await expect(page.getByTestId('chat.error')).toContainText('Delivery could not be confirmed');
+});
+
+test('a complete service-unavailable 503 is definitive and does not fence an exact replay', async ({ page }) => {
+  const state = await mockAgentRunWorkspace(page, {
+    initialSession: true,
+    structuredSubmitUnavailable: true
+  });
+  await page.goto('/projects/7/workshop/sessions/9007');
+
+  await page.getByTestId('chat.composer.input').fill('Reject this turn authoritatively when the provider is unavailable.');
+  await page.getByTestId('chat.command.send').click();
+
+  await expect.poll(() => state.submitOperationIds.length).toBe(1);
+  await expect(page.getByTestId('chat.error')).toContainText('Business Analyst service is unavailable');
+  await expect(page.getByTestId('chat.error')).not.toContainText('Delivery could not be confirmed');
+  await expect(page.getByTestId('chat.sessions.new')).toBeEnabled();
+  expect(state.agentRunRows).toBe(0);
+});
+
+test('a cancellation committed before HTTP 500 replays its exact operation and original receipt', async ({ page }) => {
+  const state = await mockAgentRunWorkspace(page, {
+    holdRunning: true,
+    cancelPostCommitHttpStatus: 500
+  });
+  await page.goto('/projects/7/workshop');
+
+  await page.getByTestId('chat.composer.input').fill('Cancel this run once, even if its response is lost.');
+  await page.getByTestId('chat.command.send').click();
+  await expect(page.getByTestId('chat.agentRun.cancel')).toBeVisible();
+  await page.getByTestId('chat.agentRun.cancel').click();
+
+  await expect.poll(() => state.cancelOperationIds.length).toBe(1);
+  await expect(page.getByTestId('chat.error')).toContainText('Cancellation delivery could not be confirmed');
+  await expect(page.getByTestId('chat.agentRun.status')).toContainText('Business Analyst run cancelled');
+  await expect(page.getByTestId('chat.agentRun.cancel')).toBeVisible();
+  await expect(page.getByTestId('chat.agentRun.cancel')).toContainText('Retry cancellation');
+  expect(state.cancellationCommits).toBe(1);
+
+  await page.getByTestId('chat.agentRun.cancel').click();
+
+  await expect.poll(() => state.cancelOperationIds.length).toBe(2);
+  await expect(page.getByTestId('chat.agentRun.status')).toContainText('Business Analyst run cancelled');
+  expect(state.cancelOperationIds[1]).toBe(state.cancelOperationIds[0]);
+  expect(state.cancelBodies[1]).toEqual(state.cancelBodies[0]);
+  expect(state.cancellationCommits).toBe(1);
+  expect(state.deliveredCancelReceipts).toEqual([
+    { clientOperationId: state.cancelOperationIds[0], isReplay: true }
+  ]);
+  await expect(page.getByTestId('chat.agentRun.cancel')).toHaveCount(0);
+  await expect(page.getByTestId('chat.error')).toHaveCount(0);
+  expect(state.sessionRows).toBe(1);
+  expect(state.agentRunRows).toBe(1);
+  expect(state.history.filter((message) => message.role === 'user')).toHaveLength(1);
+  expect(state.history.filter((message) => message.role === 'assistant')).toHaveLength(0);
+  expect(state.directMessageWrites).toBe(0);
+  expect(state.legacyCompletions).toBe(0);
+
+  await page.reload();
+  await expect(page.getByTestId('chat.agentRun.status')).toContainText('Business Analyst run cancelled');
+  await expect(page.getByTestId('chat.message.assistant')).toHaveCount(0);
 });
 
 test('an active AgentRun can be cancelled with its own fenced operation', async ({ page }) => {
@@ -459,11 +664,20 @@ async function mockAgentRunWorkspace(page: Page, options: AgentRunMockOptions = 
   const state: AgentRunMockState = {
     submitRequests: 0,
     submitOperationIds: [],
+    submitBodies: [],
+    submitReplayResponses: 0,
     sessionWrites: 0,
     sessionOperationIds: [],
+    sessionBodies: [],
+    sessionRows: options.initialSession || options.initialActiveRun || options.terminalAppearsDuringRecovery ? 1 : 0,
+    agentRunRows: options.initialActiveRun || options.terminalAppearsDuringRecovery ? 1 : 0,
     directMessageWrites: 0,
     legacyCompletions: 0,
     cancelRequests: 0,
+    cancelOperationIds: [],
+    cancelBodies: [],
+    cancellationCommits: 0,
+    deliveredCancelReceipts: [],
     pollRequests: 0,
     recoveryRequests: 0,
     history: [],
@@ -486,7 +700,13 @@ async function mockAgentRunWorkspace(page: Page, options: AgentRunMockOptions = 
   let pollCount = 0;
   let sessionTransportFailures = options.sessionTransportFailures ?? 0;
   let submitTransportFailures = options.submitTransportFailures ?? 0;
-  let committedSubmitOperationId: string | null = null;
+  let sessionPostCommitHttpStatus = options.sessionPostCommitHttpStatus ?? null;
+  let submitPostCommitHttpStatus = options.submitPostCommitHttpStatus ?? null;
+  let submitPostCommitInvalidSuccess = Boolean(options.submitPostCommitInvalidSuccess);
+  let cancelPostCommitHttpStatus = options.cancelPostCommitHttpStatus ?? null;
+  const sessionReceipts = new Map<string, { body: Record<string, unknown>; sessionId: number }>();
+  const submitReceipts = new Map<string, { body: Record<string, unknown>; result: Record<string, unknown> }>();
+  const cancelReceipts = new Map<string, { body: Record<string, unknown>; result: Record<string, unknown> }>();
   const transientPollFailureStatuses = [...(options.transientPollFailureStatuses ?? [])];
   let assistantPersisted = false;
 
@@ -610,16 +830,39 @@ async function mockAgentRunWorkspace(page: Page, options: AgentRunMockOptions = 
       }
       return json(route, savedSessions);
     }
-    const request = route.request().postDataJSON() as { title?: string; clientOperationId: string };
+    const request = route.request().postDataJSON() as Record<string, unknown> & {
+      title?: string;
+      clientOperationId: string;
+    };
     state.sessionWrites += 1;
     state.sessionOperationIds.push(request.clientOperationId);
+    state.sessionBodies.push({ ...request });
+    const existingReceipt = sessionReceipts.get(request.clientOperationId);
+    if (existingReceipt) {
+      if (!sameJson(existingReceipt.body, request)) {
+        return json(route, { error: 'operation_id_payload_mismatch' }, 409);
+      }
+      return json(route, existingReceipt.sessionId);
+    }
+
+    const createdSessionId = 9007 + state.sessionRows;
+    sessionReceipts.set(request.clientOperationId, {
+      body: { ...request },
+      sessionId: createdSessionId
+    });
+    state.sessionRows += 1;
     sessionExists = true;
     sessionTitle = request.title ?? sessionTitle;
     if (sessionTransportFailures > 0) {
       sessionTransportFailures -= 1;
       return route.abort('failed');
     }
-    return json(route, 9007);
+    if (sessionPostCommitHttpStatus) {
+      const status = sessionPostCommitHttpStatus;
+      sessionPostCommitHttpStatus = null;
+      return ambiguousHttpFailure(route, status);
+    }
+    return json(route, createdSessionId);
   });
   await page.route('**/irondev-api/api/projects/7/chat/sessions/9007', (route) =>
     sessionExists
@@ -667,16 +910,41 @@ async function mockAgentRunWorkspace(page: Page, options: AgentRunMockOptions = 
     }
 
     if (request.method() === 'POST' && url.pathname.endsWith('/cancel')) {
+      const body = request.postDataJSON() as Record<string, unknown> & { clientOperationId: string };
       state.cancelRequests += 1;
+      state.cancelOperationIds.push(body.clientOperationId);
+      state.cancelBodies.push({ ...body });
+
+      const existingReceipt = cancelReceipts.get(body.clientOperationId);
+      if (existingReceipt) {
+        if (!sameJson(existingReceipt.body, body)) {
+          return json(route, { error: 'operation_id_payload_mismatch' }, 409);
+        }
+        const replay = { ...existingReceipt.result, isReplay: true };
+        state.deliveredCancelReceipts.push({ clientOperationId: body.clientOperationId, isReplay: true });
+        return json(route, replay);
+      }
+
+      const result = {
+        agentRunId,
+        status: 'Cancelled',
+        cancellationRequested: true,
+        clientOperationId: body.clientOperationId,
+        isReplay: false
+      };
+      cancelReceipts.set(body.clientOperationId, { body: { ...body }, result });
+      state.cancellationCommits += 1;
       currentStatus = 'Cancelled';
       activeRun = false;
-      return json(route, {
-        agentRunId,
-        status: currentStatus,
-        cancellationRequested: true,
-        clientOperationId: (request.postDataJSON() as { clientOperationId: string }).clientOperationId,
-        isReplay: false
-      });
+
+      if (cancelPostCommitHttpStatus) {
+        const status = cancelPostCommitHttpStatus;
+        cancelPostCommitHttpStatus = null;
+        return ambiguousHttpFailure(route, status);
+      }
+
+      state.deliveredCancelReceipts.push({ clientOperationId: body.clientOperationId, isReplay: false });
+      return json(route, result);
     }
 
     if (request.method() === 'GET' && url.pathname.endsWith(`/${agentRunId}`)) {
@@ -716,57 +984,80 @@ async function mockAgentRunWorkspace(page: Page, options: AgentRunMockOptions = 
 
     if (request.method() === 'POST' && url.pathname.endsWith('/agent-runs')) {
       state.submitRequests += 1;
-      const body = request.postDataJSON() as {
+      const body = request.postDataJSON() as Record<string, unknown> & {
         clientOperationId: string;
         message: string;
         chatSessionId: number;
       };
       state.submitOperationIds.push(body.clientOperationId);
+      state.submitBodies.push({ ...body });
       await submitGate;
-      if (submitTransportFailures > 0) {
-        submitTransportFailures -= 1;
-        committedSubmitOperationId = body.clientOperationId;
-        boundChatSessionId = body.chatSessionId;
-        activeRun = true;
-        currentStatus = 'Pending';
-        pollCount = 0;
-        if (!state.history.some((message) => message.id === 9101)) {
-          state.history.push(chatMessage(9101, 'user', body.message));
+
+      const existingReceipt = submitReceipts.get(body.clientOperationId);
+      if (existingReceipt) {
+        if (!sameJson(existingReceipt.body, body)) {
+          return json(route, { error: 'operation_id_payload_mismatch' }, 409);
         }
-        return route.abort('failed');
+        state.submitReplayResponses += 1;
+        return json(route, { ...existingReceipt.result, isReplay: true }, 202);
       }
-      if (options.unavailable) {
+
+      if (options.unavailable || options.structuredSubmitUnavailable) {
         return json(route, {
           error: 'workbench_agent_run_unavailable',
+          message: 'The Business Analyst provider is unavailable.',
           failureCategory: 'service_unavailable',
           retryable: false
         }, 503);
       }
-      if (activeRun && body.clientOperationId !== committedSubmitOperationId) {
+      if (options.malformedSubmitUnavailable) {
+        return json(route, { error: 'workbench_agent_run_unavailable' }, 503);
+      }
+      if (activeRun) {
         return json(route, { error: 'workbench_agent_run_active', agentRunId }, 409);
       }
 
-      if (body.clientOperationId !== committedSubmitOperationId) {
-        boundChatSessionId = body.chatSessionId;
-        activeRun = true;
-        currentStatus = 'Pending';
-        pollCount = 0;
-        if (!state.history.some((message) => message.id === 9101)) {
-          state.history.push(chatMessage(9101, 'user', body.message));
-        }
-      }
-      return json(route, {
+      const userMessageId = 9101 + (state.agentRunRows * 2);
+      state.agentRunRows += 1;
+      boundChatSessionId = body.chatSessionId;
+      activeRun = true;
+      currentStatus = 'Pending';
+      pollCount = 0;
+      state.history.push(chatMessage(userMessageId, 'user', body.message));
+      const result = {
         agentRunId,
         projectId: 7,
         workbenchSessionId: 7007,
         leaseEpoch: 1,
-        chatSessionId: 9007,
-        userMessageId: 9101,
+        chatSessionId: body.chatSessionId,
+        userMessageId,
         status: 'Pending',
         clientOperationId: body.clientOperationId,
         createdAtUtc: '2026-07-20T02:00:00Z',
         isReplay: false
-      }, 202);
+      };
+      submitReceipts.set(body.clientOperationId, { body: { ...body }, result });
+
+      if (submitTransportFailures > 0) {
+        submitTransportFailures -= 1;
+        return route.abort('failed');
+      }
+      if (submitPostCommitHttpStatus) {
+        const status = submitPostCommitHttpStatus;
+        submitPostCommitHttpStatus = null;
+        currentStatus = 'Completed';
+        activeRun = false;
+        if (!assistantPersisted) {
+          assistantPersisted = true;
+          state.history.push(chatMessage(9102, 'assistant', 'Start with the login outcome and the people who need it.'));
+        }
+        return ambiguousHttpFailure(route, status);
+      }
+      if (submitPostCommitInvalidSuccess) {
+        submitPostCommitInvalidSuccess = false;
+        return json(route, { ...result, status: 'Completed' }, 202);
+      }
+      return json(route, result, 202);
     }
 
     return json(route, { error: 'unexpected_agent_run_request' }, 500);
@@ -811,6 +1102,33 @@ function chatMessage(id: number, role: 'user' | 'assistant', message: string) {
 
 function isTerminal(status: AgentRunStatus) {
   return status !== 'Pending' && status !== 'Running';
+}
+
+function sameJson(left: unknown, right: unknown) {
+  return JSON.stringify(canonicalJson(left)) === JSON.stringify(canonicalJson(right));
+}
+
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalJson);
+  }
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, canonicalJson(item)])
+  );
+}
+
+function ambiguousHttpFailure(route: Route, status: 500 | 502 | 504) {
+  return route.fulfill({
+    status,
+    contentType: 'text/plain',
+    body: `Upstream response failed after commit (HTTP ${status}).`
+  });
 }
 
 function json(route: Route, body: unknown, status = 200) {

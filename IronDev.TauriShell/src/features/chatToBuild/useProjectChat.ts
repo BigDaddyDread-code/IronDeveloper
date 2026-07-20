@@ -19,9 +19,9 @@ import { buildAssistantTagEnvelope, parseAssistantTagMetadata } from './chatTurn
 import type { ChatAgentRunState, ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 
 const projectReviewPrompt = [
-  'Review the current project state for this project.',
-  'Include current project state, recent tickets, recent decisions, recent runs, risks or blockers, and recommended next actions.',
-  'Use grounded project context and call out missing context clearly.'
+  'Review the current captured project understanding.',
+  'Summarize the problem, intended users and outcomes, constraints, assumptions, open questions, risks or blockers, and recommended next shaping actions.',
+  'Use only the grounded understanding and conversation context supplied to you, and call out missing context clearly.'
 ].join('\n');
 
 const chatAuditHydrationLimit = 50;
@@ -39,6 +39,13 @@ interface UnresolvedDurableOperation {
   prompt: string;
   kind: 'CreateSession' | 'SubmitRun';
 }
+
+interface UnresolvedAgentCancellation {
+  agentRunId: string;
+  cancellationKey: string;
+}
+
+type DurableMutationKind = 'CreateSession' | 'SubmitRun' | 'CancelRun';
 
 class StaleWorkbenchSubmissionContextError extends Error {}
 
@@ -70,6 +77,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const [documentSourceError, setDocumentSourceError] = useState<string | null>(null);
   const [selectedDocumentSource, setSelectedDocumentSource] = useState<ChatDocumentSource | null>(null);
   const [unresolvedDurableOperations, setUnresolvedDurableOperations] = useState<Record<string, UnresolvedDurableOperation>>({});
+  const [unresolvedAgentCancellations, setUnresolvedAgentCancellations] = useState<Record<string, UnresolvedAgentCancellation>>({});
   const freshConversationRef = useRef(false);
   const errorSessionIdRef = useRef<number | null>(null);
   const agentSubmissionAttemptsRef = useRef(new Map<string, DurableOperationAttempt>());
@@ -79,6 +87,10 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const agentSubmissionInFlightRef = useRef(false);
   const agentSubmissionGenerationRef = useRef(0);
   const agentTerminalHistoryRefreshRef = useRef<string | null>(null);
+  const unresolvedAgentCancellationsRef = useRef<Record<string, UnresolvedAgentCancellation>>({});
+  const agentRunRef = useRef<ChatAgentRunState | null>(agentRun);
+  const agentCancellationUiInvocationRef = useRef<object | null>(null);
+  agentRunRef.current = agentRun;
 
   const projectId = project.selectedProjectId;
   const workbenchSession = project.workbenchSession;
@@ -92,7 +104,11 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const unresolvedDurableOperation = authorityContextKey
     ? unresolvedDurableOperations[authorityContextKey] ?? null
     : null;
-  const hasUnresolvedDurableOperation = unresolvedDurableOperation !== null;
+  const unresolvedAgentCancellation = authorityContextKey
+    ? unresolvedAgentCancellations[authorityContextKey] ?? null
+    : null;
+  const hasUnresolvedDurableOperation = unresolvedDurableOperation !== null || unresolvedAgentCancellation !== null;
+  const agentCancellationDeliveryUnresolved = unresolvedAgentCancellation !== null;
   const agentRunIsActive = isActiveAgentRunStatus(agentRun?.status);
   const agentRunUnavailableReason =
     conversationAuthorityEnabled && agentRunAvailability === 'unavailable' && !agentRunIsActive
@@ -107,6 +123,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     (isHistoryLoading ? 'Workshop history is loading.' : null);
   const sendDisabledReason =
     disabledReason ??
+    (unresolvedAgentCancellation
+      ? 'Cancellation delivery is unresolved. Retry cancellation before sending another message.'
+      : null) ??
     agentRunReadinessReason ??
     (unresolvedDurableOperation && draft.trim() !== unresolvedDurableOperation.prompt
       ? 'Delivery is unresolved. Restore the unchanged message to retry the same operation safely.'
@@ -136,6 +155,28 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     });
   }, []);
 
+  const markAgentCancellationUnresolved = useCallback((
+    contextKey: string,
+    cancellation: UnresolvedAgentCancellation
+  ) => {
+    const next = { ...unresolvedAgentCancellationsRef.current, [contextKey]: cancellation };
+    unresolvedAgentCancellationsRef.current = next;
+    setUnresolvedAgentCancellations(next);
+  }, []);
+
+  const clearAgentCancellationUnresolved = useCallback((
+    contextKey: string,
+    cancellationKey: string
+  ) => {
+    if (unresolvedAgentCancellationsRef.current[contextKey]?.cancellationKey !== cancellationKey) {
+      return;
+    }
+    const next = { ...unresolvedAgentCancellationsRef.current };
+    delete next[contextKey];
+    unresolvedAgentCancellationsRef.current = next;
+    setUnresolvedAgentCancellations(next);
+  }, []);
+
   useEffect(() => {
     agentSubmissionGenerationRef.current += 1;
     agentSubmissionInFlightRef.current = false;
@@ -147,13 +188,21 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     const unresolvedOperation = authorityContextKey
       ? unresolvedDurableOperations[authorityContextKey]
       : null;
+    const unresolvedCancellation = authorityContextKey
+      ? unresolvedAgentCancellationsRef.current[authorityContextKey]
+      : null;
     setDraft(unresolvedOperation?.prompt ?? '');
-    setErrorMessage(unresolvedOperation
-      ? 'Delivery could not be confirmed. Retry the unchanged message before changing conversations.'
-      : null);
+    setErrorMessage(
+      unresolvedCancellation
+        ? 'Cancellation delivery could not be confirmed. Retry cancellation to replay the same operation safely.'
+        : unresolvedOperation
+          ? 'Delivery could not be confirmed. Retry the unchanged message before changing conversations.'
+          : null
+    );
     setSelectedDocumentSource(null);
     setSending(false);
     setCancellingAgentRun(false);
+    agentCancellationUiInvocationRef.current = null;
     setAgentRun(null);
     setAgentRunAvailability('unknown');
     setAgentRunUnavailableCategory(null);
@@ -310,6 +359,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
       const pollingContextIsCurrent = () =>
         pollingAuthorityContextKey !== null &&
         authorityContextKeyRef.current === pollingAuthorityContextKey;
+      const cancellationDeliveryIsUnresolved = () =>
+        pollingAuthorityContextKey !== null &&
+        unresolvedAgentCancellationsRef.current[pollingAuthorityContextKey]?.agentRunId === agentRunId;
       agentPollControllerRef.current?.abort();
       const controller = new AbortController();
       agentPollControllerRef.current = controller;
@@ -346,7 +398,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
             if (isTerminalAgentRunStatus(snapshot.status)) {
               setSending(false);
               setCancellingAgentRun(false);
-              setErrorMessage(describeTerminalAgentRunOutcome(snapshot));
+              setErrorMessage(cancellationDeliveryIsUnresolved()
+                ? 'Cancellation delivery could not be confirmed. Retry cancellation to replay the same operation safely.'
+                : describeTerminalAgentRunOutcome(snapshot));
               agentTerminalHistoryRefreshRef.current = terminalAgentRunRefreshKey(
                 pollingAuthorityContextKey,
                 snapshot
@@ -355,7 +409,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
               return;
             }
 
-            setErrorMessage(null);
+            if (!cancellationDeliveryIsUnresolved()) {
+              setErrorMessage(null);
+            }
             await waitForAgentRunPoll(controller.signal, 750);
           } catch (error) {
             if (controller.signal.aborted || !pollingContextIsCurrent() || isAbortError(error)) {
@@ -364,10 +420,14 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
             if (error instanceof IronDevApiError && isAuthoritativeAgentRunPollingError(error)) {
               setSending(false);
               setCancellingAgentRun(false);
-              setAgentRun(null);
+              if (!cancellationDeliveryIsUnresolved()) {
+                setAgentRun(null);
+              }
               setAgentRunAvailability('unavailable');
               setAgentRunUnavailableCategory('status_unavailable');
-              setErrorMessage(describeAuthoritativeAgentRunPollingFailure(error));
+              setErrorMessage(cancellationDeliveryIsUnresolved()
+                ? 'Cancellation delivery could not be confirmed. Retry cancellation to replay the same operation safely.'
+                : describeAuthoritativeAgentRunPollingFailure(error));
               return;
             }
             setErrorMessage('Business Analyst status is temporarily unavailable. IronDev will keep checking this run.');
@@ -418,7 +478,13 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
         setAgentRun(toChatAgentRunState(current.latestRun));
         setSending(false);
         setCancellingAgentRun(false);
-        setErrorMessage(describeTerminalAgentRunOutcome(current.latestRun));
+        const cancellationDeliveryUnresolved = Boolean(
+          recoveryAuthorityContextKey &&
+          unresolvedAgentCancellationsRef.current[recoveryAuthorityContextKey]?.agentRunId === current.latestRun.agentRunId
+        );
+        setErrorMessage(cancellationDeliveryUnresolved
+          ? 'Cancellation delivery could not be confirmed. Retry cancellation to replay the same operation safely.'
+          : describeTerminalAgentRunOutcome(current.latestRun));
         const refreshKey = terminalAgentRunRefreshKey(recoveryAuthorityContextKey, current.latestRun);
         if (agentTerminalHistoryRefreshRef.current !== refreshKey) {
           agentTerminalHistoryRefreshRef.current = refreshKey;
@@ -517,8 +583,10 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
 
   const startNewConversation = useCallback(() => {
     if (conversationAuthorityEnabled && (hasUnresolvedDurableOperation || isSending || boundAgentRunChatSessionId !== null)) {
-      setErrorMessage(hasUnresolvedDurableOperation
-        ? 'Delivery could not be confirmed. Retry the unchanged message before changing conversations.'
+      setErrorMessage(unresolvedAgentCancellation
+        ? 'Cancellation delivery could not be confirmed. Retry cancellation before changing conversations.'
+        : unresolvedDurableOperation
+          ? 'Delivery could not be confirmed. Retry the unchanged message before changing conversations.'
         : isSending
           ? 'Wait for the governed Business Analyst turn to settle before changing conversations.'
           : 'This Workbench session is permanently bound to its governed conversation. Starting another direct conversation is not available in this preview.');
@@ -535,7 +603,14 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     setErrorMessage(null);
     setSessionLoadState('ready');
     return true;
-  }, [boundAgentRunChatSessionId, conversationAuthorityEnabled, hasUnresolvedDurableOperation, isSending]);
+  }, [
+    boundAgentRunChatSessionId,
+    conversationAuthorityEnabled,
+    hasUnresolvedDurableOperation,
+    isSending,
+    unresolvedAgentCancellation,
+    unresolvedDurableOperation
+  ]);
 
   const ensureChatSession = useCallback(
     async (prompt: string, expectedAuthorityContextKey: string | null = null) => {
@@ -578,11 +653,12 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           throw new StaleWorkbenchSubmissionContextError();
         }
       } catch (error) {
-        if (error instanceof IronDevApiError &&
+        const definitiveRejection = isDefinitiveDurableMutationRejection(error, 'CreateSession');
+        if (definitiveRejection &&
             chatSessionCreationAttemptsRef.current.get(operationKey) === operationAttempt) {
           chatSessionCreationAttemptsRef.current.delete(operationKey);
         }
-        if (expectedAuthorityContextKey && error instanceof IronDevApiError) {
+        if (expectedAuthorityContextKey && definitiveRejection) {
           clearDurableOperationUnresolved(expectedAuthorityContextKey, prompt);
         } else if (expectedAuthorityContextKey &&
                    !(error instanceof StaleWorkbenchSubmissionContextError)) {
@@ -612,6 +688,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
       const unresolvedRetryBlocked = unresolvedDurableOperation &&
         prompt !== unresolvedDurableOperation.prompt;
       const blockedReason = disabledReason ??
+        (unresolvedAgentCancellation
+          ? 'Cancellation delivery is unresolved. Retry cancellation before starting another operation.'
+          : null) ??
         agentRunReadinessReason ??
         (unresolvedRetryBlocked
           ? 'Delivery is unresolved. Retry the unchanged message before starting another operation.'
@@ -702,7 +781,8 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
             setSelectedDocumentSource(null);
             beginAgentRunPolling(submitted.agentRunId, submitted.status, activeSessionId);
           } catch (error) {
-            if (error instanceof IronDevApiError) {
+            const definitiveRejection = isDefinitiveDurableMutationRejection(error, 'SubmitRun');
+            if (definitiveRejection) {
               if (agentSubmissionAttemptsRef.current.get(submissionKey) === operationAttempt) {
                 agentSubmissionAttemptsRef.current.delete(submissionKey);
               }
@@ -716,7 +796,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
             if (!submissionIsCurrent()) {
               return;
             }
-            if (!(error instanceof IronDevApiError)) {
+            if (!definitiveRejection) {
               setMessages((current) =>
                 current.map((message) =>
                   message.id === userMessage.id ? { ...message, deliveryState: 'uncertain' } : message
@@ -847,8 +927,9 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           return;
         }
         errorSessionIdRef.current = createdSessionId ?? sessionId;
+        const definitiveRejection = isDefinitiveDurableMutationRejection(error, 'CreateSession');
         if (conversationAuthorityEnabled) {
-          if (error instanceof IronDevApiError) {
+          if (definitiveRejection) {
             setMessages((current) => current.filter((message) => message.id !== userMessage.id));
           } else {
             setMessages((current) =>
@@ -857,12 +938,12 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
               )
             );
           }
-          if (!(error instanceof IronDevApiError)) {
+          if (!definitiveRejection) {
             setSessionLoadRequest((current) => current + 1);
           }
         }
         setErrorMessage(
-          conversationAuthorityEnabled && !(error instanceof IronDevApiError)
+          conversationAuthorityEnabled && !definitiveRejection
             ? 'Delivery could not be confirmed while opening the conversation. Send the unchanged message again to retry safely.'
             : describeApiError(error, 'Send failed.')
         );
@@ -900,6 +981,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
       session.client,
       sessionId,
       unresolvedDurableOperation,
+      unresolvedAgentCancellation,
       workbenchSession
     ]
   );
@@ -907,40 +989,75 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
   const reviewProjectState = useCallback(() => {
     void sendMessage({
       prompt: projectReviewPrompt,
-      displayText: 'Review Project State',
+      displayText: 'Review Project Understanding',
       mode: 'projectStateReview',
       canContinueInBuild: false
     });
   }, [sendMessage]);
 
   const cancelAgentRun = useCallback(async () => {
-    if (!conversationAuthorityEnabled || !projectId || !workbenchSession || !agentRun || !agentRunIsActive || isCancellingAgentRun) {
+    const isCancellationReplay = unresolvedAgentCancellation !== null;
+    const targetAgentRunId = unresolvedAgentCancellation?.agentRunId ?? agentRun?.agentRunId ?? null;
+    if (!conversationAuthorityEnabled ||
+        !projectId ||
+        !workbenchSession ||
+        !targetAgentRunId ||
+        (!agentRunIsActive && !isCancellationReplay) ||
+        isCancellingAgentRun) {
       return;
     }
 
-    const cancellationKey = `${projectId}:${agentRun.agentRunId}:${workbenchSession.workbenchSessionId}:${workbenchSession.leaseEpoch}`;
-    const operationAttempt = agentCancellationAttemptsRef.current.get(cancellationKey) ?? {
+    if (unresolvedDurableOperation || (unresolvedAgentCancellation && !isCancellationReplay)) {
+      setErrorMessage('Resolve the existing ambiguous operation before cancelling this run.');
+      return;
+    }
+
+    const cancellationKey = isCancellationReplay
+      ? unresolvedAgentCancellation!.cancellationKey
+      : `${projectId}:${targetAgentRunId}:${workbenchSession.workbenchSessionId}:${workbenchSession.leaseEpoch}`;
+    const retainedAttempt = agentCancellationAttemptsRef.current.get(cancellationKey);
+    if (isCancellationReplay && !retainedAttempt) {
+      setErrorMessage('The retained cancellation receipt is unavailable. Reopen Workshop before continuing.');
+      return;
+    }
+    const operationAttempt = retainedAttempt ?? {
       key: cancellationKey,
       clientOperationId: crypto.randomUUID()
     };
     const cancellationAuthorityContextKey = authorityContextKey;
-    const cancellationIsCurrent = () =>
-      cancellationAuthorityContextKey !== null &&
-      authorityContextKeyRef.current === cancellationAuthorityContextKey &&
+    const cancellationAttemptIsRetained = () =>
       agentCancellationAttemptsRef.current.get(cancellationKey) === operationAttempt;
+    const cancellationContextIsCurrent = () =>
+      cancellationAuthorityContextKey !== null &&
+      authorityContextKeyRef.current === cancellationAuthorityContextKey;
+    const cancellationUiInvocation = {};
     agentCancellationAttemptsRef.current.set(cancellationKey, operationAttempt);
+    agentCancellationUiInvocationRef.current = cancellationUiInvocation;
+    if (cancellationAuthorityContextKey) {
+      markAgentCancellationUnresolved(cancellationAuthorityContextKey, {
+        agentRunId: targetAgentRunId,
+        cancellationKey
+      });
+    }
     setCancellingAgentRun(true);
     setErrorMessage(null);
     try {
-      const cancelled = await session.client.cancelWorkbenchAgentRun(projectId, agentRun.agentRunId, {
+      const cancelled = await session.client.cancelWorkbenchAgentRun(projectId, targetAgentRunId, {
         workbenchSessionId: workbenchSession.workbenchSessionId,
         leaseEpoch: workbenchSession.leaseEpoch,
         clientOperationId: operationAttempt.clientOperationId
       });
-      if (!cancellationIsCurrent()) {
+      if (!cancellationAttemptIsRetained()) {
         return;
       }
       agentCancellationAttemptsRef.current.delete(cancellationKey);
+      if (cancellationAuthorityContextKey) {
+        clearAgentCancellationUnresolved(cancellationAuthorityContextKey, cancellationKey);
+      }
+      if (!cancellationContextIsCurrent()) {
+        return;
+      }
+      setErrorMessage(null);
       setAgentRun((current) => current?.agentRunId === cancelled.agentRunId
         ? {
             ...current,
@@ -949,23 +1066,39 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           }
         : current);
       if (isTerminalAgentRunStatus(cancelled.status)) {
-        setSending(false);
+        if (agentRunRef.current?.agentRunId === cancelled.agentRunId) {
+          setSending(false);
+        }
         setSessionLoadRequest((current) => current + 1);
       }
     } catch (error) {
-      if (!cancellationIsCurrent()) {
+      if (!cancellationAttemptIsRetained()) {
         return;
       }
-      if (error instanceof IronDevApiError) {
+      const definitiveRejection = isDefinitiveDurableMutationRejection(error, 'CancelRun');
+      if (definitiveRejection) {
         agentCancellationAttemptsRef.current.delete(cancellationKey);
+        if (cancellationAuthorityContextKey) {
+          clearAgentCancellationUnresolved(cancellationAuthorityContextKey, cancellationKey);
+        }
+      } else if (cancellationAuthorityContextKey) {
+        markAgentCancellationUnresolved(cancellationAuthorityContextKey, {
+          agentRunId: targetAgentRunId,
+          cancellationKey
+        });
+      }
+      if (!cancellationContextIsCurrent()) {
+        return;
       }
       setErrorMessage(
-        error instanceof IronDevApiError
+        definitiveRejection
           ? describeApiError(error, 'The Business Analyst run could not be cancelled.')
           : 'Cancellation delivery could not be confirmed. Try Cancel again to replay the same operation safely.'
       );
     } finally {
-      if (cancellationIsCurrent() || !agentCancellationAttemptsRef.current.has(cancellationKey)) {
+      if (cancellationContextIsCurrent() &&
+          agentCancellationUiInvocationRef.current === cancellationUiInvocation) {
+        agentCancellationUiInvocationRef.current = null;
         setCancellingAgentRun(false);
       }
     }
@@ -973,10 +1106,14 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     agentRun,
     agentRunIsActive,
     authorityContextKey,
+    clearAgentCancellationUnresolved,
     conversationAuthorityEnabled,
     isCancellingAgentRun,
+    markAgentCancellationUnresolved,
     projectId,
     session.client,
+    unresolvedAgentCancellation,
+    unresolvedDurableOperation,
     workbenchSession
   ]);
 
@@ -1108,6 +1245,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     agentRunAvailability,
     conversationAuthorityEnabled,
     hasUnresolvedDurableOperation,
+    agentCancellationDeliveryUnresolved,
     boundAgentRunChatSessionId,
     disabledReason,
     sendDisabledReason,
@@ -1445,6 +1583,63 @@ function describeApiError(error: unknown, fallback: string) {
   }
 
   return fallback;
+}
+
+const definitiveDurableMutationConflictCodes: Record<DurableMutationKind, ReadonlySet<string>> = {
+  CreateSession: new Set([
+    'operation_id_payload_mismatch',
+    'workbench_lease_fence_rejected',
+    'workbench_conversation_authority_required'
+  ]),
+  SubmitRun: new Set([
+    'operation_id_payload_mismatch',
+    'workbench_chat_session_mismatch',
+    'workbench_agent_run_active',
+    'workbench_lease_fence_rejected'
+  ]),
+  CancelRun: new Set([
+    'operation_id_payload_mismatch',
+    'workbench_lease_fence_rejected'
+  ])
+};
+
+function isDefinitiveDurableMutationRejection(
+  error: unknown,
+  kind: DurableMutationKind
+): error is IronDevApiError {
+  if (!(error instanceof IronDevApiError)) {
+    return false;
+  }
+
+  if (error.status === 400 ||
+      error.status === 401 ||
+      error.status === 403 ||
+      error.status === 404) {
+    return true;
+  }
+
+  const errorCode = readApiErrorCode(error.body);
+  if (error.status === 409 && errorCode && definitiveDurableMutationConflictCodes[kind].has(errorCode)) {
+    return true;
+  }
+
+  if (kind !== 'SubmitRun' || error.status !== 503) {
+    return false;
+  }
+
+  const body = readAgentRunErrorBody(error.body);
+  return body.error === 'workbench_agent_run_unavailable' &&
+    Boolean(body.message?.trim()) &&
+    Boolean(body.failureCategory?.trim()) &&
+    body.retryable === false;
+}
+
+function readApiErrorCode(body: unknown) {
+  if (!body || typeof body !== 'object' || !('error' in body)) {
+    return null;
+  }
+
+  return typeof body.error === 'string' ? body.error : null;
 }
 
 interface AgentRunErrorBody {

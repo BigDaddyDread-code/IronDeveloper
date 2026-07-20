@@ -36,7 +36,7 @@ export function ChatMessage({ message, onSaveDiscussion, onViewSources }: ChatMe
   return (
     <article className={`chat-message chat-message--${message.role}`} data-testid={`chat.message.${message.role}`}>
       <header className="chat-message__header">
-        <span>{message.role === 'user' ? 'You' : 'IronDev'}</span>
+        <span>{message.role === 'user' ? 'You' : 'Business Analyst'}</span>
         <div className="chat-message__meta">
           <time dateTime={message.createdUtc}>{DateTimeDisplay.toLocalDisplay(message.createdUtc)}</time>
         </div>

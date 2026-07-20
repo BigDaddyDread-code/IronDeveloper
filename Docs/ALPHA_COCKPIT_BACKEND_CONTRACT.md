@@ -20,6 +20,16 @@ IronDev's cockpit API is project-scoped by default. Any endpoint that returns ti
 - Prepared provider requests preserve authority roles: code-owned contract and safety policy are `System`, configured profile instructions are advisory `Developer`, and project context/conversation text are untrusted `User`. One versioned aggregate request budget is enforced before provider selection and invocation; a single user message is limited to 20,000 characters and provider output is capped at the reserved 16,000-token/UTF-8-byte/assistant-character boundary. Providers that cannot preserve the role envelope fail closed.
 - Attempt telemetry is append-only and contains only safe metadata such as status, duration, reported usage, correlation/provider request IDs, and hashes. Raw prompts, completions, secrets, and private reasoning are forbidden.
 - When `WorkbenchV2:ConversationAuthorityEnabled=true`, V2 Workshop writes go only through AgentRun. Legacy `/chat/complete`, direct chat-message mutation, existing-session update, and session deletion return `409 workbench_conversation_authority_required`; project-scoped chat/session reads and idempotent session creation remain available. Session create uses its scoped `clientOperationId` as a durable operation receipt, so a post-commit transport retry returns the same session ID. When the flag is false, compatibility behavior is unchanged.
+- A durable Workshop mutation discards its client operation receipt only after a definitive application rejection: HTTP `400`, `401`, `403`, or `404`; a recognized domain `409`; or structured `503 workbench_agent_run_unavailable` for submission. Network errors, generic or malformed `5xx`, timeouts/throttling, unknown conflicts, truncated bodies, and invalid success envelopes are ambiguous. They retain the exact operation ID and normalized payload, fence altered work/navigation, and permit only exact authoritative replay. This applies independently to conversation creation, AgentRun submission, and cancellation.
+
+#### Real-provider and default-on gates
+
+`WorkbenchV2:ConversationAuthorityEnabled` remains default-off. The aggregate 128k/16k request budget is a fail-closed envelope, not proof that an arbitrarily configured model supports that capacity. Purchased-token or default-on use is blocked until the enabling slice owns both of these contracts:
+
+- a reviewed model-capability record that pins provider, model, context window, maximum output, tokenizer policy, supported authority roles, and required structured-output capability, with request budgets derived from that record; and
+- server-owned conversation compaction/summary with provenance, or a Workbench-session rollover that carries forward server-owned Project Understanding, so context exhaustion has a recovery corridor.
+
+PR-02C-A retains ambiguous receipts only for the current mounted Workshop client instance. Persistence across a page reload, client remount, or complete browser-process loss is not claimed by this feature-gated preview and must be resolved before default-on use if uninterrupted replay across client restart is required.
 
 - Prefer `/api/projects/{projectId}/...` routes for cockpit workflows.
 - Do not use global run identifiers as sufficient authorization or ownership proof.

@@ -99,6 +99,7 @@ export function ChatRoute({
         agentRun={chat.agentRun}
         conversationAuthorityEnabled={chat.conversationAuthorityEnabled}
         hasUnresolvedDurableOperation={chat.hasUnresolvedDurableOperation}
+        agentCancellationDeliveryUnresolved={chat.agentCancellationDeliveryUnresolved}
         boundAgentRunChatSessionId={chat.boundAgentRunChatSessionId}
         disabledReason={chat.disabledReason}
         sendDisabledReason={chat.sendDisabledReason}

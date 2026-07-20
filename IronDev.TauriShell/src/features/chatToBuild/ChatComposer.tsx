@@ -9,6 +9,7 @@ interface ChatComposerProps {
   isCancellingAgentRun: boolean;
   agentRun: ChatAgentRunState | null;
   conversationAuthorityEnabled: boolean;
+  agentCancellationDeliveryUnresolved: boolean;
   disabledReason: string | null;
   sendDisabledReason: string | null;
   documentSources: ChatDocumentSource[];
@@ -28,6 +29,7 @@ export function ChatComposer({
   isCancellingAgentRun,
   agentRun,
   conversationAuthorityEnabled,
+  agentCancellationDeliveryUnresolved,
   disabledReason,
   sendDisabledReason,
   documentSources,
@@ -153,15 +155,22 @@ export function ChatComposer({
               Attach document
             </CommandButton>
           ) : null}
-          {conversationAuthorityEnabled && agentRun && (agentRun.status === 'Pending' || agentRun.status === 'Running') ? (
+          {conversationAuthorityEnabled &&
+          (agentCancellationDeliveryUnresolved || agentRun?.status === 'Pending' || agentRun?.status === 'Running') ? (
             <CommandButton
               type="button"
               variant="subtle"
               testId="chat.agentRun.cancel"
-              disabled={isCancellingAgentRun || agentRun.cancellationRequested}
+              disabled={isCancellingAgentRun || Boolean(agentRun?.cancellationRequested && !agentCancellationDeliveryUnresolved)}
               onClick={onCancelAgentRun}
             >
-              {isCancellingAgentRun ? 'Cancelling' : agentRun.cancellationRequested ? 'Cancellation requested' : 'Cancel run'}
+              {isCancellingAgentRun
+                ? 'Cancelling'
+                : agentCancellationDeliveryUnresolved
+                  ? 'Retry cancellation'
+                  : agentRun?.cancellationRequested
+                    ? 'Cancellation requested'
+                    : 'Cancel run'}
             </CommandButton>
           ) : null}
           {disabledReason ? (

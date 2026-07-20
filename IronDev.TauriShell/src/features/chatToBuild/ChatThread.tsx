@@ -43,7 +43,7 @@ export function ChatThread({
           <h2>What would you like to work on?</h2>
           <p>Start with the current project, or describe the work in your own words.</p>
           <div className="chat-empty-state__starters" aria-label="Conversation starters">
-            <button type="button" onClick={onReviewProjectState}>Review the current project</button>
+            <button type="button" onClick={onReviewProjectState}>Review current project understanding</button>
             {starters.map((starter) => (
               <button key={starter.label} type="button" onClick={() => onStartDraft(starter.prompt)}>
                 {starter.label}

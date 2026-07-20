@@ -22,6 +22,7 @@ interface ChatWorkspaceProps {
   agentRun: ChatAgentRunState | null;
   conversationAuthorityEnabled: boolean;
   hasUnresolvedDurableOperation: boolean;
+  agentCancellationDeliveryUnresolved: boolean;
   boundAgentRunChatSessionId: number | null;
   disabledReason: string | null;
   sendDisabledReason: string | null;
@@ -66,6 +67,7 @@ export function ChatWorkspace({
   agentRun,
   conversationAuthorityEnabled,
   hasUnresolvedDurableOperation,
+  agentCancellationDeliveryUnresolved,
   boundAgentRunChatSessionId,
   disabledReason,
   sendDisabledReason,
@@ -127,7 +129,7 @@ export function ChatWorkspace({
         channelLoadState={channelLoadState}
         channelError={channelError}
         directNavigationDisabledReason={conversationAuthorityEnabled && hasUnresolvedDurableOperation
-          ? 'Delivery is unresolved. Retry the unchanged message before changing conversations.'
+          ? 'Delivery is unresolved. Replay the exact operation before changing conversations.'
           : conversationAuthorityEnabled && isSending
             ? 'A governed Business Analyst turn is being submitted or processed.'
           : conversationAuthorityEnabled && boundAgentRunChatSessionId !== null
@@ -149,7 +151,7 @@ export function ChatWorkspace({
           <div>
             <h1>Workshop</h1>
             <p>
-              {projectLabel} <span aria-hidden="true">/</span> Direct with Workshop guide
+              {projectLabel} <span aria-hidden="true">/</span> Direct with Business Analyst
             </p>
           </div>
           <div className="chat-page-header__actions">
@@ -190,6 +192,7 @@ export function ChatWorkspace({
               isCancellingAgentRun={isCancellingAgentRun}
               agentRun={agentRun}
               conversationAuthorityEnabled={conversationAuthorityEnabled}
+              agentCancellationDeliveryUnresolved={agentCancellationDeliveryUnresolved}
               disabledReason={disabledReason}
               sendDisabledReason={sendDisabledReason}
               documentSources={documentSources}
