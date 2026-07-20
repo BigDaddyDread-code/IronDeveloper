@@ -435,6 +435,11 @@ export type WorkbenchAgentRunStatus =
   | 'Superseded'
   | 'Stale';
 
+export type WorkbenchAgentInvocationKind =
+  | 'Conversation'
+  | 'TicketProposalGeneration'
+  | 'TicketProposalRegeneration';
+
 export interface SubmitWorkbenchAgentRunRequest {
   workbenchSessionId: number;
   leaseEpoch: number;
@@ -454,6 +459,9 @@ export interface SubmitWorkbenchAgentRunResult {
   clientOperationId: string;
   createdAtUtc: string;
   isReplay: boolean;
+  invocationKind: WorkbenchAgentInvocationKind;
+  ticketProposalSetId: string | null;
+  ticketProposalRevision: number | null;
 }
 
 export interface SubmitWorkbenchInputRequest {
@@ -486,10 +494,10 @@ export interface SubmitWorkbenchAgentInputResult {
   workbenchSessionId: number;
   leaseEpoch: number;
   clientOperationId: string;
-  normalizedCommand: null;
-  instruction: null;
-  title: null;
-  message: null;
+  normalizedCommand: '/ticket' | null;
+  instruction: string | null;
+  title: string | null;
+  message: string | null;
   isReplay: boolean;
   agentRun: SubmitWorkbenchAgentRunResult;
   rawCommandToken: null;
@@ -497,6 +505,91 @@ export interface SubmitWorkbenchAgentInputResult {
 }
 
 export type SubmitWorkbenchInputResult = SubmitWorkbenchCommandResult | SubmitWorkbenchAgentInputResult;
+
+export type TicketProposalSetStatus = 'Ready' | 'NeedsInput';
+export type TicketProposalIssueStatus = 'Open' | 'Resolved';
+
+export interface TicketProposalReadModel {
+  ticketProposalId: string;
+  title: string;
+  problem: string;
+  proposedChange: string;
+  acceptanceCriteria: string[];
+  dependencyProposalIds: string[];
+  suggestedOrder: number;
+  sourceMessageIds: number[];
+}
+
+export interface TicketProposalIssueReadModel {
+  issueId: string;
+  kind: string;
+  text: string;
+  status: TicketProposalIssueStatus;
+  resolution: string | null;
+  sourceMessageIds: number[];
+}
+
+export interface TicketProposalSetReadModel {
+  ticketProposalSetId: string;
+  projectId: number;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  revision: number;
+  basedOnUnderstandingRevision: number;
+  status: TicketProposalSetStatus;
+  splitReason: string | null;
+  proposals: TicketProposalReadModel[];
+  openQuestions: TicketProposalIssueReadModel[];
+  potentialConflicts: TicketProposalIssueReadModel[];
+  sourceMessageIds: number[];
+  createdByAgentRunId: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+}
+
+export interface TicketProposalRevisionReadModel {
+  revision: number;
+  changeKind: string;
+  actorUserId: number;
+  agentRunId: string | null;
+  createdAtUtc: string;
+  proposalSet: TicketProposalSetReadModel;
+}
+
+export interface TicketProposalMutationAuthority {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  expectedProposalSetRevision: number;
+  clientOperationId: string;
+}
+
+export interface UpdateTicketProposalRequest extends TicketProposalMutationAuthority {
+  title: string;
+  problem: string;
+  proposedChange: string;
+  acceptanceCriteria: string[];
+}
+
+export interface ReorderTicketProposalsRequest extends TicketProposalMutationAuthority {
+  orderedProposalIds: string[];
+}
+
+export type RemoveTicketProposalRequest = TicketProposalMutationAuthority;
+
+export interface ResolveTicketProposalIssueRequest extends TicketProposalMutationAuthority {
+  resolution: string;
+}
+
+export interface RegenerateTicketProposalsRequest extends TicketProposalMutationAuthority {
+  instruction: string;
+  chatSessionId: number;
+}
+
+export interface TicketProposalMutationResult {
+  proposalSet: TicketProposalSetReadModel;
+  clientOperationId: string;
+  isReplay: boolean;
+}
 
 export interface WorkbenchAgentRunSnapshot {
   agentRunId: string;
@@ -516,6 +609,9 @@ export interface WorkbenchAgentRunSnapshot {
   cancellationRequestedAtUtc: string | null;
   failureCategory: string | null;
   retryable: boolean;
+  invocationKind: WorkbenchAgentInvocationKind;
+  ticketProposalSetId: string | null;
+  ticketProposalRevision: number | null;
 }
 
 export interface CurrentWorkbenchAgentRunResponse {

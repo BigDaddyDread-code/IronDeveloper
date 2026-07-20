@@ -5062,6 +5062,390 @@ p {
   }
 }
 
+/* PR-04A: durable ticket proposal review, deliberately separate from permanent tickets. */
+.ticket-proposal-panel {
+  gap: 14px;
+  align-content: start;
+}
+
+.ticket-proposal-panel h2,
+.ticket-proposal-panel h3,
+.ticket-proposal-panel p,
+.ticket-proposal-panel ul,
+.ticket-proposal-panel ol,
+.ticket-proposal-panel dl {
+  margin: 0;
+}
+
+.ticket-proposal-panel__header > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ticket-proposal-panel__header h2 {
+  font-size: 17px;
+}
+
+.ticket-proposal-panel__header p,
+.ticket-proposal-panel__state,
+.ticket-proposal-panel__empty,
+.ticket-proposal-panel__reason p {
+  color: var(--fl-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ticket-proposal-panel__state,
+.ticket-proposal-panel__empty,
+.ticket-proposal-panel__needs-input,
+.ticket-proposal-panel__warning {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--fl-line);
+  border-radius: 7px;
+  background: #f7f9fa;
+  padding: 11px;
+}
+
+.ticket-proposal-panel__needs-input {
+  border-color: #d8c487;
+  background: #fffaf0;
+}
+
+.ticket-proposal-panel__needs-input p,
+.ticket-proposal-panel__warning {
+  color: #765b19;
+  font-size: 12px;
+}
+
+.ticket-proposal-panel__warning {
+  border-color: #dfbd68;
+}
+
+.ticket-proposal-panel__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ticket-proposal-panel__summary > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--fl-line);
+  border-radius: 6px;
+  background: #f8fafb;
+  padding: 8px;
+}
+
+.ticket-proposal-panel__summary span,
+.ticket-proposal-panel__reason > span {
+  color: var(--fl-muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ticket-proposal-panel__summary strong {
+  overflow: hidden;
+  color: var(--fl-ink2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+
+.ticket-proposal-panel__mono {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.ticket-proposal-panel__reason {
+  display: grid;
+  gap: 4px;
+  border-left: 3px solid var(--fl-blue);
+  padding-left: 9px;
+}
+
+.ticket-proposal-list,
+.ticket-proposal-issues {
+  display: grid;
+  gap: 9px;
+}
+
+.ticket-proposal-card {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--fl-line2);
+  border-radius: 8px;
+  background: var(--fl-panel);
+  padding: 11px;
+}
+
+.ticket-proposal-card > header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.ticket-proposal-card > header > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.ticket-proposal-card h3 {
+  overflow-wrap: anywhere;
+  font-size: 15px;
+}
+
+.ticket-proposal-card header small,
+.ticket-proposal-card__dependencies,
+.ticket-proposal-card__sources {
+  color: var(--fl-muted);
+  font-size: 11px;
+}
+
+.ticket-proposal-card__order {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--fl-ink);
+  color: var(--fl-panel);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ticket-proposal-card dl,
+.ticket-proposal-card dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.ticket-proposal-card dl {
+  gap: 8px;
+}
+
+.ticket-proposal-card dt,
+.ticket-proposal-card > section > strong {
+  color: var(--fl-muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ticket-proposal-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--fl-ink2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ticket-proposal-card > section {
+  display: grid;
+  gap: 5px;
+}
+
+.ticket-proposal-card ul {
+  display: grid;
+  gap: 4px;
+  padding-left: 18px;
+  color: var(--fl-ink2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ticket-proposal-card__sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.ticket-proposal-card__sources button {
+  border: 0;
+  background: transparent;
+  color: var(--fl-blue);
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ticket-proposal-card__sources blockquote {
+  flex-basis: 100%;
+  min-width: 0;
+  margin: 4px 0 0;
+  border-left: 3px solid var(--fl-blue);
+  background: color-mix(in srgb, var(--fl-blue) 5%, var(--fl-panel));
+  padding: 7px 9px;
+}
+
+.ticket-proposal-card__sources blockquote p {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--fl-ink2);
+  line-height: 1.4;
+}
+
+.ticket-proposal-card footer,
+.ticket-proposal-editor footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ticket-proposal-editor,
+.ticket-proposal-editor label {
+  display: grid;
+  gap: 6px;
+}
+
+.ticket-proposal-editor label {
+  color: var(--fl-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ticket-proposal-editor input,
+.ticket-proposal-editor textarea,
+.ticket-proposal-issues input,
+.ticket-proposal-regenerate textarea {
+  width: 100%;
+  border: 1px solid var(--fl-line2);
+  border-radius: 6px;
+  background: var(--fl-panel);
+  color: var(--fl-ink);
+  padding: 8px;
+  font: inherit;
+  font-weight: 400;
+}
+
+.ticket-proposal-editor textarea,
+.ticket-proposal-regenerate textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.ticket-proposal-issues h3 {
+  font-size: 14px;
+}
+
+.ticket-proposal-issues article {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #dbc98e;
+  border-radius: 7px;
+  background: #fffaf0;
+  padding: 9px;
+  font-size: 12px;
+}
+
+.ticket-proposal-issues article > header,
+.ticket-proposal-issues article > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.ticket-proposal-issues article > header span,
+.ticket-proposal-issues article small {
+  color: var(--fl-muted);
+  font-size: 10px;
+}
+
+.ticket-proposal-regenerate {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--fl-line);
+  padding-top: 12px;
+}
+
+.ticket-proposal-regenerate label {
+  display: grid;
+  gap: 2px;
+}
+
+.ticket-proposal-regenerate label span {
+  color: var(--fl-muted);
+  font-size: 11px;
+}
+
+.ticket-proposal-history {
+  border-top: 1px solid var(--fl-line);
+  padding-top: 10px;
+  font-size: 12px;
+}
+
+.ticket-proposal-history summary {
+  color: var(--fl-ink2);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ticket-proposal-history ol {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-left: 20px;
+}
+
+.ticket-proposal-history li {
+  display: grid;
+  gap: 1px;
+  color: var(--fl-ink2);
+}
+
+.ticket-proposal-history small {
+  color: var(--fl-muted);
+}
+
+.ticket-proposal-history > ol > li > details > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ticket-proposal-history__snapshot {
+  display: grid;
+  gap: 8px;
+  margin-top: 7px;
+  border-left: 2px solid var(--fl-line2);
+  padding-left: 9px;
+}
+
+.ticket-proposal-history__snapshot article,
+.ticket-proposal-history__snapshot section {
+  display: grid;
+  gap: 4px;
+}
+
+.ticket-proposal-history__snapshot h4,
+.ticket-proposal-history__snapshot p,
+.ticket-proposal-history__snapshot ul {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 440px) {
+  .ticket-proposal-panel__summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ticket-proposal-issues article > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 /* PR-02C-B: durable project understanding inside the governed Workshop rail. */
 .project-understanding-panel {
   gap: 14px;

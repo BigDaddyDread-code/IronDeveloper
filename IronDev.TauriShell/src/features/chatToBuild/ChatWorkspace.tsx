@@ -7,8 +7,10 @@ import { ChatSessionRail } from './ChatSessionRail';
 import { ChatTicketDraftReview } from './ChatTicketDraftReview';
 import { ChatThread } from './ChatThread';
 import { ProjectUnderstandingPanel } from './ProjectUnderstandingPanel';
+import { TicketProposalReviewPanel } from './TicketProposalReviewPanel';
 import type { ChatAgentRunState, ChatSendRequest, ChatWorkspaceMessage } from './chatTypes';
 import type { ProjectUnderstandingController } from './useProjectUnderstanding';
+import type { TicketProposalController } from './useTicketProposals';
 import type { WorkbenchCommandNotice, WorkbenchCommandToken } from './workbenchCommands';
 
 interface ChatWorkspaceProps {
@@ -25,6 +27,7 @@ interface ChatWorkspaceProps {
   agentRun: ChatAgentRunState | null;
   conversationAuthorityEnabled: boolean;
   projectUnderstanding: ProjectUnderstandingController;
+  ticketProposals: TicketProposalController;
   hasUnresolvedDurableOperation: boolean;
   agentCancellationDeliveryUnresolved: boolean;
   boundAgentRunChatSessionId: number | null;
@@ -73,6 +76,7 @@ export function ChatWorkspace({
   agentRun,
   conversationAuthorityEnabled,
   projectUnderstanding,
+  ticketProposals,
   hasUnresolvedDurableOperation,
   agentCancellationDeliveryUnresolved,
   boundAgentRunChatSessionId,
@@ -108,11 +112,13 @@ export function ChatWorkspace({
 }: ChatWorkspaceProps) {
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [isSessionRailOpen, setIsSessionRailOpen] = useState(false);
+  const [isTicketProposalsOpen, setIsTicketProposalsOpen] = useState(false);
   const [reviewedDraft, setReviewedDraft] = useState<BaWorkingDraft | null>(null);
 
   useEffect(() => {
     setIsContextOpen(false);
     setIsSessionRailOpen(false);
+    setIsTicketProposalsOpen(false);
     setReviewedDraft(null);
   }, [activeSessionId]);
 
@@ -121,6 +127,13 @@ export function ChatWorkspace({
       setIsContextOpen(true);
     }
   }, [latestResponse?.baDraft]);
+
+  useEffect(() => {
+    if (conversationAuthorityEnabled && ticketProposals.proposalSet) {
+      setIsTicketProposalsOpen(true);
+      setIsContextOpen(false);
+    }
+  }, [conversationAuthorityEnabled, ticketProposals.proposalSet?.ticketProposalSetId]);
 
   const startDraft = (prompt: string) => {
     onComposerChange(prompt);
@@ -164,6 +177,19 @@ export function ChatWorkspace({
             </p>
           </div>
           <div className="chat-page-header__actions">
+            {conversationAuthorityEnabled ? (
+              <CommandButton
+                type="button"
+                variant="subtle"
+                testId="chat.ticketProposals.show"
+                onClick={() => {
+                  setIsTicketProposalsOpen((current) => !current);
+                  setIsContextOpen(false);
+                }}
+              >
+                {isTicketProposalsOpen ? 'Close ticket proposals' : 'Ticket proposals'}
+              </CommandButton>
+            ) : null}
             <CommandButton
               type="button"
               variant="subtle"
@@ -177,7 +203,10 @@ export function ChatWorkspace({
               type="button"
               variant="subtle"
               testId="chat.contextPanel.show"
-              onClick={() => setIsContextOpen((current) => !current)}
+              onClick={() => {
+                setIsContextOpen((current) => !current);
+                setIsTicketProposalsOpen(false);
+              }}
             >
               {conversationAuthorityEnabled
                 ? isContextOpen ? 'Close project context' : 'Project context'
@@ -185,7 +214,7 @@ export function ChatWorkspace({
             </CommandButton>
           </div>
         </header>
-        <div className={`chat-workspace-layout ${isContextOpen ? '' : 'chat-workspace-layout--context-collapsed'}`.trim()}>
+        <div className={`chat-workspace-layout ${isContextOpen || isTicketProposalsOpen ? '' : 'chat-workspace-layout--context-collapsed'}`.trim()}>
           <div className="chat-workspace-layout__thread">
             <ChatThread
               messages={messages}
@@ -220,7 +249,13 @@ export function ChatWorkspace({
             />
           </div>
           {conversationAuthorityEnabled ? (
-            isContextOpen ? (
+            isTicketProposalsOpen ? (
+              <TicketProposalReviewPanel
+                controller={ticketProposals}
+                chatSessionId={activeSessionId}
+                onClose={() => setIsTicketProposalsOpen(false)}
+              />
+            ) : isContextOpen ? (
               <ProjectUnderstandingPanel
                 controller={projectUnderstanding}
                 onClose={() => setIsContextOpen(false)}

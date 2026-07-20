@@ -333,6 +333,15 @@ public abstract class IntegrationTestBase
             END
             IF OBJECT_ID('dbo.WorkbenchAgentRunAttempts', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRunAttempts;
             IF OBJECT_ID('dbo.WorkbenchCommandRejections', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchCommandRejections;
+            IF OBJECT_ID('dbo.TicketProposalSetRevisions', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.trg_TicketProposalSetRevisions_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.trg_TicketProposalSetRevisions_AppendOnly ON dbo.TicketProposalSetRevisions;
+                DELETE FROM dbo.TicketProposalSetRevisions;
+                IF OBJECT_ID('dbo.trg_TicketProposalSetRevisions_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.trg_TicketProposalSetRevisions_AppendOnly ON dbo.TicketProposalSetRevisions;
+            END
+            IF OBJECT_ID('dbo.TicketProposalSets', 'U') IS NOT NULL DELETE FROM dbo.TicketProposalSets;
             IF OBJECT_ID('dbo.ProjectRenameProposals', 'U') IS NOT NULL DELETE FROM dbo.ProjectRenameProposals;
             IF OBJECT_ID('dbo.ProjectUnderstandings', 'U') IS NOT NULL DELETE FROM dbo.ProjectUnderstandings;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;

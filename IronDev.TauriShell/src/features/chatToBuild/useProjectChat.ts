@@ -136,7 +136,10 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
     (unresolvedAgentCancellation
       ? 'Cancellation delivery is unresolved. Retry cancellation before sending another message.'
       : null) ??
-    (draftClassification.kind === 'conversation' ? agentRunReadinessReason : null) ??
+    (draftClassification.kind === 'conversation' ||
+      (draftClassification.kind === 'known' && draftClassification.token === '/ticket')
+      ? agentRunReadinessReason
+      : null) ??
     (unresolvedDurableOperation && draft.trim() !== unresolvedDurableOperation.prompt
       ? 'Delivery is unresolved. Restore the unchanged message to retry the same operation safely.'
       : null) ??
@@ -700,6 +703,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
       const inputClassification = conversationAuthorityEnabled && !request
         ? classifyWorkbenchComposer(composerText)
         : { kind: 'conversation' as const };
+      const isTicketCommand = inputClassification.kind === 'known' && inputClassification.token === '/ticket';
       const durablePayload = inputClassification.kind === 'conversation' ? prompt : composerText;
       const unresolvedRetryBlocked = unresolvedDurableOperation &&
         durablePayload !== unresolvedDurableOperation.prompt;
@@ -707,7 +711,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
         (unresolvedAgentCancellation
           ? 'Cancellation delivery is unresolved. Retry cancellation before starting another operation.'
           : null) ??
-        (inputClassification.kind === 'conversation' ? agentRunReadinessReason : null) ??
+        (inputClassification.kind === 'conversation' || isTicketCommand ? agentRunReadinessReason : null) ??
         (unresolvedRetryBlocked
           ? 'Delivery is unresolved. Retry the unchanged message before starting another operation.'
           : null) ??
@@ -717,7 +721,7 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
         return;
       }
 
-      if (conversationAuthorityEnabled && inputClassification.kind !== 'conversation') {
+      if (conversationAuthorityEnabled && inputClassification.kind !== 'conversation' && !isTicketCommand) {
         const submissionContextKey = authorityContextKey;
         if (!submissionContextKey) {
           return;
@@ -824,18 +828,32 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
           agentSubmissionAttemptsRef.current.set(submissionKey, operationAttempt);
 
           try {
-            const submitted = await session.client.submitWorkbenchAgentRun(projectId, {
-              workbenchSessionId: workbenchSession.workbenchSessionId,
-              leaseEpoch: workbenchSession.leaseEpoch,
-              clientOperationId: operationAttempt.clientOperationId,
-              chatSessionId: activeSessionId,
-              message: prompt
-            });
+            const submitted = isTicketCommand
+              ? (await session.client.submitWorkbenchInput(projectId, {
+                  workbenchSessionId: workbenchSession.workbenchSessionId,
+                  leaseEpoch: workbenchSession.leaseEpoch,
+                  clientOperationId: operationAttempt.clientOperationId,
+                  chatSessionId: activeSessionId,
+                  composerText
+                })).agentRun
+              : await session.client.submitWorkbenchAgentRun(projectId, {
+                  workbenchSessionId: workbenchSession.workbenchSessionId,
+                  leaseEpoch: workbenchSession.leaseEpoch,
+                  clientOperationId: operationAttempt.clientOperationId,
+                  chatSessionId: activeSessionId,
+                  message: prompt
+                });
+            if (!submitted) {
+              throw new Error('The /ticket command did not return a governed AgentRun receipt.');
+            }
             if (agentSubmissionAttemptsRef.current.get(submissionKey) === operationAttempt) {
               agentSubmissionAttemptsRef.current.delete(submissionKey);
             }
             if (submissionContextKey) {
-              clearDurableOperationUnresolved(submissionContextKey, prompt);
+              clearDurableOperationUnresolved(
+                submissionContextKey,
+                isTicketCommand ? composerText : prompt
+              );
             }
             if (!submissionIsCurrent()) {
               return;
@@ -857,16 +875,24 @@ export function useProjectChat({ requestedSessionId, onSessionCreated }: UseProj
             setSelectedDocumentSource(null);
             beginAgentRunPolling(submitted.agentRunId, submitted.status, activeSessionId);
           } catch (error) {
-            const definitiveRejection = isDefinitiveDurableMutationRejection(error, 'SubmitRun');
+            const mutationKind: DurableMutationKind = isTicketCommand ? 'SubmitInput' : 'SubmitRun';
+            const definitiveRejection = isDefinitiveDurableMutationRejection(error, mutationKind);
             if (definitiveRejection) {
               if (agentSubmissionAttemptsRef.current.get(submissionKey) === operationAttempt) {
                 agentSubmissionAttemptsRef.current.delete(submissionKey);
               }
               if (submissionContextKey) {
-                clearDurableOperationUnresolved(submissionContextKey, prompt);
+                clearDurableOperationUnresolved(
+                  submissionContextKey,
+                  isTicketCommand ? composerText : prompt
+                );
               }
             } else if (submissionContextKey) {
-              markDurableOperationUnresolved(submissionContextKey, prompt, 'SubmitRun');
+              markDurableOperationUnresolved(
+                submissionContextKey,
+                isTicketCommand ? composerText : prompt,
+                isTicketCommand ? 'SubmitInput' : 'SubmitRun'
+              );
               setSessionLoadRequest((current) => current + 1);
             }
             if (!submissionIsCurrent()) {
