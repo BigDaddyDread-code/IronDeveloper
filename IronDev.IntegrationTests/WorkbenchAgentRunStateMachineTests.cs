@@ -2140,7 +2140,6 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
 
     private sealed class ValidSchemaAgent(string assistantMessage) : IWorkbenchBusinessAnalystAgent
     {
-        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
         private int _invocationCount;
 
         public string? ContextHash { get; private set; }
@@ -2155,9 +2154,8 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
             return Task.FromResult<IWorkbenchBusinessAnalystPreparedInvocation>(new PreparedInvocation(_ =>
             {
                 Interlocked.Increment(ref _invocationCount);
-                return Task.FromResult(JsonSerializer.Serialize(
-                    ValidOutput(context, assistantMessage),
-                    JsonOptions));
+                return Task.FromResult(WorkbenchBusinessAnalystOutputValidator.Serialize(
+                    ValidOutput(context, assistantMessage)));
             }));
         }
     }
