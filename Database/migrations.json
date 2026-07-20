@@ -224,6 +224,11 @@
                              "id":  "2026-07-workbench-pr04a-ticket-proposals",
                              "path":  "Database/migrate_workbench_ticket_proposals.sql",
                              "description":  "Adds trusted proposal-purpose AgentRun metadata plus current ticket proposal aggregates and append-only canonical revision history."
+                        },
+                        {
+                             "id":  "2026-07-workbench-pr04b-ticket-commitments",
+                             "path":  "Database/migrate_workbench_ticket_commitments.sql",
+                             "description":  "Adds immutable atomic permanent-ticket commitment receipts, exact proposal-to-ticket provenance, dependency mappings, and committed proposal revisions."
                         }
                    ]
 }

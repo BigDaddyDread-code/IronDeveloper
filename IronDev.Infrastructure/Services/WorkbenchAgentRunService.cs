@@ -132,7 +132,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
             {
                 var proposalSet = await connection.QuerySingleOrDefaultAsync<ExistingTicketProposalSetRow>(new CommandDefinition(
                     """
-                    SELECT Id, CurrentRevision, CreatedByAgentRunId, CreatedAtUtc
+                    SELECT Id, CurrentRevision, Status, CreatedByAgentRunId, CreatedAtUtc
                     FROM dbo.TicketProposalSets WITH (UPDLOCK, HOLDLOCK)
                     WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@TicketProposalSetId
                       AND WorkbenchSessionId=@WorkbenchSessionId AND LeaseEpoch=@LeaseEpoch;
@@ -142,6 +142,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     cancellationToken: cancellationToken));
                 if (proposalSet is null)
                     throw new WorkbenchProjectNotAccessibleException();
+                if (proposalSet.Status == TicketProposalSetStatuses.Committed)
+                    throw new TicketProposalAlreadyCommittedException();
                 if (proposalSet.CurrentRevision != command.ExpectedTicketProposalRevision)
                     throw new TicketProposalRevisionConflictException(proposalSet.CurrentRevision);
             }
@@ -2159,7 +2161,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
         {
             existing = await connection.QuerySingleOrDefaultAsync<ExistingTicketProposalSetRow>(new CommandDefinition(
                 """
-                SELECT Id, CurrentRevision, CreatedByAgentRunId, CreatedAtUtc
+                SELECT Id, CurrentRevision, Status, CreatedByAgentRunId, CreatedAtUtc
                 FROM dbo.TicketProposalSets WITH (UPDLOCK, HOLDLOCK)
                 WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@TicketProposalSetId
                   AND WorkbenchSessionId=@WorkbenchSessionId;
@@ -2167,6 +2169,8 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                 run,
                 transaction,
                 cancellationToken: cancellationToken));
+            if (existing?.Status == TicketProposalSetStatuses.Committed)
+                throw new TicketProposalAlreadyCommittedException();
             if (existing is null || existing.CurrentRevision != run.TicketProposalRevision)
                 throw new TicketProposalRevisionConflictException(existing?.CurrentRevision ?? 0);
             revision = checked(existing.CurrentRevision + 1);
@@ -2246,7 +2250,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
                     Status=@Status, SplitReason=@SplitReason,
                     SourceMessageIdsJson=@SourceMessageIdsJson, UpdatedAtUtc=@UpdatedAtUtc
                 WHERE TenantId=@TenantId AND ProjectId=@ProjectId AND Id=@TicketProposalSetId
-                  AND CurrentRevision=@ExpectedRevision;
+                  AND CurrentRevision=@ExpectedRevision AND Status<>N'Committed';
                 """,
                 new
                 {
@@ -2471,6 +2475,7 @@ public sealed class WorkbenchAgentRunService : IWorkbenchAgentRunService
     {
         public Guid Id { get; init; }
         public long CurrentRevision { get; init; }
+        public string Status { get; init; } = string.Empty;
         public Guid CreatedByAgentRunId { get; init; }
         public DateTime CreatedAtUtc { get; init; }
     }

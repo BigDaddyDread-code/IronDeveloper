@@ -25,6 +25,7 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         await ApplyMigrationAsync("migrate_workbench_agent_runs.sql");
         await ApplyMigrationAsync("migrate_workbench_project_understanding.sql");
         await ApplyMigrationAsync("migrate_workbench_ticket_proposals.sql");
+        await ApplyMigrationAsync("migrate_workbench_ticket_commitments.sql");
     }
 
     [TestMethod]

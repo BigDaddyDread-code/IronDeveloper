@@ -10,7 +10,6 @@ namespace IronDev.Infrastructure.Services;
 
 public sealed class WorkbenchTicketProposalService : IWorkbenchTicketProposalService
 {
-    private const int MaximumTitleCharacters = 300;
     private const int MaximumProblemCharacters = 4_000;
     private const int MaximumProposedChangeCharacters = 8_000;
     private const int MaximumAcceptanceCriteria = 20;
@@ -180,7 +179,8 @@ public sealed class WorkbenchTicketProposalService : IWorkbenchTicketProposalSer
         if (command.TicketProposalId == Guid.Empty)
             throw new TicketProposalValidationException("ticketProposalId is required.");
 
-        var title = NormalizeRequired(command.Title, MaximumTitleCharacters, "title");
+        var title = NormalizeRequired(
+            command.Title, TicketProposalConstraints.MaximumTitleCharacters, "title");
         var problem = NormalizeRequired(command.Problem, MaximumProblemCharacters, "problem");
         var proposedChange = NormalizeRequired(
             command.ProposedChange, MaximumProposedChangeCharacters, "proposedChange");
@@ -476,6 +476,8 @@ public sealed class WorkbenchTicketProposalService : IWorkbenchTicketProposalSer
 
             var current = ReadDocument(
                 currentRow, ticketProposalSetId, projectId, workbenchSessionId, leaseEpoch);
+            if (current.Status == TicketProposalSetStatuses.Committed)
+                throw new TicketProposalAlreadyCommittedException();
             var changedAtUtc = await connection.QuerySingleAsync<DateTime>(new CommandDefinition(
                 "SELECT SYSUTCDATETIME();",
                 transaction: transaction,

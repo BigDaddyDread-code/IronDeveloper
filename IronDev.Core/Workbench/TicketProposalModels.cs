@@ -22,6 +22,19 @@ public static class TicketProposalSetStatuses
 {
     public const string Ready = "Ready";
     public const string NeedsInput = "NeedsInput";
+    public const string Committed = "Committed";
+}
+
+public static class TicketProposalConstraints
+{
+    // ProjectTickets.Title is the permanent-ticket boundary. Proposal titles must already
+    // satisfy it so committing a reviewed proposal never requires lossy truncation.
+    public const int MaximumTitleCharacters = 200;
+
+    // PR-04A briefly accepted 300-character proposal titles. Existing immutable
+    // snapshots remain readable/editable so users can shorten them without loss;
+    // new model/edit input and permanent-ticket commitment stay at the 200 boundary.
+    public const int HistoricalMaximumTitleCharacters = 300;
 }
 
 public static class TicketProposalIssueKinds
@@ -44,6 +57,7 @@ public static class TicketProposalRevisionChangeKinds
     public const string Reordered = "Reordered";
     public const string Removed = "Removed";
     public const string IssueResolved = "IssueResolved";
+    public const string Committed = "Committed";
 }
 
 /// <summary>
@@ -207,13 +221,17 @@ public static class TicketProposalSetDocumentCodec
             document.CreatedByAgentRunId == Guid.Empty || document.CreatedAtUtc == default ||
             document.UpdatedAtUtc < document.CreatedAtUtc)
             throw new InvalidOperationException("The ticket proposal-set document identity or revision is invalid.");
-        if (document.Status is not (TicketProposalSetStatuses.Ready or TicketProposalSetStatuses.NeedsInput))
+        if (document.Status is not (
+                TicketProposalSetStatuses.Ready or
+                TicketProposalSetStatuses.NeedsInput or
+                TicketProposalSetStatuses.Committed))
             throw new InvalidOperationException("The ticket proposal-set status is invalid.");
         if (document.Proposals is null || document.OpenQuestions is null ||
             document.PotentialConflicts is null || document.SourceMessageIds is null)
             throw new InvalidOperationException("The ticket proposal-set collections are required.");
-        if (document.Status == TicketProposalSetStatuses.Ready && document.Proposals.Count is < 1 or > 5)
-            throw new InvalidOperationException("A ready ticket proposal set must contain one to five proposals.");
+        if (document.Status is TicketProposalSetStatuses.Ready or TicketProposalSetStatuses.Committed &&
+            document.Proposals.Count is < 1 or > 5)
+            throw new InvalidOperationException("A ready or committed ticket proposal set must contain one to five proposals.");
         if (document.Status == TicketProposalSetStatuses.NeedsInput && document.Proposals.Count != 0)
             throw new InvalidOperationException("A NeedsInput ticket proposal set cannot contain proposals.");
 
@@ -223,9 +241,14 @@ public static class TicketProposalSetDocumentCodec
         if (!document.Proposals.Select(value => value.SuggestedOrder)
                 .SequenceEqual(Enumerable.Range(1, document.Proposals.Count)))
             throw new InvalidOperationException("Ticket proposal order must be contiguous and canonical.");
+        var maximumStoredTitleCharacters = document.Status == TicketProposalSetStatuses.Committed
+            ? TicketProposalConstraints.MaximumTitleCharacters
+            : TicketProposalConstraints.HistoricalMaximumTitleCharacters;
         foreach (var proposal in document.Proposals)
         {
-            if (string.IsNullOrWhiteSpace(proposal.Title) || string.IsNullOrWhiteSpace(proposal.Problem) ||
+            if (string.IsNullOrWhiteSpace(proposal.Title) ||
+                proposal.Title.Length > maximumStoredTitleCharacters ||
+                string.IsNullOrWhiteSpace(proposal.Problem) ||
                 string.IsNullOrWhiteSpace(proposal.ProposedChange) || proposal.AcceptanceCriteria.Count == 0 ||
                 proposal.SourceMessageIds.Count == 0 ||
                 proposal.DependencyProposalIds.Count != proposal.DependencyProposalIds.Distinct().Count() ||
@@ -247,6 +270,10 @@ public static class TicketProposalSetDocumentCodec
                 (issue.Status == TicketProposalIssueStatuses.Resolved && string.IsNullOrWhiteSpace(issue.Resolution)))
                 throw new InvalidOperationException("A ticket proposal issue is incomplete or invalid.");
         }
+        if (document.Status == TicketProposalSetStatuses.Committed &&
+            document.OpenQuestions.Concat(document.PotentialConflicts)
+                .Any(issue => issue.Status == TicketProposalIssueStatuses.Open))
+            throw new InvalidOperationException("A committed ticket proposal set cannot contain open issues.");
     }
 }
 

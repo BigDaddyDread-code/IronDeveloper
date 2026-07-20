@@ -16721,6 +16721,134 @@
         }
       }
     },
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/{ticketProposalSetId}/commits": {
+      "post": {
+        "tags": [
+          "WorkbenchTicketProposals"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "ticketProposalSetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitTicketProposalSetRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitTicketProposalSetRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitTicketProposalSetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketProposalCommitResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketProposalCommitResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketProposalCommitResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workflow/runs": {
       "get": {
         "tags": [
@@ -22058,6 +22186,58 @@
           },
           "durationMs": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommitTicketProposalSetRequest": {
+        "type": "object",
+        "properties": {
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedProposalSetRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommittedProjectTicketReadModel": {
+        "type": "object",
+        "properties": {
+          "ticketProposalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectTicketId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "blockedByTicketIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
             "nullable": true
           }
         },
@@ -38840,6 +39020,74 @@
           "nextSafeAction": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "TicketProposalCommitReadModel": {
+        "type": "object",
+        "properties": {
+          "commitmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ticketProposalSetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reviewedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "committedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reviewedSnapshotHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorUserId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "committedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommittedProjectTicketReadModel"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "TicketProposalCommitResult": {
+        "type": "object",
+        "properties": {
+          "proposalSet": {
+            "$ref": "#/components/schemas/TicketProposalSetReadModel"
+          },
+          "commitment": {
+            "$ref": "#/components/schemas/TicketProposalCommitReadModel"
+          },
+          "projectLifecyclePhase": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionReadiness": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isReplay": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

@@ -506,7 +506,7 @@ export interface SubmitWorkbenchAgentInputResult {
 
 export type SubmitWorkbenchInputResult = SubmitWorkbenchCommandResult | SubmitWorkbenchAgentInputResult;
 
-export type TicketProposalSetStatus = 'Ready' | 'NeedsInput';
+export type TicketProposalSetStatus = 'Ready' | 'NeedsInput' | 'Committed';
 export type TicketProposalIssueStatus = 'Open' | 'Resolved';
 
 export interface TicketProposalReadModel {
@@ -583,6 +583,36 @@ export interface ResolveTicketProposalIssueRequest extends TicketProposalMutatio
 export interface RegenerateTicketProposalsRequest extends TicketProposalMutationAuthority {
   instruction: string;
   chatSessionId: number;
+}
+
+export type CommitTicketProposalSetRequest = TicketProposalMutationAuthority;
+
+export interface TicketProposalCommittedTicket {
+  ticketProposalId: string;
+  projectTicketId: number;
+  title: string;
+  suggestedOrder: number;
+  blockedByTicketIds: number[];
+}
+
+export interface TicketProposalCommitmentReadModel {
+  commitmentId: string;
+  ticketProposalSetId: string;
+  reviewedRevision: number;
+  committedRevision: number;
+  reviewedSnapshotHash: string;
+  actorUserId: number;
+  committedAtUtc: string;
+  tickets: TicketProposalCommittedTicket[];
+}
+
+export interface TicketProposalCommitResult {
+  proposalSet: TicketProposalSetReadModel;
+  commitment: TicketProposalCommitmentReadModel;
+  projectLifecyclePhase: 'Delivery';
+  executionReadiness: 'NotConfigured' | 'ValidationRequired' | 'Ready';
+  clientOperationId: string;
+  isReplay: boolean;
 }
 
 export interface TicketProposalMutationResult {

@@ -44,6 +44,7 @@ import type {
   ChatTurnAuditResponse,
   CancelWorkbenchAgentRunRequest,
   CancelWorkbenchAgentRunResult,
+  CommitTicketProposalSetRequest,
   ConfirmBaWorkingDraftRequest,
   CurrentWorkbenchAgentRunResponse,
   ControlledActionRequestCreateRequest,
@@ -114,6 +115,8 @@ import type {
   SubmitWorkbenchInputRequest,
   SubmitWorkbenchInputResult,
   TicketProposalMutationResult,
+  TicketProposalCommitResult,
+  TicketProposalCommittedTicket,
   TicketProposalMutationAuthority,
   TicketProposalReadModel,
   TicketProposalRevisionReadModel,
@@ -1114,6 +1117,22 @@ class IronDevApiClient {
     return result;
   }
 
+  async commitTicketProposalSet(
+    projectId: number,
+    proposalSetId: string,
+    request: CommitTicketProposalSetRequest,
+    signal?: AbortSignal
+  ): Promise<TicketProposalCommitResult> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/ticket-proposal-sets/${encodeURIComponent(proposalSetId)}/commits`,
+      { method: 'POST', body: request, signal }
+    );
+    if (!isTicketProposalCommitResult(result, projectId, proposalSetId, request)) {
+      throw new IronDevApiProtocolError('Ticket proposal commit');
+    }
+    return result;
+  }
+
   private async submitTicketProposalMutation(
     projectId: number,
     proposalSetId: string,
@@ -2091,7 +2110,7 @@ function isTicketProposalSetReadModel(
       !isPositiveInteger(value.leaseEpoch) ||
       !isPositiveInteger(value.revision) ||
       !isPositiveInteger(value.basedOnUnderstandingRevision) ||
-      (value.status !== 'Ready' && value.status !== 'NeedsInput') ||
+      (value.status !== 'Ready' && value.status !== 'NeedsInput' && value.status !== 'Committed') ||
       (value.splitReason !== null && typeof value.splitReason !== 'string') ||
       !Array.isArray(value.proposals) ||
       !value.proposals.every(isTicketProposalReadModel) ||
@@ -2107,9 +2126,11 @@ function isTicketProposalSetReadModel(
   }
 
   const proposals = value.proposals as TicketProposalReadModel[];
-  if ((value.status === 'Ready' && (proposals.length < 1 || proposals.length > 5)) ||
+  if (((value.status === 'Ready' || value.status === 'Committed') && (proposals.length < 1 || proposals.length > 5)) ||
       (value.status === 'NeedsInput' &&
-        (proposals.length !== 0 || value.openQuestions.length + value.potentialConflicts.length === 0))) {
+        (proposals.length !== 0 || value.openQuestions.length + value.potentialConflicts.length === 0)) ||
+      (value.status === 'Committed' &&
+        [...value.openQuestions, ...value.potentialConflicts].some((issue) => issue.status === 'Open'))) {
     return false;
   }
   const proposalIds = new Set(proposals.map((proposal) => proposal.ticketProposalId));
@@ -2165,6 +2186,70 @@ function isTicketProposalMutationResult(
     value.proposalSet.ticketProposalSetId === proposalSetId &&
     value.proposalSet.leaseEpoch === request.leaseEpoch &&
     value.proposalSet.revision === request.expectedProposalSetRevision + 1;
+}
+
+function isTicketProposalCommitResult(
+  value: unknown,
+  projectId: number,
+  proposalSetId: string,
+  request: CommitTicketProposalSetRequest
+): value is TicketProposalCommitResult {
+  if (!isJsonRecord(value) ||
+      value.clientOperationId !== request.clientOperationId ||
+      typeof value.isReplay !== 'boolean' ||
+      value.projectLifecyclePhase !== 'Delivery' ||
+      !isTicketProposalCommitExecutionReadiness(value.executionReadiness) ||
+      !isTicketProposalSetReadModel(
+        value.proposalSet,
+        projectId,
+        request.workbenchSessionId,
+        request.leaseEpoch) ||
+      value.proposalSet.ticketProposalSetId !== proposalSetId ||
+      value.proposalSet.status !== 'Committed' ||
+      value.proposalSet.revision !== request.expectedProposalSetRevision + 1 ||
+      !isJsonRecord(value.commitment)) {
+    return false;
+  }
+
+  const commitment = value.commitment;
+  if (!isNonEmptyUuidString(commitment.commitmentId) ||
+      commitment.ticketProposalSetId !== proposalSetId ||
+      commitment.reviewedRevision !== request.expectedProposalSetRevision ||
+      commitment.committedRevision !== value.proposalSet.revision ||
+      !isNonEmptyString(commitment.reviewedSnapshotHash) ||
+      !isPositiveInteger(commitment.actorUserId) ||
+      !isTimestampString(commitment.committedAtUtc) ||
+      !Array.isArray(commitment.tickets) ||
+      commitment.tickets.length !== value.proposalSet.proposals.length ||
+      !commitment.tickets.every(isTicketProposalCommittedTicket)) {
+    return false;
+  }
+
+  const permanentIds = commitment.tickets.map((ticket) => ticket.projectTicketId);
+  const committedProposalIds = commitment.tickets.map((ticket) => ticket.ticketProposalId);
+  const committedOrders = commitment.tickets.map((ticket) => ticket.suggestedOrder).sort((left, right) => left - right);
+  const proposalIds = new Set(value.proposalSet.proposals.map((proposal) => proposal.ticketProposalId));
+  return new Set(permanentIds).size === permanentIds.length &&
+    new Set(committedProposalIds).size === committedProposalIds.length &&
+    committedOrders.every((order, index) => order === index + 1) &&
+    commitment.tickets.every((ticket) => proposalIds.has(ticket.ticketProposalId)) &&
+    commitment.tickets.every((ticket) => ticket.blockedByTicketIds.every(
+      (id) => id !== ticket.projectTicketId && permanentIds.includes(id)));
+}
+
+function isTicketProposalCommittedTicket(value: unknown): value is TicketProposalCommittedTicket {
+  return isJsonRecord(value) &&
+    isNonEmptyUuidString(value.ticketProposalId) &&
+    isPositiveInteger(value.projectTicketId) &&
+    isNonEmptyString(value.title) &&
+    isPositiveInteger(value.suggestedOrder) &&
+    isPositiveIntegerArray(value.blockedByTicketIds);
+}
+
+function isTicketProposalCommitExecutionReadiness(
+  value: unknown
+): value is TicketProposalCommitResult['executionReadiness'] {
+  return value === 'NotConfigured' || value === 'ValidationRequired' || value === 'Ready';
 }
 
 function isTicketProposalRevisionReadModel(

@@ -12345,6 +12345,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/ticket-proposal-sets/{ticketProposalSetId}/commits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                    ticketProposalSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CommitTicketProposalSetRequest"];
+                    "text/json": components["schemas"]["CommitTicketProposalSetRequest"];
+                    "application/*+json": components["schemas"]["CommitTicketProposalSetRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["TicketProposalCommitResult"];
+                        "application/json": components["schemas"]["TicketProposalCommitResult"];
+                        "text/json": components["schemas"]["TicketProposalCommitResult"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workflow/runs": {
         parameters: {
             query?: never;
@@ -14204,6 +14283,26 @@ export interface components {
             stdoutPath?: string | null;
             stderrPath?: string | null;
             durationMs?: string | null;
+        };
+        CommitTicketProposalSetRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            expectedProposalSetRevision?: number;
+        };
+        CommittedProjectTicketReadModel: {
+            /** Format: uuid */
+            ticketProposalId?: string;
+            /** Format: int64 */
+            projectTicketId?: number;
+            title?: string | null;
+            /** Format: int32 */
+            suggestedOrder?: number;
+            blockedByTicketIds?: number[] | null;
         };
         ConfirmBaWorkingDraftRequest: {
             /** Format: int64 */
@@ -18774,6 +18873,31 @@ export interface components {
             hasBlockingWarnings?: boolean;
             blockedActions?: string[] | null;
             nextSafeAction?: string | null;
+        };
+        TicketProposalCommitReadModel: {
+            /** Format: uuid */
+            commitmentId?: string;
+            /** Format: uuid */
+            ticketProposalSetId?: string;
+            /** Format: int64 */
+            reviewedRevision?: number;
+            /** Format: int64 */
+            committedRevision?: number;
+            reviewedSnapshotHash?: string | null;
+            /** Format: int32 */
+            actorUserId?: number;
+            /** Format: date-time */
+            committedAtUtc?: string;
+            tickets?: components["schemas"]["CommittedProjectTicketReadModel"][] | null;
+        };
+        TicketProposalCommitResult: {
+            proposalSet?: components["schemas"]["TicketProposalSetReadModel"];
+            commitment?: components["schemas"]["TicketProposalCommitReadModel"];
+            projectLifecyclePhase?: string | null;
+            executionReadiness?: string | null;
+            /** Format: uuid */
+            clientOperationId?: string;
+            isReplay?: boolean;
         };
         TicketProposalIssueReadModel: {
             /** Format: uuid */

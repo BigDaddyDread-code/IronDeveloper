@@ -323,6 +323,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_project_understanding.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_commands.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ticket_proposals.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ticket_commitments.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -623,6 +624,36 @@ public abstract class ApiTestBase
             IF OBJECT_ID('dbo.ProjectImplementationPlans', 'U') IS NOT NULL DELETE FROM dbo.ProjectImplementationPlans;
             IF OBJECT_ID('dbo.RunEvents', 'U') IS NOT NULL DELETE FROM dbo.RunEvents;
             IF OBJECT_ID('dbo.Runs', 'U') IS NOT NULL DELETE FROM dbo.Runs;
+            IF OBJECT_ID('dbo.TicketProposalCommitmentDependencies', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitmentDependencies_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.trg_TicketProposalCommitmentDependencies_AppendOnly
+                        ON dbo.TicketProposalCommitmentDependencies;
+                DELETE FROM dbo.TicketProposalCommitmentDependencies;
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitmentDependencies_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.trg_TicketProposalCommitmentDependencies_AppendOnly
+                        ON dbo.TicketProposalCommitmentDependencies;
+            END;
+            IF OBJECT_ID('dbo.TicketProposalCommitmentTickets', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitmentTickets_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.trg_TicketProposalCommitmentTickets_AppendOnly
+                        ON dbo.TicketProposalCommitmentTickets;
+                DELETE FROM dbo.TicketProposalCommitmentTickets;
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitmentTickets_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.trg_TicketProposalCommitmentTickets_AppendOnly
+                        ON dbo.TicketProposalCommitmentTickets;
+            END;
+            IF OBJECT_ID('dbo.TicketProposalCommitments', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitments_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.trg_TicketProposalCommitments_AppendOnly
+                        ON dbo.TicketProposalCommitments;
+                DELETE FROM dbo.TicketProposalCommitments;
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitments_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.trg_TicketProposalCommitments_AppendOnly
+                        ON dbo.TicketProposalCommitments;
+            END;
             DELETE FROM dbo.ProjectTickets;
             IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectContextDocuments;
             IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;

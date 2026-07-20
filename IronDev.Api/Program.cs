@@ -178,6 +178,8 @@ builder.Services.AddScoped<IWorkbenchProjectEntryService, WorkbenchProjectEntryS
 builder.Services.AddScoped<IWorkbenchProjectUnderstandingService, WorkbenchProjectUnderstandingService>();
 builder.Services.AddScoped<IWorkbenchInputService, WorkbenchInputService>();
 builder.Services.AddScoped<IWorkbenchTicketProposalService, WorkbenchTicketProposalService>();
+builder.Services.AddScoped<IWorkbenchTicketProposalCommitService, WorkbenchTicketProposalCommitService>();
+builder.Services.AddSingleton<ITicketProposalCommitFailureInjector, NoOpTicketProposalCommitFailureInjector>();
 builder.Services.AddSingleton<IWorkbenchAgentRunFailureInjector, NoOpWorkbenchAgentRunFailureInjector>();
 var workbenchAgentRunWorkerEnabled =
     builder.Configuration.GetValue<bool>("Features:WorkbenchAgentRunWorker");

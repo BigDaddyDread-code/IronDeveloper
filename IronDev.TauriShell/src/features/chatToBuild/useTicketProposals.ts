@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { IronDevApiError } from '../../api/ironDevApi';
 import type {
   ChatMessage,
+  TicketProposalCommitResult,
   TicketProposalReadModel,
   TicketProposalRevisionReadModel,
   TicketProposalSetReadModel
@@ -24,7 +25,10 @@ export interface TicketProposalController {
   mutationError: string | null;
   isMutating: boolean;
   isRegenerating: boolean;
+  isCommitting: boolean;
   deliveryUnresolved: boolean;
+  commitDeliveryUnresolved: boolean;
+  commitResult: TicketProposalCommitResult | null;
   refresh: () => void;
   loadSourceMessage: (messageId: number) => Promise<ChatMessage | null>;
   updateProposal: (proposal: TicketProposalReadModel) => Promise<boolean>;
@@ -32,6 +36,7 @@ export interface TicketProposalController {
   removeProposal: (proposalId: string) => Promise<boolean>;
   resolveIssue: (issueId: string, resolution: string) => Promise<boolean>;
   regenerate: (instruction: string, chatSessionId: number | null) => Promise<boolean>;
+  commitTickets: () => Promise<boolean>;
 }
 
 export function useTicketProposals({
@@ -52,7 +57,10 @@ export function useTicketProposals({
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [isMutating, setMutating] = useState(false);
   const [isRegenerating, setRegenerating] = useState(false);
+  const [isCommitting, setCommitting] = useState(false);
   const [deliveryUnresolved, setDeliveryUnresolved] = useState(false);
+  const [commitDeliveryUnresolved, setCommitDeliveryUnresolved] = useState(false);
+  const [commitResult, setCommitResult] = useState<TicketProposalCommitResult | null>(null);
   const [loadRequest, setLoadRequest] = useState(0);
   const operationAttemptsRef = useRef(new Map<string, RetainedProposalOperation>());
   const authorityGenerationRef = useRef(0);
@@ -71,7 +79,10 @@ export function useTicketProposals({
     setMutationError(null);
     setMutating(false);
     setRegenerating(false);
+    setCommitting(false);
     setDeliveryUnresolved(false);
+    setCommitDeliveryUnresolved(false);
+    setCommitResult(null);
   }, [authorityKey, enabled]);
 
   useEffect(() => {
@@ -143,6 +154,7 @@ export function useTicketProposals({
       const result = await invoke(attempt.clientOperationId);
       operationAttemptsRef.current.delete(operationKey);
       setDeliveryUnresolved(false);
+      setCommitDeliveryUnresolved(false);
       if (generation !== authorityGenerationRef.current) {
         return true;
       }
@@ -350,6 +362,86 @@ export function useTicketProposals({
     }
   }, [authorityKey, deliveryUnresolved, isRegenerating, mutationAuthority, onRegenerationTerminal, projectId, proposalSet, session.client, workbenchSession]);
 
+  const commitTickets = useCallback(async () => {
+    if (!projectId || !proposalSet || !workbenchSession || !authorityKey || isCommitting ||
+        (proposalSet.status !== 'Ready' && proposalSet.status !== 'Committed')) {
+      return false;
+    }
+    if (proposalSet.status === 'Committed') {
+      return commitResult !== null;
+    }
+    const operationKey = `${authorityKey}:${proposalSet.ticketProposalSetId}:${proposalSet.revision}:commit`;
+    const retainedAttempt = operationAttemptsRef.current.get(operationKey);
+    if (deliveryUnresolved && !retainedAttempt) {
+      setMutationError('A previous delivery is unresolved. Retry that exact unchanged action before creating tickets.');
+      return false;
+    }
+    const attempt = retainedAttempt ?? {
+      key: operationKey,
+      clientOperationId: crypto.randomUUID()
+    };
+    operationAttemptsRef.current.set(operationKey, attempt);
+    const generation = authorityGenerationRef.current;
+    setCommitting(true);
+    setMutationError(null);
+    try {
+      const result = await session.client.commitTicketProposalSet(
+        projectId,
+        proposalSet.ticketProposalSetId,
+        mutationAuthority(attempt.clientOperationId)
+      );
+      operationAttemptsRef.current.delete(operationKey);
+      if (generation !== authorityGenerationRef.current) {
+        return true;
+      }
+      setDeliveryUnresolved(false);
+      setCommitDeliveryUnresolved(false);
+      setProposalSet(result.proposalSet);
+      setCommitResult(result);
+      try {
+        const nextHistory = await session.client.getTicketProposalSetHistory(
+          projectId,
+          result.proposalSet.ticketProposalSetId,
+          workbenchSession.workbenchSessionId,
+          workbenchSession.leaseEpoch
+        );
+        if (generation === authorityGenerationRef.current) {
+          setHistory(nextHistory);
+        }
+      } catch {
+        if (generation === authorityGenerationRef.current) {
+          setMutationError('All tickets were created, but revision history could not be refreshed.');
+        }
+      }
+      return true;
+    } catch (commitFailure) {
+      const definitive = isDefinitiveProposalFailure(commitFailure);
+      if (definitive) {
+        operationAttemptsRef.current.delete(operationKey);
+      }
+      if (generation !== authorityGenerationRef.current) {
+        return false;
+      }
+      if (isProposalRevisionConflict(commitFailure)) {
+        setDeliveryUnresolved(false);
+        setCommitDeliveryUnresolved(false);
+        setMutationError('The proposal set changed elsewhere. Reloading the latest durable revision before tickets can be created.');
+        setLoadRequest((current) => current + 1);
+        return false;
+      }
+      setDeliveryUnresolved(!definitive);
+      setCommitDeliveryUnresolved(!definitive);
+      setMutationError(definitive
+        ? describeProposalError(commitFailure, 'Ticket creation was rejected. No tickets were created.')
+        : 'Ticket creation delivery could not be confirmed. Retry this exact unchanged commit to resolve it safely.');
+      return false;
+    } finally {
+      if (generation === authorityGenerationRef.current) {
+        setCommitting(false);
+      }
+    }
+  }, [authorityKey, commitResult, deliveryUnresolved, isCommitting, mutationAuthority, projectId, proposalSet, session.client, workbenchSession]);
+
   const loadSourceMessage = useCallback(async (messageId: number) => {
     if (!projectId || !Number.isSafeInteger(messageId) || messageId <= 0) {
       return null;
@@ -365,7 +457,10 @@ export function useTicketProposals({
     mutationError,
     isMutating,
     isRegenerating,
+    isCommitting,
     deliveryUnresolved,
+    commitDeliveryUnresolved,
+    commitResult,
     loadSourceMessage,
     refresh: () => {
       if (deliveryUnresolved) {
@@ -378,7 +473,8 @@ export function useTicketProposals({
     moveProposal,
     removeProposal,
     resolveIssue,
-    regenerate
+    regenerate,
+    commitTickets
   };
 }
 
@@ -409,6 +505,11 @@ const definitiveProposalConflictCodes = new Set([
   'ticket_proposal_issue_not_open',
   'ticket_proposal_dependency_invalid',
   'ticket_proposal_final_removal',
+  'ticket_proposal_blocking_issues',
+  'ticket_proposal_already_committed',
+  'ticket_proposal_set_not_ready',
+  'ticket_proposal_commit_boundary_invalid',
+  'ticket_proposal_project_not_shaping',
   'workbench_lease_fence_rejected',
   'workbench_chat_session_mismatch',
   'workbench_agent_run_active'
