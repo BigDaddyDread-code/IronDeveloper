@@ -241,7 +241,7 @@ public sealed record ProjectOperationalProjection(
     string ProjectLifecycleAuthority,
     string ExecutionReadiness,
     string ExecutionReadinessAuthority,
-    object? RepositoryBinding);
+    RepositoryBindingSnapshot? RepositoryBinding);
 
 public sealed record ProjectUnderstandingSnapshot(
     int ProjectId,

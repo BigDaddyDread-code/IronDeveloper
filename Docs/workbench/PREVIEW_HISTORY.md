@@ -15,18 +15,19 @@ The machine-readable current version is `workbench-version.json`. Each preview u
 | `0.1.0-preview.9` | PR-03 | `workbench-pr03` | Deterministic `/help` and `/ticket`, exact allowlist parsing, hash-only rejection audit, and zero-AgentRun help/typo handling |
 | `0.1.0-preview.10` | PR-04A | `workbench-pr04a` | Governed `/ticket` generation, durable proposal review, provenance, immutable revisions, fenced edits, and regeneration without permanent tickets |
 | `0.1.0-preview.11` | PR-04B | `workbench-pr04b` | Explicit atomic creation of permanent tickets, Work Item contracts, dependency remapping, provenance receipts, and the Delivery transition |
+| `0.1.0-preview.12` | PR-05A | `workbench-pr05a` | Repository/profile authorities, deterministic setup-plan review, approved-root safety, explicit confirmation, and unsupported-profile reporting with zero filesystem writes |
 
-Start the current PR-04B preview alongside the earlier previews:
+Start the current PR-05A preview alongside the earlier previews:
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -EnableConversationAuthority -PreviewId workbench-pr04b `
-  -ApiBaseUrl http://127.0.0.1:5340 -UiPort 5321
+  -EnableConversationAuthority -PreviewId workbench-pr05a `
+  -ApiBaseUrl http://127.0.0.1:5350 -UiPort 5331
 ```
 
-The PR-04B preview owns database `IronDeveloper_Test_workbench_pr04b`, workspace `C:\IronDevTestWorkspaces\workbench-pr04b`, logs `C:\IronDevTestLogs\workbench-pr04b`, API `http://127.0.0.1:5340`, and UI `http://127.0.0.1:5321`.
+The PR-05A preview owns database `IronDeveloper_Test_workbench_pr05a`, workspace `C:\IronDevTestWorkspaces\workbench-pr05a`, logs `C:\IronDevTestLogs\workbench-pr05a`, API `http://127.0.0.1:5350`, and UI `http://127.0.0.1:5331`.
 
-Project creation and shaping remain repository-independent. `/ticket` still produces reviewable proposals through the trusted BA path, and review actions remain revisioned and fenced. PR-04B adds a separate explicit confirmation: an exact ready revision is committed once into one to five permanent tickets, matching Work Item identities/contracts, source-message provenance, and remapped permanent-ticket dependencies in one serializable transaction. The same transaction appends a committed proposal revision and moves the project from `Shaping` to `Delivery`; readiness remains `NotConfigured`, and no repository, directory, execution profile, or Builder authorization is created. Exact operation replay returns the original commitment and ticket IDs without duplicates.
+Project creation, shaping, `/ticket`, and proposal review remain repository-independent. PR-05A introduces a separate Repository surface. The server derives a safe direct-child target inside its configured repository root, evaluates desired-technology compatibility without silently substituting WinForms, and returns a deterministic plan containing the pinned profile, generated names, template hash, toolchain/image, commands, Git/index/sandbox/resource policies, and exact plan hash. Explicit confirmation is fenced by the current Workbench lease and client operation, then records versioned `RepositoryBinding` and `ProjectExecutionProfile` authorities plus an immutable confirmation receipt. It stops at `SetupConfirmed`: readiness remains `NotConfigured`, `Project.LocalPath` remains null, and no directory, template, Git repository, index, command, sandbox run, or Builder authorization is created. PR-05B owns provisioning the confirmed plan.
 
 For the deterministic LocalTest rename path, send `Rename project to CalmPlan` as its own Workshop message, then accept the pending proposal in Project Context.
 

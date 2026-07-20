@@ -324,6 +324,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_commands.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ticket_proposals.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_ticket_commitments.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_repository_setup.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -719,6 +720,32 @@ public abstract class ApiTestBase
             END
             IF OBJECT_ID('dbo.TicketProposalSets', 'U') IS NOT NULL DELETE FROM dbo.TicketProposalSets;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
+            IF OBJECT_ID('dbo.RepositorySetupConfirmations', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_RepositorySetupConfirmations_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_RepositorySetupConfirmations_AppendOnly ON dbo.RepositorySetupConfirmations;
+                DELETE FROM dbo.RepositorySetupConfirmations;
+                IF OBJECT_ID('dbo.TR_RepositorySetupConfirmations_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_RepositorySetupConfirmations_AppendOnly ON dbo.RepositorySetupConfirmations;
+            END;
+            IF OBJECT_ID('dbo.ProjectExecutionProfileRevisions', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_ProjectExecutionProfileRevisions_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_ProjectExecutionProfileRevisions_AppendOnly ON dbo.ProjectExecutionProfileRevisions;
+                DELETE FROM dbo.ProjectExecutionProfileRevisions;
+                IF OBJECT_ID('dbo.TR_ProjectExecutionProfileRevisions_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_ProjectExecutionProfileRevisions_AppendOnly ON dbo.ProjectExecutionProfileRevisions;
+            END;
+            IF OBJECT_ID('dbo.ProjectExecutionProfiles', 'U') IS NOT NULL DELETE FROM dbo.ProjectExecutionProfiles;
+            IF OBJECT_ID('dbo.RepositoryBindingRevisions', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_RepositoryBindingRevisions_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_RepositoryBindingRevisions_AppendOnly ON dbo.RepositoryBindingRevisions;
+                DELETE FROM dbo.RepositoryBindingRevisions;
+                IF OBJECT_ID('dbo.TR_RepositoryBindingRevisions_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_RepositoryBindingRevisions_AppendOnly ON dbo.RepositoryBindingRevisions;
+            END;
+            IF OBJECT_ID('dbo.RepositoryBindings', 'U') IS NOT NULL DELETE FROM dbo.RepositoryBindings;
             IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL DELETE FROM dbo.ClientOperations;
             DELETE FROM dbo.ChatMessages;
             IF OBJECT_ID('dbo.WorkbenchWriteLeases', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchWriteLeases;

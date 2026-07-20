@@ -15733,6 +15733,164 @@
         }
       }
     },
+    "/api/workbench/projects/{projectId}/repository": {
+      "get": {
+        "tags": [
+          "WorkbenchRepository"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySetupContext"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySetupContext"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySetupContext"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/projects/{projectId}/repository/setup-plans": {
+      "post": {
+        "tags": [
+          "WorkbenchRepository"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRepositorySetupPlanRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRepositorySetupPlanRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRepositorySetupPlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySetupPlanPreview"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySetupPlanPreview"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySetupPlanPreview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/projects/{projectId}/repository/setup-confirmations": {
+      "post": {
+        "tags": [
+          "WorkbenchRepository"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRepositorySetupRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRepositorySetupRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRepositorySetupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySetupConfirmationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySetupConfirmationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySetupConfirmationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workbench/projects/{projectId}/ticket-proposal-sets/current": {
       "get": {
         "tags": [
@@ -22257,6 +22415,28 @@
         },
         "additionalProperties": false
       },
+      "ConfirmRepositorySetupRequest": {
+        "type": "object",
+        "properties": {
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedPlanHash": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ContextRequestKind": {
         "enum": [
           0,
@@ -22679,6 +22859,24 @@
             "items": {
               "type": "string"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateRepositorySetupPlanRequest": {
+        "type": "object",
+        "properties": {
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "profileDefinitionId": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -29489,6 +29687,112 @@
         },
         "additionalProperties": false
       },
+      "ProjectExecutionProfileSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repositoryBindingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileDefinitionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "profileDescriptorRevision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "descriptorSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "templateBundleSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "planningBundleSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetFramework": {
+            "type": "string",
+            "nullable": true
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "applicationKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "testFramework": {
+            "type": "string",
+            "nullable": true
+          },
+          "sdkVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "runtimeVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "solutionPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "appProjectPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "testProjectPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "restoreCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "buildCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "testCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "toolchainManifestId": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionImageReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "planningReadiness": {
+            "type": "string",
+            "nullable": true
+          },
+          "certificationState": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ProjectFile": {
         "type": "object",
         "properties": {
@@ -30181,7 +30485,7 @@
             "nullable": true
           },
           "repositoryBinding": {
-            "nullable": true
+            "$ref": "#/components/schemas/RepositoryBindingSnapshot"
           }
         },
         "additionalProperties": false
@@ -32922,6 +33226,398 @@
               "type": "string",
               "format": "uuid"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositoryBindingSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repositoryKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "canonicalPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "bindingState": {
+            "type": "string",
+            "nullable": true
+          },
+          "defaultBranch": {
+            "type": "string",
+            "nullable": true
+          },
+          "baselineCommit": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByActorUserId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "confirmedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositorySetupConfirmationResult": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "confirmationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isReplay": {
+            "type": "boolean"
+          },
+          "projectLifecyclePhase": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionReadiness": {
+            "type": "string",
+            "nullable": true
+          },
+          "readinessReasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "repositoryBinding": {
+            "$ref": "#/components/schemas/RepositoryBindingSnapshot"
+          },
+          "executionProfile": {
+            "$ref": "#/components/schemas/ProjectExecutionProfileSnapshot"
+          },
+          "setupPlan": {
+            "$ref": "#/components/schemas/RepositorySetupPlanPreview"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositorySetupConfirmationSnapshot": {
+        "type": "object",
+        "properties": {
+          "confirmationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositorySetupContext": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tenantId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "projectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectLifecyclePhase": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionReadiness": {
+            "type": "string",
+            "nullable": true
+          },
+          "readinessReasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "repositoryBinding": {
+            "$ref": "#/components/schemas/RepositoryBindingSnapshot"
+          },
+          "executionProfile": {
+            "$ref": "#/components/schemas/ProjectExecutionProfileSnapshot"
+          },
+          "latestConfirmation": {
+            "$ref": "#/components/schemas/RepositorySetupConfirmationSnapshot"
+          },
+          "environmentCapability": {
+            "$ref": "#/components/schemas/RepositorySetupEnvironmentCapability"
+          },
+          "availableProfiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepositorySetupProfileSummary"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositorySetupEnvironmentCapability": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedTarget": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositorySetupPlanPreview": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "canonicalProjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "basedOnUnderstandingRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "basedOnUnderstandingHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "profileDescriptorRevision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "profileDescriptorSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "profile": {
+            "$ref": "#/components/schemas/RepositorySetupProfileSummary"
+          },
+          "targetPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "solutionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "appProjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "testProjectName": {
+            "type": "string",
+            "nullable": true
+          },
+          "solutionPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "appProjectPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "testProjectPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "templateBundleSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "planningBundleSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetFramework": {
+            "type": "string",
+            "nullable": true
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "applicationKind": {
+            "type": "string",
+            "nullable": true
+          },
+          "testFramework": {
+            "type": "string",
+            "nullable": true
+          },
+          "sdkVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "runtimeVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "restoreCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "buildCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "testCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "toolchainManifestId": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionImageReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "defaultBranch": {
+            "type": "string",
+            "nullable": true
+          },
+          "initializeGit": {
+            "type": "boolean"
+          },
+          "indexAfterProvisioning": {
+            "type": "boolean"
+          },
+          "sandboxValidation": {
+            "type": "string",
+            "nullable": true
+          },
+          "resourcePolicy": {
+            "type": "string",
+            "nullable": true
+          },
+          "planHash": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositorySetupProfileSummary": {
+        "type": "object",
+        "properties": {
+          "profileDefinitionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "compatibility": {
+            "type": "string",
+            "nullable": true
+          },
+          "compatibilityReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "planningReadiness": {
+            "type": "string",
+            "nullable": true
+          },
+          "certificationState": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptorSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "templateBundleSha256": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -40661,8 +41357,7 @@
             "format": "uuid"
           },
           "repositoryBinding": {
-            "nullable": true,
-            "readOnly": true
+            "$ref": "#/components/schemas/RepositoryBindingSnapshot"
           }
         },
         "additionalProperties": false
@@ -42630,6 +43325,9 @@
     },
     {
       "name": "WorkbenchProjectUnderstanding"
+    },
+    {
+      "name": "WorkbenchRepository"
     },
     {
       "name": "WorkbenchTicketProposals"

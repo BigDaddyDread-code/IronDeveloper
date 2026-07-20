@@ -18,7 +18,13 @@ public sealed class ProjectMembershipMiddleware(RequestDelegate next)
             !await memberships.HasAccessAsync(tenant.TenantId, projectId, userId, context.RequestAborted))
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
-            await context.Response.WriteAsJsonAsync(new { error = "Project not found or you no longer have access." }, context.RequestAborted);
+            await context.Response.WriteAsJsonAsync(
+                new
+                {
+                    error = "project_not_found",
+                    message = "Project not found or you no longer have access."
+                },
+                context.RequestAborted);
             return;
         }
 

@@ -148,6 +148,21 @@ public sealed class ProjectsController : ControllerBase
         if (string.IsNullOrWhiteSpace(project.Name))
             return BadRequest(new { error = "Project name is required." });
 
+        if (_workbenchV2Enabled)
+        {
+            var current = await _projects.GetByIdAsync(projectId, ct);
+            if (current is null) return ProjectNotFound();
+            if (!string.Equals(current.LocalPath, project.LocalPath, StringComparison.Ordinal))
+            {
+                return Conflict(new
+                {
+                    error = "legacy_local_path_mutation_disabled",
+                    message = "Repository paths are changed only through the Workbench repository workflow."
+                });
+            }
+            project.LocalPath = current.LocalPath;
+        }
+
         var updated = await _projects.UpdateProjectAsync(projectId, project, ct);
         return updated is null ? NotFound() : Ok(updated);
     }
@@ -160,7 +175,8 @@ public sealed class ProjectsController : ControllerBase
         // Selecting an existing project is the explicit, authenticated requalification
         // point for a new launcher session. The apply boundary still rechecks the
         // signed server record and its matching non-secret Git correlation marker.
-        await TryQualifyDisposableProjectAsync(projectId, user.UserId, ct);
+        if (!_workbenchV2Enabled)
+            await TryQualifyDisposableProjectAsync(projectId, user.UserId, ct);
         return Ok(new { projectId });
     }
 
@@ -168,6 +184,14 @@ public sealed class ProjectsController : ControllerBase
     public async Task<IActionResult> UpdateLocalPath(int projectId, [FromBody] UpdateLocalPathRequest request, CancellationToken ct)
     {
         if (!await HasProjectAccessAsync(projectId, ct)) return ProjectNotFound();
+        if (_workbenchV2Enabled)
+        {
+            return StatusCode(StatusCodes.Status410Gone, new
+            {
+                error = "legacy_local_path_mutation_disabled",
+                message = "Legacy LocalPath mutation is disabled in Workbench V2. Use the repository setup workflow."
+            });
+        }
         await _projects.UpdateLocalPathAsync(projectId, request.LocalPath, ct);
         // A deliberate path change invalidates the old path binding and explicitly
         // creates a new authenticated, session-bound server qualification when safe.
@@ -181,6 +205,14 @@ public sealed class ProjectsController : ControllerBase
     public async Task<IActionResult> MarkIndexStale(int projectId, [FromBody] MarkIndexStaleRequest request, CancellationToken ct)
     {
         if (!await HasProjectAccessAsync(projectId, ct)) return ProjectNotFound();
+        if (_workbenchV2Enabled)
+        {
+            return StatusCode(StatusCodes.Status410Gone, new
+            {
+                error = "legacy_project_index_mutation_disabled",
+                message = "Legacy index projection mutation is disabled in Workbench V2."
+            });
+        }
         await _projects.MarkIndexStaleAsync(projectId, request.Reason, ct);
         return Ok();
     }

@@ -11739,6 +11739,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/repository": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RepositorySetupContext"];
+                        "application/json": components["schemas"]["RepositorySetupContext"];
+                        "text/json": components["schemas"]["RepositorySetupContext"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/repository/setup-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateRepositorySetupPlanRequest"];
+                    "text/json": components["schemas"]["CreateRepositorySetupPlanRequest"];
+                    "application/*+json": components["schemas"]["CreateRepositorySetupPlanRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RepositorySetupPlanPreview"];
+                        "application/json": components["schemas"]["RepositorySetupPlanPreview"];
+                        "text/json": components["schemas"]["RepositorySetupPlanPreview"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/repository/setup-confirmations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ConfirmRepositorySetupRequest"];
+                    "text/json": components["schemas"]["ConfirmRepositorySetupRequest"];
+                    "application/*+json": components["schemas"]["ConfirmRepositorySetupRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RepositorySetupConfirmationResult"];
+                        "application/json": components["schemas"]["RepositorySetupConfirmationResult"];
+                        "text/json": components["schemas"]["RepositorySetupConfirmationResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workbench/projects/{projectId}/ticket-proposal-sets/current": {
         parameters: {
             query?: never;
@@ -14309,6 +14438,15 @@ export interface components {
             sourceChatSessionId?: number | null;
             draft?: components["schemas"]["BaWorkingDraft"];
         };
+        ConfirmRepositorySetupRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            expectedPlanHash?: string | null;
+        };
         /**
          * Format: int32
          * @enum {integer}
@@ -14404,6 +14542,13 @@ export interface components {
             externalReferences?: components["schemas"]["ExternalReferenceDto"][] | null;
             provenance?: components["schemas"]["TicketProvenanceDto"];
             linkedFilePaths?: string[] | null;
+        };
+        CreateRepositorySetupPlanRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            profileDefinitionId?: string | null;
         };
         CreateTenantUserRequest: {
             email?: string | null;
@@ -16242,6 +16387,38 @@ export interface components {
             createdAtUtc?: string;
             createdBy?: string | null;
         };
+        ProjectExecutionProfileSnapshot: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            revision?: number;
+            /** Format: uuid */
+            repositoryBindingId?: string;
+            profileDefinitionId?: string | null;
+            /** Format: int32 */
+            profileDescriptorRevision?: number;
+            descriptorSha256?: string | null;
+            templateBundleSha256?: string | null;
+            planningBundleSha256?: string | null;
+            targetFramework?: string | null;
+            language?: string | null;
+            applicationKind?: string | null;
+            testFramework?: string | null;
+            sdkVersion?: string | null;
+            runtimeVersion?: string | null;
+            solutionPath?: string | null;
+            appProjectPath?: string | null;
+            testProjectPath?: string | null;
+            restoreCommand?: string | null;
+            buildCommand?: string | null;
+            testCommand?: string | null;
+            toolchainManifestId?: string | null;
+            executionImageReference?: string | null;
+            planningReadiness?: string | null;
+            certificationState?: string | null;
+        };
         ProjectFile: {
             /** Format: int64 */
             id?: number;
@@ -16445,7 +16622,7 @@ export interface components {
             projectLifecycleAuthority?: string | null;
             executionReadiness?: string | null;
             executionReadinessAuthority?: string | null;
-            repositoryBinding?: unknown;
+            repositoryBinding?: components["schemas"]["RepositoryBindingSnapshot"];
         };
         ProjectProfile: {
             /** Format: int64 */
@@ -17241,6 +17418,130 @@ export interface components {
             /** Format: int64 */
             expectedProposalSetRevision?: number;
             orderedProposalIds?: string[] | null;
+        };
+        RepositoryBindingSnapshot: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int64 */
+            revision?: number;
+            repositoryKind?: string | null;
+            canonicalPath?: string | null;
+            bindingState?: string | null;
+            defaultBranch?: string | null;
+            baselineCommit?: string | null;
+            /** Format: int32 */
+            createdByActorUserId?: number | null;
+            /** Format: date-time */
+            confirmedAtUtc?: string | null;
+        };
+        RepositorySetupConfirmationResult: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: uuid */
+            confirmationId?: string;
+            /** Format: uuid */
+            clientOperationId?: string;
+            isReplay?: boolean;
+            projectLifecyclePhase?: string | null;
+            executionReadiness?: string | null;
+            readinessReasonCode?: string | null;
+            repositoryBinding?: components["schemas"]["RepositoryBindingSnapshot"];
+            executionProfile?: components["schemas"]["ProjectExecutionProfileSnapshot"];
+            setupPlan?: components["schemas"]["RepositorySetupPlanPreview"];
+        };
+        RepositorySetupConfirmationSnapshot: {
+            /** Format: uuid */
+            confirmationId?: string;
+            planHash?: string | null;
+            /** Format: date-time */
+            confirmedAtUtc?: string;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+        };
+        RepositorySetupContext: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: int32 */
+            tenantId?: number;
+            projectName?: string | null;
+            projectLifecyclePhase?: string | null;
+            executionReadiness?: string | null;
+            readinessReasonCode?: string | null;
+            repositoryBinding?: components["schemas"]["RepositoryBindingSnapshot"];
+            executionProfile?: components["schemas"]["ProjectExecutionProfileSnapshot"];
+            latestConfirmation?: components["schemas"]["RepositorySetupConfirmationSnapshot"];
+            environmentCapability?: components["schemas"]["RepositorySetupEnvironmentCapability"];
+            availableProfiles?: components["schemas"]["RepositorySetupProfileSummary"][] | null;
+        };
+        RepositorySetupEnvironmentCapability: {
+            state?: string | null;
+            reasonCode?: string | null;
+            message?: string | null;
+            suggestedTarget?: string | null;
+        };
+        RepositorySetupPlanPreview: {
+            /** Format: int32 */
+            schemaVersion?: number;
+            source?: string | null;
+            /** Format: int32 */
+            projectId?: number;
+            canonicalProjectName?: string | null;
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: int64 */
+            basedOnUnderstandingRevision?: number;
+            basedOnUnderstandingHash?: string | null;
+            /** Format: int32 */
+            profileDescriptorRevision?: number;
+            profileDescriptorSha256?: string | null;
+            state?: string | null;
+            reasonCode?: string | null;
+            message?: string | null;
+            profile?: components["schemas"]["RepositorySetupProfileSummary"];
+            targetPath?: string | null;
+            solutionName?: string | null;
+            appProjectName?: string | null;
+            testProjectName?: string | null;
+            solutionPath?: string | null;
+            appProjectPath?: string | null;
+            testProjectPath?: string | null;
+            templateBundleSha256?: string | null;
+            planningBundleSha256?: string | null;
+            targetFramework?: string | null;
+            language?: string | null;
+            applicationKind?: string | null;
+            testFramework?: string | null;
+            sdkVersion?: string | null;
+            runtimeVersion?: string | null;
+            restoreCommand?: string | null;
+            buildCommand?: string | null;
+            testCommand?: string | null;
+            toolchainManifestId?: string | null;
+            executionImageReference?: string | null;
+            defaultBranch?: string | null;
+            initializeGit?: boolean;
+            indexAfterProvisioning?: boolean;
+            sandboxValidation?: string | null;
+            resourcePolicy?: string | null;
+            planHash?: string | null;
+        };
+        RepositorySetupProfileSummary: {
+            profileDefinitionId?: string | null;
+            displayName?: string | null;
+            compatibility?: string | null;
+            compatibilityReason?: string | null;
+            planningReadiness?: string | null;
+            certificationState?: string | null;
+            descriptorSha256?: string | null;
+            templateBundleSha256?: string | null;
         };
         ResolveTicketProposalIssueRequest: {
             /** Format: int64 */
@@ -19330,7 +19631,7 @@ export interface components {
             wasTakenOver?: boolean;
             /** Format: uuid */
             clientOperationId?: string;
-            readonly repositoryBinding?: unknown;
+            repositoryBinding?: components["schemas"]["RepositoryBindingSnapshot"];
         };
         WorkflowAuthorityFlagsDto: {
             grantsApproval?: boolean;
