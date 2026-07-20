@@ -1968,6 +1968,9 @@ public sealed class WorkbenchAgentRunStateMachineTests : IntegrationTestBase
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystInvocationAudits;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystToolCallAudits;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystPreparations;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.TicketProposalCommitmentDependencies;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.TicketProposalCommitmentTickets;");
+        await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.TicketProposalCommitments;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.TicketProposalSetRevisions;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.TicketProposalSets;");
         await connection.ExecuteAsync("DROP TABLE IF EXISTS dbo.ProjectRenameProposals;");
