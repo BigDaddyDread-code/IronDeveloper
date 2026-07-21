@@ -16,7 +16,7 @@ public sealed class WorkbenchPreviewFoundationTests
 
         var version = manifest.RootElement.GetProperty("version").GetString();
         Assert.AreEqual(1, manifest.RootElement.GetProperty("schemaVersion").GetInt32());
-        Assert.AreEqual("PR-04B", manifest.RootElement.GetProperty("programmePr").GetString());
+        Assert.AreEqual("PR-05A", manifest.RootElement.GetProperty("programmePr").GetString());
         Assert.AreEqual(version, defaults.RootElement.GetProperty("WorkbenchV2").GetProperty("Version").GetString());
         Assert.AreEqual(version, localTest.RootElement.GetProperty("WorkbenchV2").GetProperty("Version").GetString());
         Assert.IsFalse(defaults.RootElement.GetProperty("WorkbenchV2").GetProperty("Enabled").GetBoolean());

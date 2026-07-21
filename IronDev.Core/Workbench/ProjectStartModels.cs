@@ -93,10 +93,8 @@ public sealed record WorkbenchProjectEntryContext(
     long LeaseEpoch,
     bool WasResumed,
     bool WasTakenOver,
-    Guid ClientOperationId)
-{
-    public object? RepositoryBinding => null;
-}
+    Guid ClientOperationId,
+    RepositoryBindingSnapshot? RepositoryBinding = null);
 
 public sealed record OpenWorkbenchProjectCommand(
     int TenantId,

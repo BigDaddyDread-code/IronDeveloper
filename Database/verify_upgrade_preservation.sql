@@ -6,8 +6,34 @@ IF DB_NAME() NOT LIKE N'%Test%'
 IF NOT EXISTS (SELECT 1 FROM dbo.Tenants WHERE Id = 2101 AND Name = N'CLN-21 Upgrade Tenant' AND Slug = N'cln-21-upgrade' AND IsActive = 1)
     THROW 51000, N'CLN-21 tenant row was not preserved.', 1;
 
-IF NOT EXISTS (SELECT 1 FROM dbo.Projects WHERE Id = 2101 AND TenantId = 2101 AND Name = N'CLN-21 Upgrade Project' AND Description = N'Preservation fixture' AND IndexedFileCount = 12)
+IF NOT EXISTS (SELECT 1 FROM dbo.Projects WHERE Id = 2101 AND TenantId = 2101 AND Name = N'CLN-21 Upgrade Project' AND Description = N'Preservation fixture' AND LocalPath = N'C:\IronDevUpgradeTest\Project' AND IndexedFileCount = 12)
     THROW 51000, N'CLN-21 project row was not preserved.', 1;
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM dbo.RepositoryBindings binding
+    INNER JOIN dbo.RepositoryBindingRevisions revision
+        ON revision.TenantId=binding.TenantId
+       AND revision.ProjectId=binding.ProjectId
+       AND revision.RepositoryBindingId=binding.Id
+       AND revision.Revision=1
+    WHERE binding.TenantId=2101 AND binding.ProjectId=2101
+      AND binding.RepositoryKind=N'Existing'
+      AND binding.BindingState=N'LegacyUnverified'
+      AND binding.CanonicalPath=N'C:\IronDevUpgradeTest\Project'
+      AND binding.DefaultBranch IS NULL
+      AND binding.BaselineCommit IS NULL
+      AND binding.CreatedByActorUserId IS NULL
+      AND binding.ConfirmedAtUtc IS NULL
+      AND revision.ActorUserId IS NULL
+      AND revision.ChangeKind=N'LegacyBackfill'
+)
+    THROW 51000, N'CLN-21 legacy repository evidence was not preserved as unverified compatibility data.', 1;
+
+IF EXISTS (SELECT 1 FROM dbo.ProjectExecutionProfiles WHERE TenantId=2101 AND ProjectId=2101) OR
+   EXISTS (SELECT 1 FROM dbo.RepositorySetupConfirmations WHERE TenantId=2101 AND ProjectId=2101)
+    THROW 51000, N'CLN-21 legacy repository evidence was incorrectly promoted into setup authority.', 1;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.ProjectContextDocuments WHERE Id = 210101 AND TenantId = 2101 AND ProjectId = 2101 AND Content = N'context-payload-2101' AND AuthorityLevel = N'Accepted' AND Status = N'Active')
     THROW 51000, N'CLN-21 context document was not preserved.', 1;

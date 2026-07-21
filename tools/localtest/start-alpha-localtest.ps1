@@ -52,6 +52,16 @@ $sandboxApplyEnabled = $false
 $sandboxApplyRoot = if ($EnableSandboxApply) {
     [System.IO.Path]::GetFullPath([string]$seedContract.paths.workspaceRoot).TrimEnd('\')
 } else { $null }
+$repositorySetupRoot = Join-Path ([string]$seedContract.paths.workspaceRoot) "repository-setup"
+$resolvedRepositorySetupRoot = [System.IO.Path]::GetFullPath($repositorySetupRoot).TrimEnd('\')
+$resolvedWorkspaceRoot = [System.IO.Path]::GetFullPath([string]$seedContract.paths.workspaceRoot).TrimEnd('\')
+if (-not $resolvedRepositorySetupRoot.StartsWith($resolvedWorkspaceRoot + '\', [StringComparison]::OrdinalIgnoreCase) -or
+    -not ([System.IO.DirectoryInfo]$resolvedRepositorySetupRoot).Parent.FullName.Equals($resolvedWorkspaceRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Repository setup root must be a direct child of the preview-scoped LocalTest workspace root."
+}
+# This is environment infrastructure only. Project target directories remain absent
+# until the separately confirmed PR-05B provisioning workflow owns their creation.
+New-Item -ItemType Directory -Force -Path $resolvedRepositorySetupRoot | Out-Null
 $sessionCapabilities = if ($EnableSandboxApply) {
     @("ProjectFeatureWork", "ControlledSandboxApply")
 } else {
@@ -429,6 +439,7 @@ try {
         IRONDEV_LOCALTEST_CAPABILITIES = ($sessionCapabilities -join ";")
         LocalTest__WorkspaceRoot = [string]$seedContract.paths.workspaceRoot
         LocalTest__LogsRoot = [string]$seedContract.paths.logsRoot
+        WorkbenchRepositorySetup__ApprovedWorkspaceRoot = $resolvedRepositorySetupRoot
         LocalTest__WeaviatePrefix = if ($PreviewId -eq "default") { "irondev_test" } else { "irondev_test_$($PreviewId.Replace('-', '_'))" }
         WorkbenchV2__Version = $workbenchVersion
         WorkbenchV2__Enabled = (-not [bool]$UseV1).ToString().ToLowerInvariant()

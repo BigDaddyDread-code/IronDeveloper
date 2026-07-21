@@ -2482,6 +2482,35 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Records one immutable idempotent commitment, exact reviewed snapshot provenance, every proposal-to-ticket mapping, and every mapped dependency edge without repository or Builder authority side effects."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-repository-setup",
+                        "path":  "Database/migrate_workbench_repository_setup.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.RepositoryBindings",
+                                               "dbo.RepositoryBindingRevisions",
+                                               "dbo.ProjectExecutionProfiles",
+                                               "dbo.ProjectExecutionProfileRevisions",
+                                               "dbo.RepositorySetupConfirmations",
+                                               "append-only repository authority history triggers"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users",
+                                              "dbo.ProjectMembers",
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.ClientOperations",
+                                              "dbo.ProjectReadinessAssessments"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-05A repository setup preview and explicit confirmation"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Persists setup confirmation and immutable server-derived plan authority only; no repository target or project files are created. Existing LocalPath rows are backfilled solely as Existing/LegacyUnverified."
                     }
                 ]
 }

@@ -229,6 +229,11 @@
                              "id":  "2026-07-workbench-pr04b-ticket-commitments",
                              "path":  "Database/migrate_workbench_ticket_commitments.sql",
                              "description":  "Adds immutable atomic permanent-ticket commitment receipts, exact proposal-to-ticket provenance, dependency mappings, and committed proposal revisions."
+                        },
+                        {
+                             "id":  "2026-07-workbench-pr05a-repository-setup",
+                             "path":  "Database/migrate_workbench_repository_setup.sql",
+                             "description":  "Adds repository binding and execution-profile authorities, immutable revisions, explicit setup confirmations, and LegacyUnverified LocalPath compatibility without provisioning files."
                         }
                    ]
 }

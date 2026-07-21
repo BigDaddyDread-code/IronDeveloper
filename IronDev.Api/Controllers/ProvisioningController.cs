@@ -20,13 +20,16 @@ public sealed class ProvisioningController : ControllerBase
 {
     private readonly IProjectProvisioningReadinessService _readiness;
     private readonly IProjectProvisioningActionService _actions;
+    private readonly bool _workbenchV2Enabled;
 
     public ProvisioningController(
         IProjectProvisioningReadinessService readiness,
-        IProjectProvisioningActionService actions)
+        IProjectProvisioningActionService actions,
+        IConfiguration configuration)
     {
         _readiness = readiness;
         _actions = actions;
+        _workbenchV2Enabled = configuration.GetValue("WorkbenchV2:Enabled", false);
     }
 
     [HttpGet("api/projects/{projectId:int}/provisioning/readiness")]
@@ -50,6 +53,8 @@ public sealed class ProvisioningController : ControllerBase
     [ProducesResponseType(typeof(GovernedRefusalEnvelope), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> IndexProject(int projectId, CancellationToken ct)
     {
+        if (_workbenchV2Enabled)
+            return LegacyMutationDisabled();
         if (Request.ContentLength is > 0)
         {
             return BadRequest(GovernedRefusal.Create(
@@ -77,6 +82,8 @@ public sealed class ProvisioningController : ControllerBase
         BuilderWorkspacePermissionRequest request,
         CancellationToken ct)
     {
+        if (_workbenchV2Enabled)
+            return LegacyMutationDisabled();
         if (!request.Enabled.HasValue)
         {
             return BadRequest(GovernedRefusal.Create(
@@ -119,6 +126,16 @@ public sealed class ProvisioningController : ControllerBase
             nextSafeActions: [NextSafeAction(result.Status)],
             forbiddenActions: ["Bypass the governed project setup action with browser-supplied scope."]));
     }
+
+    private ObjectResult LegacyMutationDisabled() => StatusCode(
+        StatusCodes.Status410Gone,
+        GovernedRefusal.Create(
+            "legacy_project_provisioning_mutation_disabled",
+            "Legacy project provisioning mutations are disabled in Workbench V2.",
+            CorrelationId(),
+            blockedReasons: ["Repository setup, technical readiness, and run-scoped Builder authorization are separate Workbench authorities."],
+            nextSafeActions: ["Use the Workbench repository setup workflow."],
+            forbiddenActions: ["Mint code-index or general Builder workspace authority through a legacy LocalPath route."]));
 
     private static string NextSafeAction(string status) => status switch
     {

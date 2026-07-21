@@ -79,7 +79,7 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
 
             var project = await connection.QuerySingleOrDefaultAsync<ProjectEntryRow>(new CommandDefinition(
                 """
-                SELECT p.Id AS ProjectId, p.TenantId, p.Name,
+                SELECT p.Id AS ProjectId, p.TenantId, p.Name, p.LocalPath,
                        COALESCE(phase.Phase, N'Shaping') AS ProjectLifecyclePhase,
                        COALESCE(readiness.ExecutionReadiness, N'NotConfigured') AS ExecutionReadiness
                 FROM dbo.Projects p
@@ -400,6 +400,18 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                 }
             }
 
+            var repositoryBinding = await connection.QuerySingleOrDefaultAsync<RepositoryBindingSnapshot>(new CommandDefinition(
+                """
+                SELECT Id, ProjectId, CurrentRevision AS Revision, RepositoryKind,
+                       CanonicalPath, BindingState, DefaultBranch, BaselineCommit,
+                       CreatedByActorUserId, ConfirmedAtUtc
+                FROM dbo.RepositoryBindings
+                WHERE TenantId=@TenantId AND ProjectId=@ProjectId;
+                """,
+                new { command.TenantId, command.ProjectId },
+                transaction,
+                cancellationToken: cancellationToken));
+            repositoryBinding ??= RepositoryBindingProjection.CreateLegacy(project.ProjectId, project.LocalPath);
             var result = new WorkbenchProjectEntryContext(
                 project.ProjectId,
                 project.TenantId,
@@ -410,7 +422,8 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                 leaseEpoch,
                 wasResumed,
                 wasTakenOver,
-                command.ClientOperationId);
+                command.ClientOperationId,
+                repositoryBinding);
             var canonicalResultJson = JsonSerializer.Serialize(result);
             var resultHash = ComputeHash(canonicalResultJson);
             var eventKind = wasTakenOver ? "WorkbenchLeaseTakenOver" : wasResumed ? "WorkbenchSessionResumed" : "WorkbenchSessionOpened";
@@ -526,6 +539,7 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
         public int ProjectId { get; init; }
         public int TenantId { get; init; }
         public string Name { get; init; } = string.Empty;
+        public string? LocalPath { get; init; }
         public string ProjectLifecyclePhase { get; init; } = string.Empty;
         public string ExecutionReadiness { get; init; } = string.Empty;
     }

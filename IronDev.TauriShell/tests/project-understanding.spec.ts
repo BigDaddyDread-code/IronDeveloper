@@ -38,6 +38,32 @@ test('V2 Project context presents durable facts, Unknown fields, conflicts, prov
   await expect(page.locator('[data-message-id="user-9101"]')).toBeFocused();
 });
 
+test('Project context distinguishes a setup-confirmed repository authority', async ({ page }) => {
+  await mockProjectUnderstandingWorkspace(page, { repositoryBindingState: 'SetupConfirmed' });
+  await page.goto('/projects/7/workshop/sessions/9007');
+  await page.getByTestId('chat.contextPanel.show').click();
+
+  await expect(page.getByTestId('chat.projectUnderstanding.operational.repository')).toContainText('Setup confirmed');
+});
+
+test('Project context never presents a legacy-unverified binding as configured', async ({ page }) => {
+  await mockProjectUnderstandingWorkspace(page, { repositoryBindingState: 'LegacyUnverified' });
+  await page.goto('/projects/7/workshop/sessions/9007');
+  await page.getByTestId('chat.contextPanel.show').click();
+
+  await expect(page.getByTestId('chat.projectUnderstanding.operational.repository')).toContainText('Legacy unverified');
+  await expect(page.getByTestId('chat.projectUnderstanding.operational.repository')).not.toContainText('Configured');
+});
+
+test('Project context rejects a malformed repository-binding projection', async ({ page }) => {
+  await mockProjectUnderstandingWorkspace(page, { malformedRepositoryBinding: true });
+  await page.goto('/projects/7/workshop/sessions/9007');
+  await page.getByTestId('chat.contextPanel.show').click();
+
+  await expect(page.getByTestId('chat.projectUnderstanding.error')).toContainText('Workshop conversation remains available');
+  await expect(page.getByTestId('chat.projectUnderstanding.operational')).toHaveCount(0);
+});
+
 test('an empty typed understanding exposes all eleven normative fields and accepts a new confirmed value', async ({ page }) => {
   const state = await mockProjectUnderstandingWorkspace(page, { emptyFacts: true });
   await page.goto('/projects/7/workshop/sessions/9007');
@@ -198,7 +224,9 @@ interface UnderstandingMockOptions {
   holdProject7Understanding?: boolean;
   holdUnderstandingReadFailure?: boolean;
   malformedFactSuccess?: boolean;
+  malformedRepositoryBinding?: boolean;
   multipleProjects?: boolean;
+  repositoryBindingState?: 'SetupConfirmed' | 'LegacyUnverified';
 }
 
 interface UnderstandingMockState {
@@ -234,6 +262,13 @@ async function mockProjectUnderstandingWorkspace(
     7: understandingFixture(7, 'BookSeller', Boolean(options.emptyFacts)),
     8: understandingFixture(8, 'Warehouse Planner', false)
   };
+  const project7RepositoryBinding = options.repositoryBindingState
+    ? repositoryBindingFixture(7, options.repositoryBindingState)
+    : null;
+  models[7].operationalProjections.repositoryBinding = project7RepositoryBinding;
+  if (options.malformedRepositoryBinding) {
+    models[7].operationalProjections.repositoryBinding = {};
+  }
   models[8].facts[0] = {
     ...models[8].facts[0],
     value: 'A warehouse planning tool scoped only to project eight.',
@@ -302,7 +337,7 @@ async function mockProjectUnderstandingWorkspace(
       name: projectId === 7 ? 'BookSeller' : 'Second project',
       projectLifecyclePhase: 'Shaping',
       executionReadiness: 'NotConfigured',
-      repositoryBinding: null,
+      repositoryBinding: projectId === 7 ? project7RepositoryBinding : null,
       workbenchSessionId: projectId === 7 ? 7007 : 8008,
       leaseEpoch: 1,
       wasResumed: true,
@@ -578,6 +613,22 @@ function projectIdFrom(url: string) {
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function repositoryBindingFixture(projectId: number, bindingState: 'SetupConfirmed' | 'LegacyUnverified') {
+  const setupConfirmed = bindingState === 'SetupConfirmed';
+  return {
+    id: '55555555-6666-4777-8888-999999999999',
+    projectId,
+    revision: 1,
+    repositoryKind: setupConfirmed ? 'Greenfield' : 'Existing',
+    canonicalPath: `C:\\IronDevTestWorkspaces\\repositories\\project-${projectId}`,
+    bindingState,
+    defaultBranch: setupConfirmed ? 'main' : null,
+    baselineCommit: null,
+    createdByActorUserId: setupConfirmed ? 7 : null,
+    confirmedAtUtc: setupConfirmed ? '2026-07-21T01:00:00Z' : null
+  };
 }
 
 function json(route: Route, body: unknown, status = 200) {

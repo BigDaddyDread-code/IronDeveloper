@@ -180,6 +180,17 @@ builder.Services.AddScoped<IWorkbenchInputService, WorkbenchInputService>();
 builder.Services.AddScoped<IWorkbenchTicketProposalService, WorkbenchTicketProposalService>();
 builder.Services.AddScoped<IWorkbenchTicketProposalCommitService, WorkbenchTicketProposalCommitService>();
 builder.Services.AddSingleton<ITicketProposalCommitFailureInjector, NoOpTicketProposalCommitFailureInjector>();
+builder.Services.AddSingleton<RepositorySetupProfileCatalog>();
+builder.Services.AddSingleton<IRepositorySetupProfileCatalog>(services =>
+    services.GetRequiredService<RepositorySetupProfileCatalog>());
+builder.Services.AddSingleton<IRepositorySetupTemplateBundleCatalog>(services =>
+    services.GetRequiredService<RepositorySetupProfileCatalog>());
+builder.Services.AddSingleton<IRepositorySetupFileSystemInspector, PhysicalRepositorySetupFileSystemInspector>();
+builder.Services.AddSingleton<IRepositorySetupForbiddenRootCatalog, RepositorySetupForbiddenRootCatalog>();
+builder.Services.AddSingleton<IRepositorySetupPathPolicy, RepositorySetupPathPolicy>();
+builder.Services.AddSingleton<IRepositorySetupConfirmationFailureInjector,
+    NoOpRepositorySetupConfirmationFailureInjector>();
+builder.Services.AddScoped<IWorkbenchRepositorySetupService, WorkbenchRepositorySetupService>();
 builder.Services.AddSingleton<IWorkbenchAgentRunFailureInjector, NoOpWorkbenchAgentRunFailureInjector>();
 var workbenchAgentRunWorkerEnabled =
     builder.Configuration.GetValue<bool>("Features:WorkbenchAgentRunWorker");
