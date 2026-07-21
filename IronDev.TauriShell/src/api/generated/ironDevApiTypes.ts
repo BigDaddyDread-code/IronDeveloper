@@ -11739,6 +11739,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/repository/provisionings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ProvisionRepositoryRequest"];
+                    "text/json": components["schemas"]["ProvisionRepositoryRequest"];
+                    "application/*+json": components["schemas"]["ProvisionRepositoryRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RepositoryProvisioningResult"];
+                        "application/json": components["schemas"]["RepositoryProvisioningResult"];
+                        "text/json": components["schemas"]["RepositoryProvisioningResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workbench/projects/{projectId}/repository": {
         parameters: {
             query?: never;
@@ -17145,6 +17190,20 @@ export interface components {
             validationMessage?: string | null;
             fullContentAfter?: string | null;
         };
+        ProvisionRepositoryRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: uuid */
+            setupConfirmationId?: string;
+            /** Format: int64 */
+            expectedRepositoryBindingRevision?: number;
+            /** Format: int64 */
+            expectedExecutionProfileRevision?: number;
+        };
         ProvisioningCheck: {
             code?: string | null;
             name?: string | null;
@@ -17436,6 +17495,51 @@ export interface components {
             /** Format: date-time */
             confirmedAtUtc?: string | null;
         };
+        RepositoryProvisioningResult: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: uuid */
+            attemptId?: string;
+            /** Format: uuid */
+            receiptId?: string;
+            /** Format: uuid */
+            clientOperationId?: string;
+            isReplay?: boolean;
+            projectLifecyclePhase?: string | null;
+            executionReadiness?: string | null;
+            readinessReasonCode?: string | null;
+            projectLocalPath?: string | null;
+            repositoryBinding?: components["schemas"]["RepositoryBindingSnapshot"];
+            executionProfile?: components["schemas"]["ProjectExecutionProfileSnapshot"];
+            branchName?: string | null;
+            baselineCommit?: string | null;
+            manifestSha256?: string | null;
+            gitTreeId?: string | null;
+        };
+        RepositoryProvisioningSnapshot: {
+            /** Format: uuid */
+            attemptId?: string;
+            state?: string | null;
+            /** Format: int32 */
+            attemptNumber?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: uuid */
+            setupConfirmationId?: string;
+            /** Format: int64 */
+            expectedRepositoryBindingRevision?: number;
+            /** Format: int64 */
+            expectedExecutionProfileRevision?: number;
+            /** Format: date-time */
+            startedAtUtc?: string;
+            /** Format: date-time */
+            completedAtUtc?: string | null;
+            failureCode?: string | null;
+            /** Format: uuid */
+            receiptId?: string | null;
+            branchName?: string | null;
+            baselineCommit?: string | null;
+        };
         RepositorySetupConfirmationResult: {
             /** Format: int32 */
             projectId?: number;
@@ -17473,11 +17577,13 @@ export interface components {
             projectLifecyclePhase?: string | null;
             executionReadiness?: string | null;
             readinessReasonCode?: string | null;
+            projectLocalPath?: string | null;
             repositoryBinding?: components["schemas"]["RepositoryBindingSnapshot"];
             executionProfile?: components["schemas"]["ProjectExecutionProfileSnapshot"];
             latestConfirmation?: components["schemas"]["RepositorySetupConfirmationSnapshot"];
             environmentCapability?: components["schemas"]["RepositorySetupEnvironmentCapability"];
             availableProfiles?: components["schemas"]["RepositorySetupProfileSummary"][] | null;
+            latestProvisioning?: components["schemas"]["RepositoryProvisioningSnapshot"];
         };
         RepositorySetupEnvironmentCapability: {
             state?: string | null;

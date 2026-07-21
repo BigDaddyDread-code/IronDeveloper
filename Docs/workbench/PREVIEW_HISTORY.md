@@ -16,18 +16,19 @@ The machine-readable current version is `workbench-version.json`. Each preview u
 | `0.1.0-preview.10` | PR-04A | `workbench-pr04a` | Governed `/ticket` generation, durable proposal review, provenance, immutable revisions, fenced edits, and regeneration without permanent tickets |
 | `0.1.0-preview.11` | PR-04B | `workbench-pr04b` | Explicit atomic creation of permanent tickets, Work Item contracts, dependency remapping, provenance receipts, and the Delivery transition |
 | `0.1.0-preview.12` | PR-05A | `workbench-pr05a` | Repository/profile authorities, deterministic setup-plan review, approved-root safety, explicit confirmation, and unsupported-profile reporting with zero filesystem writes |
+| `0.1.0-preview.13` | PR-05B | `workbench-pr05b` | Confirmed-plan provisioning through isolated staging, pinned product-neutral rendering, controlled Git initialization, atomic install, crash-safe replay, and no technical-readiness claims |
 
-Start the current PR-05A preview alongside the earlier previews:
+Start the current PR-05B preview alongside the earlier previews:
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -EnableConversationAuthority -PreviewId workbench-pr05a `
-  -ApiBaseUrl http://127.0.0.1:5350 -UiPort 5331
+  -EnableConversationAuthority -PreviewId workbench-pr05b `
+  -ApiBaseUrl http://127.0.0.1:5370 -UiPort 5351
 ```
 
-The PR-05A preview owns database `IronDeveloper_Test_workbench_pr05a`, workspace `C:\IronDevTestWorkspaces\workbench-pr05a`, logs `C:\IronDevTestLogs\workbench-pr05a`, API `http://127.0.0.1:5350`, and UI `http://127.0.0.1:5331`.
+The PR-05B preview owns database `IronDeveloper_Test_workbench_pr05b`, workspace `C:\IronDevTestWorkspaces\workbench-pr05b`, logs `C:\IronDevTestLogs\workbench-pr05b`, API `http://127.0.0.1:5370`, and UI `http://127.0.0.1:5351`.
 
-Project creation, shaping, `/ticket`, and proposal review remain repository-independent. PR-05A introduces a separate Repository surface. The server derives a safe direct-child target inside its configured repository root, evaluates desired-technology compatibility without silently substituting WinForms, and returns a deterministic plan containing the pinned profile, generated names, template hash, toolchain/image, commands, Git/index/sandbox/resource policies, and exact plan hash. Explicit confirmation is fenced by the current Workbench lease and client operation, then records versioned `RepositoryBinding` and `ProjectExecutionProfile` authorities plus an immutable confirmation receipt. It stops at `SetupConfirmed`: readiness remains `NotConfigured`, `Project.LocalPath` remains null, and no directory, template, Git repository, index, command, sandbox run, or Builder authorization is created. PR-05B owns provisioning the confirmed plan.
+Project creation, shaping, `/ticket`, and proposal review remain repository-independent. PR-05B extends the separate Repository surface only after PR-05A's immutable setup confirmation exists. The browser sends the current Workbench fence, one durable client operation ID, the confirmation ID, and the expected binding/profile revisions; it never supplies a path, template, command, branch, or product decision. The server revalidates that authority, renders the exact pinned bundle in an isolated sibling, initializes a clean `main` Git repository, and atomically installs the target. Success records `Qualified` repository authority and the immutable baseline while readiness remains `NotConfigured`. No restore, build, test, code index, sandbox validation, Builder authorization, or BA invocation occurs. A durable failed attempt remains retryable, and an ambiguous browser delivery replays the exact same operation.
 
 For the deterministic LocalTest rename path, send `Rename project to CalmPlan` as its own Workshop message, then accept the pending proposal in Project Context.
 

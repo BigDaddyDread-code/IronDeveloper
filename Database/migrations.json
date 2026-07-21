@@ -234,6 +234,11 @@
                              "id":  "2026-07-workbench-pr05a-repository-setup",
                              "path":  "Database/migrate_workbench_repository_setup.sql",
                              "description":  "Adds repository binding and execution-profile authorities, immutable revisions, explicit setup confirmations, and LegacyUnverified LocalPath compatibility without provisioning files."
+                        },
+                        {
+                             "id":  "2026-07-workbench-pr05b-repository-provisioning",
+                             "path":  "Database/migrate_workbench_repository_provisioning.sql",
+                             "description":  "Adds durable controlled repository-provisioning attempts and immutable qualification receipts, exact setup-confirmation provenance, and operation result linkage."
                         }
                    ]
 }

@@ -89,18 +89,18 @@ The current Workshop conversation-authority preview can run beside the earlier p
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -EnableConversationAuthority -PreviewId workbench-pr05a `
-  -ApiBaseUrl http://127.0.0.1:5350 -UiPort 5331
+  -EnableConversationAuthority -PreviewId workbench-pr05b `
+  -ApiBaseUrl http://127.0.0.1:5370 -UiPort 5351
 ```
 
-Sign in, open or create a repository-free project, and continue shaping or creating tickets normally. Open **Repository** only when you want to attach an execution shell. PR-05A reports whether the project’s desired technology is compatible with the single v0.1 profile, derives a safe target inside the configured IronDev repository root, and shows the exact profile, generated names, template hash, toolchain/image, commands, Git/index/sandbox policy, and resource policy before confirmation. Unsupported technology and an unavailable environment are explicit, nonblocking outcomes; neither silently selects WinForms. Confirmation records the exact versioned binding/profile plan but does not create a directory, write templates, initialize Git, index code, run commands, grant Builder authority, or advance readiness beyond `NotConfigured`. PR-05B owns provisioning.
+Sign in, open or create a repository-free project, and continue shaping or creating tickets normally. Open **Repository** only when you want to attach an execution shell. PR-05B adds one explicit provisioning action after the exact setup authority is confirmed. IronDev consumes only that immutable confirmation plus the current binding/profile revisions, renders the pinned product-neutral shell in an isolated staging sibling, initializes a clean `main` Git repository, and atomically installs it into the server-derived target. It never accepts a browser path, template, command, or product decision. Provisioning does not restore, build, test, index, run a sandbox, authorize Builder, or advance readiness beyond `NotConfigured`; technical qualification remains a later slice.
 
 To exercise the deterministic rename flow, send `Rename project to CalmPlan` as its own Workshop message and accept the proposal in Project Context.
 
 With that preview running, the lower-level submit/worker/stateless-host continuity proof is also available:
 
 ```powershell
-.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5350 -PreviewId workbench-pr05a
+.\tools\localtest\test-workbench-ba-host.ps1 -ApiBaseUrl http://127.0.0.1:5370 -PreviewId workbench-pr05b
 ```
 
 The proof verifies the preview-scoped database's hash-only preparation record and exact three read-only snapshot-tool records, then prints the project and chat IDs plus a preview-pinned follow-up command. Restart the same preview without `-Reset`, run that follow-up, and the continuity marker must come from the durable Workbench context rather than provider-side conversation memory.

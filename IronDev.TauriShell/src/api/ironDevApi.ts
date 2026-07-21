@@ -105,12 +105,16 @@ import type {
   ProjectFileSummary,
   ProjectSummary,
   RepositoryBindingSnapshot,
+  RepositorySetupConfirmationSnapshot,
   RepositorySetupConfirmationResult,
   RepositorySetupContext,
   RepositorySetupPlanPreview,
   RepositorySetupProfileSummary,
+  RepositoryProvisioningAttemptSnapshot,
+  RepositoryProvisioningResult,
   CreateRepositorySetupPlanRequest,
   ConfirmRepositorySetupRequest,
+  ProvisionRepositoryRequest,
   ProjectExecutionProfileSnapshot,
   ProjectRenameProposal,
   ProjectUnderstandingConflict,
@@ -470,6 +474,21 @@ class IronDevApiClient {
     );
     if (!isRepositorySetupConfirmationResult(result, projectId, request)) {
       throw new IronDevApiProtocolError('Repository setup confirmation');
+    }
+    return result;
+  }
+
+  async provisionRepository(
+    projectId: number,
+    request: ProvisionRepositoryRequest,
+    signal?: AbortSignal
+  ): Promise<RepositoryProvisioningResult> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/repository/provisionings`,
+      { method: 'POST', body: request, signal }
+    );
+    if (!isRepositoryProvisioningResult(result, projectId, request)) {
+      throw new IronDevApiProtocolError('Repository provisioning');
     }
     return result;
   }
@@ -2545,7 +2564,9 @@ function isRepositorySetupContext(value: unknown, projectId: number): value is R
       !isNonEmptyString(value.projectLifecyclePhase) ||
       !isNonEmptyString(value.executionReadiness) ||
       !isNonEmptyString(value.readinessReasonCode) ||
+      !isNullableString(value.projectLocalPath) ||
       !(value.latestConfirmation === null || isRepositorySetupConfirmationSnapshot(value.latestConfirmation)) ||
+      !(value.latestProvisioning === null || isRepositoryProvisioningAttemptSnapshot(value.latestProvisioning)) ||
       !isRepositorySetupEnvironmentCapability(value.environmentCapability) ||
       !Array.isArray(value.availableProfiles) ||
       !value.availableProfiles.every(isRepositorySetupProfileSummary)) {
@@ -2562,16 +2583,50 @@ function isRepositorySetupContext(value: unknown, projectId: number): value is R
     return false;
   }
   if (value.repositoryBinding === null) {
-    return value.executionProfile === null && value.latestConfirmation === null;
+    return value.projectLocalPath === null && value.executionProfile === null &&
+      value.latestConfirmation === null && value.latestProvisioning === null;
   }
   if (value.executionProfile !== null && value.executionProfile.repositoryBindingId !== value.repositoryBinding.id) {
     return false;
   }
-  return value.repositoryBinding.bindingState !== 'SetupConfirmed' ||
-    (value.executionProfile !== null && value.latestConfirmation !== null);
+  if (value.repositoryBinding.bindingState === 'LegacyUnverified') {
+    return value.projectLocalPath === value.repositoryBinding.canonicalPath &&
+      value.executionProfile === null && value.latestConfirmation === null && value.latestProvisioning === null;
+  }
+
+  if (value.executionProfile === null || value.latestConfirmation === null) {
+    return false;
+  }
+
+  if (value.latestProvisioning !== null &&
+      (value.latestProvisioning.setupConfirmationId !== value.latestConfirmation.confirmationId ||
+       value.latestProvisioning.expectedExecutionProfileRevision !== value.executionProfile.revision)) {
+    return false;
+  }
+
+  if (value.repositoryBinding.bindingState === 'SetupConfirmed') {
+    return value.projectLocalPath === null && value.latestProvisioning === null;
+  }
+
+  if (value.repositoryBinding.bindingState === 'Provisioning') {
+    return value.projectLocalPath === null && value.latestProvisioning?.state === 'Provisioning' &&
+      value.repositoryBinding.revision === value.latestProvisioning.expectedRepositoryBindingRevision + 1;
+  }
+
+  if (value.repositoryBinding.bindingState === 'ProvisioningFailed') {
+    return value.projectLocalPath === null && value.latestProvisioning?.state === 'ProvisioningFailed' &&
+      value.repositoryBinding.revision === value.latestProvisioning.expectedRepositoryBindingRevision + 2;
+  }
+
+  return value.repositoryBinding.bindingState === 'Qualified' &&
+    value.projectLocalPath === value.repositoryBinding.canonicalPath &&
+    value.latestProvisioning?.state === 'Qualified' &&
+    value.repositoryBinding.revision === value.latestProvisioning.expectedRepositoryBindingRevision + 2 &&
+    value.latestProvisioning.branchName === value.repositoryBinding.defaultBranch &&
+    value.latestProvisioning.baselineCommit === value.repositoryBinding.baselineCommit;
 }
 
-function isRepositorySetupConfirmationSnapshot(value: unknown): boolean {
+function isRepositorySetupConfirmationSnapshot(value: unknown): value is RepositorySetupConfirmationSnapshot {
   return isJsonRecord(value) &&
     isNonEmptyUuidString(value.confirmationId) &&
     isSha256(value.planHash) &&
@@ -2579,6 +2634,36 @@ function isRepositorySetupConfirmationSnapshot(value: unknown): boolean {
     isNonEmptyUuidString(value.clientOperationId) &&
     isPositiveInteger(value.workbenchSessionId) &&
     isPositiveInteger(value.leaseEpoch);
+}
+
+function isRepositoryProvisioningAttemptSnapshot(value: unknown): value is RepositoryProvisioningAttemptSnapshot {
+  if (!isJsonRecord(value) ||
+      !isNonEmptyUuidString(value.attemptId) ||
+      (value.state !== 'Provisioning' && value.state !== 'Qualified' && value.state !== 'ProvisioningFailed') ||
+      !isPositiveInteger(value.attemptNumber) ||
+      !isNonEmptyUuidString(value.clientOperationId) ||
+      !isNonEmptyUuidString(value.setupConfirmationId) ||
+      !isPositiveInteger(value.expectedRepositoryBindingRevision) ||
+      !isPositiveInteger(value.expectedExecutionProfileRevision) ||
+      !isTimestampString(value.startedAtUtc) ||
+      !(value.completedAtUtc === null || isTimestampString(value.completedAtUtc)) ||
+      !(value.failureCode === null || isNonEmptyString(value.failureCode)) ||
+      !(value.receiptId === null || isNonEmptyUuidString(value.receiptId)) ||
+      !(value.branchName === null || isNonEmptyString(value.branchName)) ||
+      !(value.baselineCommit === null || isGitObjectId(value.baselineCommit))) {
+    return false;
+  }
+
+  if (value.state === 'Provisioning') {
+    return value.completedAtUtc === null && value.failureCode === null && value.receiptId === null &&
+      value.branchName === null && value.baselineCommit === null;
+  }
+  if (value.state === 'ProvisioningFailed') {
+    return value.completedAtUtc !== null && value.failureCode !== null && value.receiptId === null &&
+      value.branchName === null && value.baselineCommit === null;
+  }
+  return value.completedAtUtc !== null && value.failureCode === null && value.receiptId !== null &&
+    value.branchName !== null && value.baselineCommit !== null;
 }
 
 function isRepositorySetupEnvironmentCapability(value: unknown): boolean {
@@ -2719,6 +2804,39 @@ function isRepositorySetupConfirmationResult(
     value.setupPlan.planningBundleSha256 === value.executionProfile.planningBundleSha256;
 }
 
+function isRepositoryProvisioningResult(
+  value: unknown,
+  projectId: number,
+  request: ProvisionRepositoryRequest
+): value is RepositoryProvisioningResult {
+  if (!isJsonRecord(value) ||
+      value.projectId !== projectId ||
+      !isNonEmptyUuidString(value.attemptId) ||
+      !isNonEmptyUuidString(value.receiptId) ||
+      value.clientOperationId !== request.clientOperationId ||
+      typeof value.isReplay !== 'boolean' ||
+      !isNonEmptyString(value.projectLifecyclePhase) ||
+      value.executionReadiness !== 'NotConfigured' ||
+      !isNonEmptyString(value.readinessReasonCode) ||
+      !isNonEmptyString(value.projectLocalPath) ||
+      !isRepositoryBindingSnapshot(value.repositoryBinding, projectId) ||
+      value.repositoryBinding.bindingState !== 'Qualified' ||
+      !isProjectExecutionProfileSnapshot(value.executionProfile, projectId) ||
+      value.executionProfile.repositoryBindingId !== value.repositoryBinding.id ||
+      value.executionProfile.revision !== request.expectedExecutionProfileRevision ||
+      value.repositoryBinding.revision !== request.expectedRepositoryBindingRevision + 2 ||
+      !isNonEmptyString(value.branchName) ||
+      !isGitObjectId(value.baselineCommit) ||
+      !isLowerSha256(value.manifestSha256) ||
+      !isGitObjectId(value.gitTreeId)) {
+    return false;
+  }
+
+  return value.repositoryBinding.defaultBranch === value.branchName &&
+    value.repositoryBinding.baselineCommit === value.baselineCommit &&
+    value.projectLocalPath === value.repositoryBinding.canonicalPath;
+}
+
 function isRepositoryBindingSnapshot(value: unknown, projectId: number): value is RepositoryBindingSnapshot {
   return isJsonRecord(value) &&
     isNonEmptyUuidString(value.id) &&
@@ -2796,6 +2914,14 @@ function isNullableString(value: unknown): value is string | null {
 
 function isSha256(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value);
+}
+
+function isLowerSha256(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+}
+
+function isGitObjectId(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
 }
 
 function isUuidString(value: unknown): value is string {
