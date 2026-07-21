@@ -471,7 +471,7 @@ public sealed class WorkbenchProjectUnderstandingService : IWorkbenchProjectUnde
     {
         var row = await connection.QuerySingleOrDefaultAsync<UnderstandingSnapshotRow>(new CommandDefinition(
             """
-            SELECT project.Name AS ProjectName,
+            SELECT project.Name AS ProjectName, project.LocalPath,
                    understanding.Revision, understanding.UnderstandingJson,
                    phase.Phase AS ProjectLifecyclePhase,
                    readiness.ExecutionReadiness
@@ -517,6 +517,18 @@ public sealed class WorkbenchProjectUnderstandingService : IWorkbenchProjectUnde
             cancellationToken: cancellationToken));
 
         var document = ProjectUnderstandingDocumentCodec.Deserialize(row.UnderstandingJson);
+        var repositoryBinding = await connection.QuerySingleOrDefaultAsync<RepositoryBindingSnapshot>(new CommandDefinition(
+            """
+            SELECT Id, ProjectId, CurrentRevision AS Revision, RepositoryKind,
+                   CanonicalPath, BindingState, DefaultBranch, BaselineCommit,
+                   CreatedByActorUserId, ConfirmedAtUtc
+            FROM dbo.RepositoryBindings
+            WHERE TenantId=@TenantId AND ProjectId=@ProjectId;
+            """,
+            new { TenantId = tenantId, ProjectId = projectId },
+            transaction,
+            cancellationToken: cancellationToken));
+        repositoryBinding ??= RepositoryBindingProjection.CreateLegacy(projectId, row.LocalPath);
         return new ProjectUnderstandingSnapshot(
             projectId,
             tenantId,
@@ -531,7 +543,7 @@ public sealed class WorkbenchProjectUnderstandingService : IWorkbenchProjectUnde
                 "ProjectLifecyclePhase",
                 row.ExecutionReadiness,
                 "ProjectReadinessAssessment",
-                RepositoryBinding: null));
+                repositoryBinding));
     }
 
     private static ProjectRenameProposalSnapshot ToSnapshot(RenameProposalReadRow row) => new(
@@ -796,6 +808,7 @@ public sealed class WorkbenchProjectUnderstandingService : IWorkbenchProjectUnde
     private sealed class UnderstandingSnapshotRow : CurrentUnderstandingRow
     {
         public string ProjectName { get; init; } = string.Empty;
+        public string? LocalPath { get; init; }
         public string ProjectLifecyclePhase { get; init; } = string.Empty;
         public string ExecutionReadiness { get; init; } = string.Empty;
     }

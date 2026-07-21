@@ -615,7 +615,8 @@ public static class WorkbenchBusinessAnalystOutputValidator
             if (string.IsNullOrWhiteSpace(proposal.ProposalKey) || proposal.ProposalKey.Length > 80 ||
                 proposal.ProposalKey.Any(char.IsWhiteSpace) || !keys.Add(proposal.ProposalKey))
                 throw new WorkbenchAgentOutputValidationException("Ticket proposal keys must be unique bounded tokens.");
-            if (string.IsNullOrWhiteSpace(proposal.Title) || proposal.Title.Length > 300 ||
+            if (string.IsNullOrWhiteSpace(proposal.Title) ||
+                proposal.Title.Length > TicketProposalConstraints.MaximumTitleCharacters ||
                 string.IsNullOrWhiteSpace(proposal.Problem) || proposal.Problem.Length > 4_000 ||
                 string.IsNullOrWhiteSpace(proposal.ProposedChange) || proposal.ProposedChange.Length > 8_000 ||
                 proposal.AcceptanceCriteria is null || proposal.AcceptanceCriteria.Count is < 1 or > 20 ||

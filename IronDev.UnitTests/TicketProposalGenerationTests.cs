@@ -124,6 +124,131 @@ public sealed class TicketProposalGenerationTests
         Assert.AreEqual(64, TicketProposalSetDocumentCodec.ComputeHash(json).Length);
     }
 
+    [TestMethod]
+    public void ProposalTitle_UsesPermanentTicketLimitWithoutTruncation()
+    {
+        var context = Context();
+        var exactTitle = new string('x', TicketProposalConstraints.MaximumTitleCharacters);
+        var valid = Output(context,
+        [
+            Proposal("first", 1, [], context.SourceUserMessageId) with { Title = exactTitle }
+        ]);
+
+        WorkbenchBusinessAnalystOutputValidator.Validate(valid, context);
+        var document = TicketProposalSetDocumentCodec.Materialize(
+            valid.TicketProposalSet!, 3, 4, 1, 2, context.AgentRunId,
+            existingSetId: null, revision: 1, DateTime.UtcNow, DateTime.UtcNow, valid.Outcome);
+        var roundTrip = TicketProposalSetDocumentCodec.Deserialize(
+            TicketProposalSetDocumentCodec.Serialize(document));
+
+        Assert.AreEqual(exactTitle, roundTrip.Proposals.Single().Title);
+
+        var tooLong = valid with
+        {
+            TicketProposalSet = valid.TicketProposalSet! with
+            {
+                Proposals =
+                [
+                    valid.TicketProposalSet.Proposals.Single() with
+                    {
+                        Title = new string('x', TicketProposalConstraints.MaximumTitleCharacters + 1)
+                    }
+                ]
+            }
+        };
+        Assert.ThrowsException<WorkbenchAgentOutputValidationException>(() =>
+            WorkbenchBusinessAnalystOutputValidator.Validate(tooLong, context));
+
+        var invalidDocument = document with
+        {
+            Proposals =
+            [
+                document.Proposals.Single() with
+                {
+                    Title = new string(
+                        'x',
+                        TicketProposalConstraints.HistoricalMaximumTitleCharacters + 1)
+                }
+            ]
+        };
+        Assert.ThrowsException<InvalidOperationException>(() =>
+            TicketProposalSetDocumentCodec.Serialize(invalidDocument));
+    }
+
+    [TestMethod]
+    public void HistoricalReadyProposalTitle_RemainsReadableButCannotBecomeCommitted()
+    {
+        var context = Context();
+        var output = Output(context,
+        [
+            Proposal("first", 1, [], context.SourceUserMessageId)
+        ]);
+        var now = DateTime.UtcNow;
+        var document = TicketProposalSetDocumentCodec.Materialize(
+            output.TicketProposalSet!, 3, 4, 1, 2, context.AgentRunId,
+            existingSetId: null, revision: 1, now, now, output.Outcome);
+        var historicalTitle = new string(
+            'h',
+            TicketProposalConstraints.MaximumTitleCharacters + 1);
+        var historicalReady = document with
+        {
+            Proposals =
+            [
+                document.Proposals.Single() with { Title = historicalTitle }
+            ]
+        };
+
+        var roundTrip = TicketProposalSetDocumentCodec.Deserialize(
+            TicketProposalSetDocumentCodec.Serialize(historicalReady));
+
+        Assert.AreEqual(historicalTitle, roundTrip.Proposals.Single().Title);
+        Assert.ThrowsException<InvalidOperationException>(() =>
+            TicketProposalSetDocumentCodec.Serialize(
+                historicalReady with { Status = TicketProposalSetStatuses.Committed }));
+    }
+
+    [TestMethod]
+    public void CommittedDocument_RequiresResolvedIssuesAndRoundTripsCommittedStatus()
+    {
+        var context = Context();
+        var output = Output(context,
+        [
+            Proposal("first", 1, [], context.SourceUserMessageId)
+        ]);
+        var now = DateTime.UtcNow;
+        var document = TicketProposalSetDocumentCodec.Materialize(
+            output.TicketProposalSet!, 3, 4, 1, 2, context.AgentRunId,
+            existingSetId: null, revision: 1, now, now, output.Outcome);
+        var resolvedIssue = new TicketProposalIssueDocument(
+            Guid.NewGuid(),
+            TicketProposalIssueKinds.Question,
+            "Which users are affected?",
+            TicketProposalIssueStatuses.Resolved,
+            "Project owners.",
+            [context.SourceUserMessageId]);
+        var committed = document with
+        {
+            Revision = 2,
+            Status = TicketProposalSetStatuses.Committed,
+            OpenQuestions = [resolvedIssue],
+            UpdatedAtUtc = now.AddSeconds(1)
+        };
+
+        var roundTrip = TicketProposalSetDocumentCodec.Deserialize(
+            TicketProposalSetDocumentCodec.Serialize(committed));
+
+        Assert.AreEqual(TicketProposalSetStatuses.Committed, roundTrip.Status);
+        Assert.AreEqual("Committed", TicketProposalRevisionChangeKinds.Committed);
+
+        var openIssue = resolvedIssue with
+        {
+            Status = TicketProposalIssueStatuses.Open,
+            Resolution = null
+        };
+        Assert.ThrowsException<InvalidOperationException>(() =>
+            TicketProposalSetDocumentCodec.Serialize(committed with { OpenQuestions = [openIssue] }));
+    }
+
     private static WorkbenchBusinessAnalystContext Context()
     {
         var hash = new string('a', 64);

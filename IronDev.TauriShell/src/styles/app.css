@@ -5369,6 +5369,69 @@ p {
   padding-top: 12px;
 }
 
+.ticket-proposal-commit,
+.ticket-proposal-committed {
+  display: grid;
+  gap: 9px;
+  border: 1px solid color-mix(in srgb, var(--fl-blue) 38%, var(--fl-line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fl-blue) 5%, var(--fl-panel));
+  padding: 11px;
+}
+
+.ticket-proposal-commit > div:first-child,
+.ticket-proposal-commit__confirmation,
+.ticket-proposal-committed li {
+  display: grid;
+  gap: 4px;
+}
+
+.ticket-proposal-commit p,
+.ticket-proposal-committed p,
+.ticket-proposal-committed li {
+  color: var(--fl-ink2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ticket-proposal-commit__confirmation {
+  border-top: 1px solid var(--fl-line);
+  padding-top: 9px;
+}
+
+.ticket-proposal-commit__confirmation footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ticket-proposal-commit__boundary {
+  border-left: 3px solid #c39219;
+  background: #fffaf0;
+  padding: 7px 9px;
+  color: #6c5318 !important;
+}
+
+.ticket-proposal-committed {
+  border-color: #7eaf91;
+  background: #f2faf5;
+}
+
+.ticket-proposal-committed ol {
+  display: grid;
+  gap: 7px;
+  padding-left: 22px;
+}
+
+.ticket-proposal-committed li span,
+.ticket-proposal-committed li small {
+  overflow-wrap: anywhere;
+}
+
+.ticket-proposal-committed li small {
+  color: var(--fl-muted);
+}
+
 .ticket-proposal-regenerate label {
   display: grid;
   gap: 2px;

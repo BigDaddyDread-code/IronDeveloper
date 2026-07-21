@@ -333,6 +333,36 @@ public abstract class IntegrationTestBase
             END
             IF OBJECT_ID('dbo.WorkbenchAgentRunAttempts', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRunAttempts;
             IF OBJECT_ID('dbo.WorkbenchCommandRejections', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchCommandRejections;
+            IF OBJECT_ID('dbo.TicketProposalCommitmentDependencies', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitmentDependencies_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.trg_TicketProposalCommitmentDependencies_AppendOnly
+                        ON dbo.TicketProposalCommitmentDependencies;
+                DELETE FROM dbo.TicketProposalCommitmentDependencies;
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitmentDependencies_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.trg_TicketProposalCommitmentDependencies_AppendOnly
+                        ON dbo.TicketProposalCommitmentDependencies;
+            END
+            IF OBJECT_ID('dbo.TicketProposalCommitmentTickets', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitmentTickets_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.trg_TicketProposalCommitmentTickets_AppendOnly
+                        ON dbo.TicketProposalCommitmentTickets;
+                DELETE FROM dbo.TicketProposalCommitmentTickets;
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitmentTickets_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.trg_TicketProposalCommitmentTickets_AppendOnly
+                        ON dbo.TicketProposalCommitmentTickets;
+            END
+            IF OBJECT_ID('dbo.TicketProposalCommitments', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitments_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.trg_TicketProposalCommitments_AppendOnly
+                        ON dbo.TicketProposalCommitments;
+                DELETE FROM dbo.TicketProposalCommitments;
+                IF OBJECT_ID('dbo.trg_TicketProposalCommitments_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.trg_TicketProposalCommitments_AppendOnly
+                        ON dbo.TicketProposalCommitments;
+            END
             IF OBJECT_ID('dbo.TicketProposalSetRevisions', 'U') IS NOT NULL
             BEGIN
                 IF OBJECT_ID('dbo.trg_TicketProposalSetRevisions_AppendOnly', 'TR') IS NOT NULL
@@ -345,6 +375,32 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.ProjectRenameProposals', 'U') IS NOT NULL DELETE FROM dbo.ProjectRenameProposals;
             IF OBJECT_ID('dbo.ProjectUnderstandings', 'U') IS NOT NULL DELETE FROM dbo.ProjectUnderstandings;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
+            IF OBJECT_ID('dbo.RepositorySetupConfirmations', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_RepositorySetupConfirmations_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_RepositorySetupConfirmations_AppendOnly ON dbo.RepositorySetupConfirmations;
+                DELETE FROM dbo.RepositorySetupConfirmations;
+                IF OBJECT_ID('dbo.TR_RepositorySetupConfirmations_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_RepositorySetupConfirmations_AppendOnly ON dbo.RepositorySetupConfirmations;
+            END;
+            IF OBJECT_ID('dbo.ProjectExecutionProfileRevisions', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_ProjectExecutionProfileRevisions_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_ProjectExecutionProfileRevisions_AppendOnly ON dbo.ProjectExecutionProfileRevisions;
+                DELETE FROM dbo.ProjectExecutionProfileRevisions;
+                IF OBJECT_ID('dbo.TR_ProjectExecutionProfileRevisions_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_ProjectExecutionProfileRevisions_AppendOnly ON dbo.ProjectExecutionProfileRevisions;
+            END;
+            IF OBJECT_ID('dbo.ProjectExecutionProfiles', 'U') IS NOT NULL DELETE FROM dbo.ProjectExecutionProfiles;
+            IF OBJECT_ID('dbo.RepositoryBindingRevisions', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_RepositoryBindingRevisions_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_RepositoryBindingRevisions_AppendOnly ON dbo.RepositoryBindingRevisions;
+                DELETE FROM dbo.RepositoryBindingRevisions;
+                IF OBJECT_ID('dbo.TR_RepositoryBindingRevisions_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_RepositoryBindingRevisions_AppendOnly ON dbo.RepositoryBindingRevisions;
+            END;
+            IF OBJECT_ID('dbo.RepositoryBindings', 'U') IS NOT NULL DELETE FROM dbo.RepositoryBindings;
             IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL DELETE FROM dbo.ClientOperations;
             DELETE FROM dbo.ChatMessages;
             IF OBJECT_ID('dbo.ProjectChannelPins', 'U') IS NOT NULL DELETE FROM dbo.ProjectChannelPins;
@@ -397,6 +453,7 @@ public abstract class IntegrationTestBase
 
         await connection.ExecuteAsync(sql);
         await ApplySqlFileAsync(connection, "Database", "migrate_work_item_identity.sql");
+        await ApplySqlFileAsync(connection, "Database", "migrate_workbench_repository_setup.sql");
     }
 
     protected async Task<MemoryRetrievalRequestContext> CreateMemoryRetrievalContextAsync(

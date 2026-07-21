@@ -8,6 +8,11 @@ public static class TicketProposalReviewOperationKinds
     public const string ResolveIssue = "ResolveTicketProposalIssue";
 }
 
+public static class TicketProposalCommitOperationKinds
+{
+    public const string Commit = "CommitTicketProposalSet";
+}
+
 public sealed record TicketProposalReadModel(
     Guid TicketProposalId,
     string Title,
@@ -87,6 +92,55 @@ public sealed record TicketProposalSetHistoryEntry(
 
 public sealed record TicketProposalSetMutationResult(
     TicketProposalSetReadModel ProposalSet,
+    Guid ClientOperationId,
+    bool IsReplay);
+
+/// <summary>
+/// Public mutation body for committing one reviewed proposal-set revision.
+/// Project, tenant, actor, and proposal-set identities remain route/server owned.
+/// </summary>
+public sealed record CommitTicketProposalSetRequest(
+    long WorkbenchSessionId,
+    long LeaseEpoch,
+    Guid ClientOperationId,
+    long ExpectedProposalSetRevision);
+
+public sealed record CommitTicketProposalSetCommand(
+    int TenantId,
+    int ActorUserId,
+    int ProjectId,
+    long WorkbenchSessionId,
+    long LeaseEpoch,
+    Guid ClientOperationId,
+    Guid TicketProposalSetId,
+    long ExpectedProposalSetRevision);
+
+/// <summary>
+/// Stable mapping returned for each permanent ticket created from the reviewed set.
+/// Dependencies contain permanent ticket identifiers, never proposal identifiers.
+/// </summary>
+public sealed record CommittedProjectTicketReadModel(
+    Guid TicketProposalId,
+    long ProjectTicketId,
+    string Title,
+    int SuggestedOrder,
+    IReadOnlyList<long> BlockedByTicketIds);
+
+public sealed record TicketProposalCommitReadModel(
+    Guid CommitmentId,
+    Guid TicketProposalSetId,
+    long ReviewedRevision,
+    long CommittedRevision,
+    string ReviewedSnapshotHash,
+    int ActorUserId,
+    DateTime CommittedAtUtc,
+    IReadOnlyList<CommittedProjectTicketReadModel> Tickets);
+
+public sealed record TicketProposalCommitResult(
+    TicketProposalSetReadModel ProposalSet,
+    TicketProposalCommitReadModel Commitment,
+    string ProjectLifecyclePhase,
+    string ExecutionReadiness,
     Guid ClientOperationId,
     bool IsReplay);
 
@@ -200,6 +254,35 @@ public interface IWorkbenchTicketProposalService
         CancellationToken cancellationToken = default);
 }
 
+public interface IWorkbenchTicketProposalCommitService
+{
+    Task<TicketProposalCommitResult> CommitAsync(
+        CommitTicketProposalSetCommand command,
+        CancellationToken cancellationToken = default);
+}
+
+public enum TicketProposalCommitFailurePoint
+{
+    ClientOperationCreated,
+    TicketsCreated,
+    ProposalCommitted,
+    CommitmentRecorded,
+    LifecycleAdvanced,
+    OutboxRecorded
+}
+
+public interface ITicketProposalCommitFailureInjector
+{
+    void ThrowIfRequested(TicketProposalCommitFailurePoint point);
+}
+
+public sealed class NoOpTicketProposalCommitFailureInjector : ITicketProposalCommitFailureInjector
+{
+    public void ThrowIfRequested(TicketProposalCommitFailurePoint point)
+    {
+    }
+}
+
 public sealed class TicketProposalValidationException(string message) : Exception(message);
 
 public sealed class TicketProposalIssueNotOpenException : Exception
@@ -223,6 +306,56 @@ public sealed class TicketProposalFinalRemovalException : Exception
 
     public TicketProposalFinalRemovalException()
         : base("A ready proposal set must retain at least one ticket proposal.")
+    {
+    }
+}
+
+public sealed class TicketProposalBlockingIssuesException : Exception
+{
+    public const string ErrorCode = "ticket_proposal_blocking_issues";
+
+    public TicketProposalBlockingIssuesException()
+        : base("Resolve every open ticket proposal question and conflict before creating tickets.")
+    {
+    }
+}
+
+public sealed class TicketProposalAlreadyCommittedException : Exception
+{
+    public const string ErrorCode = "ticket_proposal_already_committed";
+
+    public TicketProposalAlreadyCommittedException()
+        : base("This ticket proposal set has already been committed.")
+    {
+    }
+}
+
+public sealed class TicketProposalSetNotReadyException : Exception
+{
+    public const string ErrorCode = "ticket_proposal_set_not_ready";
+
+    public TicketProposalSetNotReadyException()
+        : base("Only a ready ticket proposal set can create permanent tickets.")
+    {
+    }
+}
+
+public sealed class TicketProposalCommitBoundaryException : Exception
+{
+    public const string ErrorCode = "ticket_proposal_commit_boundary_invalid";
+
+    public TicketProposalCommitBoundaryException()
+        : base("Shorten every proposal title to 200 characters or fewer before creating permanent tickets.")
+    {
+    }
+}
+
+public sealed class TicketProposalProjectNotShapingException : Exception
+{
+    public const string ErrorCode = "ticket_proposal_project_not_shaping";
+
+    public TicketProposalProjectNotShapingException()
+        : base("Permanent tickets can be created from proposals only while the project is Shaping.")
     {
     }
 }

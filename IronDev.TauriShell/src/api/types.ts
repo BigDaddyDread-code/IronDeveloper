@@ -94,12 +94,171 @@ export interface WorkbenchProjectEntryContext {
   name: string;
   projectLifecyclePhase: 'Shaping' | 'Delivery' | 'Archived' | string;
   executionReadiness: 'NotConfigured' | 'ValidationRequired' | 'Ready' | string;
-  repositoryBinding: null;
+  repositoryBinding: RepositoryBindingSnapshot | null;
   workbenchSessionId: number;
   leaseEpoch: number;
   wasResumed: boolean;
   wasTakenOver: boolean;
   clientOperationId: string;
+}
+
+export interface RepositoryBindingSnapshot {
+  id: string;
+  projectId: number;
+  revision: number;
+  repositoryKind: string;
+  canonicalPath: string;
+  bindingState: string;
+  defaultBranch: string | null;
+  baselineCommit: string | null;
+  createdByActorUserId: number | null;
+  confirmedAtUtc: string | null;
+}
+
+export interface ProjectExecutionProfileSnapshot {
+  id: string;
+  projectId: number;
+  revision: number;
+  repositoryBindingId: string;
+  profileDefinitionId: string;
+  profileDescriptorRevision: number;
+  descriptorSha256: string;
+  templateBundleSha256: string;
+  planningBundleSha256: string;
+  targetFramework: string;
+  language: string;
+  applicationKind: string;
+  testFramework: string;
+  sdkVersion: string;
+  runtimeVersion: string;
+  solutionPath: string;
+  appProjectPath: string;
+  testProjectPath: string;
+  restoreCommand: string;
+  buildCommand: string;
+  testCommand: string;
+  toolchainManifestId: string;
+  executionImageReference: string;
+  planningReadiness: 'PreviewPlanningOnly';
+  certificationState: 'NotCertificationReady';
+}
+
+export interface RepositorySetupProfileSummary {
+  profileDefinitionId: string;
+  displayName: string;
+  compatibility: 'Compatible' | 'Incompatible' | 'NeedsConfirmation' | 'NoPreference';
+  compatibilityReason: string;
+  planningReadiness: 'PreviewPlanningOnly';
+  certificationState: 'NotCertificationReady';
+  descriptorSha256: string;
+  templateBundleSha256: string;
+}
+
+export type RepositorySetupEnvironmentCapabilityState = 'Available' | 'Unavailable' | 'Unsafe';
+
+export interface RepositorySetupEnvironmentCapability {
+  state: RepositorySetupEnvironmentCapabilityState;
+  reasonCode: string;
+  message: string;
+  suggestedTarget: string;
+}
+
+export interface RepositorySetupConfirmationSnapshot {
+  confirmationId: string;
+  planHash: string;
+  confirmedAtUtc: string;
+  clientOperationId: string;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+}
+
+export interface RepositorySetupContext {
+  projectId: number;
+  tenantId: number;
+  projectName: string;
+  projectLifecyclePhase: string;
+  executionReadiness: string;
+  readinessReasonCode: string;
+  repositoryBinding: RepositoryBindingSnapshot | null;
+  executionProfile: ProjectExecutionProfileSnapshot | null;
+  latestConfirmation: RepositorySetupConfirmationSnapshot | null;
+  environmentCapability: RepositorySetupEnvironmentCapability;
+  availableProfiles: RepositorySetupProfileSummary[];
+}
+
+export interface CreateRepositorySetupPlanRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  profileDefinitionId: string;
+}
+
+export type RepositorySetupPlanState =
+  | 'ReadyForConfirmation'
+  | 'UnsupportedProfile'
+  | 'EnvironmentUnavailable'
+  | 'NeedsConfirmation';
+
+export interface RepositorySetupPlanPreview {
+  schemaVersion: number;
+  source: string;
+  projectId: number;
+  canonicalProjectName: string;
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  basedOnUnderstandingRevision: number;
+  basedOnUnderstandingHash: string;
+  profileDescriptorRevision: number;
+  profileDescriptorSha256: string;
+  state: RepositorySetupPlanState;
+  reasonCode: string;
+  message: string;
+  profile: RepositorySetupProfileSummary;
+  targetPath: string;
+  solutionName: string;
+  appProjectName: string;
+  testProjectName: string;
+  solutionPath: string;
+  appProjectPath: string;
+  testProjectPath: string;
+  templateBundleSha256: string;
+  planningBundleSha256: string;
+  targetFramework: string;
+  language: string;
+  applicationKind: string;
+  testFramework: string;
+  sdkVersion: string;
+  runtimeVersion: string;
+  restoreCommand: string;
+  buildCommand: string;
+  testCommand: string;
+  toolchainManifestId: string;
+  executionImageReference: string;
+  defaultBranch: string;
+  initializeGit: boolean;
+  indexAfterProvisioning: boolean;
+  sandboxValidation: string;
+  resourcePolicy: string;
+  planHash: string;
+}
+
+export interface ConfirmRepositorySetupRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+  expectedPlanHash: string;
+}
+
+export interface RepositorySetupConfirmationResult {
+  projectId: number;
+  confirmationId: string;
+  clientOperationId: string;
+  isReplay: boolean;
+  projectLifecyclePhase: string;
+  executionReadiness: string;
+  readinessReasonCode: string;
+  repositoryBinding: RepositoryBindingSnapshot;
+  executionProfile: ProjectExecutionProfileSnapshot;
+  setupPlan: RepositorySetupPlanPreview;
 }
 
 export type ProjectUnderstandingFactState = 'Unknown' | 'Inferred' | 'Confirmed' | 'Conflicted';
@@ -149,7 +308,7 @@ export interface ProjectUnderstandingOperationalProjection {
   projectLifecycleAuthority: 'ProjectLifecyclePhase' | string;
   executionReadiness: string;
   executionReadinessAuthority: 'ProjectReadinessAssessment' | string;
-  repositoryBinding: unknown | null;
+  repositoryBinding: RepositoryBindingSnapshot | null;
 }
 
 export interface ProjectUnderstandingReadModel {
@@ -506,7 +665,7 @@ export interface SubmitWorkbenchAgentInputResult {
 
 export type SubmitWorkbenchInputResult = SubmitWorkbenchCommandResult | SubmitWorkbenchAgentInputResult;
 
-export type TicketProposalSetStatus = 'Ready' | 'NeedsInput';
+export type TicketProposalSetStatus = 'Ready' | 'NeedsInput' | 'Committed';
 export type TicketProposalIssueStatus = 'Open' | 'Resolved';
 
 export interface TicketProposalReadModel {
@@ -583,6 +742,36 @@ export interface ResolveTicketProposalIssueRequest extends TicketProposalMutatio
 export interface RegenerateTicketProposalsRequest extends TicketProposalMutationAuthority {
   instruction: string;
   chatSessionId: number;
+}
+
+export type CommitTicketProposalSetRequest = TicketProposalMutationAuthority;
+
+export interface TicketProposalCommittedTicket {
+  ticketProposalId: string;
+  projectTicketId: number;
+  title: string;
+  suggestedOrder: number;
+  blockedByTicketIds: number[];
+}
+
+export interface TicketProposalCommitmentReadModel {
+  commitmentId: string;
+  ticketProposalSetId: string;
+  reviewedRevision: number;
+  committedRevision: number;
+  reviewedSnapshotHash: string;
+  actorUserId: number;
+  committedAtUtc: string;
+  tickets: TicketProposalCommittedTicket[];
+}
+
+export interface TicketProposalCommitResult {
+  proposalSet: TicketProposalSetReadModel;
+  commitment: TicketProposalCommitmentReadModel;
+  projectLifecyclePhase: 'Delivery';
+  executionReadiness: 'NotConfigured' | 'ValidationRequired' | 'Ready';
+  clientOperationId: string;
+  isReplay: boolean;
 }
 
 export interface TicketProposalMutationResult {

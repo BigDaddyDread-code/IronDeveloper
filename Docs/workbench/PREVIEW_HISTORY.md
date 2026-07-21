@@ -14,18 +14,20 @@ The machine-readable current version is `workbench-version.json`. Each preview u
 | `0.1.0-preview.8` | PR-02C-B | `workbench-pr02c-b` | Typed Project Understanding facts, provenance, locks, conflicts, explicit rename acceptance, and authority-labelled operational projections |
 | `0.1.0-preview.9` | PR-03 | `workbench-pr03` | Deterministic `/help` and `/ticket`, exact allowlist parsing, hash-only rejection audit, and zero-AgentRun help/typo handling |
 | `0.1.0-preview.10` | PR-04A | `workbench-pr04a` | Governed `/ticket` generation, durable proposal review, provenance, immutable revisions, fenced edits, and regeneration without permanent tickets |
+| `0.1.0-preview.11` | PR-04B | `workbench-pr04b` | Explicit atomic creation of permanent tickets, Work Item contracts, dependency remapping, provenance receipts, and the Delivery transition |
+| `0.1.0-preview.12` | PR-05A | `workbench-pr05a` | Repository/profile authorities, deterministic setup-plan review, approved-root safety, explicit confirmation, and unsupported-profile reporting with zero filesystem writes |
 
-Start the current PR-04A preview alongside the earlier previews:
+Start the current PR-05A preview alongside the earlier previews:
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -EnableConversationAuthority -PreviewId workbench-pr04a `
-  -ApiBaseUrl http://127.0.0.1:5310 -UiPort 5291
+  -EnableConversationAuthority -PreviewId workbench-pr05a `
+  -ApiBaseUrl http://127.0.0.1:5350 -UiPort 5331
 ```
 
-The PR-04A preview owns database `IronDeveloper_Test_workbench_pr04a`, workspace `C:\IronDevTestWorkspaces\workbench-pr04a`, logs `C:\IronDevTestLogs\workbench-pr04a`, API `http://127.0.0.1:5310`, and UI `http://127.0.0.1:5291`.
+The PR-05A preview owns database `IronDeveloper_Test_workbench_pr05a`, workspace `C:\IronDevTestWorkspaces\workbench-pr05a`, logs `C:\IronDevTestLogs\workbench-pr05a`, API `http://127.0.0.1:5350`, and UI `http://127.0.0.1:5331`.
 
-Project creation and shaping remain repository-independent. A slash command exists only when `/` is the first meaningful composer character. `/help` remains deterministic and unknown tokens remain hash-only rejections with no chat or AgentRun side effects. In PR-04A, `/ticket` submits a trusted Business Analyst AgentRun against frozen Workbench context and materializes either one to five ordered proposals or a zero-proposal `NeedsInput` result. The review panel reloads from durable state and supports source navigation, editing, reordering, dependency-safe removal, issue resolution, regeneration, and immutable full-snapshot history. Every review write is lease-fenced, expected-revision checked, and idempotent. No review or regeneration action creates a permanent ticket, repository, execution authorization, or readiness claim.
+Project creation, shaping, `/ticket`, and proposal review remain repository-independent. PR-05A introduces a separate Repository surface. The server derives a safe direct-child target inside its configured repository root, evaluates desired-technology compatibility without silently substituting WinForms, and returns a deterministic plan containing the pinned profile, generated names, template hash, toolchain/image, commands, Git/index/sandbox/resource policies, and exact plan hash. Explicit confirmation is fenced by the current Workbench lease and client operation, then records versioned `RepositoryBinding` and `ProjectExecutionProfile` authorities plus an immutable confirmation receipt. It stops at `SetupConfirmed`: readiness remains `NotConfigured`, `Project.LocalPath` remains null, and no directory, template, Git repository, index, command, sandbox run, or Builder authorization is created. PR-05B owns provisioning the confirmed plan.
 
 For the deterministic LocalTest rename path, send `Rename project to CalmPlan` as its own Workshop message, then accept the pending proposal in Project Context.
 

@@ -460,7 +460,9 @@ function OperationalStatus({ model }: { model: ProjectUnderstandingReadModel }) 
       />
       <OperationalRow
         label="Repository"
-        value={operational.repositoryBinding === null ? 'Not configured' : 'Configured'}
+        value={operational.repositoryBinding === null
+          ? 'Not configured'
+          : formatState(operational.repositoryBinding.bindingState)}
         authority="RepositoryBinding"
         testId="chat.projectUnderstanding.operational.repository"
       />
@@ -472,7 +474,7 @@ function OperationalRow({ label, value, authority, testId }: { label: string; va
   return (
     <dl className="project-understanding-operational__row" data-testid={testId}>
       <dt>{label}</dt>
-      <dd><strong>{value}</strong><small>{authority} · read only</small></dd>
+      <dd><strong>{value}</strong><small>{authority} - read only</small></dd>
     </dl>
   );
 }
@@ -520,5 +522,8 @@ function splitPascalCase(value: string) {
 }
 
 function formatState(value: string) {
-  return splitPascalCase(value).replace(/\bnot configured\b/i, 'Not configured');
+  const separated = splitPascalCase(value);
+  return separated.length === 0
+    ? separated
+    : separated[0].toUpperCase() + separated.slice(1).toLowerCase();
 }

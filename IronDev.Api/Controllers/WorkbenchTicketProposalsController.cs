@@ -12,13 +12,16 @@ namespace IronDev.Api.Controllers;
 public sealed class WorkbenchTicketProposalsController : ControllerBase
 {
     private readonly IWorkbenchTicketProposalService _proposals;
+    private readonly IWorkbenchTicketProposalCommitService _commits;
     private readonly ICurrentTenantContext _tenant;
 
     public WorkbenchTicketProposalsController(
         IWorkbenchTicketProposalService proposals,
+        IWorkbenchTicketProposalCommitService commits,
         ICurrentTenantContext tenant)
     {
         _proposals = proposals;
+        _commits = commits;
         _tenant = tenant;
     }
 
@@ -277,6 +280,37 @@ public sealed class WorkbenchTicketProposalsController : ControllerBase
         }
     }
 
+    [HttpPost("{ticketProposalSetId:guid}/commits")]
+    [ProducesResponseType(typeof(TicketProposalCommitResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TicketProposalCommitResult>> Commit(
+        int projectId,
+        Guid ticketProposalSetId,
+        CommitTicketProposalSetRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _commits.CommitAsync(
+                new CommitTicketProposalSetCommand(
+                    _tenant.TenantId,
+                    CurrentActor().UserId,
+                    projectId,
+                    request.WorkbenchSessionId,
+                    request.LeaseEpoch,
+                    request.ClientOperationId,
+                    ticketProposalSetId,
+                    request.ExpectedProposalSetRevision),
+                cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return MapFailure(exception);
+        }
+    }
+
     private CurrentUserContext CurrentActor() =>
         new(HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());
 
@@ -301,6 +335,16 @@ public sealed class WorkbenchTicketProposalsController : ControllerBase
             Conflict(new { error = TicketProposalDependencyException.ErrorCode, message = dependency.Message }),
         TicketProposalFinalRemovalException finalRemoval =>
             Conflict(new { error = TicketProposalFinalRemovalException.ErrorCode, message = finalRemoval.Message }),
+        TicketProposalBlockingIssuesException blockingIssues =>
+            Conflict(new { error = TicketProposalBlockingIssuesException.ErrorCode, message = blockingIssues.Message }),
+        TicketProposalAlreadyCommittedException committed =>
+            Conflict(new { error = TicketProposalAlreadyCommittedException.ErrorCode, message = committed.Message }),
+        TicketProposalSetNotReadyException notReady =>
+            Conflict(new { error = TicketProposalSetNotReadyException.ErrorCode, message = notReady.Message }),
+        TicketProposalCommitBoundaryException boundary =>
+            Conflict(new { error = TicketProposalCommitBoundaryException.ErrorCode, message = boundary.Message }),
+        TicketProposalProjectNotShapingException lifecycle =>
+            Conflict(new { error = TicketProposalProjectNotShapingException.ErrorCode, message = lifecycle.Message }),
         WorkbenchLeaseFenceException fence =>
             Conflict(new { error = WorkbenchLeaseFenceException.ErrorCode, message = fence.Message }),
         WorkbenchChatSessionBindingException binding =>

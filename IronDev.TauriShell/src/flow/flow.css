@@ -3428,6 +3428,128 @@
   width: 55%;
 }
 
+/* PR-05A: repository setup is a reviewable authority workflow, not provisioning. */
+.fl-repository-setup .fl-project-setup__body {
+  width: min(920px, 100%);
+}
+
+.fl-repository-setup__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--fl-muted);
+  font-size: 12px;
+}
+
+.fl-repository-setup__steps strong {
+  color: var(--fl-ink);
+}
+
+.fl-repository-setup__configure {
+  display: grid;
+  gap: 18px;
+}
+
+.fl-repository-setup__capabilities {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fl-repository-setup__capabilities article {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid var(--fl-line);
+  border-radius: 8px;
+  background: var(--fl-panel);
+  padding: 18px;
+}
+
+.fl-repository-setup__capabilities h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.fl-repository-setup__capabilities p {
+  margin: 0;
+  color: var(--fl-ink2);
+  line-height: 1.5;
+}
+
+.fl-repository-setup__capabilities dl,
+.fl-repository-setup__confirmed dl {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  margin: 4px 0 0;
+}
+
+.fl-repository-setup__capabilities dl div,
+.fl-repository-setup__confirmed dl div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.45fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.fl-repository-setup__capabilities dt,
+.fl-repository-setup__confirmed dt,
+.fl-repository-setup__plan dt {
+  color: var(--fl-muted);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.fl-repository-setup__capabilities dd,
+.fl-repository-setup__confirmed dd,
+.fl-repository-setup__plan dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--fl-ink2);
+}
+
+.fl-repository-setup__review {
+  gap: 18px;
+}
+
+.fl-repository-setup__plan {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--fl-line);
+}
+
+.fl-repository-setup__plan > div {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.6fr) minmax(0, 1.4fr);
+  gap: 16px;
+  border-bottom: 1px solid var(--fl-line);
+  padding: 10px 0;
+}
+
+.fl-repository-setup__plan code,
+.fl-repository-setup__capabilities code {
+  font-family: var(--fl-mono);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.fl-repository-setup__confirmed {
+  justify-items: stretch;
+  text-align: left;
+}
+
+.fl-repository-setup__confirmed .fl-project-setup__ready-mark,
+.fl-repository-setup__confirmed h2,
+.fl-repository-setup__confirmed > p,
+.fl-repository-setup__confirmed > button {
+  justify-self: center;
+  text-align: center;
+}
+
 @media (max-width: 760px) {
   .fl-project-setup--entry {
     padding: 0 18px 32px;
@@ -3468,6 +3590,17 @@
   .fl-project-setup__detail-list dl div {
     grid-template-columns: 1fr;
     gap: 2px;
+  }
+
+  .fl-repository-setup__capabilities {
+    grid-template-columns: 1fr;
+  }
+
+  .fl-repository-setup__plan > div,
+  .fl-repository-setup__capabilities dl div,
+  .fl-repository-setup__confirmed dl div {
+    grid-template-columns: 1fr;
+    gap: 3px;
   }
 }
 

@@ -437,7 +437,7 @@ public sealed class WorkbenchBusinessAnalystModelGateway
                 .OrderBy(proposal => proposal.SuggestedOrder)
                 .Select(proposal => new TicketProposalOutput(
                     keys[proposal.TicketProposalId],
-                    Compact(proposal.Title, 200),
+                    proposal.Title,
                     Compact(proposal.Problem, 2_000),
                     Compact(
                         resolvedSummary is null

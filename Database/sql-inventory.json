@@ -2454,6 +2454,63 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Stores one current aggregate projection and canonical append-only full-document revisions; proposal-purpose runs remain explicitly distinct from conversation runs."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-ticket-commitments",
+                        "path":  "Database/migrate_workbench_ticket_commitments.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.TicketProposalCommitments",
+                                               "dbo.TicketProposalCommitmentTickets",
+                                               "dbo.TicketProposalCommitmentDependencies",
+                                               "project-scoped dbo.ProjectTickets candidate key and foreign key",
+                                               "append-only commitment and mapping triggers"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users",
+                                              "dbo.ProjectTickets",
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.TicketProposalSets",
+                                              "dbo.TicketProposalSetRevisions"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-04B atomic permanent-ticket creation"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Records one immutable idempotent commitment, exact reviewed snapshot provenance, every proposal-to-ticket mapping, and every mapped dependency edge without repository or Builder authority side effects."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-repository-setup",
+                        "path":  "Database/migrate_workbench_repository_setup.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.RepositoryBindings",
+                                               "dbo.RepositoryBindingRevisions",
+                                               "dbo.ProjectExecutionProfiles",
+                                               "dbo.ProjectExecutionProfileRevisions",
+                                               "dbo.RepositorySetupConfirmations",
+                                               "append-only repository authority history triggers"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users",
+                                              "dbo.ProjectMembers",
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.ClientOperations",
+                                              "dbo.ProjectReadinessAssessments"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-05A repository setup preview and explicit confirmation"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Persists setup confirmation and immutable server-derived plan authority only; no repository target or project files are created. Existing LocalPath rows are backfilled solely as Existing/LegacyUnverified."
                     }
                 ]
 }
