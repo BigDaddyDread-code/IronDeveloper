@@ -63,6 +63,8 @@ public sealed class WorkbenchRepositorySetupService : IWorkbenchRepositorySetupS
                 connection, null, query.TenantId, query.ProjectId, binding.Id, cancellationToken);
         var confirmation = await ReadLatestConfirmationAsync(
             connection, null, query.TenantId, query.ProjectId, cancellationToken);
+        var latestProvisioning = await ReadLatestProvisioningAsync(
+            connection, null, query.TenantId, query.ProjectId, cancellationToken);
         var compatibility = EvaluateCompatibility(project.UnderstandingJson);
         var suggestedNames = RepositorySetupSafeNames.FromProject(project.Name, project.ProjectId);
         var environmentPath = _pathPolicy.Assess(
@@ -86,13 +88,15 @@ public sealed class WorkbenchRepositorySetupService : IWorkbenchRepositorySetupS
             project.ProjectLifecyclePhase,
             project.ExecutionReadiness,
             project.ReadinessReasonCode,
+            project.LocalPath,
             binding,
             profile,
             confirmation,
             environmentCapability,
             _catalog.GetAll()
                 .Select(value => ToSummary(value, compatibility))
-                .ToArray());
+                .ToArray(),
+            latestProvisioning);
     }
 
     public async Task<RepositorySetupPlanPreview> PreviewAsync(
@@ -997,6 +1001,32 @@ public sealed class WorkbenchRepositorySetupService : IWorkbenchRepositorySetupS
             FROM dbo.RepositorySetupConfirmations
             WHERE TenantId=@TenantId AND ProjectId=@ProjectId
             ORDER BY ConfirmedAtUtc DESC, Id DESC;
+            """,
+            new { TenantId = tenantId, ProjectId = projectId },
+            transaction,
+            cancellationToken: cancellationToken));
+
+    private static Task<RepositoryProvisioningSnapshot?> ReadLatestProvisioningAsync(
+        IDbConnection connection,
+        IDbTransaction? transaction,
+        int tenantId,
+        int projectId,
+        CancellationToken cancellationToken) =>
+        connection.QuerySingleOrDefaultAsync<RepositoryProvisioningSnapshot>(new CommandDefinition(
+            """
+            SELECT TOP (1)
+                   attempt.Id AS AttemptId, attempt.State, attempt.AttemptNumber,
+                   attempt.ClientOperationId, attempt.SetupConfirmationId,
+                   attempt.ExpectedBindingRevision AS ExpectedRepositoryBindingRevision,
+                   attempt.ExpectedExecutionProfileRevision,
+                   attempt.StartedAtUtc, attempt.CompletedAtUtc, attempt.FailureCode,
+                   receipt.Id AS ReceiptId, receipt.BranchName, receipt.BaselineCommit
+            FROM dbo.RepositoryProvisioningAttempts attempt
+            LEFT JOIN dbo.RepositoryProvisioningReceipts receipt
+              ON receipt.TenantId=attempt.TenantId AND receipt.ProjectId=attempt.ProjectId
+             AND receipt.ProvisioningAttemptId=attempt.Id
+            WHERE attempt.TenantId=@TenantId AND attempt.ProjectId=@ProjectId
+            ORDER BY attempt.AttemptNumber DESC;
             """,
             new { TenantId = tenantId, ProjectId = projectId },
             transaction,

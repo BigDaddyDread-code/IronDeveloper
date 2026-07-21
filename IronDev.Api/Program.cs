@@ -191,6 +191,14 @@ builder.Services.AddSingleton<IRepositorySetupPathPolicy, RepositorySetupPathPol
 builder.Services.AddSingleton<IRepositorySetupConfirmationFailureInjector,
     NoOpRepositorySetupConfirmationFailureInjector>();
 builder.Services.AddScoped<IWorkbenchRepositorySetupService, WorkbenchRepositorySetupService>();
+builder.Services.AddSingleton<IRepositoryProvisioningFailureInjector,
+    NoOpRepositoryProvisioningFailureInjector>();
+builder.Services.AddSingleton<IRepositoryProvisioningGitRunner, RepositoryProvisioningGitRunner>();
+builder.Services.AddSingleton<IRepositoryProvisioningDirectoryCreator,
+    RepositoryProvisioningDirectoryCreator>();
+builder.Services.AddSingleton<IRepositoryProvisioningExecutor, RepositoryProvisioningExecutor>();
+builder.Services.AddScoped<IWorkbenchRepositoryProvisioningService,
+    WorkbenchRepositoryProvisioningService>();
 builder.Services.AddSingleton<IWorkbenchAgentRunFailureInjector, NoOpWorkbenchAgentRunFailureInjector>();
 var workbenchAgentRunWorkerEnabled =
     builder.Configuration.GetValue<bool>("Features:WorkbenchAgentRunWorker");

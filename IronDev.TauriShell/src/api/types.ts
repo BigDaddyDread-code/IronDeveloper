@@ -172,6 +172,24 @@ export interface RepositorySetupConfirmationSnapshot {
   leaseEpoch: number;
 }
 
+export type RepositoryProvisioningState = 'Provisioning' | 'Qualified' | 'ProvisioningFailed';
+
+export interface RepositoryProvisioningAttemptSnapshot {
+  attemptId: string;
+  state: RepositoryProvisioningState;
+  attemptNumber: number;
+  clientOperationId: string;
+  setupConfirmationId: string;
+  expectedRepositoryBindingRevision: number;
+  expectedExecutionProfileRevision: number;
+  startedAtUtc: string;
+  completedAtUtc: string | null;
+  failureCode: string | null;
+  receiptId: string | null;
+  branchName: string | null;
+  baselineCommit: string | null;
+}
+
 export interface RepositorySetupContext {
   projectId: number;
   tenantId: number;
@@ -179,9 +197,11 @@ export interface RepositorySetupContext {
   projectLifecyclePhase: string;
   executionReadiness: string;
   readinessReasonCode: string;
+  projectLocalPath: string | null;
   repositoryBinding: RepositoryBindingSnapshot | null;
   executionProfile: ProjectExecutionProfileSnapshot | null;
   latestConfirmation: RepositorySetupConfirmationSnapshot | null;
+  latestProvisioning: RepositoryProvisioningAttemptSnapshot | null;
   environmentCapability: RepositorySetupEnvironmentCapability;
   availableProfiles: RepositorySetupProfileSummary[];
 }
@@ -259,6 +279,33 @@ export interface RepositorySetupConfirmationResult {
   repositoryBinding: RepositoryBindingSnapshot;
   executionProfile: ProjectExecutionProfileSnapshot;
   setupPlan: RepositorySetupPlanPreview;
+}
+
+export interface ProvisionRepositoryRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+  setupConfirmationId: string;
+  expectedRepositoryBindingRevision: number;
+  expectedExecutionProfileRevision: number;
+}
+
+export interface RepositoryProvisioningResult {
+  projectId: number;
+  attemptId: string;
+  receiptId: string;
+  clientOperationId: string;
+  isReplay: boolean;
+  projectLifecyclePhase: string;
+  executionReadiness: 'NotConfigured';
+  readinessReasonCode: string;
+  projectLocalPath: string;
+  repositoryBinding: RepositoryBindingSnapshot;
+  executionProfile: ProjectExecutionProfileSnapshot;
+  branchName: string;
+  baselineCommit: string;
+  manifestSha256: string;
+  gitTreeId: string;
 }
 
 export type ProjectUnderstandingFactState = 'Unknown' | 'Inferred' | 'Confirmed' | 'Conflicted';
