@@ -5,7 +5,11 @@ import type {
 } from '../../state/useProjectContext';
 import type {
   ConfirmRepositorySetupRequest,
+  ProvisionRepositoryRequest,
   RepositoryBindingSnapshot,
+  ProjectExecutionProfileSnapshot,
+  RepositoryProvisioningAttemptSnapshot,
+  RepositoryProvisioningResult,
   RepositorySetupConfirmationResult,
   RepositorySetupContext,
   RepositorySetupPlanPreview,
@@ -22,13 +26,18 @@ interface ProjectSetupScreenProps {
 }
 
 type LoadState = 'loading' | 'loaded' | 'unavailable';
-type BusyAction = 'plan' | 'confirm' | null;
+type BusyAction = 'plan' | 'confirm' | 'provision' | null;
 
 interface PendingConfirmation extends ConfirmRepositorySetupRequest {
   projectId: number;
 }
 
+interface PendingProvisioning extends ProvisionRepositoryRequest {
+  projectId: number;
+}
+
 const pendingConfirmationPrefix = 'irondev.repository-setup-confirmation';
+const pendingProvisioningPrefix = 'irondev.repository-provisioning';
 const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function pendingConfirmationKey(projectId: number, session: ActiveWorkbenchSession): string {
@@ -72,6 +81,46 @@ function clearPendingConfirmation(projectId: number, session: ActiveWorkbenchSes
   }
 }
 
+function pendingProvisioningKey(projectId: number, session: ActiveWorkbenchSession): string {
+  return `${pendingProvisioningPrefix}:${projectId}:${session.workbenchSessionId}:${session.leaseEpoch}`;
+}
+
+function loadPendingProvisioning(projectId: number, session: ActiveWorkbenchSession): PendingProvisioning | null {
+  try {
+    const raw = window.sessionStorage.getItem(pendingProvisioningKey(projectId, session));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<PendingProvisioning>;
+    return value.projectId === projectId &&
+      value.workbenchSessionId === session.workbenchSessionId &&
+      value.leaseEpoch === session.leaseEpoch &&
+      typeof value.clientOperationId === 'string' && uuidPattern.test(value.clientOperationId) &&
+      typeof value.setupConfirmationId === 'string' && uuidPattern.test(value.setupConfirmationId) &&
+      typeof value.expectedRepositoryBindingRevision === 'number' && Number.isSafeInteger(value.expectedRepositoryBindingRevision) && value.expectedRepositoryBindingRevision > 0 &&
+      typeof value.expectedExecutionProfileRevision === 'number' && Number.isSafeInteger(value.expectedExecutionProfileRevision) && value.expectedExecutionProfileRevision > 0
+      ? value as PendingProvisioning
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingProvisioning(attempt: PendingProvisioning, session: ActiveWorkbenchSession): boolean {
+  try {
+    window.sessionStorage.setItem(pendingProvisioningKey(attempt.projectId, session), JSON.stringify(attempt));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearPendingProvisioning(projectId: number, session: ActiveWorkbenchSession): void {
+  try {
+    window.sessionStorage.removeItem(pendingProvisioningKey(projectId, session));
+  } catch {
+    // Storage cleanup does not change the authoritative API outcome.
+  }
+}
+
 function isDefinitiveResponse(error: unknown): boolean {
   if (!(error instanceof IronDevApiError) || error.status < 400 || error.status >= 500 || error.status === 408 || error.status === 429) {
     return false;
@@ -86,6 +135,30 @@ function isDefinitiveResponse(error: unknown): boolean {
   return [body.reasonCode, body.errorCode, body.code, body.error].some(
     (value) => typeof value === 'string' && value.trim().length > 0
   );
+}
+
+function isProvisioningInProgressResponse(error: unknown): boolean {
+  if (!(error instanceof IronDevApiError) || error.status !== 409 || !error.body ||
+      typeof error.body !== 'object' || Array.isArray(error.body)) {
+    return false;
+  }
+  const body = error.body as Record<string, unknown>;
+  return [body.reasonCode, body.errorCode, body.code, body.error].some(
+    (value) => typeof value === 'string' && value.trim().toLowerCase() === 'repository_provisioning_in_progress'
+  );
+}
+
+function isRecoverableProvisioningFenceResponse(error: unknown): boolean {
+  if (!(error instanceof IronDevApiError) || error.status !== 409 || !error.body ||
+      typeof error.body !== 'object' || Array.isArray(error.body)) {
+    return false;
+  }
+  const body = error.body as Record<string, unknown>;
+  return [body.reasonCode, body.errorCode, body.code, body.error].some((value) => {
+    if (typeof value !== 'string') return false;
+    const code = value.trim().toLowerCase();
+    return code === 'workbench_lease_fence_rejected' || code === 'workbench_lease_fence';
+  });
 }
 
 function describeError(error: unknown, fallback: string): string {
@@ -133,12 +206,14 @@ export function ProjectSetupScreen({
   const [context, setContext] = useState<RepositorySetupContext | null>(null);
   const [plan, setPlan] = useState<RepositorySetupPlanPreview | null>(null);
   const [confirmation, setConfirmation] = useState<RepositorySetupConfirmationResult | null>(null);
+  const [provisioning, setProvisioning] = useState<RepositoryProvisioningResult | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [ambiguousConfirmation, setAmbiguousConfirmation] = useState(false);
   const [confirmationChecked, setConfirmationChecked] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [pendingProvisioning, setPendingProvisioning] = useState<PendingProvisioning | null>(null);
   const generationRef = useRef(0);
 
   useEffect(() => {
@@ -147,12 +222,16 @@ export function ProjectSetupScreen({
     setContext(null);
     setPlan(null);
     setConfirmation(null);
+    setProvisioning(null);
     setLoadState('loading');
     setBusyAction(null);
     setErrorMessage(null);
     setAmbiguousConfirmation(false);
     setConfirmationChecked(false);
-    setPendingConfirmation(authority ? loadPendingConfirmation(projectId, authority) : null);
+    const storedConfirmation = authority ? loadPendingConfirmation(projectId, authority) : null;
+    const storedProvisioning = authority ? loadPendingProvisioning(projectId, authority) : null;
+    setPendingConfirmation(storedConfirmation);
+    setPendingProvisioning(storedProvisioning);
 
     if (!authority) {
       setLoadState('unavailable');
@@ -167,6 +246,22 @@ export function ProjectSetupScreen({
       .then((result) => {
         if (!controller.signal.aborted && generationRef.current === generation) {
           setContext(result);
+          if (!storedProvisioning && result.latestProvisioning?.state === 'Provisioning') {
+            const recovered: PendingProvisioning = {
+              projectId,
+              workbenchSessionId: authority.workbenchSessionId,
+              leaseEpoch: authority.leaseEpoch,
+              clientOperationId: result.latestProvisioning.clientOperationId,
+              setupConfirmationId: result.latestProvisioning.setupConfirmationId,
+              expectedRepositoryBindingRevision: result.latestProvisioning.expectedRepositoryBindingRevision,
+              expectedExecutionProfileRevision: result.latestProvisioning.expectedExecutionProfileRevision
+            };
+            if (savePendingProvisioning(recovered, authority)) {
+              setPendingProvisioning(recovered);
+            } else {
+              setErrorMessage('IronDev found an active provisioning operation but could not preserve its exact recovery request in this browser session.');
+            }
+          }
           setLoadState('loaded');
         }
       })
@@ -193,8 +288,20 @@ export function ProjectSetupScreen({
     [selectableProfile, context]
   );
   const technologyNeedsConfirmation = desiredTechnologyProfile?.compatibility === 'NeedsConfirmation';
-  const confirmedBinding: RepositoryBindingSnapshot | null = confirmation?.repositoryBinding ?? context?.repositoryBinding ?? null;
+  const confirmedBinding: RepositoryBindingSnapshot | null = provisioning?.repositoryBinding ?? confirmation?.repositoryBinding ?? context?.repositoryBinding ?? null;
+  const executionProfile: ProjectExecutionProfileSnapshot | null = provisioning?.executionProfile ?? confirmation?.executionProfile ?? context?.executionProfile ?? null;
+  const setupConfirmationId = confirmation?.confirmationId ?? context?.latestConfirmation?.confirmationId ?? null;
+  const latestProvisioning = context?.latestProvisioning ?? null;
   const setupIsConfirmed = confirmedBinding?.bindingState === 'SetupConfirmed';
+  const provisioningFailed = confirmedBinding?.bindingState === 'ProvisioningFailed';
+  const provisioningInProgress = confirmedBinding?.bindingState === 'Provisioning';
+  const repositoryQualified = confirmedBinding?.bindingState === 'Qualified';
+  const completeProvisioningAuthority = Boolean(
+    (setupIsConfirmed || provisioningFailed) &&
+    setupConfirmationId &&
+    executionProfile &&
+    executionProfile.repositoryBindingId === confirmedBinding?.id
+  );
   const pendingMatchesPlan = pendingConfirmation?.expectedPlanHash === plan?.planHash;
 
   const createPlan = useCallback(async () => {
@@ -277,6 +384,95 @@ export function ProjectSetupScreen({
     }
   }, [authority, busyAction, confirmationChecked, pendingConfirmation, plan, projectId, session.client]);
 
+  const provisionRepository = useCallback(async () => {
+    if (!authority || busyAction !== null) return;
+
+    const isNewProvisioning = pendingProvisioning === null;
+    if (isNewProvisioning && (!completeProvisioningAuthority || !confirmedBinding || !executionProfile || !setupConfirmationId)) {
+      return;
+    }
+
+    const generation = generationRef.current;
+    const attempt: PendingProvisioning = pendingProvisioning
+      ? pendingProvisioning
+      : {
+          projectId,
+          workbenchSessionId: authority.workbenchSessionId,
+          leaseEpoch: authority.leaseEpoch,
+          clientOperationId: crypto.randomUUID(),
+          setupConfirmationId: setupConfirmationId!,
+          expectedRepositoryBindingRevision: confirmedBinding!.revision,
+          expectedExecutionProfileRevision: executionProfile!.revision
+        };
+
+    if (!savePendingProvisioning(attempt, authority)) {
+      setErrorMessage('IronDev could not preserve the exact provisioning operation in this browser session, so no provisioning request was sent.');
+      return;
+    }
+
+    setPendingProvisioning(attempt);
+    setBusyAction('provision');
+    setErrorMessage(null);
+
+    try {
+      const result = await session.client.provisionRepository(projectId, {
+        workbenchSessionId: attempt.workbenchSessionId,
+        leaseEpoch: attempt.leaseEpoch,
+        clientOperationId: attempt.clientOperationId,
+        setupConfirmationId: attempt.setupConfirmationId,
+        expectedRepositoryBindingRevision: attempt.expectedRepositoryBindingRevision,
+        expectedExecutionProfileRevision: attempt.expectedExecutionProfileRevision
+      });
+      clearPendingProvisioning(projectId, authority);
+      if (generationRef.current !== generation) return;
+      setPendingProvisioning(null);
+      setProvisioning(result);
+      setErrorMessage(null);
+    } catch (error: unknown) {
+      const inProgress = isProvisioningInProgressResponse(error);
+      const recoverableFence = isRecoverableProvisioningFenceResponse(error);
+      const definitive = isDefinitiveResponse(error) && !inProgress && !recoverableFence;
+      if (definitive) clearPendingProvisioning(projectId, authority);
+      if (generationRef.current !== generation) return;
+      if (definitive) {
+        setPendingProvisioning(null);
+        setConfirmation(null);
+        setProvisioning(null);
+        setContext(null);
+        try {
+          const refreshed = await session.client.getRepositorySetupContext(projectId);
+          if (generationRef.current === generation) {
+            setContext(refreshed);
+            setLoadState('loaded');
+          }
+        } catch {
+          if (generationRef.current === generation) setLoadState('unavailable');
+        }
+      }
+      if (generationRef.current !== generation) return;
+      const ambiguous = !definitive;
+      setErrorMessage(ambiguous
+        ? inProgress
+          ? 'This exact repository provisioning operation is already in progress. Retry the same operation to recover its authoritative result; do not start a different operation.'
+          : recoverableFence
+            ? 'Workbench write authority changed while this exact repository provisioning operation was active. Retry the same operation after the current Workbench session is established; do not start a different operation.'
+          : 'IronDev could not determine whether repository provisioning completed. Retry to replay the exact same operation safely.'
+        : describeError(error, 'Repository provisioning did not complete.'));
+    } finally {
+      if (generationRef.current === generation) setBusyAction(null);
+    }
+  }, [
+    authority,
+    busyAction,
+    completeProvisioningAuthority,
+    confirmedBinding,
+    executionProfile,
+    pendingProvisioning,
+    projectId,
+    session.client,
+    setupConfirmationId
+  ]);
+
   const returnToConfiguration = () => {
     setPlan(null);
     setConfirmationChecked(false);
@@ -285,8 +481,14 @@ export function ProjectSetupScreen({
   };
 
   const projectName = context?.projectName ?? projects.selectedProjectName ?? `Project ${projectId}`;
-  const status = setupIsConfirmed
-    ? 'Setup confirmed'
+  const status = repositoryQualified
+    ? 'Repository qualified'
+    : provisioningInProgress || busyAction === 'provision'
+      ? 'Provisioning'
+    : provisioningFailed
+      ? 'Provisioning failed'
+    : setupIsConfirmed
+      ? 'Setup confirmed'
     : plan?.state === 'ReadyForConfirmation'
       ? 'Awaiting confirmation'
       : loadState === 'unavailable'
@@ -307,7 +509,7 @@ export function ProjectSetupScreen({
           <h1 className="fl-h1">Configure repository</h1>
           <p className="fl-project-setup__path">{projectName}</p>
         </div>
-        <span className={`fl-project-setup__status fl-project-setup__status--${setupIsConfirmed ? 'ready' : loadState === 'unavailable' ? 'unavailable' : 'attention'}`}>
+        <span className={`fl-project-setup__status fl-project-setup__status--${repositoryQualified ? 'ready' : loadState === 'unavailable' || provisioningFailed ? 'unavailable' : 'attention'}`}>
           {status}
         </span>
       </header>
@@ -338,11 +540,36 @@ export function ProjectSetupScreen({
             errorMessage={errorMessage}
             onRetry={() => void confirmSetup()}
           />
-        ) : setupIsConfirmed ? (
+        ) : pendingProvisioning ? (
+          <ProvisioningRecovery
+            attempt={pendingProvisioning}
+            active={latestProvisioning?.state === 'Provisioning' && latestProvisioning.clientOperationId === pendingProvisioning.clientOperationId}
+            busy={busyAction === 'provision'}
+            errorMessage={errorMessage}
+            onRetry={() => void provisionRepository()}
+          />
+        ) : repositoryQualified ? (
+          <QualifiedRepository
+            binding={confirmedBinding!}
+            provisioning={provisioning}
+            latestAttempt={latestProvisioning}
+            lifecycle={provisioning?.projectLifecyclePhase ?? context?.projectLifecyclePhase ?? 'Shaping'}
+            readiness={provisioning?.executionReadiness ?? context?.executionReadiness ?? 'NotConfigured'}
+            onContinue={onOpenBoard}
+          />
+        ) : provisioningInProgress ? (
+          <ProvisioningProgress latestAttempt={latestProvisioning} errorMessage={errorMessage} onContinue={onOpenBoard} />
+        ) : setupIsConfirmed || provisioningFailed ? (
           <ConfirmedSetup
             binding={confirmedBinding!}
+            profile={executionProfile!}
+            confirmationId={setupConfirmationId!}
+            latestAttempt={latestProvisioning}
             lifecycle={confirmation?.projectLifecyclePhase ?? context?.projectLifecyclePhase ?? 'Shaping'}
             readiness={confirmation?.executionReadiness ?? context?.executionReadiness ?? 'NotConfigured'}
+            busy={busyAction === 'provision'}
+            errorMessage={errorMessage}
+            onProvision={() => void provisionRepository()}
             onContinue={onOpenBoard}
           />
         ) : confirmedBinding?.bindingState === 'LegacyUnverified' ? (
@@ -368,7 +595,7 @@ export function ProjectSetupScreen({
         ) : (
           <section className="fl-repository-setup__configure" data-testid="repositorySetup.configure">
             <div className="fl-project-setup__intro">
-              <p>Create a deterministic setup plan first. No repository directory or files are created until a later provisioning slice runs.</p>
+              <p>Create and confirm a deterministic setup plan first. Provisioning remains a separate explicit action.</p>
             </div>
 
             <div className="fl-repository-setup__capabilities">
@@ -629,29 +856,178 @@ function PlanRow({ label, value, code = false, testId }: { label: string; value:
 
 function ConfirmedSetup({
   binding,
+  profile,
+  confirmationId,
+  latestAttempt,
+  lifecycle,
+  readiness,
+  busy,
+  errorMessage,
+  onProvision,
+  onContinue
+}: {
+  binding: RepositoryBindingSnapshot;
+  profile: ProjectExecutionProfileSnapshot;
+  confirmationId: string;
+  latestAttempt: RepositoryProvisioningAttemptSnapshot | null;
+  lifecycle: string;
+  readiness: string;
+  busy: boolean;
+  errorMessage: string | null;
+  onProvision: () => void;
+  onContinue: () => void;
+}) {
+  const retry = binding.bindingState === 'ProvisioningFailed';
+  return (
+    <section className="fl-project-setup__ready fl-repository-setup__confirmed" data-testid="repositorySetup.confirmed">
+      <p className="fl-project-setup__ready-mark" aria-hidden="true">{retry ? '!' : 'OK'}</p>
+      <h2>{retry ? 'Repository provisioning failed safely' : 'Repository setup confirmed'}</h2>
+      <p>{retry
+        ? 'The failed attempt is durable. The unknown or incomplete target was not adopted, and a new exact operation may retry from the current authority.'
+        : 'The exact setup authority was recorded. Provisioning has not run.'}</p>
+      <dl>
+        <div><dt>Binding state</dt><dd>{binding.bindingState}</dd></div>
+        <div><dt>Planned target</dt><dd>{binding.canonicalPath}</dd></div>
+        <div><dt>Setup confirmation</dt><dd><code>{confirmationId}</code></dd></div>
+        <div><dt>Binding revision</dt><dd>{binding.revision}</dd></div>
+        <div><dt>Profile revision</dt><dd>{profile.revision}</dd></div>
+        {latestAttempt?.failureCode ? <div><dt>Failure code</dt><dd><code>{latestAttempt.failureCode}</code></dd></div> : null}
+        <div><dt>Project lifecycle</dt><dd>{lifecycle}</dd></div>
+        <div><dt>Execution readiness</dt><dd>{readiness}</dd></div>
+      </dl>
+      <div className="fl-project-setup__safety-boundary">
+        <strong>Provisioning boundary</strong>
+        <p>The repository directory was not created by setup confirmation. Provisioning creates only the pinned source shell and a clean Git repository. It does not restore, build, test, index code, run sandbox validation, or authorize Builder. Builder is not authorized, and execution readiness remains NotConfigured.</p>
+      </div>
+      {errorMessage ? <div className="fl-error" role="alert">{errorMessage}</div> : null}
+      <div className="fl-project-setup__task-actions">
+        <button className="fl-btn" type="button" disabled={busy} onClick={onContinue}>Continue to project</button>
+        <button
+          className="fl-btn fl-pri"
+          type="button"
+          data-testid="repositorySetup.provision"
+          disabled={busy}
+          onClick={onProvision}
+        >
+          {busy ? 'Provisioning repository...' : retry ? 'Retry repository provisioning' : 'Provision repository'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ProvisioningRecovery({
+  attempt,
+  active,
+  busy,
+  errorMessage,
+  onRetry
+}: {
+  attempt: PendingProvisioning;
+  active: boolean;
+  busy: boolean;
+  errorMessage: string | null;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="fl-project-setup__next" data-testid="repositorySetup.recoverProvisioning">
+      <span className="fl-eyebrow">Unresolved provisioning delivery</span>
+      <h2>{active ? 'Repository provisioning is in progress' : 'Retry the exact repository provisioning operation'}</h2>
+      <p>{active
+        ? 'The durable attempt is active. Retry its exact operation with the current Workbench fence to recover the authoritative result.'
+        : 'IronDev could not determine whether the prior operation completed. No different target, plan, revision, or operation can replace it in this browser session.'}</p>
+      <dl className="fl-repository-setup__plan">
+        <PlanRow label="Operation ID" value={attempt.clientOperationId} code testId="repositorySetup.provisioningRecovery.operation" />
+        <PlanRow label="Setup confirmation" value={attempt.setupConfirmationId} code />
+        <PlanRow label="Expected binding revision" value={String(attempt.expectedRepositoryBindingRevision)} />
+        <PlanRow label="Expected profile revision" value={String(attempt.expectedExecutionProfileRevision)} />
+        <PlanRow label="Workbench session" value={String(attempt.workbenchSessionId)} />
+        <PlanRow label="Lease epoch" value={String(attempt.leaseEpoch)} />
+      </dl>
+      <div className="fl-project-setup__safety-boundary">
+        <strong>Exact replay only</strong>
+        <p>The request contains no browser-supplied path, template, command, branch, or cleanup policy.</p>
+      </div>
+      {errorMessage ? <div className="fl-error" role="alert">{errorMessage}</div> : null}
+      <button
+        className="fl-btn fl-pri"
+        type="button"
+        data-testid="repositorySetup.retryProvisioning"
+        disabled={busy}
+        onClick={onRetry}
+      >
+        {busy ? 'Retrying exact operation...' : 'Retry same provisioning operation'}
+      </button>
+    </section>
+  );
+}
+
+function ProvisioningProgress({
+  latestAttempt,
+  errorMessage,
+  onContinue
+}: {
+  latestAttempt: RepositoryProvisioningAttemptSnapshot | null;
+  errorMessage: string | null;
+  onContinue: () => void;
+}) {
+  return (
+    <section className="fl-project-setup__next" data-testid="repositorySetup.provisioningProgress">
+      <span className="fl-eyebrow">Controlled provisioning</span>
+      <h2>Repository provisioning is in progress</h2>
+      <p>IronDev has claimed this exact confirmed authority. A second provisioning operation is not available while it is active.</p>
+      {latestAttempt ? (
+        <dl className="fl-repository-setup__plan">
+          <PlanRow label="Attempt" value={String(latestAttempt.attemptNumber)} />
+          <PlanRow label="Attempt ID" value={latestAttempt.attemptId} code />
+          <PlanRow label="Started" value={latestAttempt.startedAtUtc} />
+        </dl>
+      ) : null}
+      <div className="fl-project-setup__safety-boundary">
+        <strong>Source and Git only</strong>
+        <p>No restore, build, test, index, sandbox validation, or Builder authorization runs in this operation.</p>
+      </div>
+      {errorMessage ? <div className="fl-error" role="alert">{errorMessage}</div> : null}
+      <button className="fl-btn" type="button" onClick={onContinue}>Continue to project</button>
+    </section>
+  );
+}
+
+function QualifiedRepository({
+  binding,
+  provisioning,
+  latestAttempt,
   lifecycle,
   readiness,
   onContinue
 }: {
   binding: RepositoryBindingSnapshot;
+  provisioning: RepositoryProvisioningResult | null;
+  latestAttempt: RepositoryProvisioningAttemptSnapshot | null;
   lifecycle: string;
   readiness: string;
   onContinue: () => void;
 }) {
+  const branchName = provisioning?.branchName ?? latestAttempt?.branchName ?? binding.defaultBranch ?? '';
+  const baselineCommit = provisioning?.baselineCommit ?? latestAttempt?.baselineCommit ?? binding.baselineCommit ?? '';
   return (
-    <section className="fl-project-setup__ready fl-repository-setup__confirmed" data-testid="repositorySetup.confirmed">
+    <section className="fl-project-setup__ready fl-repository-setup__confirmed" data-testid="repositorySetup.qualified">
       <p className="fl-project-setup__ready-mark" aria-hidden="true">OK</p>
-      <h2>Repository setup confirmed</h2>
-      <p>The exact setup authority was recorded. Provisioning has not run.</p>
+      <h2>Repository shell provisioned</h2>
+      <p>The pinned source shell and controlled Git baseline were installed at the server-derived target.</p>
       <dl>
         <div><dt>Binding state</dt><dd>{binding.bindingState}</dd></div>
-        <div><dt>Planned target</dt><dd>{binding.canonicalPath}</dd></div>
+        <div><dt>Repository / projected local path</dt><dd>{binding.canonicalPath}</dd></div>
+        <div><dt>Default branch</dt><dd><code>{branchName}</code></dd></div>
+        <div><dt>Baseline commit</dt><dd><code>{baselineCommit}</code></dd></div>
+        {provisioning ? <div><dt>Manifest SHA-256</dt><dd><code>{provisioning.manifestSha256}</code></dd></div> : null}
+        {provisioning ? <div><dt>Git tree ID</dt><dd><code>{provisioning.gitTreeId}</code></dd></div> : null}
         <div><dt>Project lifecycle</dt><dd>{lifecycle}</dd></div>
         <div><dt>Execution readiness</dt><dd>{readiness}</dd></div>
       </dl>
       <div className="fl-project-setup__safety-boundary">
-        <strong>No execution authority was granted</strong>
-        <p>The repository directory was not created. Builder is not authorized. A later provisioning workflow must perform and validate filesystem work.</p>
+        <strong>Technical readiness is still separate</strong>
+        <p>Qualified means the repository artifact and Git baseline were verified. IronDev has not restored, built, tested, indexed, run sandbox validation, or authorized Builder. Execution readiness remains NotConfigured.</p>
       </div>
       <button className="fl-btn fl-pri" type="button" onClick={onContinue}>Continue to project</button>
     </section>

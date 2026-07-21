@@ -219,6 +219,15 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                 SET RevokedAtUtc=SYSUTCDATETIME()
                 WHERE TenantId=@TenantId AND ProjectId=@ProjectId
                   AND RevokedAtUtc IS NULL AND ExpiresAtUtc <= SYSUTCDATETIME();
+
+                UPDATE lease
+                SET RevokedAtUtc=SYSUTCDATETIME()
+                FROM dbo.WorkbenchWriteLeases lease
+                INNER JOIN dbo.WorkbenchSessions session
+                    ON session.TenantId=lease.TenantId AND session.ProjectId=lease.ProjectId
+                   AND session.Id=lease.WorkbenchSessionId
+                WHERE lease.TenantId=@TenantId AND lease.ProjectId=@ProjectId
+                  AND lease.RevokedAtUtc IS NULL AND session.Status<>N'Active';
                 """,
                 command,
                 transaction,
@@ -232,7 +241,7 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                     ON session.TenantId=lease.TenantId AND session.ProjectId=lease.ProjectId
                    AND session.Id=lease.WorkbenchSessionId
                 WHERE lease.TenantId=@TenantId AND lease.ProjectId=@ProjectId
-                  AND lease.RevokedAtUtc IS NULL;
+                  AND lease.RevokedAtUtc IS NULL AND session.Status=N'Active';
                 """,
                 command,
                 transaction,

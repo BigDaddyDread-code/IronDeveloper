@@ -375,6 +375,23 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.ProjectRenameProposals', 'U') IS NOT NULL DELETE FROM dbo.ProjectRenameProposals;
             IF OBJECT_ID('dbo.ProjectUnderstandings', 'U') IS NOT NULL DELETE FROM dbo.ProjectUnderstandings;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultRepositoryProvisioningAttemptId') IS NOT NULL
+               AND COL_LENGTH('dbo.ClientOperations', 'ResultRepositoryProvisioningReceiptId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
+                    SET ResultRepositoryProvisioningReceiptId=NULL,
+                        ResultRepositoryProvisioningAttemptId=NULL;';
+            IF OBJECT_ID('dbo.RepositoryProvisioningReceipts', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_RepositoryProvisioningReceipts_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_RepositoryProvisioningReceipts_AppendOnly
+                        ON dbo.RepositoryProvisioningReceipts;
+                DELETE FROM dbo.RepositoryProvisioningReceipts;
+                IF OBJECT_ID('dbo.TR_RepositoryProvisioningReceipts_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_RepositoryProvisioningReceipts_AppendOnly
+                        ON dbo.RepositoryProvisioningReceipts;
+            END;
+            IF OBJECT_ID('dbo.RepositoryProvisioningAttempts', 'U') IS NOT NULL
+                DELETE FROM dbo.RepositoryProvisioningAttempts;
             IF OBJECT_ID('dbo.RepositorySetupConfirmations', 'U') IS NOT NULL
             BEGIN
                 IF OBJECT_ID('dbo.TR_RepositorySetupConfirmations_AppendOnly', 'TR') IS NOT NULL
@@ -454,6 +471,7 @@ public abstract class IntegrationTestBase
         await connection.ExecuteAsync(sql);
         await ApplySqlFileAsync(connection, "Database", "migrate_work_item_identity.sql");
         await ApplySqlFileAsync(connection, "Database", "migrate_workbench_repository_setup.sql");
+        await ApplySqlFileAsync(connection, "Database", "migrate_workbench_repository_provisioning.sql");
     }
 
     protected async Task<MemoryRetrievalRequestContext> CreateMemoryRetrievalContextAsync(
