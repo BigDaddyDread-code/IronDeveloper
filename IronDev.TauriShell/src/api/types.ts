@@ -308,6 +308,78 @@ export interface RepositoryProvisioningResult {
   gitTreeId: string;
 }
 
+export type SandboxCapabilityState =
+  | 'Available'
+  | 'Disabled'
+  | 'UnsupportedHost'
+  | 'Unavailable'
+  | 'Unsafe';
+
+export interface SandboxCapability {
+  state: SandboxCapabilityState;
+  reasonCode: string;
+  message: string;
+  policyVersion: string;
+  policySha256: string | null;
+}
+
+export type SandboxQualificationState =
+  | 'Running'
+  | 'Passed'
+  | 'Failed'
+  | 'Cancelled'
+  | 'Recovered';
+
+export interface WorkbenchSandboxRepositoryAuthority {
+  repositoryBindingId: string;
+  repositoryBindingRevision: number;
+  projectExecutionProfileId: string;
+  projectExecutionProfileRevision: number;
+  baselineCommit: string;
+}
+
+export interface SandboxQualificationAttemptSnapshot {
+  attemptId: string;
+  clientOperationId: string;
+  state: SandboxQualificationState;
+  canRecover: boolean;
+  repositoryBindingId: string;
+  expectedRepositoryBindingRevision: number;
+  projectExecutionProfileId: string;
+  expectedExecutionProfileRevision: number;
+  baselineCommit: string;
+  startedAtUtc: string;
+  completedAtUtc: string | null;
+  evidenceManifestSha256: string | null;
+  failureCode: string | null;
+  safeSummary: string | null;
+}
+
+export interface WorkbenchSandboxContext {
+  projectId: number;
+  projectLifecyclePhase: string;
+  executionReadiness: string;
+  repositoryAuthority: WorkbenchSandboxRepositoryAuthority | null;
+  capability: SandboxCapability;
+  latestAttempt: SandboxQualificationAttemptSnapshot | null;
+}
+
+export interface StartSandboxQualificationRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+  expectedRepositoryBindingRevision: number;
+  expectedExecutionProfileRevision: number;
+}
+
+export interface WorkbenchSandboxQualificationResult {
+  projectId: number;
+  clientOperationId: string;
+  isReplay: boolean;
+  capability: SandboxCapability;
+  attempt: SandboxQualificationAttemptSnapshot;
+}
+
 export type ProjectUnderstandingFactState = 'Unknown' | 'Inferred' | 'Confirmed' | 'Conflicted';
 
 export interface ProjectUnderstandingFact {

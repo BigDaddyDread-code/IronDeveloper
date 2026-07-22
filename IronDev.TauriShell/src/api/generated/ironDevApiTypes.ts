@@ -11739,6 +11739,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/repository/sandbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkbenchSandboxContext"];
+                        "application/json": components["schemas"]["WorkbenchSandboxContext"];
+                        "text/json": components["schemas"]["WorkbenchSandboxContext"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/repository/sandbox-qualifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartSandboxQualificationRequest"];
+                    "text/json": components["schemas"]["StartSandboxQualificationRequest"];
+                    "application/*+json": components["schemas"]["StartSandboxQualificationRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkbenchSandboxQualificationResult"];
+                        "application/json": components["schemas"]["WorkbenchSandboxQualificationResult"];
+                        "text/json": components["schemas"]["WorkbenchSandboxQualificationResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workbench/projects/{projectId}/repository/provisionings": {
         parameters: {
             query?: never;
@@ -18073,6 +18157,37 @@ export interface components {
             reviewId: string | null;
             result: components["schemas"]["TicketReviewResult"];
         };
+        SandboxCapability: {
+            state?: string | null;
+            reasonCode?: string | null;
+            message?: string | null;
+            policyVersion?: string | null;
+            policySha256?: string | null;
+        };
+        SandboxQualificationAttemptSnapshot: {
+            /** Format: uuid */
+            attemptId?: string;
+            /** Format: uuid */
+            clientOperationId?: string;
+            state?: string | null;
+            /** Format: uuid */
+            repositoryBindingId?: string;
+            /** Format: int64 */
+            expectedRepositoryBindingRevision?: number;
+            /** Format: uuid */
+            projectExecutionProfileId?: string;
+            /** Format: int64 */
+            expectedExecutionProfileRevision?: number;
+            baselineCommit?: string | null;
+            /** Format: date-time */
+            startedAtUtc?: string;
+            /** Format: date-time */
+            completedAtUtc?: string | null;
+            evidenceManifestSha256?: string | null;
+            failureCode?: string | null;
+            safeSummary?: string | null;
+            canRecover?: boolean;
+        };
         SaveDiscussionRequest: {
             title: string | null;
             content: string | null;
@@ -19114,6 +19229,18 @@ export interface components {
             isReplay?: boolean;
             readonly repositoryBinding?: unknown;
         };
+        StartSandboxQualificationRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            expectedRepositoryBindingRevision?: number;
+            /** Format: int64 */
+            expectedExecutionProfileRevision?: number;
+        };
         StartTicketBuildRunRequest: {
             /** Format: uuid */
             workflowRunId?: string | null;
@@ -19738,6 +19865,35 @@ export interface components {
             /** Format: uuid */
             clientOperationId?: string;
             repositoryBinding?: components["schemas"]["RepositoryBindingSnapshot"];
+        };
+        WorkbenchSandboxContext: {
+            /** Format: int32 */
+            projectId?: number;
+            projectLifecyclePhase?: string | null;
+            executionReadiness?: string | null;
+            repositoryAuthority?: components["schemas"]["WorkbenchSandboxRepositoryAuthority"];
+            capability?: components["schemas"]["SandboxCapability"];
+            latestAttempt?: components["schemas"]["SandboxQualificationAttemptSnapshot"];
+        };
+        WorkbenchSandboxQualificationResult: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            isReplay?: boolean;
+            capability?: components["schemas"]["SandboxCapability"];
+            attempt?: components["schemas"]["SandboxQualificationAttemptSnapshot"];
+        };
+        WorkbenchSandboxRepositoryAuthority: {
+            /** Format: uuid */
+            repositoryBindingId?: string;
+            /** Format: int64 */
+            repositoryBindingRevision?: number;
+            /** Format: uuid */
+            projectExecutionProfileId?: string;
+            /** Format: int64 */
+            projectExecutionProfileRevision?: number;
+            baselineCommit?: string | null;
         };
         WorkflowAuthorityFlagsDto: {
             grantsApproval?: boolean;

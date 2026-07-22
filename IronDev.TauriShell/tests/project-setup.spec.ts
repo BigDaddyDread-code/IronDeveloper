@@ -14,6 +14,12 @@ const RECEIPT_ID = '55555555-5555-4555-8555-555555555555';
 const BASELINE_COMMIT = '1'.repeat(40);
 const TREE_ID = '2'.repeat(40);
 const MANIFEST_SHA = 'f'.repeat(64);
+const SANDBOX_POLICY_SHA = '9'.repeat(64);
+const SANDBOX_EVIDENCE_SHA = '8'.repeat(64);
+const SANDBOX_ATTEMPT_ID = '99999999-9999-4999-8999-999999999999';
+const SANDBOX_OPERATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const OTHER_BINDING_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const OTHER_PROFILE_AUTHORITY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 type Compatibility = 'Compatible' | 'Incompatible' | 'NeedsConfirmation' | 'NoPreference';
 type PlanState = 'ReadyForConfirmation' | 'UnsupportedProfile' | 'EnvironmentUnavailable' | 'NeedsConfirmation';
@@ -22,6 +28,7 @@ interface MockState {
   planBodies: Array<Record<string, unknown>>;
   confirmationBodies: Array<Record<string, unknown>>;
   provisioningBodies: Array<Record<string, unknown>>;
+  sandboxQualificationBodies: Array<Record<string, unknown>>;
   oldSetupRequests: string[];
 }
 
@@ -42,6 +49,14 @@ interface MockOptions {
     requestNumber: number
   ) => Promise<void> | void;
   onProvisioning?: (
+    route: Route,
+    body: Record<string, unknown>,
+    projectId: number,
+    requestNumber: number
+  ) => Promise<void> | void;
+  sandboxContext?: (projectId: number) => unknown;
+  onSandboxContext?: (route: Route, projectId: number, requestNumber: number) => Promise<void> | void;
+  onSandboxQualification?: (
     route: Route,
     body: Record<string, unknown>,
     projectId: number,
@@ -315,6 +330,87 @@ function provisioningResult(body: Record<string, unknown>, projectId = 7, isRepl
   };
 }
 
+function sandboxCapability(state: 'Available' | 'Disabled' | 'UnsupportedHost' | 'Unavailable' | 'Unsafe' = 'Available') {
+  return {
+    state,
+    reasonCode: state === 'Available' ? 'SandboxReady' : `Sandbox${state}`,
+    message: state === 'Available'
+      ? 'The production sandbox policy is configured for this exact authority.'
+      : 'The production sandbox is not configured in this environment.',
+    policyVersion: 'irondev-workbench-sandbox-v0.1-policy-1',
+    policySha256: state === 'Available' ? SANDBOX_POLICY_SHA : null
+  };
+}
+
+function sandboxAttempt(
+  state: 'Running' | 'Passed' | 'Failed' | 'Cancelled' | 'Recovered',
+  operationId = SANDBOX_OPERATION_ID,
+  canRecover = state === 'Running'
+) {
+  const terminal = state !== 'Running';
+  const passed = state === 'Passed';
+  return {
+    attemptId: SANDBOX_ATTEMPT_ID,
+    clientOperationId: operationId,
+    state,
+    canRecover,
+    repositoryBindingId: BINDING_ID,
+    expectedRepositoryBindingRevision: 3,
+    projectExecutionProfileId: PROFILE_AUTHORITY_ID,
+    expectedExecutionProfileRevision: 1,
+    baselineCommit: BASELINE_COMMIT,
+    startedAtUtc: '2026-07-22T03:00:00Z',
+    completedAtUtc: terminal ? '2026-07-22T03:04:00Z' : null,
+    evidenceManifestSha256: passed ? SANDBOX_EVIDENCE_SHA : null,
+    failureCode: terminal && !passed ? 'SandboxExecutionRejected' : null,
+    safeSummary: terminal
+      ? passed
+        ? 'The production sandbox qualification completed with teardown confirmed.'
+        : 'Sandbox qualification stopped safely before it produced passing evidence.'
+      : null
+  };
+}
+
+function workbenchSandboxContext(
+  projectId = 7,
+  capabilityState: 'Available' | 'Disabled' | 'UnsupportedHost' | 'Unavailable' | 'Unsafe' = 'Available',
+  latestAttempt: ReturnType<typeof sandboxAttempt> | null = null
+) {
+  return {
+    projectId,
+    projectLifecyclePhase: 'Shaping',
+    executionReadiness: 'NotConfigured',
+    repositoryAuthority: {
+      repositoryBindingId: BINDING_ID,
+      repositoryBindingRevision: 3,
+      projectExecutionProfileId: PROFILE_AUTHORITY_ID,
+      projectExecutionProfileRevision: 1,
+      baselineCommit: BASELINE_COMMIT
+    },
+    capability: sandboxCapability(capabilityState),
+    latestAttempt
+  };
+}
+
+function sandboxQualificationResult(
+  body: Record<string, unknown>,
+  projectId = 7,
+  isReplay = false,
+  state: 'Passed' | 'Failed' | 'Cancelled' | 'Recovered' = 'Passed'
+) {
+  return {
+    projectId,
+    clientOperationId: body.clientOperationId,
+    isReplay,
+    capability: state === 'Passed' ? sandboxCapability('Available') : sandboxCapability('Unavailable'),
+    attempt: {
+      ...sandboxAttempt(state, String(body.clientOperationId)),
+      expectedRepositoryBindingRevision: body.expectedRepositoryBindingRevision,
+      expectedExecutionProfileRevision: body.expectedExecutionProfileRevision
+    }
+  };
+}
+
 async function json(route: Route, body: unknown, status = 200) {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
@@ -326,11 +422,19 @@ function projectIdFrom(route: Route): number {
 }
 
 async function mockRepositorySetup(page: Page, options: MockOptions = {}): Promise<MockState> {
-  const state: MockState = { planBodies: [], confirmationBodies: [], provisioningBodies: [], oldSetupRequests: [] };
+  const state: MockState = {
+    planBodies: [],
+    confirmationBodies: [],
+    provisioningBodies: [],
+    sandboxQualificationBodies: [],
+    oldSetupRequests: []
+  };
   let planRequests = 0;
   let confirmationRequests = 0;
   let provisioningRequests = 0;
   let contextRequests = 0;
+  let sandboxContextRequests = 0;
+  let sandboxQualificationRequests = 0;
 
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
@@ -392,6 +496,22 @@ async function mockRepositorySetup(page: Page, options: MockOptions = {}): Promi
     if (options.onContext) return options.onContext(route, projectId, contextRequests);
     await json(route, options.context?.(projectId) ?? repositoryContext(projectId));
   });
+  await page.route('**/irondev-api/api/workbench/projects/*/repository/sandbox', async (route) => {
+    sandboxContextRequests += 1;
+    const projectId = projectIdFrom(route);
+    if (options.onSandboxContext) return options.onSandboxContext(route, projectId, sandboxContextRequests);
+    await json(route, options.sandboxContext?.(projectId) ?? workbenchSandboxContext(projectId));
+  });
+  await page.route('**/irondev-api/api/workbench/projects/*/repository/sandbox-qualifications', async (route) => {
+    sandboxQualificationRequests += 1;
+    const projectId = projectIdFrom(route);
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    state.sandboxQualificationBodies.push(body);
+    if (options.onSandboxQualification) {
+      return options.onSandboxQualification(route, body, projectId, sandboxQualificationRequests);
+    }
+    await json(route, sandboxQualificationResult(body, projectId));
+  });
   await page.route('**/irondev-api/api/workbench/projects/*/repository/setup-plans', async (route) => {
     planRequests += 1;
     const projectId = projectIdFrom(route);
@@ -429,6 +549,39 @@ async function openSetup(page: Page, projectId = 7) {
 async function openReadyPlan(page: Page) {
   await page.getByTestId('repositorySetup.reviewPlan').click();
   await expect(page.getByTestId('repositorySetup.review')).toBeVisible();
+}
+
+async function seedSandboxRecoveryReceipt(page: Page, options: {
+  projectId?: number;
+  userId?: number;
+  workbenchSessionId?: number;
+  leaseEpoch?: number;
+  clientOperationId?: string;
+  repositoryBindingId?: string;
+  expectedRepositoryBindingRevision?: number;
+  projectExecutionProfileId?: string;
+  expectedExecutionProfileRevision?: number;
+  baselineCommit?: string;
+} = {}) {
+  const projectId = options.projectId ?? 7;
+  const userId = options.userId ?? 7;
+  await page.addInitScript(({ key, receipt }) => {
+    window.sessionStorage.setItem(key, JSON.stringify(receipt));
+  }, {
+    key: `irondev.sandbox-qualification:${userId}:${projectId}`,
+    receipt: {
+      projectId,
+      userId,
+      workbenchSessionId: options.workbenchSessionId ?? 7007,
+      leaseEpoch: options.leaseEpoch ?? 1,
+      clientOperationId: options.clientOperationId ?? SANDBOX_OPERATION_ID,
+      repositoryBindingId: options.repositoryBindingId ?? BINDING_ID,
+      expectedRepositoryBindingRevision: options.expectedRepositoryBindingRevision ?? 3,
+      projectExecutionProfileId: options.projectExecutionProfileId ?? PROFILE_AUTHORITY_ID,
+      expectedExecutionProfileRevision: options.expectedExecutionProfileRevision ?? 1,
+      baselineCommit: options.baselineCommit ?? BASELINE_COMMIT
+    }
+  });
 }
 
 test('supported or explicitly selected profile produces a complete read-only setup review', async ({ page }) => {
@@ -688,7 +841,7 @@ test('complete SetupConfirmed authority can provision only by immutable ids and 
   await expect(qualified).toContainText('NotConfigured');
   await expect(qualified).toContainText(BASELINE_COMMIT);
   await expect(qualified).toContainText(TREE_ID);
-  await expect(qualified).toContainText('has not restored, built, tested, indexed');
+  await expect(qualified).toContainText('Repository qualification did not itself restore, build, test, index');
 
   expect(Object.keys(state.provisioningBodies[0]).sort()).toEqual([
     'clientOperationId',
@@ -1049,4 +1202,334 @@ test('unconfigured and legacy-unverified projects never show provisioning author
   await expect(page.getByTestId('repositorySetup.legacy')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('repositorySetup.provision')).toHaveCount(0);
   expect(state.provisioningBodies).toHaveLength(0);
+});
+
+test('qualified repository runs sandbox qualification only with exact server authority', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified')
+  });
+  await openSetup(page);
+
+  const sandbox = page.getByTestId('repositorySetup.sandbox');
+  await expect(sandbox).toContainText('Available');
+  await expect(sandbox).toContainText('NotConfigured');
+  await page.getByTestId('repositorySetup.qualifySandbox').click();
+
+  const attempt = page.getByTestId('repositorySetup.sandboxAttempt');
+  await expect(attempt).toContainText('Passed');
+  await expect(attempt).toContainText(SANDBOX_EVIDENCE_SHA);
+  await expect(attempt).toContainText('teardown confirmed');
+  await expect(attempt).toContainText('Confirmed before passing evidence was published');
+  await expect(sandbox).toContainText('does not change execution readiness');
+  await expect(sandbox).toContainText('grant Builder authorization');
+  await expect(page.getByTestId('repositorySetup.qualified')).toContainText('Any sandbox evidence shown below comes from the separate qualification step');
+
+  expect(state.sandboxQualificationBodies).toHaveLength(1);
+  expect(Object.keys(state.sandboxQualificationBodies[0]).sort()).toEqual([
+    'clientOperationId',
+    'expectedExecutionProfileRevision',
+    'expectedRepositoryBindingRevision',
+    'leaseEpoch',
+    'workbenchSessionId'
+  ]);
+  expect(state.sandboxQualificationBodies[0]).toMatchObject({
+    workbenchSessionId: 7007,
+    leaseEpoch: 1,
+    expectedRepositoryBindingRevision: 3,
+    expectedExecutionProfileRevision: 1
+  });
+  expect(String(state.sandboxQualificationBodies[0].clientOperationId)).toMatch(/^[0-9a-f-]{36}$/i);
+});
+
+test('disabled sandbox is a nonblocking repository capability with no execution action', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(projectId, 'Disabled')
+  });
+  await openSetup(page);
+
+  const sandbox = page.getByTestId('repositorySetup.sandbox');
+  await expect(sandbox).toContainText('Disabled');
+  await expect(sandbox).toContainText('not available in this environment');
+  await expect(sandbox).toContainText('continue shaping the project and creating tickets');
+  await expect(page.getByTestId('repositorySetup.qualifySandbox')).toHaveCount(0);
+  await expect(page.getByTestId('repositorySetup.retrySandboxQualification')).toHaveCount(0);
+  await expect(page.getByTestId('repositorySetup.qualified')).toBeVisible();
+  expect(state.sandboxQualificationBodies).toHaveLength(0);
+});
+
+test('ambiguous sandbox delivery preserves and replays one exact client operation across reload', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    onSandboxQualification: (route, body, projectId, requestNumber) => {
+      if (requestNumber === 1) {
+        return json(route, {
+          ...sandboxQualificationResult(body, projectId),
+          attempt: { ...sandboxQualificationResult(body, projectId).attempt, evidenceManifestSha256: 'not-a-hash' }
+        });
+      }
+      if (requestNumber === 2) return json(route, { error: 'gateway_incomplete' }, 500);
+      return json(route, sandboxQualificationResult(body, projectId, true));
+    }
+  });
+  await openSetup(page);
+  await page.getByTestId('repositorySetup.qualifySandbox').click();
+
+  const recovery = page.getByTestId('repositorySetup.sandboxRecovery');
+  await expect(recovery).toBeVisible();
+  const operationId = String(state.sandboxQualificationBodies[0].clientOperationId);
+  await expect(page.getByTestId('repositorySetup.sandboxRecovery.operation')).toContainText(operationId);
+  await page.reload();
+  await expect(page.getByTestId('repositorySetup.retrySandboxQualification')).toBeVisible({ timeout: 15_000 });
+
+  await page.getByTestId('repositorySetup.retrySandboxQualification').click();
+  await expect(page.getByTestId('repositorySetup.retrySandboxQualification')).toBeVisible();
+  await page.getByTestId('repositorySetup.retrySandboxQualification').click();
+  await expect(page.getByTestId('repositorySetup.sandboxAttempt')).toContainText('Passed');
+
+  expect(state.sandboxQualificationBodies).toHaveLength(3);
+  expect(state.sandboxQualificationBodies[1]).toEqual(state.sandboxQualificationBodies[0]);
+  expect(state.sandboxQualificationBodies[2]).toEqual(state.sandboxQualificationBodies[0]);
+  const pendingKeys = await page.evaluate(() => Object.keys(sessionStorage)
+    .filter((key) => key.startsWith('irondev.sandbox-qualification')));
+  expect(pendingKeys).toEqual([]);
+});
+
+test('in-progress response enables recovery only after GET confirms the same actor and exact operation', async ({ page }) => {
+  let operationId: string | null = null;
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    onSandboxContext: (route, projectId, requestNumber) => json(
+      route,
+      workbenchSandboxContext(
+        projectId,
+        'Available',
+        requestNumber > 1 && operationId ? sandboxAttempt('Running', operationId, true) : null
+      )
+    ),
+    onSandboxQualification: (route, body, projectId, requestNumber) => {
+      if (requestNumber === 1) {
+        operationId = String(body.clientOperationId);
+        return json(route, {
+          error: 'sandbox_qualification_in_progress',
+          message: 'A sandbox qualification is already in progress.'
+        }, 409);
+      }
+      return json(route, sandboxQualificationResult(body, projectId, true));
+    }
+  });
+  await openSetup(page);
+  await page.getByTestId('repositorySetup.qualifySandbox').click();
+
+  await expect(page.getByTestId('repositorySetup.retrySandboxQualification')).toBeVisible();
+  await expect(page.getByTestId('repositorySetup.sandboxRecovery.operation')).toContainText(operationId!);
+  await expect(page.getByRole('alert')).toContainText('server confirmed this actor owns the exact durable qualification');
+  await page.getByTestId('repositorySetup.retrySandboxQualification').click();
+  await expect(page.getByTestId('repositorySetup.sandboxAttempt')).toContainText('Passed');
+
+  expect(state.sandboxQualificationBodies).toHaveLength(2);
+  expect(state.sandboxQualificationBodies[1]).toEqual(state.sandboxQualificationBodies[0]);
+});
+
+test('in-progress response from another actor never becomes an exact recovery affordance', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    onSandboxContext: (route, projectId, requestNumber) => json(
+      route,
+      workbenchSandboxContext(
+        projectId,
+        'Available',
+        requestNumber > 1 ? sandboxAttempt('Running', SANDBOX_OPERATION_ID, false) : null
+      )
+    ),
+    onSandboxQualification: (route) => json(route, {
+      error: 'sandbox_qualification_in_progress',
+      message: 'A sandbox qualification is already in progress.'
+    }, 409)
+  });
+  await openSetup(page);
+  await page.getByTestId('repositorySetup.qualifySandbox').click();
+
+  await expect(page.getByRole('alert')).toContainText('not this actor’s exact durable operation');
+  await expect(page.getByTestId('repositorySetup.retrySandboxQualification')).toHaveCount(0);
+  await expect(page.getByTestId('repositorySetup.qualifySandbox')).toHaveCount(0);
+  expect(state.sandboxQualificationBodies).toHaveLength(1);
+  const pendingKeys = await page.evaluate(() => Object.keys(sessionStorage)
+    .filter((key) => key.startsWith('irondev.sandbox-qualification')));
+  expect(pendingKeys).toEqual([]);
+});
+
+test('durable Running sandbox attempt reconstructs exact recovery under the current Workbench fence', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    authority: () => ({ workbenchSessionId: 9009, leaseEpoch: 9 }),
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(projectId, 'Available', sandboxAttempt('Running')),
+    onSandboxQualification: (route, body, projectId) => json(route, sandboxQualificationResult(body, projectId, true))
+  });
+  await openSetup(page);
+
+  const recovery = page.getByTestId('repositorySetup.sandboxRecovery');
+  await expect(recovery).toContainText(SANDBOX_OPERATION_ID);
+  await expect(page.getByTestId('repositorySetup.qualifySandbox')).toHaveCount(0);
+  await page.getByTestId('repositorySetup.retrySandboxQualification').click();
+  await expect(page.getByTestId('repositorySetup.sandboxAttempt')).toContainText('Passed');
+
+  expect(state.sandboxQualificationBodies).toHaveLength(1);
+  expect(state.sandboxQualificationBodies[0]).toEqual({
+    workbenchSessionId: 9009,
+    leaseEpoch: 9,
+    clientOperationId: SANDBOX_OPERATION_ID,
+    expectedRepositoryBindingRevision: 3,
+    expectedExecutionProfileRevision: 1
+  });
+});
+
+test('ambiguous local sandbox receipt keeps its operation while migrating to a new Workbench fence', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    authority: () => ({ workbenchSessionId: 9009, leaseEpoch: 9 }),
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    onSandboxQualification: (route, body, projectId) => json(route, sandboxQualificationResult(body, projectId, true))
+  });
+  await seedSandboxRecoveryReceipt(page, {
+    workbenchSessionId: 7007,
+    leaseEpoch: 1
+  });
+  await openSetup(page);
+
+  await expect(page.getByTestId('repositorySetup.sandboxRecovery.operation')).toContainText(SANDBOX_OPERATION_ID);
+  await page.getByTestId('repositorySetup.retrySandboxQualification').click();
+  await expect(page.getByTestId('repositorySetup.sandboxAttempt')).toContainText('Passed');
+
+  expect(state.sandboxQualificationBodies).toHaveLength(1);
+  expect(state.sandboxQualificationBodies[0]).toEqual({
+    workbenchSessionId: 9009,
+    leaseEpoch: 9,
+    clientOperationId: SANDBOX_OPERATION_ID,
+    expectedRepositoryBindingRevision: 3,
+    expectedExecutionProfileRevision: 1
+  });
+});
+
+test('another actor running sandbox attempt stays visible but cannot be replayed without an owned receipt', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(
+      projectId,
+      'Available',
+      sandboxAttempt('Running', SANDBOX_OPERATION_ID, false)
+    )
+  });
+  await openSetup(page);
+
+  await expect(page.getByTestId('repositorySetup.sandboxAttempt')).toContainText('Running');
+  await expect(page.getByRole('alert')).toContainText('Only the actor who started that operation can recover it');
+  await expect(page.getByTestId('repositorySetup.retrySandboxQualification')).toHaveCount(0);
+  await expect(page.getByTestId('repositorySetup.qualifySandbox')).toHaveCount(0);
+  expect(state.sandboxQualificationBodies).toHaveLength(0);
+});
+
+for (const [authorityPart, staleAuthority] of [
+  ['repository binding identity', { repositoryBindingId: OTHER_BINDING_ID }],
+  ['execution profile identity', { projectExecutionProfileId: OTHER_PROFILE_AUTHORITY_ID }],
+  ['baseline commit', { baselineCommit: '3'.repeat(40) }]
+] as const) {
+  test(`terminal sandbox evidence with stale ${authorityPart} is clearly historical`, async ({ page }) => {
+    const staleAttempt = {
+      ...sandboxAttempt('Passed'),
+      ...staleAuthority
+    };
+    await mockRepositorySetup(page, {
+      context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+      sandboxContext: (projectId) => workbenchSandboxContext(projectId, 'Available', staleAttempt)
+    });
+    await openSetup(page);
+
+    await expect(page.getByTestId('repositorySetup.sandboxAttempt')).toContainText('Historical qualification attempt');
+    await expect(page.getByTestId('repositorySetup.sandboxHistoricalEvidence')).toContainText('not passing evidence for the current authority');
+    await expect(page.getByTestId('repositorySetup.qualifySandbox')).toBeVisible();
+  });
+}
+
+test('terminal sandbox attempt claiming recoverability is rejected as malformed', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(
+      projectId,
+      'Available',
+      sandboxAttempt('Passed', SANDBOX_OPERATION_ID, true)
+    )
+  });
+  await openSetup(page);
+
+  await expect(page.getByTestId('repositorySetup.sandboxUnavailable')).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Workbench sandbox context returned an invalid success response');
+  await expect(page.getByTestId('repositorySetup.retrySandboxQualification')).toHaveCount(0);
+  await expect(page.getByTestId('repositorySetup.qualifySandbox')).toHaveCount(0);
+  expect(state.sandboxQualificationBodies).toHaveLength(0);
+});
+
+test('terminal sandbox failure rechecks ambient capability and allows a new operation', async ({ page }) => {
+  let latestAttempt: ReturnType<typeof sandboxAttempt> | null = null;
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(projectId, 'Available', latestAttempt),
+    onSandboxContext: (route, projectId) => json(
+      route,
+      workbenchSandboxContext(projectId, 'Available', latestAttempt)
+    ),
+    onSandboxQualification: (route, body, projectId) => {
+      latestAttempt = sandboxAttempt('Failed', String(body.clientOperationId), false);
+      return json(route, sandboxQualificationResult(body, projectId, false, 'Failed'));
+    }
+  });
+  await openSetup(page);
+
+  await page.getByTestId('repositorySetup.qualifySandbox').click();
+  await expect(page.getByTestId('repositorySetup.sandboxAttempt')).toContainText('Failed');
+  await expect(page.getByTestId('repositorySetup.qualifySandbox')).toBeVisible();
+  await page.getByTestId('repositorySetup.qualifySandbox').click();
+  await expect.poll(() => state.sandboxQualificationBodies.length).toBe(2);
+  expect(state.sandboxQualificationBodies[1].clientOperationId).not.toBe(state.sandboxQualificationBodies[0].clientOperationId);
+});
+
+test('malformed or mismatched sandbox authority fails closed without hiding the qualified repository', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => ({
+      ...workbenchSandboxContext(projectId),
+      repositoryAuthority: {
+        ...workbenchSandboxContext(projectId).repositoryAuthority,
+        baselineCommit: '3'.repeat(40)
+      }
+    })
+  });
+  await openSetup(page);
+
+  await expect(page.getByTestId('repositorySetup.qualified')).toBeVisible();
+  await expect(page.getByTestId('repositorySetup.sandboxAuthorityMismatch')).toContainText('blocked');
+  await expect(page.getByTestId('repositorySetup.qualifySandbox')).toHaveCount(0);
+  expect(state.sandboxQualificationBodies).toHaveLength(0);
+});
+
+test('late project-A sandbox result cannot install evidence into project B', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    onSandboxQualification: async (route, body, projectId) => {
+      if (projectId === 7) await new Promise((resolve) => setTimeout(resolve, 450));
+      await json(route, sandboxQualificationResult(body, projectId));
+    }
+  });
+  await openSetup(page, 7);
+  await page.getByTestId('repositorySetup.qualifySandbox').click();
+  await expect.poll(() => state.sandboxQualificationBodies.length).toBe(1);
+
+  await page.evaluate(() => {
+    window.history.pushState(null, '', '/projects/8/setup');
+    window.dispatchEvent(new Event('irondev:navigation'));
+  });
+  await expect(page.getByText('OtherRepo', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('repositorySetup.sandbox')).toContainText('Available');
+  await page.waitForTimeout(550);
+  await expect(page.getByText(SANDBOX_EVIDENCE_SHA)).toHaveCount(0);
+  await expect(page.getByText('OtherRepo', { exact: true })).toBeVisible();
 });

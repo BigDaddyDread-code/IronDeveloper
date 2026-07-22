@@ -1,6 +1,8 @@
 using IronDev.Api.Auth;
 using IronDev.Core.Auth;
+using IronDev.Core.Sandbox;
 using IronDev.Core.Workbench;
+using IronDev.Infrastructure.Services.Sandbox;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,16 +15,117 @@ public sealed class WorkbenchRepositoryController : ControllerBase
 {
     private readonly IWorkbenchRepositorySetupService _repositorySetup;
     private readonly IWorkbenchRepositoryProvisioningService _repositoryProvisioning;
+    private readonly IWorkbenchSandboxQualificationService _sandboxQualification;
     private readonly ICurrentTenantContext _tenant;
 
     public WorkbenchRepositoryController(
         IWorkbenchRepositorySetupService repositorySetup,
         IWorkbenchRepositoryProvisioningService repositoryProvisioning,
+        IWorkbenchSandboxQualificationService sandboxQualification,
         ICurrentTenantContext tenant)
     {
         _repositorySetup = repositorySetup;
         _repositoryProvisioning = repositoryProvisioning;
+        _sandboxQualification = sandboxQualification;
         _tenant = tenant;
+    }
+
+    [HttpGet("sandbox")]
+    public async Task<ActionResult<WorkbenchSandboxContext>> GetSandboxContext(
+        int projectId,
+        CancellationToken cancellationToken)
+    {
+        var actor = CurrentActor();
+        try
+        {
+            return Ok(await _sandboxQualification.GetContextAsync(
+                new GetWorkbenchSandboxContextQuery(_tenant.TenantId, actor.UserId, projectId),
+                cancellationToken));
+        }
+        catch (WorkbenchProjectNotAccessibleException)
+        {
+            return ProjectNotFound();
+        }
+        catch (SandboxQualificationValidationException exception)
+        {
+            return BadRequest(Error(SandboxQualificationValidationException.ErrorCode, exception.Message));
+        }
+    }
+
+    [HttpPost("sandbox-qualifications")]
+    public async Task<ActionResult<WorkbenchSandboxQualificationResult>> StartSandboxQualification(
+        int projectId,
+        StartSandboxQualificationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actor = CurrentActor();
+        try
+        {
+            return Ok(await _sandboxQualification.StartAsync(
+                new StartWorkbenchSandboxQualificationCommand(
+                    _tenant.TenantId,
+                    actor.UserId,
+                    projectId,
+                    request.WorkbenchSessionId,
+                    request.LeaseEpoch,
+                    request.ClientOperationId,
+                    request.ExpectedRepositoryBindingRevision,
+                    request.ExpectedExecutionProfileRevision),
+                cancellationToken));
+        }
+        catch (SandboxQualificationForbiddenException exception)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden,
+                Error(SandboxQualificationForbiddenException.ErrorCode, exception.Message));
+        }
+        catch (WorkbenchProjectNotAccessibleException)
+        {
+            return ProjectNotFound();
+        }
+        catch (SandboxQualificationStaleException exception)
+        {
+            return Conflict(Error(SandboxQualificationStaleException.ErrorCode, exception.Message));
+        }
+        catch (SandboxQualificationNotAllowedException exception)
+        {
+            return Conflict(Error(SandboxQualificationNotAllowedException.ErrorCode, exception.Message));
+        }
+        catch (SandboxQualificationInProgressException exception)
+        {
+            return Conflict(Error(SandboxQualificationInProgressException.ErrorCode, exception.Message));
+        }
+        catch (ProjectStartOperationMismatchException exception)
+        {
+            return Conflict(Error(ProjectStartOperationMismatchException.ErrorCode, exception.Message));
+        }
+        catch (WorkbenchLeaseFenceException exception)
+        {
+            return Conflict(Error(WorkbenchLeaseFenceException.ErrorCode, exception.Message));
+        }
+        catch (SandboxQualificationUnavailableException exception)
+        {
+            return UnprocessableEntity(new SandboxQualificationUnavailableResponse(
+                SandboxQualificationUnavailableException.ErrorCode,
+                exception.Capability.ReasonCode,
+                exception.Message,
+                exception.Capability));
+        }
+        catch (SandboxQualificationIntegrityException)
+        {
+            return UnprocessableEntity(Error(
+                SandboxQualificationIntegrityException.ErrorCode,
+                "The sandbox qualification authority or evidence failed integrity validation."));
+        }
+        catch (SandboxContractValidationException)
+        {
+            return UnprocessableEntity(Error(
+                SandboxQualificationIntegrityException.ErrorCode,
+                "The sandbox qualification authority or evidence failed integrity validation."));
+        }
+        catch (SandboxQualificationValidationException exception)
+        {
+            return BadRequest(Error(SandboxQualificationValidationException.ErrorCode, exception.Message));
+        }
     }
 
     [HttpPost("provisionings")]
@@ -242,6 +345,19 @@ public sealed class WorkbenchRepositoryController : ControllerBase
         Guid SetupConfirmationId,
         long ExpectedRepositoryBindingRevision,
         long ExpectedExecutionProfileRevision);
+
+    public sealed record StartSandboxQualificationRequest(
+        long WorkbenchSessionId,
+        long LeaseEpoch,
+        Guid ClientOperationId,
+        long ExpectedRepositoryBindingRevision,
+        long ExpectedExecutionProfileRevision);
+
+    public sealed record SandboxQualificationUnavailableResponse(
+        string Error,
+        string ReasonCode,
+        string Message,
+        SandboxCapability Capability);
 
     private CurrentUserContext CurrentActor() => new(
         HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());

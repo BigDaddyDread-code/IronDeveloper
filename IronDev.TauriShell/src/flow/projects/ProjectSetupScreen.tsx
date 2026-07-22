@@ -6,6 +6,8 @@ import type {
 import type {
   ConfirmRepositorySetupRequest,
   ProvisionRepositoryRequest,
+  SandboxQualificationAttemptSnapshot,
+  StartSandboxQualificationRequest,
   RepositoryBindingSnapshot,
   ProjectExecutionProfileSnapshot,
   RepositoryProvisioningAttemptSnapshot,
@@ -13,7 +15,9 @@ import type {
   RepositorySetupConfirmationResult,
   RepositorySetupContext,
   RepositorySetupPlanPreview,
-  RepositorySetupProfileSummary
+  RepositorySetupProfileSummary,
+  WorkbenchSandboxContext,
+  WorkbenchSandboxRepositoryAuthority
 } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
@@ -26,7 +30,7 @@ interface ProjectSetupScreenProps {
 }
 
 type LoadState = 'loading' | 'loaded' | 'unavailable';
-type BusyAction = 'plan' | 'confirm' | 'provision' | null;
+type BusyAction = 'plan' | 'confirm' | 'provision' | 'qualifySandbox' | null;
 
 interface PendingConfirmation extends ConfirmRepositorySetupRequest {
   projectId: number;
@@ -36,8 +40,17 @@ interface PendingProvisioning extends ProvisionRepositoryRequest {
   projectId: number;
 }
 
+interface PendingSandboxQualification extends StartSandboxQualificationRequest {
+  projectId: number;
+  userId: number;
+  repositoryBindingId: string;
+  projectExecutionProfileId: string;
+  baselineCommit: string;
+}
+
 const pendingConfirmationPrefix = 'irondev.repository-setup-confirmation';
 const pendingProvisioningPrefix = 'irondev.repository-provisioning';
+const pendingSandboxQualificationPrefix = 'irondev.sandbox-qualification';
 const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function pendingConfirmationKey(projectId: number, session: ActiveWorkbenchSession): string {
@@ -121,6 +134,67 @@ function clearPendingProvisioning(projectId: number, session: ActiveWorkbenchSes
   }
 }
 
+function pendingSandboxQualificationKey(projectId: number, userId: number): string {
+  return `${pendingSandboxQualificationPrefix}:${userId}:${projectId}`;
+}
+
+function loadPendingSandboxQualification(
+  projectId: number,
+  userId: number,
+  session: ActiveWorkbenchSession
+): PendingSandboxQualification | null {
+  try {
+    const raw = window.sessionStorage.getItem(pendingSandboxQualificationKey(projectId, userId));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<PendingSandboxQualification>;
+    return value.projectId === projectId &&
+      value.userId === userId &&
+      typeof value.workbenchSessionId === 'number' && Number.isSafeInteger(value.workbenchSessionId) && value.workbenchSessionId > 0 &&
+      typeof value.leaseEpoch === 'number' && Number.isSafeInteger(value.leaseEpoch) && value.leaseEpoch > 0 &&
+      typeof value.clientOperationId === 'string' && uuidPattern.test(value.clientOperationId) &&
+      typeof value.repositoryBindingId === 'string' && uuidPattern.test(value.repositoryBindingId) &&
+      typeof value.expectedRepositoryBindingRevision === 'number' && Number.isSafeInteger(value.expectedRepositoryBindingRevision) && value.expectedRepositoryBindingRevision > 0 &&
+      typeof value.projectExecutionProfileId === 'string' && uuidPattern.test(value.projectExecutionProfileId) &&
+      typeof value.expectedExecutionProfileRevision === 'number' && Number.isSafeInteger(value.expectedExecutionProfileRevision) && value.expectedExecutionProfileRevision > 0 &&
+      typeof value.baselineCommit === 'string' && /^[0-9a-f]{40}$/i.test(value.baselineCommit)
+      ? {
+          ...(value as PendingSandboxQualification),
+          workbenchSessionId: session.workbenchSessionId,
+          leaseEpoch: session.leaseEpoch
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingSandboxQualification(
+  attempt: PendingSandboxQualification,
+  session: ActiveWorkbenchSession
+): boolean {
+  try {
+    window.sessionStorage.setItem(
+      pendingSandboxQualificationKey(attempt.projectId, attempt.userId),
+      JSON.stringify({
+        ...attempt,
+        workbenchSessionId: session.workbenchSessionId,
+        leaseEpoch: session.leaseEpoch
+      })
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearPendingSandboxQualification(projectId: number, userId: number): void {
+  try {
+    window.sessionStorage.removeItem(pendingSandboxQualificationKey(projectId, userId));
+  } catch {
+    // Storage cleanup does not change the authoritative API outcome.
+  }
+}
+
 function isDefinitiveResponse(error: unknown): boolean {
   if (!(error instanceof IronDevApiError) || error.status < 400 || error.status >= 500 || error.status === 408 || error.status === 429) {
     return false;
@@ -159,6 +233,47 @@ function isRecoverableProvisioningFenceResponse(error: unknown): boolean {
     const code = value.trim().toLowerCase();
     return code === 'workbench_lease_fence_rejected' || code === 'workbench_lease_fence';
   });
+}
+
+function responseCode(error: unknown): string | null {
+  if (!(error instanceof IronDevApiError) || !error.body ||
+      typeof error.body !== 'object' || Array.isArray(error.body)) {
+    return null;
+  }
+  const body = error.body as Record<string, unknown>;
+  const code = [body.reasonCode, body.errorCode, body.code, body.error]
+    .find((value) => typeof value === 'string' && value.trim().length > 0);
+  return typeof code === 'string' ? code.trim().toLowerCase() : null;
+}
+
+function isRecoverableSandboxResponse(error: unknown): boolean {
+  const code = responseCode(error);
+  return code === 'sandbox_qualification_in_progress' ||
+    code === 'workbench_lease_fence_rejected' ||
+    code === 'workbench_lease_fence';
+}
+
+function sandboxAttemptMatchesAuthority(
+  attempt: SandboxQualificationAttemptSnapshot,
+  authority: WorkbenchSandboxRepositoryAuthority
+): boolean {
+  return attempt.repositoryBindingId === authority.repositoryBindingId &&
+    attempt.expectedRepositoryBindingRevision === authority.repositoryBindingRevision &&
+    attempt.projectExecutionProfileId === authority.projectExecutionProfileId &&
+    attempt.expectedExecutionProfileRevision === authority.projectExecutionProfileRevision &&
+    attempt.baselineCommit === authority.baselineCommit;
+}
+
+function sandboxAttemptMatchesPending(
+  attempt: SandboxQualificationAttemptSnapshot,
+  pending: PendingSandboxQualification
+): boolean {
+  return attempt.clientOperationId === pending.clientOperationId &&
+    attempt.repositoryBindingId === pending.repositoryBindingId &&
+    attempt.expectedRepositoryBindingRevision === pending.expectedRepositoryBindingRevision &&
+    attempt.projectExecutionProfileId === pending.projectExecutionProfileId &&
+    attempt.expectedExecutionProfileRevision === pending.expectedExecutionProfileRevision &&
+    attempt.baselineCommit === pending.baselineCommit;
 }
 
 function describeError(error: unknown, fallback: string): string {
@@ -200,6 +315,7 @@ export function ProjectSetupScreen({
 }: ProjectSetupScreenProps) {
   const session = useSessionContext();
   const projects = useProjectContext();
+  const userId = projects.userProfile?.userId ?? null;
   const authority = projects.workbenchSession?.projectId === projectId
     ? projects.workbenchSession
     : null;
@@ -214,7 +330,12 @@ export function ProjectSetupScreen({
   const [confirmationChecked, setConfirmationChecked] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [pendingProvisioning, setPendingProvisioning] = useState<PendingProvisioning | null>(null);
+  const [sandboxContext, setSandboxContext] = useState<WorkbenchSandboxContext | null>(null);
+  const [sandboxLoadState, setSandboxLoadState] = useState<LoadState>('loading');
+  const [sandboxErrorMessage, setSandboxErrorMessage] = useState<string | null>(null);
+  const [pendingSandboxQualification, setPendingSandboxQualification] = useState<PendingSandboxQualification | null>(null);
   const generationRef = useRef(0);
+  const sandboxGenerationRef = useRef(0);
 
   useEffect(() => {
     const generation = ++generationRef.current;
@@ -232,6 +353,10 @@ export function ProjectSetupScreen({
     const storedProvisioning = authority ? loadPendingProvisioning(projectId, authority) : null;
     setPendingConfirmation(storedConfirmation);
     setPendingProvisioning(storedProvisioning);
+    setSandboxContext(null);
+    setSandboxLoadState('loading');
+    setSandboxErrorMessage(null);
+    setPendingSandboxQualification(null);
 
     if (!authority) {
       setLoadState('unavailable');
@@ -303,6 +428,136 @@ export function ProjectSetupScreen({
     executionProfile.repositoryBindingId === confirmedBinding?.id
   );
   const pendingMatchesPlan = pendingConfirmation?.expectedPlanHash === plan?.planHash;
+
+  useEffect(() => {
+    const generation = ++sandboxGenerationRef.current;
+    const controller = new AbortController();
+    setSandboxContext(null);
+    setSandboxErrorMessage(null);
+    setSandboxLoadState('loading');
+
+    if (!authority || userId === null || context?.projectId !== projectId || !repositoryQualified || !confirmedBinding ||
+        confirmedBinding.projectId !== projectId || !executionProfile ||
+        executionProfile.projectId !== projectId || !confirmedBinding.baselineCommit) {
+      setPendingSandboxQualification(null);
+      if (repositoryQualified && userId === null) {
+        setSandboxLoadState('unavailable');
+        setSandboxErrorMessage('The current user identity is required before sandbox qualification can be recovered or started.');
+      }
+      return () => {
+        controller.abort();
+        if (sandboxGenerationRef.current === generation) sandboxGenerationRef.current += 1;
+      };
+    }
+
+    const stored = loadPendingSandboxQualification(projectId, userId, authority);
+    setPendingSandboxQualification(stored);
+    void session.client.getWorkbenchSandboxContext(projectId, controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted || sandboxGenerationRef.current !== generation) return;
+
+        const sandboxAuthority = result.repositoryAuthority;
+        const exactAuthority = sandboxAuthority !== null &&
+          sandboxAuthority.repositoryBindingId === confirmedBinding.id &&
+          sandboxAuthority.repositoryBindingRevision === confirmedBinding.revision &&
+          sandboxAuthority.projectExecutionProfileId === executionProfile.id &&
+          sandboxAuthority.projectExecutionProfileRevision === executionProfile.revision &&
+          sandboxAuthority.baselineCommit === confirmedBinding.baselineCommit;
+        setSandboxContext(result);
+        setSandboxLoadState('loaded');
+
+        if (!exactAuthority) {
+          if (stored) clearPendingSandboxQualification(projectId, userId);
+          setPendingSandboxQualification(null);
+          setSandboxErrorMessage('Sandbox qualification authority does not match the current repository binding, profile, and baseline. Refresh before running qualification.');
+          return;
+        }
+
+        if (result.latestAttempt?.state === 'Running') {
+          if (!result.latestAttempt.canRecover) {
+            if (stored) clearPendingSandboxQualification(projectId, userId);
+            setPendingSandboxQualification(null);
+            setSandboxErrorMessage('A sandbox qualification is already running for another actor. Only the actor who started that operation can recover it.');
+            return;
+          }
+          if (stored && !sandboxAttemptMatchesPending(result.latestAttempt, stored)) {
+            clearPendingSandboxQualification(projectId, userId);
+          }
+          const running: PendingSandboxQualification = {
+            projectId,
+            userId,
+            workbenchSessionId: authority.workbenchSessionId,
+            leaseEpoch: authority.leaseEpoch,
+            clientOperationId: result.latestAttempt.clientOperationId,
+            repositoryBindingId: result.latestAttempt.repositoryBindingId,
+            expectedRepositoryBindingRevision: result.latestAttempt.expectedRepositoryBindingRevision,
+            projectExecutionProfileId: result.latestAttempt.projectExecutionProfileId,
+            expectedExecutionProfileRevision: result.latestAttempt.expectedExecutionProfileRevision,
+            baselineCommit: result.latestAttempt.baselineCommit
+          };
+          if (savePendingSandboxQualification(running, authority)) {
+            setPendingSandboxQualification(running);
+          } else {
+            setPendingSandboxQualification(null);
+            setSandboxErrorMessage('IronDev found an active sandbox qualification but could not preserve its exact recovery request in this browser session.');
+          }
+          return;
+        }
+
+        if (stored && (stored.repositoryBindingId !== sandboxAuthority.repositoryBindingId ||
+            stored.expectedRepositoryBindingRevision !== sandboxAuthority.repositoryBindingRevision ||
+            stored.projectExecutionProfileId !== sandboxAuthority.projectExecutionProfileId ||
+            stored.expectedExecutionProfileRevision !== sandboxAuthority.projectExecutionProfileRevision ||
+            stored.baselineCommit !== sandboxAuthority.baselineCommit)) {
+          clearPendingSandboxQualification(projectId, userId);
+          setPendingSandboxQualification(null);
+          setSandboxErrorMessage('The saved sandbox qualification no longer matches the current repository authority and cannot be replayed.');
+          return;
+        }
+
+        if (stored && result.latestAttempt?.clientOperationId === stored.clientOperationId) {
+          clearPendingSandboxQualification(projectId, userId);
+          setPendingSandboxQualification(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || sandboxGenerationRef.current !== generation) return;
+        setSandboxLoadState('unavailable');
+        setSandboxErrorMessage(describeError(error, 'Production sandbox capability is unavailable.'));
+      });
+
+    return () => {
+      controller.abort();
+      if (sandboxGenerationRef.current === generation) sandboxGenerationRef.current += 1;
+    };
+  }, [
+    authority?.leaseEpoch,
+    authority?.workbenchSessionId,
+    confirmedBinding?.baselineCommit,
+    confirmedBinding?.id,
+    confirmedBinding?.revision,
+    context?.projectId,
+    executionProfile?.id,
+    executionProfile?.revision,
+    projectId,
+    repositoryQualified,
+    session.client,
+    userId
+  ]);
+
+  const sandboxAuthorityMatchesRepository = Boolean(
+    sandboxContext?.repositoryAuthority &&
+    sandboxContext.projectId === projectId &&
+    confirmedBinding &&
+    confirmedBinding.projectId === projectId &&
+    executionProfile &&
+    executionProfile.projectId === projectId &&
+    sandboxContext.repositoryAuthority.repositoryBindingId === confirmedBinding.id &&
+    sandboxContext.repositoryAuthority.repositoryBindingRevision === confirmedBinding.revision &&
+    sandboxContext.repositoryAuthority.projectExecutionProfileId === executionProfile.id &&
+    sandboxContext.repositoryAuthority.projectExecutionProfileRevision === executionProfile.revision &&
+    sandboxContext.repositoryAuthority.baselineCommit === confirmedBinding.baselineCommit
+  );
 
   const createPlan = useCallback(async () => {
     if (!authority || !selectableProfile || pendingConfirmation || busyAction !== null) return;
@@ -473,6 +728,178 @@ export function ProjectSetupScreen({
     setupConfirmationId
   ]);
 
+  const qualifySandbox = useCallback(async () => {
+    if (!authority || userId === null || busyAction !== null || !confirmedBinding || !executionProfile ||
+        !sandboxContext?.repositoryAuthority || !sandboxAuthorityMatchesRepository) {
+      return;
+    }
+
+    const isNewQualification = pendingSandboxQualification === null;
+    if (isNewQualification && sandboxContext.capability.state !== 'Available') return;
+
+    const sandboxAuthority = sandboxContext.repositoryAuthority;
+    const attempt: PendingSandboxQualification = pendingSandboxQualification
+      ? {
+          ...pendingSandboxQualification,
+          workbenchSessionId: authority.workbenchSessionId,
+          leaseEpoch: authority.leaseEpoch
+        }
+      : {
+          projectId,
+          userId,
+          workbenchSessionId: authority.workbenchSessionId,
+          leaseEpoch: authority.leaseEpoch,
+          clientOperationId: crypto.randomUUID(),
+          repositoryBindingId: sandboxAuthority.repositoryBindingId,
+          expectedRepositoryBindingRevision: sandboxAuthority.repositoryBindingRevision,
+          projectExecutionProfileId: sandboxAuthority.projectExecutionProfileId,
+          expectedExecutionProfileRevision: sandboxAuthority.projectExecutionProfileRevision,
+          baselineCommit: sandboxAuthority.baselineCommit
+        };
+    if (attempt.repositoryBindingId !== sandboxAuthority.repositoryBindingId ||
+        attempt.expectedRepositoryBindingRevision !== sandboxAuthority.repositoryBindingRevision ||
+        attempt.projectExecutionProfileId !== sandboxAuthority.projectExecutionProfileId ||
+        attempt.expectedExecutionProfileRevision !== sandboxAuthority.projectExecutionProfileRevision ||
+        attempt.baselineCommit !== sandboxAuthority.baselineCommit) {
+      clearPendingSandboxQualification(projectId, userId);
+      setPendingSandboxQualification(null);
+      setSandboxErrorMessage('The saved sandbox qualification no longer matches the exact repository authority and was not sent.');
+      return;
+    }
+    if (!savePendingSandboxQualification(attempt, authority)) {
+      setSandboxErrorMessage('IronDev could not preserve the exact sandbox qualification operation in this browser session, so no qualification request was sent.');
+      return;
+    }
+
+    const generation = sandboxGenerationRef.current;
+    setPendingSandboxQualification(attempt);
+    setBusyAction('qualifySandbox');
+    setSandboxErrorMessage(null);
+    try {
+      const result = await session.client.startWorkbenchSandboxQualification(projectId, {
+        workbenchSessionId: attempt.workbenchSessionId,
+        leaseEpoch: attempt.leaseEpoch,
+        clientOperationId: attempt.clientOperationId,
+        expectedRepositoryBindingRevision: attempt.expectedRepositoryBindingRevision,
+        expectedExecutionProfileRevision: attempt.expectedExecutionProfileRevision
+      });
+      clearPendingSandboxQualification(projectId, userId);
+      if (sandboxGenerationRef.current !== generation) return;
+      setPendingSandboxQualification(null);
+      setSandboxContext((current) => current ? {
+        ...current,
+        capability: result.capability,
+        latestAttempt: result.attempt
+      } : current);
+      setSandboxErrorMessage(null);
+      if (result.attempt.state !== 'Passed') {
+        try {
+          const refreshed = await session.client.getWorkbenchSandboxContext(projectId);
+          if (sandboxGenerationRef.current === generation) {
+            setSandboxContext(refreshed);
+            setSandboxLoadState('loaded');
+          }
+        } catch {
+          // The terminal result remains authoritative even when capability recheck is unavailable.
+        }
+      }
+    } catch (error: unknown) {
+      const code = responseCode(error);
+      if (code === 'sandbox_qualification_in_progress') {
+        try {
+          const refreshed = await session.client.getWorkbenchSandboxContext(projectId);
+          if (sandboxGenerationRef.current !== generation) return;
+          setSandboxContext(refreshed);
+          setSandboxLoadState('loaded');
+
+          const durableAttempt = refreshed.latestAttempt;
+          const durableAuthority = refreshed.repositoryAuthority;
+          const authorityIsCurrent = durableAuthority !== null &&
+            durableAuthority.repositoryBindingId === confirmedBinding.id &&
+            durableAuthority.repositoryBindingRevision === confirmedBinding.revision &&
+            durableAuthority.projectExecutionProfileId === executionProfile.id &&
+            durableAuthority.projectExecutionProfileRevision === executionProfile.revision &&
+            durableAuthority.baselineCommit === confirmedBinding.baselineCommit;
+          const ownsExactDurableAttempt = durableAttempt?.state === 'Running' &&
+            durableAttempt.canRecover &&
+            durableAuthority !== null &&
+            authorityIsCurrent &&
+            sandboxAttemptMatchesAuthority(durableAttempt, durableAuthority) &&
+            sandboxAttemptMatchesPending(durableAttempt, attempt);
+
+          if (ownsExactDurableAttempt) {
+            const recoverableAttempt = {
+              ...attempt,
+              workbenchSessionId: authority.workbenchSessionId,
+              leaseEpoch: authority.leaseEpoch
+            };
+            if (savePendingSandboxQualification(recoverableAttempt, authority)) {
+              setPendingSandboxQualification(recoverableAttempt);
+              setSandboxErrorMessage('The server confirmed this actor owns the exact durable qualification. Retry it to recover the authoritative result.');
+            } else {
+              setPendingSandboxQualification(null);
+              setSandboxLoadState('unavailable');
+              setSandboxErrorMessage('The server confirmed the durable qualification, but this browser could not preserve its exact recovery request. Refresh before recovering it.');
+            }
+            return;
+          }
+
+          clearPendingSandboxQualification(projectId, userId);
+          setPendingSandboxQualification(null);
+          if (durableAttempt?.state === 'Running') {
+            setSandboxErrorMessage('A sandbox qualification is running, but it is not this actor’s exact durable operation. Only the actor and operation recorded by the server can recover it.');
+          } else if (durableAttempt?.clientOperationId === attempt.clientOperationId) {
+            setSandboxErrorMessage(null);
+          } else {
+            setSandboxErrorMessage('The server did not confirm this request as a durable running qualification. Its recovery receipt was cleared; review the latest status before starting again.');
+          }
+        } catch {
+          if (sandboxGenerationRef.current !== generation) return;
+          setPendingSandboxQualification(null);
+          setSandboxLoadState('unavailable');
+          setSandboxErrorMessage('IronDev could not confirm whether the in-progress response belongs to this actor and exact operation. Refresh to recover from durable server state.');
+        }
+        return;
+      }
+
+      const recoverable = isRecoverableSandboxResponse(error);
+      const definitive = isDefinitiveResponse(error) && !recoverable;
+      if (definitive) clearPendingSandboxQualification(projectId, userId);
+      if (sandboxGenerationRef.current !== generation) return;
+      if (definitive) {
+        setPendingSandboxQualification(null);
+        try {
+          const refreshed = await session.client.getWorkbenchSandboxContext(projectId);
+          if (sandboxGenerationRef.current === generation) {
+            setSandboxContext(refreshed);
+            setSandboxLoadState('loaded');
+          }
+        } catch {
+          if (sandboxGenerationRef.current === generation) setSandboxLoadState('unavailable');
+        }
+      }
+      if (sandboxGenerationRef.current !== generation) return;
+      setSandboxErrorMessage(!definitive
+        ? code === 'workbench_lease_fence_rejected' || code === 'workbench_lease_fence'
+            ? 'Workbench write authority changed while this exact sandbox qualification was active. Retry the same operation with the current Workbench fence.'
+            : 'IronDev could not determine whether sandbox qualification completed. Retry the exact same operation safely.'
+        : describeError(error, 'Sandbox qualification did not start.'));
+    } finally {
+      if (sandboxGenerationRef.current === generation) setBusyAction(null);
+    }
+  }, [
+    authority,
+    busyAction,
+    confirmedBinding,
+    executionProfile,
+    pendingSandboxQualification,
+    projectId,
+    sandboxAuthorityMatchesRepository,
+    sandboxContext,
+    session.client,
+    userId
+  ]);
+
   const returnToConfiguration = () => {
     setPlan(null);
     setConfirmationChecked(false);
@@ -555,6 +982,13 @@ export function ProjectSetupScreen({
             latestAttempt={latestProvisioning}
             lifecycle={provisioning?.projectLifecyclePhase ?? context?.projectLifecyclePhase ?? 'Shaping'}
             readiness={provisioning?.executionReadiness ?? context?.executionReadiness ?? 'NotConfigured'}
+            sandboxContext={sandboxContext}
+            sandboxLoadState={sandboxLoadState}
+            sandboxAuthorityMatches={sandboxAuthorityMatchesRepository}
+            pendingSandboxQualification={pendingSandboxQualification}
+            sandboxBusy={busyAction === 'qualifySandbox'}
+            sandboxErrorMessage={sandboxErrorMessage}
+            onQualifySandbox={() => void qualifySandbox()}
             onContinue={onOpenBoard}
           />
         ) : provisioningInProgress ? (
@@ -999,6 +1433,13 @@ function QualifiedRepository({
   latestAttempt,
   lifecycle,
   readiness,
+  sandboxContext,
+  sandboxLoadState,
+  sandboxAuthorityMatches,
+  pendingSandboxQualification,
+  sandboxBusy,
+  sandboxErrorMessage,
+  onQualifySandbox,
   onContinue
 }: {
   binding: RepositoryBindingSnapshot;
@@ -1006,30 +1447,201 @@ function QualifiedRepository({
   latestAttempt: RepositoryProvisioningAttemptSnapshot | null;
   lifecycle: string;
   readiness: string;
+  sandboxContext: WorkbenchSandboxContext | null;
+  sandboxLoadState: LoadState;
+  sandboxAuthorityMatches: boolean;
+  pendingSandboxQualification: PendingSandboxQualification | null;
+  sandboxBusy: boolean;
+  sandboxErrorMessage: string | null;
+  onQualifySandbox: () => void;
   onContinue: () => void;
 }) {
   const branchName = provisioning?.branchName ?? latestAttempt?.branchName ?? binding.defaultBranch ?? '';
   const baselineCommit = provisioning?.baselineCommit ?? latestAttempt?.baselineCommit ?? binding.baselineCommit ?? '';
   return (
-    <section className="fl-project-setup__ready fl-repository-setup__confirmed" data-testid="repositorySetup.qualified">
-      <p className="fl-project-setup__ready-mark" aria-hidden="true">OK</p>
-      <h2>Repository shell provisioned</h2>
-      <p>The pinned source shell and controlled Git baseline were installed at the server-derived target.</p>
-      <dl>
-        <div><dt>Binding state</dt><dd>{binding.bindingState}</dd></div>
-        <div><dt>Repository / projected local path</dt><dd>{binding.canonicalPath}</dd></div>
-        <div><dt>Default branch</dt><dd><code>{branchName}</code></dd></div>
-        <div><dt>Baseline commit</dt><dd><code>{baselineCommit}</code></dd></div>
-        {provisioning ? <div><dt>Manifest SHA-256</dt><dd><code>{provisioning.manifestSha256}</code></dd></div> : null}
-        {provisioning ? <div><dt>Git tree ID</dt><dd><code>{provisioning.gitTreeId}</code></dd></div> : null}
-        <div><dt>Project lifecycle</dt><dd>{lifecycle}</dd></div>
-        <div><dt>Execution readiness</dt><dd>{readiness}</dd></div>
+    <>
+      <section className="fl-project-setup__ready fl-repository-setup__confirmed" data-testid="repositorySetup.qualified">
+        <p className="fl-project-setup__ready-mark" aria-hidden="true">OK</p>
+        <h2>Repository shell provisioned</h2>
+        <p>The pinned source shell and controlled Git baseline were installed at the server-derived target.</p>
+        <dl>
+          <div><dt>Binding state</dt><dd>{binding.bindingState}</dd></div>
+          <div><dt>Repository / projected local path</dt><dd>{binding.canonicalPath}</dd></div>
+          <div><dt>Default branch</dt><dd><code>{branchName}</code></dd></div>
+          <div><dt>Baseline commit</dt><dd><code>{baselineCommit}</code></dd></div>
+          {provisioning ? <div><dt>Manifest SHA-256</dt><dd><code>{provisioning.manifestSha256}</code></dd></div> : null}
+          {provisioning ? <div><dt>Git tree ID</dt><dd><code>{provisioning.gitTreeId}</code></dd></div> : null}
+          <div><dt>Project lifecycle</dt><dd>{lifecycle}</dd></div>
+          <div><dt>Execution readiness</dt><dd>{readiness}</dd></div>
+        </dl>
+        <div className="fl-project-setup__safety-boundary">
+          <strong>Technical readiness is still separate</strong>
+          <p>Qualified means the repository artifact and Git baseline were verified. Repository qualification did not itself restore, build, test, index, run sandbox qualification, or authorize Builder. Any sandbox evidence shown below comes from the separate qualification step. Execution readiness remains NotConfigured.</p>
+        </div>
+        <button className="fl-btn fl-pri" type="button" onClick={onContinue}>Continue to project</button>
+      </section>
+      <SandboxQualificationPanel
+        context={sandboxContext}
+        loadState={sandboxLoadState}
+        authorityMatches={sandboxAuthorityMatches}
+        pending={pendingSandboxQualification}
+        busy={sandboxBusy}
+        errorMessage={sandboxErrorMessage}
+        onQualify={onQualifySandbox}
+      />
+    </>
+  );
+}
+
+function SandboxQualificationPanel({
+  context,
+  loadState,
+  authorityMatches,
+  pending,
+  busy,
+  errorMessage,
+  onQualify
+}: {
+  context: WorkbenchSandboxContext | null;
+  loadState: LoadState;
+  authorityMatches: boolean;
+  pending: PendingSandboxQualification | null;
+  busy: boolean;
+  errorMessage: string | null;
+  onQualify: () => void;
+}) {
+  if (loadState === 'loading') {
+    return (
+      <section className="fl-project-setup__next fl-project-setup__next--loading" data-testid="repositorySetup.sandbox">
+        <span className="fl-eyebrow">Production sandbox</span>
+        <h2>Checking sandbox capability</h2>
+        <p>This check does not change readiness or grant execution authority.</p>
+      </section>
+    );
+  }
+
+  if (loadState === 'unavailable' || !context) {
+    return (
+      <section className="fl-project-setup__unavailable" data-testid="repositorySetup.sandboxUnavailable">
+        <span className="fl-eyebrow">Production sandbox</span>
+        <h2>Sandbox qualification is unavailable</h2>
+        <p>The repository remains available for Workbench shaping and ticket creation.</p>
+        <p>Execution readiness and Builder authorization are unchanged.</p>
+        {errorMessage ? <div className="fl-error" role="alert">{errorMessage}</div> : null}
+      </section>
+    );
+  }
+
+  const attempt = context.latestAttempt;
+  const running = attempt?.state === 'Running';
+  const attemptMatchesAuthority = Boolean(
+    attempt &&
+    context.repositoryAuthority &&
+    sandboxAttemptMatchesAuthority(attempt, context.repositoryAuthority)
+  );
+  const canStart = context.capability.state === 'Available' && authorityMatches && !running && !pending;
+  const canRecover = authorityMatches && pending !== null;
+  return (
+    <section className="fl-project-setup__next" data-testid="repositorySetup.sandbox">
+      <span className="fl-eyebrow">Production sandbox</span>
+      <h2>{running ? 'Sandbox qualification is running' : 'Qualify the production sandbox'}</h2>
+      <p>{context.capability.message}</p>
+      <dl className="fl-repository-setup__plan">
+        <PlanRow label="Capability" value={context.capability.state} />
+        <PlanRow label="Reason" value={context.capability.reasonCode} code />
+        <PlanRow label="Policy version" value={context.capability.policyVersion} code />
+        {context.capability.policySha256 ? <PlanRow label="Policy SHA-256" value={context.capability.policySha256} code /> : null}
+        <PlanRow label="Execution readiness" value={context.executionReadiness} />
       </dl>
+
+      {attempt ? <SandboxAttemptEvidence attempt={attempt} isCurrentAuthority={attemptMatchesAuthority} /> : (
+        <p>No sandbox qualification attempt has been recorded for this project.</p>
+      )}
+
       <div className="fl-project-setup__safety-boundary">
-        <strong>Technical readiness is still separate</strong>
-        <p>Qualified means the repository artifact and Git baseline were verified. IronDev has not restored, built, tested, indexed, run sandbox validation, or authorized Builder. Execution readiness remains NotConfigured.</p>
+        <strong>Evidence only</strong>
+        <p>Qualification runs the server-owned restore, build, and test policy for this exact repository binding, profile revision, and baseline. It does not change execution readiness, index code, grant Builder authorization, or authorize source changes.</p>
       </div>
-      <button className="fl-btn fl-pri" type="button" onClick={onContinue}>Continue to project</button>
+
+      {!authorityMatches ? (
+        <p data-testid="repositorySetup.sandboxAuthorityMismatch">The sandbox authority does not match the current qualified repository. Qualification is blocked.</p>
+      ) : null}
+      {pending ? (
+        <dl className="fl-repository-setup__plan" data-testid="repositorySetup.sandboxRecovery">
+           <PlanRow label="Exact recovery operation" value={pending.clientOperationId} code testId="repositorySetup.sandboxRecovery.operation" />
+           <PlanRow label="Repository binding" value={pending.repositoryBindingId} code />
+           <PlanRow label="Expected binding revision" value={String(pending.expectedRepositoryBindingRevision)} />
+           <PlanRow label="Execution profile" value={pending.projectExecutionProfileId} code />
+           <PlanRow label="Expected profile revision" value={String(pending.expectedExecutionProfileRevision)} />
+           <PlanRow label="Baseline commit" value={pending.baselineCommit} code />
+          <PlanRow label="Workbench session" value={String(pending.workbenchSessionId)} />
+          <PlanRow label="Lease epoch" value={String(pending.leaseEpoch)} />
+        </dl>
+      ) : null}
+      {errorMessage ? <div className="fl-error" role="alert">{errorMessage}</div> : null}
+
+      {canRecover ? (
+        <button
+          className="fl-btn fl-pri"
+          type="button"
+          data-testid="repositorySetup.retrySandboxQualification"
+          disabled={busy}
+          onClick={onQualify}
+        >
+          {busy ? 'Recovering exact qualification...' : 'Retry exact sandbox qualification'}
+        </button>
+      ) : canStart ? (
+        <button
+          className="fl-btn fl-pri"
+          type="button"
+          data-testid="repositorySetup.qualifySandbox"
+          disabled={busy}
+          onClick={onQualify}
+        >
+          {busy ? 'Running sandbox qualification...' : 'Run sandbox qualification'}
+        </button>
+      ) : context.capability.state !== 'Available' ? (
+        <p data-testid="repositorySetup.sandboxNonblocking">Sandbox qualification is not available in this environment. You can continue shaping the project and creating tickets.</p>
+      ) : null}
     </section>
+  );
+}
+
+function SandboxAttemptEvidence({
+  attempt,
+  isCurrentAuthority
+}: {
+  attempt: SandboxQualificationAttemptSnapshot;
+  isCurrentAuthority: boolean;
+}) {
+  const cleanup = attempt.state === 'Passed'
+    ? 'Confirmed before passing evidence was published.'
+    : attempt.state === 'Running'
+      ? 'Pending; no passing evidence has been published.'
+      : 'No passing cleanup claim is made; see the safe result summary.';
+  return (
+    <div data-testid="repositorySetup.sandboxAttempt">
+      <h3>{isCurrentAuthority ? 'Latest qualification attempt' : 'Historical qualification attempt'}</h3>
+      {!isCurrentAuthority ? (
+        <p data-testid="repositorySetup.sandboxHistoricalEvidence">This terminal evidence belongs to an earlier repository binding or execution profile revision. It is not passing evidence for the current authority.</p>
+      ) : null}
+      <dl className="fl-repository-setup__plan">
+        <PlanRow label="State" value={attempt.state} />
+        <PlanRow label="Recoverable by current actor" value={attempt.canRecover ? 'Yes' : 'No'} />
+         <PlanRow label="Attempt ID" value={attempt.attemptId} code />
+         <PlanRow label="Operation ID" value={attempt.clientOperationId} code />
+         <PlanRow label="Repository binding" value={attempt.repositoryBindingId} code />
+         <PlanRow label="Binding revision" value={String(attempt.expectedRepositoryBindingRevision)} />
+         <PlanRow label="Execution profile" value={attempt.projectExecutionProfileId} code />
+         <PlanRow label="Profile revision" value={String(attempt.expectedExecutionProfileRevision)} />
+         <PlanRow label="Baseline commit" value={attempt.baselineCommit} code />
+        <PlanRow label="Started" value={attempt.startedAtUtc} />
+        {attempt.completedAtUtc ? <PlanRow label="Completed" value={attempt.completedAtUtc} /> : null}
+        {attempt.evidenceManifestSha256 ? <PlanRow label="Evidence manifest SHA-256" value={attempt.evidenceManifestSha256} code /> : null}
+        {attempt.failureCode ? <PlanRow label="Failure code" value={attempt.failureCode} code /> : null}
+        {attempt.safeSummary ? <PlanRow label="Safe result" value={attempt.safeSummary} /> : null}
+        <PlanRow label="Cleanup" value={cleanup} />
+      </dl>
+    </div>
   );
 }

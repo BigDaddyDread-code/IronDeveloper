@@ -375,6 +375,31 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.ProjectRenameProposals', 'U') IS NOT NULL DELETE FROM dbo.ProjectRenameProposals;
             IF OBJECT_ID('dbo.ProjectUnderstandings', 'U') IS NOT NULL DELETE FROM dbo.ProjectUnderstandings;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultSandboxQualificationAttemptId') IS NOT NULL
+               AND COL_LENGTH('dbo.ClientOperations', 'ResultSandboxEvidenceManifestId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
+                    SET ResultSandboxEvidenceManifestId=NULL,
+                        ResultSandboxQualificationAttemptId=NULL;';
+            IF OBJECT_ID('dbo.SandboxEvidenceManifests', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_SandboxEvidenceManifests_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_SandboxEvidenceManifests_AppendOnly
+                        ON dbo.SandboxEvidenceManifests;
+                DELETE FROM dbo.SandboxEvidenceManifests;
+                IF OBJECT_ID('dbo.TR_SandboxEvidenceManifests_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_SandboxEvidenceManifests_AppendOnly
+                        ON dbo.SandboxEvidenceManifests;
+            END;
+            IF OBJECT_ID('dbo.SandboxQualificationAttempts', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_SandboxQualificationAttempts_TerminalImmutable', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_SandboxQualificationAttempts_TerminalImmutable
+                        ON dbo.SandboxQualificationAttempts;
+                DELETE FROM dbo.SandboxQualificationAttempts;
+                IF OBJECT_ID('dbo.TR_SandboxQualificationAttempts_TerminalImmutable', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_SandboxQualificationAttempts_TerminalImmutable
+                        ON dbo.SandboxQualificationAttempts;
+            END;
             IF COL_LENGTH('dbo.ClientOperations', 'ResultRepositoryProvisioningAttemptId') IS NOT NULL
                AND COL_LENGTH('dbo.ClientOperations', 'ResultRepositoryProvisioningReceiptId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
