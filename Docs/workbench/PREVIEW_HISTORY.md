@@ -17,18 +17,19 @@ The machine-readable current version is `workbench-version.json`. Each preview u
 | `0.1.0-preview.11` | PR-04B | `workbench-pr04b` | Explicit atomic creation of permanent tickets, Work Item contracts, dependency remapping, provenance receipts, and the Delivery transition |
 | `0.1.0-preview.12` | PR-05A | `workbench-pr05a` | Repository/profile authorities, deterministic setup-plan review, approved-root safety, explicit confirmation, and unsupported-profile reporting with zero filesystem writes |
 | `0.1.0-preview.13` | PR-05B | `workbench-pr05b` | Confirmed-plan provisioning through isolated staging, pinned product-neutral rendering, controlled Git initialization, atomic install, crash-safe replay, and no technical-readiness claims |
+| `0.1.0-preview.14` | PR-06A | `workbench-pr06a` | Fail-closed production sandbox capability, Hyper-V isolation policy, digest/feed verification, bounded qualification evidence, and cleanup/recovery without readiness or Builder authority |
 
-Start the current PR-05B preview alongside the earlier previews:
+Start the current PR-06A preview alongside the earlier previews:
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
-  -EnableConversationAuthority -PreviewId workbench-pr05b `
-  -ApiBaseUrl http://127.0.0.1:5370 -UiPort 5351
+  -EnableConversationAuthority -PreviewId workbench-pr06a `
+  -ApiBaseUrl http://127.0.0.1:5390 -UiPort 5371
 ```
 
-The PR-05B preview owns database `IronDeveloper_Test_workbench_pr05b`, workspace `C:\IronDevTestWorkspaces\workbench-pr05b`, logs `C:\IronDevTestLogs\workbench-pr05b`, API `http://127.0.0.1:5370`, and UI `http://127.0.0.1:5351`.
+The PR-06A preview owns database `IronDeveloper_Test_workbench_pr06a`, workspace `C:\IronDevTestWorkspaces\workbench-pr06a`, logs `C:\IronDevTestLogs\workbench-pr06a`, API `http://127.0.0.1:5390`, and UI `http://127.0.0.1:5371`.
 
-Project creation, shaping, `/ticket`, and proposal review remain repository-independent. PR-05B extends the separate Repository surface only after PR-05A's immutable setup confirmation exists. The browser sends the current Workbench fence, one durable client operation ID, the confirmation ID, and the expected binding/profile revisions; it never supplies a path, template, command, branch, or product decision. The server revalidates that authority, renders the exact pinned bundle in an isolated sibling, initializes a clean `main` Git repository, and atomically installs the target. Success records `Qualified` repository authority and the immutable baseline while readiness remains `NotConfigured`. No restore, build, test, code index, sandbox validation, Builder authorization, or BA invocation occurs. A durable failed attempt remains retryable, and an ambiguous browser delivery replays the exact same operation.
+Project creation, shaping, `/ticket`, and proposal review remain repository-independent. PR-06A extends the Repository surface only after a qualified repository and exact execution-profile authority exist. The production sandbox is unavailable unless the host can prove Windows/x64 HCS access, a digest-pinned Windows SDK image, the content-addressed read-only offline feed, and the exact versioned resource policy. It never falls back to host execution. The v0.1 process guarantee is 64 untrusted project-workload processes, enforced by a versioned and hash-bound Windows Job supervisor that creates each project process suspended and assigns it before resume. Trusted HCS, bootstrap, and supervisor processes are outside that workload count; the preview does not claim a Docker whole-silo PID limit. Failure to prove the exact Job flags, suspended assignment, restricted workload identity, or fixed broker-denial checks makes sandbox capability unavailable before project bytes are read. Qualification evidence is bound to the repository baseline, binding/profile revisions, image/feed/template/toolchain/policy/supervisor hashes, actual isolation and workload-limit inspection, stage results, bounded copied artifacts, and confirmed teardown. An ambiguous retry or service restart may materialize the exact completed evidence or repeat exact cleanup, but it never reruns a pending qualification; cleanup that cannot be proven remains visibly `Running` and fenced for later recovery. Passing evidence does not change execution readiness or grant Builder authorization; PR-06B owns mechanically current validation/readiness.
 
 For the deterministic LocalTest rename path, send `Rename project to CalmPlan` as its own Workshop message, then accept the pending proposal in Project Context.
 

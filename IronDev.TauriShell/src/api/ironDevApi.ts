@@ -115,6 +115,12 @@ import type {
   CreateRepositorySetupPlanRequest,
   ConfirmRepositorySetupRequest,
   ProvisionRepositoryRequest,
+  SandboxCapability,
+  SandboxQualificationAttemptSnapshot,
+  StartSandboxQualificationRequest,
+  WorkbenchSandboxContext,
+  WorkbenchSandboxQualificationResult,
+  WorkbenchSandboxRepositoryAuthority,
   ProjectExecutionProfileSnapshot,
   ProjectRenameProposal,
   ProjectUnderstandingConflict,
@@ -489,6 +495,35 @@ class IronDevApiClient {
     );
     if (!isRepositoryProvisioningResult(result, projectId, request)) {
       throw new IronDevApiProtocolError('Repository provisioning');
+    }
+    return result;
+  }
+
+  async getWorkbenchSandboxContext(
+    projectId: number,
+    signal?: AbortSignal
+  ): Promise<WorkbenchSandboxContext> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/repository/sandbox`,
+      { method: 'GET', signal }
+    );
+    if (!isWorkbenchSandboxContext(result, projectId)) {
+      throw new IronDevApiProtocolError('Workbench sandbox context');
+    }
+    return result;
+  }
+
+  async startWorkbenchSandboxQualification(
+    projectId: number,
+    request: StartSandboxQualificationRequest,
+    signal?: AbortSignal
+  ): Promise<WorkbenchSandboxQualificationResult> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/repository/sandbox-qualifications`,
+      { method: 'POST', body: request, signal }
+    );
+    if (!isWorkbenchSandboxQualificationResult(result, projectId, request)) {
+      throw new IronDevApiProtocolError('Workbench sandbox qualification');
     }
     return result;
   }
@@ -2835,6 +2870,123 @@ function isRepositoryProvisioningResult(
   return value.repositoryBinding.defaultBranch === value.branchName &&
     value.repositoryBinding.baselineCommit === value.baselineCommit &&
     value.projectLocalPath === value.repositoryBinding.canonicalPath;
+}
+
+const sandboxCapabilityStates = new Set([
+  'Available',
+  'Disabled',
+  'UnsupportedHost',
+  'Unavailable',
+  'Unsafe'
+]);
+
+const sandboxQualificationStates = new Set([
+  'Running',
+  'Passed',
+  'Failed',
+  'Cancelled',
+  'Recovered'
+]);
+
+function isWorkbenchSandboxContext(value: unknown, projectId: number): value is WorkbenchSandboxContext {
+  if (!isJsonRecord(value) ||
+      value.projectId !== projectId ||
+      !isNonEmptyString(value.projectLifecyclePhase) ||
+      !isNonEmptyString(value.executionReadiness) ||
+      !(value.repositoryAuthority === null || isWorkbenchSandboxRepositoryAuthority(value.repositoryAuthority)) ||
+      !isSandboxCapability(value.capability) ||
+      !(value.latestAttempt === null || isSandboxQualificationAttemptSnapshot(value.latestAttempt))) {
+    return false;
+  }
+
+  if (value.capability.state === 'Available' && value.repositoryAuthority === null) {
+    return false;
+  }
+
+  if (value.latestAttempt?.state === 'Running') {
+    return value.repositoryAuthority !== null &&
+      value.latestAttempt.repositoryBindingId === value.repositoryAuthority.repositoryBindingId &&
+      value.latestAttempt.expectedRepositoryBindingRevision === value.repositoryAuthority.repositoryBindingRevision &&
+      value.latestAttempt.projectExecutionProfileId === value.repositoryAuthority.projectExecutionProfileId &&
+      value.latestAttempt.expectedExecutionProfileRevision === value.repositoryAuthority.projectExecutionProfileRevision &&
+      value.latestAttempt.baselineCommit === value.repositoryAuthority.baselineCommit;
+  }
+
+  return true;
+}
+
+function isWorkbenchSandboxRepositoryAuthority(value: unknown): value is WorkbenchSandboxRepositoryAuthority {
+  return isJsonRecord(value) &&
+    isNonEmptyUuidString(value.repositoryBindingId) &&
+    isPositiveInteger(value.repositoryBindingRevision) &&
+    isNonEmptyUuidString(value.projectExecutionProfileId) &&
+    isPositiveInteger(value.projectExecutionProfileRevision) &&
+    isGitObjectId(value.baselineCommit);
+}
+
+function isSandboxCapability(value: unknown): value is SandboxCapability {
+  if (!isJsonRecord(value) ||
+      typeof value.state !== 'string' || !sandboxCapabilityStates.has(value.state) ||
+      !isNonEmptyString(value.reasonCode) ||
+      !isNonEmptyString(value.message) ||
+      !isNonEmptyString(value.policyVersion) ||
+      !(value.policySha256 === null || isLowerSha256(value.policySha256))) {
+    return false;
+  }
+  return value.state !== 'Available' || isLowerSha256(value.policySha256);
+}
+
+function isSandboxQualificationAttemptSnapshot(value: unknown): value is SandboxQualificationAttemptSnapshot {
+  if (!isJsonRecord(value) ||
+      !isNonEmptyUuidString(value.attemptId) ||
+      !isNonEmptyUuidString(value.clientOperationId) ||
+      typeof value.state !== 'string' || !sandboxQualificationStates.has(value.state) ||
+      typeof value.canRecover !== 'boolean' ||
+      !isNonEmptyUuidString(value.repositoryBindingId) ||
+      !isPositiveInteger(value.expectedRepositoryBindingRevision) ||
+      !isNonEmptyUuidString(value.projectExecutionProfileId) ||
+      !isPositiveInteger(value.expectedExecutionProfileRevision) ||
+      !isGitObjectId(value.baselineCommit) ||
+      !isTimestampString(value.startedAtUtc) ||
+      !(value.completedAtUtc === null || isTimestampString(value.completedAtUtc)) ||
+      !(value.evidenceManifestSha256 === null || isLowerSha256(value.evidenceManifestSha256)) ||
+      !(value.failureCode === null || isNonEmptyString(value.failureCode)) ||
+      !(value.safeSummary === null || isNonEmptyString(value.safeSummary))) {
+    return false;
+  }
+
+  if (value.state === 'Running') {
+    return value.completedAtUtc === null && value.evidenceManifestSha256 === null &&
+      value.failureCode === null && value.safeSummary === null;
+  }
+  if (value.state === 'Passed') {
+    return !value.canRecover && value.completedAtUtc !== null && value.evidenceManifestSha256 !== null &&
+      value.failureCode === null;
+  }
+  return !value.canRecover && value.completedAtUtc !== null && value.failureCode !== null && value.safeSummary !== null;
+}
+
+function isWorkbenchSandboxQualificationResult(
+  value: unknown,
+  projectId: number,
+  request: StartSandboxQualificationRequest
+): value is WorkbenchSandboxQualificationResult {
+  if (!isJsonRecord(value) ||
+      value.projectId !== projectId ||
+      value.clientOperationId !== request.clientOperationId ||
+      typeof value.isReplay !== 'boolean' ||
+      !isSandboxCapability(value.capability) ||
+      !isSandboxQualificationAttemptSnapshot(value.attempt) ||
+      value.attempt.clientOperationId !== request.clientOperationId ||
+      value.attempt.expectedRepositoryBindingRevision !== request.expectedRepositoryBindingRevision ||
+      value.attempt.expectedExecutionProfileRevision !== request.expectedExecutionProfileRevision ||
+      value.attempt.state === 'Running') {
+    return false;
+  }
+
+  return value.attempt.state === 'Passed'
+    ? value.capability.state === 'Available'
+    : value.capability.state !== 'Available';
 }
 
 function isRepositoryBindingSnapshot(value: unknown, projectId: number): value is RepositoryBindingSnapshot {

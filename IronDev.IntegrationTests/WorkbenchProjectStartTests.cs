@@ -382,7 +382,19 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
                              AND name='FK_ClientOperations_RepositoryProvisioningReceiptAuthority')
                     ALTER TABLE dbo.ClientOperations
                         DROP CONSTRAINT FK_ClientOperations_RepositoryProvisioningReceiptAuthority;
+                IF EXISTS (SELECT 1 FROM sys.foreign_keys
+                           WHERE parent_object_id=OBJECT_ID('dbo.ClientOperations')
+                             AND name='FK_ClientOperations_SandboxQualificationAttemptAuthority')
+                    ALTER TABLE dbo.ClientOperations
+                        DROP CONSTRAINT FK_ClientOperations_SandboxQualificationAttemptAuthority;
+                IF EXISTS (SELECT 1 FROM sys.foreign_keys
+                           WHERE parent_object_id=OBJECT_ID('dbo.ClientOperations')
+                             AND name='FK_ClientOperations_SandboxEvidenceManifestAuthority')
+                    ALTER TABLE dbo.ClientOperations
+                        DROP CONSTRAINT FK_ClientOperations_SandboxEvidenceManifestAuthority;
             END;
+            DROP TABLE IF EXISTS dbo.SandboxEvidenceManifests;
+            DROP TABLE IF EXISTS dbo.SandboxQualificationAttempts;
             DROP TABLE IF EXISTS dbo.RepositoryProvisioningReceipts;
             DROP TABLE IF EXISTS dbo.RepositoryProvisioningAttempts;
             DROP TABLE IF EXISTS dbo.ClientOperations;

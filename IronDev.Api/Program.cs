@@ -23,6 +23,7 @@ using IronDev.Core.Models;
 using IronDev.Core.Promotion;
 using IronDev.Core.Runs;
 using IronDev.Core.RunReadiness;
+using IronDev.Core.Sandbox;
 using IronDev.Core.Workbench;
 using IronDev.Core.RunReports;
 using IronDev.Core.Workspaces;
@@ -38,6 +39,7 @@ using IronDev.Infrastructure.DependencyInjection;
 using IronDev.Infrastructure.Services;
 using IronDev.Infrastructure.Services.Runs;
 using IronDev.Infrastructure.Services.RunReports;
+using IronDev.Infrastructure.Services.Sandbox;
 using IronDev.Infrastructure.Services.Promotion;
 using IronDev.Infrastructure.Services.Workspaces;
 using IronDev.Infrastructure.Security;
@@ -199,6 +201,27 @@ builder.Services.AddSingleton<IRepositoryProvisioningDirectoryCreator,
 builder.Services.AddSingleton<IRepositoryProvisioningExecutor, RepositoryProvisioningExecutor>();
 builder.Services.AddScoped<IWorkbenchRepositoryProvisioningService,
     WorkbenchRepositoryProvisioningService>();
+var workbenchSandboxOptions = builder.Configuration
+    .GetSection("WorkbenchProductionSandbox")
+    .Get<WindowsSandboxOptions>() ?? new WindowsSandboxOptions();
+builder.Services.AddSingleton(workbenchSandboxOptions);
+builder.Services.AddSingleton<ISandboxRuntimePolicyCatalog>(services =>
+    new WindowsSandboxPolicyCatalog(services.GetRequiredService<WindowsSandboxOptions>()));
+builder.Services.AddSingleton<IDockerCommandRunner, DockerCommandRunner>();
+builder.Services.AddSingleton<IHcsContainerRuntime>(services =>
+    CreateWorkbenchSandboxRuntime(
+        builder.Configuration,
+        services.GetRequiredService<WindowsSandboxOptions>(),
+        services.GetRequiredService<IDockerCommandRunner>()));
+builder.Services.AddSingleton<ISandboxExecutionService, HcsHyperVSandboxExecutionService>();
+builder.Services.AddSingleton<ISandboxSourceSnapshotBuilder, SandboxSourceSnapshotBuilder>();
+builder.Services.AddScoped<IWorkbenchSandboxQualificationService,
+    WorkbenchSandboxQualificationService>();
+builder.Services.AddScoped<IWorkbenchSandboxRecoveryService, WorkbenchSandboxRecoveryService>();
+// Qualification availability is policy-gated, but cleanup must continue after a
+// restart even when an operator disables new sandbox runs. An unavailable cleanup
+// runtime leaves durable Running attempts retryable and reports only safe failures.
+builder.Services.AddHostedService<WorkbenchSandboxRecoveryWorker>();
 builder.Services.AddSingleton<IWorkbenchAgentRunFailureInjector, NoOpWorkbenchAgentRunFailureInjector>();
 var workbenchAgentRunWorkerEnabled =
     builder.Configuration.GetValue<bool>("Features:WorkbenchAgentRunWorker");
@@ -1090,6 +1113,110 @@ static IRunReportService CreateRunReportService(IConfiguration configuration)
     return string.IsNullOrWhiteSpace(configuredRoot)
         ? new FileRunReportService()
         : new FileRunReportService(Path.Combine(configuredRoot, "runs"));
+}
+
+static IHcsContainerRuntime CreateWorkbenchSandboxRuntime(
+    IConfiguration configuration,
+    WindowsSandboxOptions policyOptions,
+    IDockerCommandRunner commandRunner)
+{
+    var section = configuration.GetSection("WorkbenchProductionSandbox");
+    var dockerExecutablePath = policyOptions.RuntimeExecutablePath.Trim();
+    var dockerEngineHost = section["DockerEngineHost"]?.Trim() ?? string.Empty;
+    var dockerConfigDirectory = section["DockerConfigDirectory"]?.Trim() ?? string.Empty;
+    var snapshotRoot = section["SourceSnapshotRoot"]?.Trim() ?? string.Empty;
+    var evidenceRoot = section["EvidenceRoot"]?.Trim() ?? string.Empty;
+    var offlineFeedRoot = policyOptions.OfflineFeedPath.Trim();
+    var imageReference = policyOptions.ContainerImageDigestReference.Trim();
+    var ownerLabel = section["OwnerLabelValue"]?.Trim() ?? "irondev-workbench-pr06a";
+
+    if (!TryResolveTrustedFile(dockerExecutablePath, "docker.exe", out dockerExecutablePath) ||
+        !TryResolveTrustedDirectory(dockerConfigDirectory, requireEmpty: true, out dockerConfigDirectory) ||
+        !TryResolveTrustedDirectory(evidenceRoot, requireEmpty: false, out evidenceRoot) ||
+        !string.Equals(
+            dockerEngineHost,
+            HcsContainerRuntimeConstants.DockerEngineHost,
+            StringComparison.Ordinal) ||
+        PathsOverlap(dockerConfigDirectory, evidenceRoot))
+    {
+        return new UnavailableHcsContainerRuntime(
+            "The production Windows sandbox cleanup runtime configuration is incomplete or unsafe.");
+    }
+
+    var sourceRootAvailable = TryResolveTrustedDirectory(
+        snapshotRoot, requireEmpty: false, out snapshotRoot) &&
+        !PathsOverlap(dockerConfigDirectory, snapshotRoot) &&
+        !PathsOverlap(evidenceRoot, snapshotRoot);
+    var feedRootAvailable = TryResolveTrustedDirectory(
+        offlineFeedRoot, requireEmpty: false, out offlineFeedRoot) &&
+        !PathsOverlap(dockerConfigDirectory, offlineFeedRoot) &&
+        !PathsOverlap(evidenceRoot, offlineFeedRoot) &&
+        (!sourceRootAvailable || !PathsOverlap(snapshotRoot, offlineFeedRoot));
+
+    var dockerEnvironment = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    var windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+    if (!string.IsNullOrWhiteSpace(windowsDirectory))
+        dockerEnvironment["SystemRoot"] = windowsDirectory;
+    var temporaryDirectory = Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    if (!string.IsNullOrWhiteSpace(temporaryDirectory))
+        dockerEnvironment["TEMP"] = temporaryDirectory;
+
+    return new DockerHcsContainerRuntime(
+        new HcsContainerRuntimeConfiguration
+        {
+            DockerExecutablePath = dockerExecutablePath,
+            DockerEngineHost = dockerEngineHost,
+            DockerConfigDirectory = dockerConfigDirectory,
+            OwnerLabelValue = ownerLabel,
+            EvidenceRootPath = evidenceRoot,
+            AllowedSourceRoots = sourceRootAvailable ? [snapshotRoot] : [],
+            AllowedOfflineFeedRoots = feedRootAvailable ? [offlineFeedRoot] : [],
+            AllowedImageReferences = string.IsNullOrWhiteSpace(imageReference) ? [] : [imageReference],
+            DockerHostEnvironment = dockerEnvironment
+        },
+        commandRunner);
+}
+
+static bool TryResolveTrustedFile(string path, string requiredFileName, out string normalized)
+{
+    normalized = string.Empty;
+    try
+    {
+        if (!WindowsSandboxPathValidator.TryNormalizeExistingFile(path, out normalized, out _) ||
+            !string.Equals(Path.GetFileName(normalized), requiredFileName, StringComparison.OrdinalIgnoreCase))
+            return false;
+        return true;
+    }
+    catch
+    {
+        normalized = string.Empty;
+        return false;
+    }
+}
+
+static bool TryResolveTrustedDirectory(string path, bool requireEmpty, out string normalized)
+{
+    normalized = string.Empty;
+    try
+    {
+        if (!WindowsSandboxPathValidator.TryNormalizeExistingDirectory(path, out normalized, out _) ||
+            (requireEmpty && Directory.EnumerateFileSystemEntries(normalized).Any()))
+            return false;
+        return true;
+    }
+    catch
+    {
+        normalized = string.Empty;
+        return false;
+    }
+}
+
+static bool PathsOverlap(string first, string second)
+{
+    var firstWithSeparator = Path.TrimEndingDirectorySeparator(first) + Path.DirectorySeparatorChar;
+    var secondWithSeparator = Path.TrimEndingDirectorySeparator(second) + Path.DirectorySeparatorChar;
+    return firstWithSeparator.StartsWith(secondWithSeparator, StringComparison.OrdinalIgnoreCase) ||
+        secondWithSeparator.StartsWith(firstWithSeparator, StringComparison.OrdinalIgnoreCase);
 }
 
 // Expose Program for WebApplicationFactory in integration tests.

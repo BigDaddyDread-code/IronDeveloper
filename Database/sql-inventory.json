@@ -2542,6 +2542,41 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Records fenced provisioning attempts and immutable qualification receipts around server-owned template rendering, bounded Git initialization, atomic direct-sibling publication, and exact crash recovery. It does not restore, build, test, index, configure a sandbox, or authorize Builder execution."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-sandbox-qualification",
+                        "path":  "Database/migrate_workbench_sandbox_qualification.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.SandboxQualificationAttempts",
+                                               "dbo.SandboxEvidenceManifests",
+                                               "sandbox qualification result references on dbo.ClientOperations",
+                                               "append-only sandbox evidence manifest trigger",
+                                               "terminal-immutable sandbox attempt trigger"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users",
+                                              "dbo.ProjectMembers",
+                                              "dbo.RepositoryBindings",
+                                              "dbo.RepositoryBindingRevisions",
+                                              "dbo.ProjectExecutionProfiles",
+                                              "dbo.ProjectExecutionProfileRevisions",
+                                              "dbo.RepositoryProvisioningReceipts",
+                                              "dbo.WorkbenchSessions",
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.ClientOperations",
+                                              "dbo.WorkbenchOutboxEvents",
+                                              "dbo.UserMutationAttribution"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-06A production sandbox qualification service"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Records exact fenced sandbox attempts and immutable canonical evidence while preserving NotConfigured readiness. Missing digests, feeds, HCS access, or policy controls fail closed; qualification grants no Builder authority."
                     }
                 ]
 }

@@ -239,6 +239,11 @@
                              "id":  "2026-07-workbench-pr05b-repository-provisioning",
                              "path":  "Database/migrate_workbench_repository_provisioning.sql",
                              "description":  "Adds durable controlled repository-provisioning attempts and immutable qualification receipts, exact setup-confirmation provenance, and operation result linkage."
+                        },
+                        {
+                             "id":  "2026-07-workbench-pr06a-sandbox-qualification",
+                             "path":  "Database/migrate_workbench_sandbox_qualification.sql",
+                             "description":  "Adds fenced production-sandbox qualification attempts, exact repository/profile/policy provenance, immutable evidence manifests, cleanup outcomes, and idempotent operation result linkage without changing project readiness."
                         }
                    ]
 }

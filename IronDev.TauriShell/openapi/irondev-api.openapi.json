@@ -15733,6 +15733,105 @@
         }
       }
     },
+    "/api/workbench/projects/{projectId}/repository/sandbox": {
+      "get": {
+        "tags": [
+          "WorkbenchRepository"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchSandboxContext"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchSandboxContext"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchSandboxContext"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/projects/{projectId}/repository/sandbox-qualifications": {
+      "post": {
+        "tags": [
+          "WorkbenchRepository"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSandboxQualificationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSandboxQualificationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSandboxQualificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchSandboxQualificationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchSandboxQualificationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchSandboxQualificationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workbench/projects/{projectId}/repository/provisionings": {
       "post": {
         "tags": [
@@ -35501,6 +35600,94 @@
         },
         "additionalProperties": false
       },
+      "SandboxCapability": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "policyVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "policySha256": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SandboxQualificationAttemptSnapshot": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "repositoryBindingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRepositoryBindingRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectExecutionProfileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedExecutionProfileRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "baselineCommit": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "evidenceManifestSha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "safeSummary": {
+            "type": "string",
+            "nullable": true
+          },
+          "canRecover": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "SaveDiscussionRequest": {
         "required": [
           "content",
@@ -39434,6 +39621,32 @@
         },
         "additionalProperties": false
       },
+      "StartSandboxQualificationRequest": {
+        "type": "object",
+        "properties": {
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRepositoryBindingRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedExecutionProfileRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "StartTicketBuildRunRequest": {
         "type": "object",
         "properties": {
@@ -41577,6 +41790,82 @@
           },
           "repositoryBinding": {
             "$ref": "#/components/schemas/RepositoryBindingSnapshot"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbenchSandboxContext": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "projectLifecyclePhase": {
+            "type": "string",
+            "nullable": true
+          },
+          "executionReadiness": {
+            "type": "string",
+            "nullable": true
+          },
+          "repositoryAuthority": {
+            "$ref": "#/components/schemas/WorkbenchSandboxRepositoryAuthority"
+          },
+          "capability": {
+            "$ref": "#/components/schemas/SandboxCapability"
+          },
+          "latestAttempt": {
+            "$ref": "#/components/schemas/SandboxQualificationAttemptSnapshot"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbenchSandboxQualificationResult": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isReplay": {
+            "type": "boolean"
+          },
+          "capability": {
+            "$ref": "#/components/schemas/SandboxCapability"
+          },
+          "attempt": {
+            "$ref": "#/components/schemas/SandboxQualificationAttemptSnapshot"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbenchSandboxRepositoryAuthority": {
+        "type": "object",
+        "properties": {
+          "repositoryBindingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "repositoryBindingRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectExecutionProfileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectExecutionProfileRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "baselineCommit": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

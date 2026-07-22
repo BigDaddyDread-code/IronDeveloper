@@ -6,7 +6,7 @@ namespace IronDev.Api.Services;
 
 public static partial class WorkbenchReleaseInfoFactory
 {
-    public const string DefaultVersion = "0.1.0-preview.13";
+    public const string DefaultVersion = "0.1.0-preview.14";
     public const string DefaultPreviewId = "default";
 
     public static WorkbenchReleaseInfoDto Create(
