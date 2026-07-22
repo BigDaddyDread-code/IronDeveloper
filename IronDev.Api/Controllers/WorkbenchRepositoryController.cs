@@ -12,14 +12,89 @@ namespace IronDev.Api.Controllers;
 public sealed class WorkbenchRepositoryController : ControllerBase
 {
     private readonly IWorkbenchRepositorySetupService _repositorySetup;
+    private readonly IWorkbenchRepositoryProvisioningService _repositoryProvisioning;
     private readonly ICurrentTenantContext _tenant;
 
     public WorkbenchRepositoryController(
         IWorkbenchRepositorySetupService repositorySetup,
+        IWorkbenchRepositoryProvisioningService repositoryProvisioning,
         ICurrentTenantContext tenant)
     {
         _repositorySetup = repositorySetup;
+        _repositoryProvisioning = repositoryProvisioning;
         _tenant = tenant;
+    }
+
+    [HttpPost("provisionings")]
+    public async Task<ActionResult<RepositoryProvisioningResult>> Provision(
+        int projectId,
+        ProvisionRepositoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actor = CurrentActor();
+        try
+        {
+            return Ok(await _repositoryProvisioning.ProvisionAsync(
+                new ProvisionRepositoryCommand(
+                    _tenant.TenantId,
+                    actor.UserId,
+                    projectId,
+                    request.WorkbenchSessionId,
+                    request.LeaseEpoch,
+                    request.ClientOperationId,
+                    request.SetupConfirmationId,
+                    request.ExpectedRepositoryBindingRevision,
+                    request.ExpectedExecutionProfileRevision),
+                cancellationToken));
+        }
+        catch (RepositoryProvisioningForbiddenException exception)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden,
+                Error(RepositoryProvisioningForbiddenException.ErrorCode, exception.Message));
+        }
+        catch (WorkbenchProjectNotAccessibleException)
+        {
+            return ProjectNotFound();
+        }
+        catch (RepositoryProvisioningStaleException exception)
+        {
+            return Conflict(Error(RepositoryProvisioningStaleException.ErrorCode, exception.Message));
+        }
+        catch (RepositoryProvisioningNotAllowedException exception)
+        {
+            return Conflict(Error(RepositoryProvisioningNotAllowedException.ErrorCode, exception.Message));
+        }
+        catch (RepositoryProvisioningInProgressException exception)
+        {
+            return Conflict(Error(RepositoryProvisioningInProgressException.ErrorCode, exception.Message));
+        }
+        catch (ProjectStartOperationMismatchException exception)
+        {
+            return Conflict(Error(ProjectStartOperationMismatchException.ErrorCode, exception.Message));
+        }
+        catch (WorkbenchLeaseFenceException exception)
+        {
+            return Conflict(Error(WorkbenchLeaseFenceException.ErrorCode, exception.Message));
+        }
+        catch (RepositoryProvisioningExecutionException exception)
+        {
+            return UnprocessableEntity(new
+            {
+                error = RepositoryProvisioningExecutionException.ErrorCode,
+                reasonCode = exception.ReasonCode,
+                message = exception.Message
+            });
+        }
+        catch (RepositoryProvisioningIntegrityException)
+        {
+            return UnprocessableEntity(Error(
+                RepositoryProvisioningIntegrityException.ErrorCode,
+                "The confirmed repository provisioning package failed integrity validation."));
+        }
+        catch (RepositorySetupValidationException exception)
+        {
+            return BadRequest(Error("repository_setup_invalid", exception.Message));
+        }
     }
 
     [HttpGet]
@@ -159,6 +234,14 @@ public sealed class WorkbenchRepositoryController : ControllerBase
         long LeaseEpoch,
         Guid ClientOperationId,
         string ExpectedPlanHash);
+
+    public sealed record ProvisionRepositoryRequest(
+        long WorkbenchSessionId,
+        long LeaseEpoch,
+        Guid ClientOperationId,
+        Guid SetupConfirmationId,
+        long ExpectedRepositoryBindingRevision,
+        long ExpectedExecutionProfileRevision);
 
     private CurrentUserContext CurrentActor() => new(
         HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());

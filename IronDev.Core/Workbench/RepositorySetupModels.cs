@@ -75,11 +75,33 @@ public static class RepositorySetupReasonCodes
     public const string WorkspaceRootNotConfigured = "RepositorySetupWorkspaceRootNotConfigured";
     public const string WorkspaceRootUnavailable = "RepositorySetupWorkspaceRootUnavailable";
     public const string RepositoryProvisioningPending = "RepositoryProvisioningPending";
+    public const string RepositoryTechnicalValidationPending = "RepositoryTechnicalValidationPending";
 }
 
 public static class RepositorySetupOperationKinds
 {
     public const string Confirm = "ConfirmRepositorySetup";
+    public const string Provision = "ProvisionRepository";
+}
+
+public static class RepositoryProvisioningStates
+{
+    public const string Provisioning = "Provisioning";
+    public const string Qualified = "Qualified";
+    public const string ProvisioningFailed = "ProvisioningFailed";
+}
+
+public static class RepositoryProvisioningFailureCodes
+{
+    public const string TargetAlreadyExists = "RepositoryProvisioningTargetAlreadyExists";
+    public const string WorkspaceUnsafe = "RepositoryProvisioningWorkspaceUnsafe";
+    public const string TemplateIntegrityFailed = "RepositoryProvisioningTemplateIntegrityFailed";
+    public const string GitUnavailable = "RepositoryProvisioningGitUnavailable";
+    public const string GitCommandFailed = "RepositoryProvisioningGitCommandFailed";
+    public const string GitCommandTimedOut = "RepositoryProvisioningGitCommandTimedOut";
+    public const string PublishedRepositoryInvalid = "RepositoryProvisioningPublishedRepositoryInvalid";
+    public const string FileSystemFailed = "RepositoryProvisioningFileSystemFailed";
+    public const string UnexpectedFailure = "RepositoryProvisioningUnexpectedFailure";
 }
 
 public sealed record RepositorySetupProfileDescriptor(
@@ -219,11 +241,85 @@ public sealed record RepositorySetupContext(
     string ProjectLifecyclePhase,
     string ExecutionReadiness,
     string ReadinessReasonCode,
+    string? ProjectLocalPath,
     RepositoryBindingSnapshot? RepositoryBinding,
     ProjectExecutionProfileSnapshot? ExecutionProfile,
     RepositorySetupConfirmationSnapshot? LatestConfirmation,
     RepositorySetupEnvironmentCapability EnvironmentCapability,
-    IReadOnlyList<RepositorySetupProfileSummary> AvailableProfiles);
+    IReadOnlyList<RepositorySetupProfileSummary> AvailableProfiles,
+    RepositoryProvisioningSnapshot? LatestProvisioning = null);
+
+public sealed record RepositoryProvisioningSnapshot(
+    Guid AttemptId,
+    string State,
+    int AttemptNumber,
+    Guid ClientOperationId,
+    Guid SetupConfirmationId,
+    long ExpectedRepositoryBindingRevision,
+    long ExpectedExecutionProfileRevision,
+    DateTime StartedAtUtc,
+    DateTime? CompletedAtUtc,
+    string? FailureCode,
+    Guid? ReceiptId,
+    string? BranchName,
+    string? BaselineCommit);
+
+public sealed record ProvisionRepositoryCommand(
+    int TenantId,
+    int ActorUserId,
+    int ProjectId,
+    long WorkbenchSessionId,
+    long LeaseEpoch,
+    Guid ClientOperationId,
+    Guid SetupConfirmationId,
+    long ExpectedRepositoryBindingRevision,
+    long ExpectedExecutionProfileRevision);
+
+public sealed record RepositoryProvisioningResult(
+    int ProjectId,
+    Guid AttemptId,
+    Guid ReceiptId,
+    Guid ClientOperationId,
+    bool IsReplay,
+    string ProjectLifecyclePhase,
+    string ExecutionReadiness,
+    string ReadinessReasonCode,
+    string ProjectLocalPath,
+    RepositoryBindingSnapshot RepositoryBinding,
+    ProjectExecutionProfileSnapshot ExecutionProfile,
+    string BranchName,
+    string BaselineCommit,
+    string ManifestSha256,
+    string GitTreeId);
+
+public sealed record RepositoryProvisioningExecutionRequest(
+    Guid AttemptId,
+    string ApprovedWorkspaceRoot,
+    RepositorySetupPlanPreview ConfirmedPlan,
+    RepositorySetupTemplateBundle TemplateBundle,
+    DateTime DeterministicCommitTimeUtc);
+
+public sealed record RepositoryProvisioningExecutionEvidence(
+    string CanonicalPath,
+    string BranchName,
+    string BaselineCommit,
+    string ManifestJson,
+    string ManifestSha256,
+    string GitTreeId,
+    DateTime PublishedAtUtc,
+    bool WasRecovered);
+
+public enum RepositoryProvisioningPublishedInspectionState
+{
+    AbsentOrForeign,
+    Verified,
+    VerificationUnavailable,
+    Invalid
+}
+
+public sealed record RepositoryProvisioningPublishedInspection(
+    RepositoryProvisioningPublishedInspectionState State,
+    string ReasonCode);
 
 public sealed record RepositorySetupPlanPreview(
     int SchemaVersion,
@@ -316,6 +412,40 @@ public interface IWorkbenchRepositorySetupService
         CancellationToken cancellationToken = default);
 }
 
+public interface IWorkbenchRepositoryProvisioningService
+{
+    Task<RepositoryProvisioningResult> ProvisionAsync(
+        ProvisionRepositoryCommand command,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IRepositoryProvisioningExecutor
+{
+    Task<RepositoryProvisioningExecutionEvidence> ExecuteOrRecoverAsync(
+        RepositoryProvisioningExecutionRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<RepositoryProvisioningPublishedInspection> InspectPublishedRepositoryForAttemptAsync(
+        RepositoryProvisioningExecutionRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record RepositoryProvisioningGitResult(int ExitCode, string StandardOutput, string StandardError);
+
+public interface IRepositoryProvisioningGitRunner
+{
+    Task<RepositoryProvisioningGitResult> RunAsync(
+        string repositoryPath,
+        IReadOnlyList<string> arguments,
+        DateTime deterministicCommitTimeUtc,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IRepositoryProvisioningDirectoryCreator
+{
+    void CreateNew(string path);
+}
+
 public interface IRepositorySetupProfileCatalog
 {
     IReadOnlyList<RepositorySetupProfileDescriptor> GetAll();
@@ -376,6 +506,33 @@ public interface IRepositorySetupConfirmationFailureInjector
 public sealed class NoOpRepositorySetupConfirmationFailureInjector : IRepositorySetupConfirmationFailureInjector
 {
     public void ThrowIfRequested(RepositorySetupConfirmationFailurePoint point)
+    {
+    }
+}
+
+public enum RepositoryProvisioningFailurePoint
+{
+    ClaimCommitted,
+    BeforeStagingCreate,
+    StagingCreated,
+    BundleRendered,
+    GitInitialized,
+    GitIndexCreated,
+    GitCommitted,
+    BeforePublish,
+    AfterPublish,
+    PublishedMarkerInspected,
+    BeforeFinalize
+}
+
+public interface IRepositoryProvisioningFailureInjector
+{
+    void ThrowIfRequested(RepositoryProvisioningFailurePoint point);
+}
+
+public sealed class NoOpRepositoryProvisioningFailureInjector : IRepositoryProvisioningFailureInjector
+{
+    public void ThrowIfRequested(RepositoryProvisioningFailurePoint point)
     {
     }
 }
@@ -553,12 +710,15 @@ public static class RepositorySetupTemplateBundleRenderer
     private static void ValidateIdentifier(string value, string name)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 100 ||
-            !(char.IsLetter(value[0]) || value[0] == '_') ||
-            value.Any(character => !(char.IsLetterOrDigit(character) || character is '_' or '.')) ||
+            !(IsAsciiLetter(value[0]) || value[0] == '_') ||
+            value.Any(character => !(IsAsciiLetter(character) || char.IsAsciiDigit(character) || character is '_' or '.')) ||
             value.Contains("..", StringComparison.Ordinal))
             throw new RepositorySetupIntegrityException(
                 $"The confirmed {name} is not a safe server-derived template identifier.");
     }
+
+    private static bool IsAsciiLetter(char value) =>
+        value is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
 }
 
 public static class RepositorySetupPlanCodec
@@ -661,3 +821,58 @@ public sealed class RepositorySetupForbiddenException : Exception
 }
 
 public sealed class RepositorySetupIntegrityException(string message) : Exception(message);
+
+public sealed class RepositoryProvisioningStaleException : Exception
+{
+    public const string ErrorCode = "repository_provisioning_stale";
+
+    public RepositoryProvisioningStaleException()
+        : base("Repository setup changed. Refresh before provisioning.")
+    {
+    }
+}
+
+public sealed class RepositoryProvisioningNotAllowedException(string message) : Exception(message)
+{
+    public const string ErrorCode = "repository_provisioning_not_allowed";
+}
+
+public sealed class RepositoryProvisioningInProgressException : Exception
+{
+    public const string ErrorCode = "repository_provisioning_in_progress";
+
+    public RepositoryProvisioningInProgressException()
+        : base("This exact repository provisioning operation is already in progress.")
+    {
+    }
+}
+
+public sealed class RepositoryProvisioningForbiddenException : Exception
+{
+    public const string ErrorCode = "repository_provisioning_forbidden";
+
+    public RepositoryProvisioningForbiddenException()
+        : base("Only an active project Owner or Contributor may provision a repository.")
+    {
+    }
+}
+
+public sealed class RepositoryProvisioningExecutionException : Exception
+{
+    public const string ErrorCode = "repository_provisioning_failed";
+
+    public RepositoryProvisioningExecutionException(string reasonCode, string message, Exception? inner = null)
+        : base(message, inner) => ReasonCode = reasonCode;
+
+    public string ReasonCode { get; }
+}
+
+public sealed class RepositoryProvisioningIntegrityException : Exception
+{
+    public const string ErrorCode = "repository_provisioning_integrity_failed";
+
+    public RepositoryProvisioningIntegrityException(string message, Exception? inner = null)
+        : base(message, inner)
+    {
+    }
+}

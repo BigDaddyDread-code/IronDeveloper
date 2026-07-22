@@ -9,6 +9,11 @@ const PLAN_HASH = 'e'.repeat(64);
 const BINDING_ID = '11111111-1111-4111-8111-111111111111';
 const PROFILE_AUTHORITY_ID = '22222222-2222-4222-8222-222222222222';
 const CONFIRMATION_ID = '33333333-3333-4333-8333-333333333333';
+const ATTEMPT_ID = '44444444-4444-4444-8444-444444444444';
+const RECEIPT_ID = '55555555-5555-4555-8555-555555555555';
+const BASELINE_COMMIT = '1'.repeat(40);
+const TREE_ID = '2'.repeat(40);
+const MANIFEST_SHA = 'f'.repeat(64);
 
 type Compatibility = 'Compatible' | 'Incompatible' | 'NeedsConfirmation' | 'NoPreference';
 type PlanState = 'ReadyForConfirmation' | 'UnsupportedProfile' | 'EnvironmentUnavailable' | 'NeedsConfirmation';
@@ -16,11 +21,14 @@ type PlanState = 'ReadyForConfirmation' | 'UnsupportedProfile' | 'EnvironmentUna
 interface MockState {
   planBodies: Array<Record<string, unknown>>;
   confirmationBodies: Array<Record<string, unknown>>;
+  provisioningBodies: Array<Record<string, unknown>>;
   oldSetupRequests: string[];
 }
 
 interface MockOptions {
+  authority?: (projectId: number) => { workbenchSessionId: number; leaseEpoch: number };
   context?: (projectId: number) => unknown;
+  onContext?: (route: Route, projectId: number, requestNumber: number) => Promise<void> | void;
   onPlan?: (
     route: Route,
     body: Record<string, unknown>,
@@ -28,6 +36,12 @@ interface MockOptions {
     requestNumber: number
   ) => Promise<void> | void;
   onConfirmation?: (
+    route: Route,
+    body: Record<string, unknown>,
+    projectId: number,
+    requestNumber: number
+  ) => Promise<void> | void;
+  onProvisioning?: (
     route: Route,
     body: Record<string, unknown>,
     projectId: number,
@@ -73,9 +87,11 @@ function repositoryContext(
     projectLifecyclePhase: 'Shaping',
     executionReadiness: 'NotConfigured',
     readinessReasonCode: 'RepositoryNotConfigured',
+    projectLocalPath: null,
     repositoryBinding: null,
     executionProfile: null,
     latestConfirmation: null,
+    latestProvisioning: null,
     environmentCapability: {
       state: environmentState,
       reasonCode: environmentState === 'Available' ? 'RepositorySetupEnvironmentAvailable' : 'RepositorySetupWorkspaceRootUnavailable',
@@ -205,6 +221,100 @@ function confirmationResult(
   };
 }
 
+function repositoryBinding(
+  projectId: number,
+  state: 'SetupConfirmed' | 'Provisioning' | 'Qualified' | 'ProvisioningFailed',
+  revision: number
+) {
+  return {
+    id: BINDING_ID,
+    projectId,
+    revision,
+    repositoryKind: 'Greenfield',
+    canonicalPath: setupPlan(projectId).targetPath,
+    bindingState: state,
+    defaultBranch: state === 'Qualified' ? 'main' : null,
+    baselineCommit: state === 'Qualified' ? BASELINE_COMMIT : null,
+    createdByActorUserId: 7,
+    confirmedAtUtc: '2026-07-21T01:02:03Z'
+  };
+}
+
+function executionProfile(projectId: number, revision = 1) {
+  const result = confirmationResult({ clientOperationId: '66666666-6666-4666-8666-666666666666' }, projectId);
+  return { ...result.executionProfile, revision };
+}
+
+function provisioningAttempt(
+  state: 'Provisioning' | 'Qualified' | 'ProvisioningFailed',
+  operationId = '77777777-7777-4777-8777-777777777777',
+  attemptNumber = 1,
+  expectedBindingRevision = 1
+) {
+  return {
+    attemptId: ATTEMPT_ID,
+    state,
+    attemptNumber,
+    clientOperationId: operationId,
+    setupConfirmationId: CONFIRMATION_ID,
+    expectedRepositoryBindingRevision: expectedBindingRevision,
+    expectedExecutionProfileRevision: 1,
+    startedAtUtc: '2026-07-21T02:00:00Z',
+    completedAtUtc: state === 'Provisioning' ? null : '2026-07-21T02:00:01Z',
+    failureCode: state === 'ProvisioningFailed' ? 'RepositoryProvisioningGitFailed' : null,
+    receiptId: state === 'Qualified' ? RECEIPT_ID : null,
+    branchName: state === 'Qualified' ? 'main' : null,
+    baselineCommit: state === 'Qualified' ? BASELINE_COMMIT : null
+  };
+}
+
+function configuredRepositoryContext(
+  projectId = 7,
+  state: 'SetupConfirmed' | 'Provisioning' | 'Qualified' | 'ProvisioningFailed' = 'SetupConfirmed',
+  operationId = '77777777-7777-4777-8777-777777777777'
+) {
+  const revision = state === 'SetupConfirmed' ? 1 : state === 'Provisioning' ? 2 : 3;
+  const context = repositoryContext(projectId) as Record<string, unknown>;
+  return {
+    ...context,
+    readinessReasonCode: state === 'Qualified' ? 'RepositoryTechnicalReadinessPending' : 'RepositoryProvisioningPending',
+    projectLocalPath: state === 'Qualified' ? setupPlan(projectId).targetPath : null,
+    repositoryBinding: repositoryBinding(projectId, state, revision),
+    executionProfile: executionProfile(projectId),
+    latestConfirmation: {
+      confirmationId: CONFIRMATION_ID,
+      planHash: PLAN_HASH,
+      confirmedAtUtc: '2026-07-21T01:02:03Z',
+      clientOperationId: '66666666-6666-4666-8666-666666666666',
+      workbenchSessionId: workbenchSession(projectId).workbenchSessionId,
+      leaseEpoch: workbenchSession(projectId).leaseEpoch
+    },
+    latestProvisioning: state === 'SetupConfirmed' ? null : provisioningAttempt(state, operationId)
+  };
+}
+
+function provisioningResult(body: Record<string, unknown>, projectId = 7, isReplay = false) {
+  const expectedBindingRevision = Number(body.expectedRepositoryBindingRevision);
+  const expectedProfileRevision = Number(body.expectedExecutionProfileRevision);
+  return {
+    projectId,
+    attemptId: ATTEMPT_ID,
+    receiptId: RECEIPT_ID,
+    clientOperationId: body.clientOperationId,
+    isReplay,
+    projectLifecyclePhase: 'Delivery',
+    executionReadiness: 'NotConfigured',
+    readinessReasonCode: 'RepositoryTechnicalReadinessPending',
+    projectLocalPath: setupPlan(projectId).targetPath,
+    repositoryBinding: repositoryBinding(projectId, 'Qualified', expectedBindingRevision + 2),
+    executionProfile: executionProfile(projectId, expectedProfileRevision),
+    branchName: 'main',
+    baselineCommit: BASELINE_COMMIT,
+    manifestSha256: MANIFEST_SHA,
+    gitTreeId: TREE_ID
+  };
+}
+
 async function json(route: Route, body: unknown, status = 200) {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
@@ -216,9 +326,11 @@ function projectIdFrom(route: Route): number {
 }
 
 async function mockRepositorySetup(page: Page, options: MockOptions = {}): Promise<MockState> {
-  const state: MockState = { planBodies: [], confirmationBodies: [], oldSetupRequests: [] };
+  const state: MockState = { planBodies: [], confirmationBodies: [], provisioningBodies: [], oldSetupRequests: [] };
   let planRequests = 0;
   let confirmationRequests = 0;
+  let provisioningRequests = 0;
+  let contextRequests = 0;
 
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
@@ -259,6 +371,7 @@ async function mockRepositorySetup(page: Page, options: MockOptions = {}): Promi
   await page.route('**/irondev-api/api/workbench/projects/*/open', async (route) => {
     const projectId = projectIdFrom(route);
     const request = route.request().postDataJSON() as { clientOperationId: string };
+    const activeAuthority = options.authority?.(projectId) ?? workbenchSession(projectId);
     await json(route, {
       projectId,
       tenantId: 3,
@@ -266,16 +379,18 @@ async function mockRepositorySetup(page: Page, options: MockOptions = {}): Promi
       projectLifecyclePhase: 'Shaping',
       executionReadiness: 'NotConfigured',
       repositoryBinding: null,
-      ...workbenchSession(projectId),
+      ...activeAuthority,
       wasResumed: true,
       wasTakenOver: false,
       clientOperationId: request.clientOperationId
     });
   });
   await page.route('**/irondev-api/api/projects/*/tickets', (route) => json(route, []));
-  await page.route('**/irondev-api/api/workbench/projects/*/repository', (route) => {
+  await page.route('**/irondev-api/api/workbench/projects/*/repository', async (route) => {
+    contextRequests += 1;
     const projectId = projectIdFrom(route);
-    return json(route, options.context?.(projectId) ?? repositoryContext(projectId));
+    if (options.onContext) return options.onContext(route, projectId, contextRequests);
+    await json(route, options.context?.(projectId) ?? repositoryContext(projectId));
   });
   await page.route('**/irondev-api/api/workbench/projects/*/repository/setup-plans', async (route) => {
     planRequests += 1;
@@ -292,6 +407,14 @@ async function mockRepositorySetup(page: Page, options: MockOptions = {}): Promi
     state.confirmationBodies.push(body);
     if (options.onConfirmation) return options.onConfirmation(route, body, projectId, confirmationRequests);
     await json(route, confirmationResult(body, projectId));
+  });
+  await page.route('**/irondev-api/api/workbench/projects/*/repository/provisionings', async (route) => {
+    provisioningRequests += 1;
+    const projectId = projectIdFrom(route);
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    state.provisioningBodies.push(body);
+    if (options.onProvisioning) return options.onProvisioning(route, body, projectId, provisioningRequests);
+    await json(route, provisioningResult(body, projectId));
   });
 
   return state;
@@ -544,4 +667,376 @@ test('strict response validation refuses a malformed repository context', async 
   await expect(unavailable).toContainText('Repository setup is unavailable');
   await expect(unavailable).toContainText('invalid success response');
   await expect(page.getByTestId('repositorySetup.reviewPlan')).toHaveCount(0);
+});
+
+test('complete SetupConfirmed authority can provision only by immutable ids and revisions', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId)
+  });
+  await openSetup(page);
+
+  const confirmed = page.getByTestId('repositorySetup.confirmed');
+  await expect(confirmed).toContainText('Repository setup confirmed');
+  await expect(confirmed).toContainText('source shell and a clean Git repository');
+  await expect(confirmed).toContainText('does not restore, build, test, index code');
+  await expect(confirmed).toContainText('Builder is not authorized');
+  await page.getByTestId('repositorySetup.provision').click();
+
+  const qualified = page.getByTestId('repositorySetup.qualified');
+  await expect(qualified).toContainText('Repository shell provisioned');
+  await expect(qualified).toContainText('Qualified');
+  await expect(qualified).toContainText('NotConfigured');
+  await expect(qualified).toContainText(BASELINE_COMMIT);
+  await expect(qualified).toContainText(TREE_ID);
+  await expect(qualified).toContainText('has not restored, built, tested, indexed');
+
+  expect(Object.keys(state.provisioningBodies[0]).sort()).toEqual([
+    'clientOperationId',
+    'expectedExecutionProfileRevision',
+    'expectedRepositoryBindingRevision',
+    'leaseEpoch',
+    'setupConfirmationId',
+    'workbenchSessionId'
+  ]);
+  expect(state.provisioningBodies[0]).toMatchObject({
+    workbenchSessionId: 7007,
+    leaseEpoch: 1,
+    setupConfirmationId: CONFIRMATION_ID,
+    expectedRepositoryBindingRevision: 1,
+    expectedExecutionProfileRevision: 1
+  });
+  expect(String(state.provisioningBodies[0].clientOperationId)).toMatch(/^[0-9a-f-]{36}$/i);
+  expect(state.oldSetupRequests).toEqual([]);
+});
+
+test('leaving a confirmed setup does not provision implicitly', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId)
+  });
+  await openSetup(page);
+
+  await page.getByRole('button', { name: 'Continue to project' }).click();
+  await expect(page).toHaveURL(/\/projects\/7\/(?:board|workshop)/);
+  expect(state.provisioningBodies).toHaveLength(0);
+});
+
+test('malformed success and generic 5xx retain one provisioning operation for exact replay', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId),
+    onProvisioning: async (route, body, projectId, requestNumber) => {
+      if (requestNumber === 1) {
+        await json(route, { ...provisioningResult(body, projectId), gitTreeId: 'not-a-git-tree' });
+        return;
+      }
+      if (requestNumber === 2) {
+        await json(route, { error: 'Gateway response was incomplete.' }, 500);
+        return;
+      }
+      await json(route, provisioningResult(body, projectId, true));
+    }
+  });
+  await openSetup(page);
+  await page.getByTestId('repositorySetup.provision').click();
+
+  await expect(page.getByTestId('repositorySetup.recoverProvisioning')).toBeVisible();
+  const operationId = String(state.provisioningBodies[0].clientOperationId);
+  await expect(page.getByTestId('repositorySetup.provisioningRecovery.operation')).toContainText(operationId);
+  await page.reload();
+  await expect(page.getByTestId('repositorySetup.recoverProvisioning')).toBeVisible({ timeout: 15_000 });
+
+  await page.getByTestId('repositorySetup.retryProvisioning').click();
+  await expect(page.getByTestId('repositorySetup.recoverProvisioning')).toBeVisible();
+  await page.getByTestId('repositorySetup.retryProvisioning').click();
+  await expect(page.getByTestId('repositorySetup.qualified')).toBeVisible();
+
+  expect(state.provisioningBodies).toHaveLength(3);
+  expect(state.provisioningBodies[1]).toEqual(state.provisioningBodies[0]);
+  expect(state.provisioningBodies[2]).toEqual(state.provisioningBodies[0]);
+  const pendingKeys = await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith('irondev.repository-provisioning')));
+  expect(pendingKeys).toEqual([]);
+});
+
+test('definitive provisioning rejection clears the receipt before a new operation', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId),
+    onProvisioning: (route, body, projectId, requestNumber) => requestNumber === 1
+      ? json(route, { error: 'repository_provisioning_revision_stale', message: 'The binding revision is stale.' }, 409)
+      : json(route, provisioningResult(body, projectId))
+  });
+  await openSetup(page);
+  await page.getByTestId('repositorySetup.provision').click();
+
+  await expect(page.getByRole('alert')).toContainText('The binding revision is stale.');
+  await expect(page.getByTestId('repositorySetup.provision')).toHaveText('Provision repository');
+  await page.getByTestId('repositorySetup.provision').click();
+  await expect(page.getByTestId('repositorySetup.qualified')).toBeVisible();
+  expect(state.provisioningBodies).toHaveLength(2);
+  expect(state.provisioningBodies[1].clientOperationId).not.toBe(state.provisioningBodies[0].clientOperationId);
+});
+
+test('definitive provisioning rejection fails closed when authority refresh is unavailable', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    onContext: (route, projectId, requestNumber) => requestNumber === 1
+      ? json(route, configuredRepositoryContext(projectId))
+      : json(route, { error: 'repository_context_unavailable' }, 503),
+    onProvisioning: (route) => json(route, {
+      error: 'repository_provisioning_revision_stale',
+      message: 'The binding revision is stale.'
+    }, 409)
+  });
+  await openSetup(page);
+  await page.getByTestId('repositorySetup.provision').click();
+
+  await expect(page.getByTestId('repositorySetup.unavailable')).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('The binding revision is stale.');
+  await expect(page.getByTestId('repositorySetup.provision')).toHaveCount(0);
+  expect(state.provisioningBodies).toHaveLength(1);
+  const pendingKeys = await page.evaluate(() => Object.keys(sessionStorage)
+    .filter((key) => key.startsWith('irondev.repository-provisioning')));
+  expect(pendingKeys).toEqual([]);
+});
+
+test('in-progress conflict retains the exact provisioning operation for recovery', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId),
+    onProvisioning: (route, body, projectId, requestNumber) => requestNumber === 1
+      ? json(route, {
+          error: 'repository_provisioning_in_progress',
+          message: 'The exact provisioning operation is still active.'
+        }, 409)
+      : json(route, provisioningResult(body, projectId, true))
+  });
+  await openSetup(page);
+  await page.getByTestId('repositorySetup.provision').click();
+
+  const recovery = page.getByTestId('repositorySetup.recoverProvisioning');
+  await expect(recovery).toContainText('already in progress');
+  await expect(recovery).toContainText('Retry the same operation');
+  await page.getByTestId('repositorySetup.retryProvisioning').click();
+  await expect(page.getByTestId('repositorySetup.qualified')).toBeVisible();
+  expect(state.provisioningBodies).toHaveLength(2);
+  expect(state.provisioningBodies[1]).toEqual(state.provisioningBodies[0]);
+});
+
+test('lease-fence conflict retains and retries the exact provisioning operation', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId),
+    onProvisioning: (route, body, projectId, requestNumber) => requestNumber === 1
+      ? json(route, {
+          error: 'workbench_lease_fence_rejected',
+          message: 'The Workbench write lease is no longer current.'
+        }, 409)
+      : json(route, provisioningResult(body, projectId, true))
+  });
+  await openSetup(page);
+  await page.getByTestId('repositorySetup.provision').click();
+
+  const operationId = String(state.provisioningBodies[0].clientOperationId);
+  const recovery = page.getByTestId('repositorySetup.recoverProvisioning');
+  await expect(recovery).toContainText('write authority changed');
+  await expect(page.getByTestId('repositorySetup.provisioningRecovery.operation')).toContainText(operationId);
+  const pendingKeys = await page.evaluate(() => Object.keys(sessionStorage)
+    .filter((key) => key.startsWith('irondev.repository-provisioning')));
+  expect(pendingKeys).toHaveLength(1);
+
+  await page.getByTestId('repositorySetup.retryProvisioning').click();
+  await expect(page.getByTestId('repositorySetup.qualified')).toBeVisible();
+  expect(state.provisioningBodies).toHaveLength(2);
+  expect(state.provisioningBodies[1]).toEqual(state.provisioningBodies[0]);
+  expect(state.provisioningBodies[1].clientOperationId).toBe(operationId);
+});
+
+test('durable provisioning failure refreshes authority and retries from its new revision', async ({ page }) => {
+  let failed = false;
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, failed ? 'ProvisioningFailed' : 'SetupConfirmed'),
+    onProvisioning: (route, body, projectId, requestNumber) => {
+      if (requestNumber === 1) {
+        failed = true;
+        return json(route, {
+          error: 'repository_provisioning_git_failed',
+          message: 'Controlled Git initialization failed.'
+        }, 422);
+      }
+      return json(route, provisioningResult(body, projectId));
+    }
+  });
+  await openSetup(page);
+  await page.getByTestId('repositorySetup.provision').click();
+
+  const failure = page.getByTestId('repositorySetup.confirmed');
+  await expect(failure).toContainText('Repository provisioning failed safely');
+  await expect(failure).toContainText('RepositoryProvisioningGitFailed');
+  await expect(page.getByTestId('repositorySetup.provision')).toHaveText('Retry repository provisioning');
+  await page.getByTestId('repositorySetup.provision').click();
+  await expect(page.getByTestId('repositorySetup.qualified')).toBeVisible();
+
+  expect(state.provisioningBodies[0].expectedRepositoryBindingRevision).toBe(1);
+  expect(state.provisioningBodies[1].expectedRepositoryBindingRevision).toBe(3);
+  expect(state.provisioningBodies[1].clientOperationId).not.toBe(state.provisioningBodies[0].clientOperationId);
+});
+
+test('late project-A provisioning response cannot install Qualified state into project B', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId),
+    onProvisioning: async (route, body, projectId) => {
+      if (projectId === 7) await new Promise((resolve) => setTimeout(resolve, 450));
+      await json(route, provisioningResult(body, projectId));
+    }
+  });
+  await openSetup(page, 7);
+  await page.getByTestId('repositorySetup.provision').click();
+  await expect.poll(() => state.provisioningBodies.length).toBe(1);
+
+  await page.evaluate(() => {
+    window.history.pushState(null, '', '/projects/8/setup');
+    window.dispatchEvent(new Event('irondev:navigation'));
+  });
+  await expect(page.getByText('OtherRepo', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('repositorySetup.confirmed')).toBeVisible();
+  await page.waitForTimeout(550);
+  await expect(page.getByTestId('repositorySetup.qualified')).toHaveCount(0);
+  await expect(page.getByText('OtherRepo', { exact: true })).toBeVisible();
+});
+
+test('late definitive refetch and error cannot overwrite the newly selected project', async ({ page }) => {
+  let projectAContextRequests = 0;
+  await mockRepositorySetup(page, {
+    onContext: async (route, projectId) => {
+      if (projectId === 7) {
+        projectAContextRequests += 1;
+        if (projectAContextRequests > 1) {
+          await new Promise((resolve) => setTimeout(resolve, 450));
+          await json(route, configuredRepositoryContext(projectId, 'ProvisioningFailed'));
+          return;
+        }
+      }
+      await json(route, configuredRepositoryContext(projectId));
+    },
+    onProvisioning: (route) => json(route, {
+      error: 'repository_provisioning_revision_stale',
+      message: 'Project A binding revision is stale.'
+    }, 409)
+  });
+  await openSetup(page, 7);
+  await page.getByTestId('repositorySetup.provision').click();
+  await expect.poll(() => projectAContextRequests).toBe(2);
+
+  await page.evaluate(() => {
+    window.history.pushState(null, '', '/projects/8/setup');
+    window.dispatchEvent(new Event('irondev:navigation'));
+  });
+  await expect(page.getByText('OtherRepo', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('repositorySetup.confirmed')).toBeVisible();
+  await page.waitForTimeout(550);
+  await expect(page.getByText('OtherRepo', { exact: true })).toBeVisible();
+  await expect(page.getByText('Project A binding revision is stale.')).toHaveCount(0);
+  await expect(page.getByTestId('repositorySetup.qualified')).toHaveCount(0);
+});
+
+test('new Workbench lease reconstructs exact recovery from the durable active attempt', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    authority: () => ({ workbenchSessionId: 9009, leaseEpoch: 9 }),
+    context: (projectId) => configuredRepositoryContext(projectId, 'Provisioning')
+  });
+  await openSetup(page);
+
+  const recovery = page.getByTestId('repositorySetup.recoverProvisioning');
+  await expect(recovery).toContainText('Repository provisioning is in progress');
+  await expect(recovery).toContainText('current Workbench fence');
+  await expect(recovery).toContainText('77777777-7777-4777-8777-777777777777');
+  await expect(page.getByTestId('repositorySetup.provision')).toHaveCount(0);
+  expect(state.provisioningBodies).toHaveLength(0);
+
+  await page.getByTestId('repositorySetup.retryProvisioning').click();
+  await expect(page.getByTestId('repositorySetup.qualified')).toBeVisible();
+  expect(state.provisioningBodies[0]).toMatchObject({
+    workbenchSessionId: 9009,
+    leaseEpoch: 9,
+    clientOperationId: '77777777-7777-4777-8777-777777777777',
+    setupConfirmationId: CONFIRMATION_ID,
+    expectedRepositoryBindingRevision: 1,
+    expectedExecutionProfileRevision: 1
+  });
+});
+
+test('Qualified reload requires matching projected local path, branch, baseline, and attempt evidence', async ({ page }) => {
+  await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified')
+  });
+  await openSetup(page);
+
+  const qualified = page.getByTestId('repositorySetup.qualified');
+  await expect(qualified).toContainText('Repository / projected local path');
+  await expect(qualified).toContainText(setupPlan(7).targetPath);
+  await expect(qualified).toContainText('main');
+  await expect(qualified).toContainText(BASELINE_COMMIT);
+  await expect(qualified).toContainText('NotConfigured');
+  await expect(page.getByTestId('repositorySetup.provision')).toHaveCount(0);
+});
+
+test('inconsistent in-progress Git fields are rejected as a malformed context', async ({ page }) => {
+  await mockRepositorySetup(page, {
+    context: (projectId) => {
+      const context = configuredRepositoryContext(projectId, 'Provisioning');
+      return {
+        ...context,
+        latestProvisioning: {
+          ...context.latestProvisioning,
+          branchName: 'main',
+          baselineCommit: BASELINE_COMMIT
+        }
+      };
+    }
+  });
+  await openSetup(page);
+
+  await expect(page.getByTestId('repositorySetup.unavailable')).toContainText('invalid success response');
+  await expect(page.getByTestId('repositorySetup.provision')).toHaveCount(0);
+});
+
+test('ProvisioningFailed cannot claim a projected project local path', async ({ page }) => {
+  await mockRepositorySetup(page, {
+    context: (projectId) => ({
+      ...configuredRepositoryContext(projectId, 'ProvisioningFailed'),
+      projectLocalPath: setupPlan(projectId).targetPath
+    })
+  });
+  await openSetup(page);
+
+  await expect(page.getByTestId('repositorySetup.unavailable')).toContainText('invalid success response');
+  await expect(page.getByTestId('repositorySetup.provision')).toHaveCount(0);
+});
+
+test('unconfigured and legacy-unverified projects never show provisioning authority', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => projectId === 7
+      ? repositoryContext(projectId)
+      : {
+          ...repositoryContext(projectId),
+          projectLocalPath: 'C:\\legacy\\unknown',
+          repositoryBinding: {
+            id: BINDING_ID,
+            projectId,
+            revision: 1,
+            repositoryKind: 'Existing',
+            canonicalPath: 'C:\\legacy\\unknown',
+            bindingState: 'LegacyUnverified',
+            defaultBranch: null,
+            baselineCommit: null,
+            createdByActorUserId: null,
+            confirmedAtUtc: null
+          }
+        }
+  });
+
+  await openSetup(page, 7);
+  await expect(page.getByTestId('repositorySetup.provision')).toHaveCount(0);
+  await page.evaluate(() => {
+    window.history.pushState(null, '', '/projects/8/setup');
+    window.dispatchEvent(new Event('irondev:navigation'));
+  });
+  await expect(page.getByTestId('repositorySetup.legacy')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('repositorySetup.provision')).toHaveCount(0);
+  expect(state.provisioningBodies).toHaveLength(0);
 });

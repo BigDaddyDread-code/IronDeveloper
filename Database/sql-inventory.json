@@ -2511,6 +2511,37 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Persists setup confirmation and immutable server-derived plan authority only; no repository target or project files are created. Existing LocalPath rows are backfilled solely as Existing/LegacyUnverified."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-repository-provisioning",
+                        "path":  "Database/migrate_workbench_repository_provisioning.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.RepositoryProvisioningAttempts",
+                                               "dbo.RepositoryProvisioningReceipts",
+                                               "repository provisioning result references on dbo.ClientOperations",
+                                               "append-only provisioning receipt trigger"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users",
+                                              "dbo.RepositoryBindings",
+                                              "dbo.RepositoryBindingRevisions",
+                                              "dbo.ProjectExecutionProfiles",
+                                              "dbo.RepositorySetupConfirmations",
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.ClientOperations",
+                                              "dbo.ProjectReadinessAssessments",
+                                              "dbo.WorkbenchOutboxEvents"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-05B controlled product-neutral repository provisioning"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Records fenced provisioning attempts and immutable qualification receipts around server-owned template rendering, bounded Git initialization, atomic direct-sibling publication, and exact crash recovery. It does not restore, build, test, index, configure a sandbox, or authorize Builder execution."
                     }
                 ]
 }
