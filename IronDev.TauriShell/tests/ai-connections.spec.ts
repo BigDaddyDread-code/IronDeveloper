@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockLocalTestPreflight, mockWorkbenchProjectOpen } from './helpers/mockWorkbench';
 
 test('settings shows tenant AI connection metadata without credential material', async ({ page }) => {
   await mockWorkspace(page, {
@@ -185,6 +186,7 @@ async function mockWorkspace(page: Page, options: { connections: unknown[] }) {
   await page.route('**/irondev-api/health', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) });
   });
+  await mockLocalTestPreflight(page);
   await page.route('**/irondev-api/api/environment', async (route) => {
     await route.fulfill({
       status: 200,
@@ -213,9 +215,7 @@ async function mockWorkspace(page: Page, options: { connections: unknown[] }) {
   await page.route('**/irondev-api/api/projects', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 7, tenantId: 3, name: 'BookSeller', description: 'Dogfood project' }]) });
   });
-  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
-  });
+  await mockWorkbenchProjectOpen(page, 7, { name: 'BookSeller' });
   await page.route('**/irondev-api/api/v1/ai-connections/**', async (route) => {
     const url = route.request().url();
     const current = connections[0] ?? {

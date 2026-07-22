@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { ProjectGovernanceOverview } from '../src/api/types';
 import { mockProjectBoard } from './helpers/mockBoard';
+import { mockLocalTestPreflight, workbenchProjectEntryContext } from './helpers/mockWorkbench';
 
 test('attention overview renders backend truth and primary action opens the Work Item', async ({ page }) => {
   await prepareSelectedProject(page);
@@ -144,6 +145,7 @@ async function prepareSelectedProject(page: Page) {
     window.localStorage.setItem('irondev.selectedProjectId', '7');
   });
   await page.route('**/irondev-api/health', async (route) => fulfillJson(route, { status: 'ok' }));
+  await mockLocalTestPreflight(page);
   await page.route('**/irondev-api/api/environment**', async (route) => fulfillJson(route, {
     environment: 'LocalTest', database: 'IronDeveloper_Test', weaviatePrefix: 'irondev_test', isTestEnvironment: true,
     workspaceRoot: 'C:\\IronDevTestWorkspaces\\', logsRoot: 'C:\\IronDevTestLogs\\', dangerRealRepoWritesEnabled: false
@@ -153,19 +155,9 @@ async function prepareSelectedProject(page: Page) {
   }));
   await page.route('**/irondev-api/api/tenants', async (route) => fulfillJson(route, [{ id: 3, name: 'IronDev Local', slug: 'irondev-local' }]));
   await page.route('**/irondev-api/api/projects', async (route) => fulfillJson(route, [{ id: 7, tenantId: 3, name: 'IronDeveloper' }]));
-  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route) => fulfillJson(route, {
-    projectId: 7,
-    tenantId: 3,
-    name: 'IronDeveloper',
-    projectLifecyclePhase: 'Shaping',
-    executionReadiness: 'NotConfigured',
-    repositoryBinding: null,
-    workbenchSessionId: 7007,
-    leaseEpoch: 1,
-    wasResumed: true,
-    wasTakenOver: false,
-    clientOperationId: '00000000-0000-0000-0000-000000000007'
-  }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route) =>
+    fulfillJson(route, workbenchProjectEntryContext(route, 7, { name: 'IronDeveloper' }))
+  );
   await page.route('**/irondev-api/api/projects/7/**', async (route) => fulfillJson(route, {}));
   await page.route('**/irondev-api/api/projects/7/notifications**', async (route) => fulfillJson(route, {
     projectId: 7, unreadCount: 0, notifications: [], boundary: 'Notification visibility grants no authority.'

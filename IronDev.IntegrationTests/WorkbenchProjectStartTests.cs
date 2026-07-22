@@ -16,8 +16,10 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
     {
         await base.TestInitialize();
         await ApplyMigrationAsync("migrate_user_mutation_attribution.sql");
+        await ApplyMigrationAsync("migrate_project_collaboration.sql");
         await DropWorkbenchMigrationObjectsAsync();
         await ApplyMigrationAsync("migrate_workbench_project_start.sql");
+        await ApplyMigrationAsync("migrate_workbench_repository_setup.sql");
         await ApplyMigrationAsync("migrate_workbench_agent_runs.sql");
     }
 
@@ -344,6 +346,12 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
         await connection.ExecuteAsync("""
             IF COL_LENGTH('dbo.ClientOperations', 'ResultAgentRunId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations SET ResultAgentRunId=NULL;';
+            DROP TABLE IF EXISTS dbo.TicketProposalCommitmentDependencies;
+            DROP TABLE IF EXISTS dbo.TicketProposalCommitmentTickets;
+            DROP TABLE IF EXISTS dbo.TicketProposalCommitments;
+            DROP TABLE IF EXISTS dbo.TicketProposalSetRevisions;
+            DROP TABLE IF EXISTS dbo.TicketProposalSets;
+            DROP TABLE IF EXISTS dbo.WorkbenchCommandRejections;
             DROP TABLE IF EXISTS dbo.WorkbenchOutboxEvents;
             DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystInvocationAudits;
             DROP TABLE IF EXISTS dbo.WorkbenchBusinessAnalystToolCallAudits;
@@ -352,7 +360,37 @@ public sealed class WorkbenchProjectStartTests : IntegrationTestBase
             DROP TABLE IF EXISTS dbo.ProjectRenameProposals;
             DROP TABLE IF EXISTS dbo.ProjectUnderstandings;
             DROP TABLE IF EXISTS dbo.WorkbenchAgentRuns;
+            IF OBJECT_ID('dbo.ClientOperations', 'U') IS NOT NULL
+            BEGIN
+                IF EXISTS (SELECT 1 FROM sys.foreign_keys
+                           WHERE parent_object_id=OBJECT_ID('dbo.ClientOperations')
+                             AND name='FK_ClientOperations_RepositoryProvisioningAttempt')
+                    ALTER TABLE dbo.ClientOperations
+                        DROP CONSTRAINT FK_ClientOperations_RepositoryProvisioningAttempt;
+                IF EXISTS (SELECT 1 FROM sys.foreign_keys
+                           WHERE parent_object_id=OBJECT_ID('dbo.ClientOperations')
+                             AND name='FK_ClientOperations_RepositoryProvisioningReceipt')
+                    ALTER TABLE dbo.ClientOperations
+                        DROP CONSTRAINT FK_ClientOperations_RepositoryProvisioningReceipt;
+                IF EXISTS (SELECT 1 FROM sys.foreign_keys
+                           WHERE parent_object_id=OBJECT_ID('dbo.ClientOperations')
+                             AND name='FK_ClientOperations_RepositoryProvisioningAttemptAuthority')
+                    ALTER TABLE dbo.ClientOperations
+                        DROP CONSTRAINT FK_ClientOperations_RepositoryProvisioningAttemptAuthority;
+                IF EXISTS (SELECT 1 FROM sys.foreign_keys
+                           WHERE parent_object_id=OBJECT_ID('dbo.ClientOperations')
+                             AND name='FK_ClientOperations_RepositoryProvisioningReceiptAuthority')
+                    ALTER TABLE dbo.ClientOperations
+                        DROP CONSTRAINT FK_ClientOperations_RepositoryProvisioningReceiptAuthority;
+            END;
+            DROP TABLE IF EXISTS dbo.RepositoryProvisioningReceipts;
+            DROP TABLE IF EXISTS dbo.RepositoryProvisioningAttempts;
             DROP TABLE IF EXISTS dbo.ClientOperations;
+            DROP TABLE IF EXISTS dbo.RepositorySetupConfirmations;
+            DROP TABLE IF EXISTS dbo.ProjectExecutionProfileRevisions;
+            DROP TABLE IF EXISTS dbo.ProjectExecutionProfiles;
+            DROP TABLE IF EXISTS dbo.RepositoryBindingRevisions;
+            DROP TABLE IF EXISTS dbo.RepositoryBindings;
             DROP TABLE IF EXISTS dbo.WorkbenchWriteLeases;
             DROP TABLE IF EXISTS dbo.WorkbenchSessions;
             DROP TABLE IF EXISTS dbo.ProjectReadinessAssessments;

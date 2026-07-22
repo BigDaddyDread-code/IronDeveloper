@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readyToRunReadiness, setupIncompleteRunReadiness } from './helpers/mockBoard';
+import { mockLocalTestPreflight, workbenchProjectEntryContext } from './helpers/mockWorkbench';
 
 // UX-START-0/1 — the session front door and the project-scoped Board. The project is
 // the authority boundary: no project, no work item; no readiness, no run. These
@@ -201,6 +202,7 @@ async function mockStart(
   await page.route('**/irondev-api/health', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) })
   );
+  await mockLocalTestPreflight(page);
   await page.route('**/irondev-api/api/environment', (route) =>
     route.fulfill({
       status: 200,
@@ -238,23 +240,15 @@ async function mockStart(
   });
   for (const projectId of [7, 8, 9]) {
     await page.route(`**/irondev-api/api/workbench/projects/${projectId}/open`, (route) => {
-      const request = route.request().postDataJSON() as { clientOperationId?: string; takeOverExistingLease?: boolean };
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          projectId,
-          tenantId: 3,
+        body: JSON.stringify(workbenchProjectEntryContext(route, projectId, {
           name: projectId === 7 ? 'BookSeller' : projectId === 8 ? 'ParcelTracker' : 'Fresh idea',
-          projectLifecyclePhase: 'Shaping',
           executionReadiness: projectId === 7 ? 'Ready' : 'NotConfigured',
-          repositoryBinding: projectId === 7 ? 'C:\\repos\\BookSeller' : null,
           workbenchSessionId: 7000 + projectId,
-          leaseEpoch: 1,
-          wasResumed: false,
-          wasTakenOver: request.takeOverExistingLease === true,
-          clientOperationId: request.clientOperationId
-        })
+          wasResumed: false
+        }))
       });
     });
     await page.route(`**/irondev-api/api/projects/${projectId}/tickets`, async (route) => {

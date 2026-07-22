@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockProjectBoard } from './helpers/mockBoard';
 import { mockProjectWorkItem } from './helpers/mockWorkItem';
+import { mockLocalTestPreflight, mockWorkbenchProjectOpen } from './helpers/mockWorkbench';
 
 test.beforeEach(async ({ page }) => {
   await mockRoutedProject(page);
@@ -125,6 +126,7 @@ async function mockRoutedProject(page: Page) {
   await page.route('**/irondev-api/health', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) })
   );
+  await mockLocalTestPreflight(page);
   await page.route('**/irondev-api/api/environment', (route) =>
     route.fulfill({
       status: 200,
@@ -153,25 +155,12 @@ async function mockRoutedProject(page: Page) {
       body: JSON.stringify([{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
     })
   );
-  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        projectId: 7,
-        tenantId: 3,
-        name: 'BookSeller',
-        projectLifecyclePhase: 'Shaping',
-        executionReadiness: 'Ready',
-        repositoryBinding: 'C:\\repos\\BookSeller',
-        workbenchSessionId: 7007,
-        leaseEpoch: 1,
-        wasResumed: false,
-        wasTakenOver: false,
-        clientOperationId: route.request().postDataJSON().clientOperationId
-      })
-    })
-  );
+  await mockWorkbenchProjectOpen(page, 7, {
+    name: 'BookSeller',
+    executionReadiness: 'Ready',
+    wasResumed: false,
+    wasTakenOver: false
+  });
   await page.route('**/irondev-api/api/projects/7/provisioning/readiness', (route) =>
     route.fulfill({
       status: 200,

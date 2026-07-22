@@ -775,14 +775,18 @@ test('definitive provisioning rejection clears the receipt before a new operatio
 });
 
 test('definitive provisioning rejection fails closed when authority refresh is unavailable', async ({ page }) => {
+  let provisioningRejected = false;
   const state = await mockRepositorySetup(page, {
-    onContext: (route, projectId, requestNumber) => requestNumber === 1
-      ? json(route, configuredRepositoryContext(projectId))
-      : json(route, { error: 'repository_context_unavailable' }, 503),
-    onProvisioning: (route) => json(route, {
-      error: 'repository_provisioning_revision_stale',
-      message: 'The binding revision is stale.'
-    }, 409)
+    onContext: (route, projectId) => provisioningRejected
+      ? json(route, { error: 'repository_context_unavailable' }, 503)
+      : json(route, configuredRepositoryContext(projectId)),
+    onProvisioning: (route) => {
+      provisioningRejected = true;
+      return json(route, {
+        error: 'repository_provisioning_revision_stale',
+        message: 'The binding revision is stale.'
+      }, 409);
+    }
   });
   await openSetup(page);
   await page.getByTestId('repositorySetup.provision').click();
@@ -900,27 +904,33 @@ test('late project-A provisioning response cannot install Qualified state into p
 });
 
 test('late definitive refetch and error cannot overwrite the newly selected project', async ({ page }) => {
-  let projectAContextRequests = 0;
+  let provisioningRejected = false;
+  let signalProjectARefetchStarted: (() => void) | undefined;
+  const projectARefetchStarted = new Promise<void>((resolve) => {
+    signalProjectARefetchStarted = resolve;
+  });
   await mockRepositorySetup(page, {
     onContext: async (route, projectId) => {
-      if (projectId === 7) {
-        projectAContextRequests += 1;
-        if (projectAContextRequests > 1) {
-          await new Promise((resolve) => setTimeout(resolve, 450));
-          await json(route, configuredRepositoryContext(projectId, 'ProvisioningFailed'));
-          return;
-        }
+      if (projectId === 7 && provisioningRejected) {
+        signalProjectARefetchStarted?.();
+        signalProjectARefetchStarted = undefined;
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        await json(route, configuredRepositoryContext(projectId, 'ProvisioningFailed'));
+        return;
       }
       await json(route, configuredRepositoryContext(projectId));
     },
-    onProvisioning: (route) => json(route, {
-      error: 'repository_provisioning_revision_stale',
-      message: 'Project A binding revision is stale.'
-    }, 409)
+    onProvisioning: (route) => {
+      provisioningRejected = true;
+      return json(route, {
+        error: 'repository_provisioning_revision_stale',
+        message: 'Project A binding revision is stale.'
+      }, 409);
+    }
   });
   await openSetup(page, 7);
   await page.getByTestId('repositorySetup.provision').click();
-  await expect.poll(() => projectAContextRequests).toBe(2);
+  await projectARefetchStarted;
 
   await page.evaluate(() => {
     window.history.pushState(null, '', '/projects/8/setup');

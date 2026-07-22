@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mockProjectBoard } from './helpers/mockBoard';
+import { workbenchProjectEntryContext } from './helpers/mockWorkbench';
 
 // Flow-shell smoke: sign-in gate, board, shape stage, settings users, and a
 // governance deep link rendering inside the Library. Replaces the old
@@ -458,19 +459,11 @@ async function mockSelectedProject(page: import('@playwright/test').Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        projectId: 7,
-        tenantId: 3,
+      body: JSON.stringify(workbenchProjectEntryContext(route, 7, {
         name: 'IronDeveloper',
-        projectLifecyclePhase: 'Shaping',
-        executionReadiness: 'NotConfigured',
-        repositoryBinding: null,
-        workbenchSessionId: 7007,
-        leaseEpoch: 1,
         wasResumed: true,
-        wasTakenOver: false,
-        clientOperationId: '00000000-0000-0000-0000-000000000007'
-      })
+        wasTakenOver: false
+      }))
     });
   });
   await page.route('**/irondev-api/api/projects/7/tickets', async (route) => {
