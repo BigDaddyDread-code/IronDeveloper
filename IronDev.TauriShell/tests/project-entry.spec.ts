@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mockProjectBoard } from './helpers/mockBoard';
 import { createDeferred } from './helpers/deferred';
 import { workItemProjection } from './helpers/mockWorkItem';
+import { workbenchProjectEntryContext } from './helpers/mockWorkbench';
 
 const READY_READINESS = {
   projectId: 7,
@@ -414,7 +415,7 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
     });
     await page.route(`**/irondev-api/api/workbench/projects/${projectId}/open`, (route) => {
       state.workbenchOpenRequests += 1;
-      const request = route.request().postDataJSON() as { clientOperationId?: string; takeOverExistingLease?: boolean };
+      const request = route.request().postDataJSON() as { clientOperationId?: string };
       state.workbenchOpenOperationIds.push(request.clientOperationId ?? '');
       if (options.selectionTransportFailures?.includes(projectId) &&
           state.workbenchOpenOperationIds.filter((operationId) => operationId === request.clientOperationId).length === 1) {
@@ -426,19 +427,17 @@ async function mockCommonApi(page: Page, options: MockOptions, state: MockState)
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          projectId,
-          tenantId: 3,
+        body: JSON.stringify(workbenchProjectEntryContext(route, projectId, {
           name: candidate.name,
-          projectLifecyclePhase: candidate.lifecyclePhase ?? 'Shaping',
+          projectLifecyclePhase: candidate.lifecyclePhase === 'Delivery'
+            ? 'Delivery'
+            : candidate.lifecyclePhase === 'Archived'
+              ? 'Archived'
+              : 'Shaping',
           executionReadiness: 'NotConfigured',
-          repositoryBinding: candidate.localPath ?? null,
           workbenchSessionId: 7000 + projectId,
-          leaseEpoch: 1,
-          wasResumed: false,
-          wasTakenOver: request.takeOverExistingLease === true,
-          clientOperationId: request.clientOperationId
-        })
+          wasResumed: false
+        }))
       });
     });
     await page.route(`**/irondev-api/api/projects/${projectId}/tickets`, async (route) => {

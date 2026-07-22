@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { ProjectChannelChatSummary } from '../src/api/types';
 import { createDeferred } from './helpers/deferred';
+import { workbenchProjectEntryContext } from './helpers/mockWorkbench';
 
 test('recent backend sessions form the Workshop rail and the latest conversation opens', async ({ page }) => {
   await mockSessionWorkspace(page);
@@ -459,19 +460,9 @@ async function mockSessionWorkspace(page: Page, options: SessionMockOptions = {}
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, {
-    projectId: 7,
-    tenantId: 3,
-    name: 'BookSeller',
-    projectLifecyclePhase: 'Shaping',
-    executionReadiness: 'NotConfigured',
-    repositoryBinding: null,
-    workbenchSessionId: 7007,
-    leaseEpoch: 1,
-    wasResumed: true,
-    wasTakenOver: false,
-    clientOperationId: '00000000-0000-0000-0000-000000000007'
-  }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) =>
+    json(route, workbenchProjectEntryContext(route, 7, { name: 'BookSeller' }))
+  );
 
   await page.route(/\/irondev-api\/api\/projects\/7\/channels$/, async (route) => {
     if (route.request().method() === 'GET') {

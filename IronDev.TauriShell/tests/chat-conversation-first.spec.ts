@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { createDeferred } from './helpers/deferred';
+import { workbenchProjectEntryContext } from './helpers/mockWorkbench';
 
 test('empty Workshop is conversation-first with useful starters and no backstage diagnostics', async ({ page }) => {
   await mockChatWorkspace(page);
@@ -409,19 +410,11 @@ async function mockChatWorkspace(page: Page, options: ChatMockOptions = {}): Pro
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        projectId: 7,
-        tenantId: 3,
+      body: JSON.stringify(workbenchProjectEntryContext(route, 7, {
         name: options.projectName ?? 'BookSeller',
-        projectLifecyclePhase: 'Shaping',
-        executionReadiness: 'NotConfigured',
-        repositoryBinding: null,
-        workbenchSessionId: 7007,
-        leaseEpoch: 1,
         wasResumed: true,
-        wasTakenOver: false,
-        clientOperationId: '00000000-0000-0000-0000-000000000007'
-      })
+        wasTakenOver: false
+      }))
     })
   );
   await page.route('**/irondev-api/api/projects/7/chat/document-sources', (route) =>

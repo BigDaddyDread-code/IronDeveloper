@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { workbenchProjectEntryContext } from './helpers/mockWorkbench';
 
 type AgentRunStatus = 'Pending' | 'Running' | 'NeedsInput' | 'Completed' | 'Failed' | 'Cancelled' | 'Superseded' | 'Stale';
 
@@ -768,32 +769,13 @@ async function mockAgentRunWorkspace(page: Page, options: AgentRunMockOptions = 
       ? [{ id: 8, tenantId: 3, name: 'Second project', localPath: null, lifecyclePhase: 'Shaping', executionReadiness: 'NotConfigured' }]
       : [])
   ]));
-  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, {
-    projectId: 7,
-    tenantId: 3,
-    name: 'BookSeller',
-    projectLifecyclePhase: 'Shaping',
-    executionReadiness: 'NotConfigured',
-    repositoryBinding: null,
-    workbenchSessionId: 7007,
-    leaseEpoch: 1,
-    wasResumed: true,
-    wasTakenOver: false,
-    clientOperationId: '00000000-0000-0000-0000-000000000007'
-  }));
-  await page.route('**/irondev-api/api/workbench/projects/8/open', (route) => json(route, {
-    projectId: 8,
-    tenantId: 3,
-    name: 'Second project',
-    projectLifecyclePhase: 'Shaping',
-    executionReadiness: 'NotConfigured',
-    repositoryBinding: null,
-    workbenchSessionId: 8008,
-    leaseEpoch: 1,
-    wasResumed: true,
-    wasTakenOver: false,
-    clientOperationId: '00000000-0000-0000-0000-000000000008'
-  }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route,
+    workbenchProjectEntryContext(route, 7, { name: 'BookSeller' })));
+  await page.route('**/irondev-api/api/workbench/projects/8/open', (route) => json(route,
+    workbenchProjectEntryContext(route, 8, {
+      name: 'Second project',
+      workbenchSessionId: 8008
+    })));
   await page.route('**/irondev-api/api/projects/7/channels', (route) => json(route, {
     projectId: 7,
     canCreateChannels: true,

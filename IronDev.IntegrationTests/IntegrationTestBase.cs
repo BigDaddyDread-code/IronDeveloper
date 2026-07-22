@@ -470,8 +470,6 @@ public abstract class IntegrationTestBase
 
         await connection.ExecuteAsync(sql);
         await ApplySqlFileAsync(connection, "Database", "migrate_work_item_identity.sql");
-        await ApplySqlFileAsync(connection, "Database", "migrate_workbench_repository_setup.sql");
-        await ApplySqlFileAsync(connection, "Database", "migrate_workbench_repository_provisioning.sql");
     }
 
     protected async Task<MemoryRetrievalRequestContext> CreateMemoryRetrievalContextAsync(

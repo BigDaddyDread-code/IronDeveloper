@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mockLocalTestPreflight, mockWorkbenchProjectOpen } from './helpers/mockWorkbench';
 
 // AG-5: the Settings → Agents panel. Edit a per-agent model and voice through
 // the governed endpoints; a refused secret is shown honestly. Voice and model
@@ -450,6 +451,7 @@ async function mockWorkspace(page: Page) {
   await page.route('**/irondev-api/health', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'healthy' }) });
   });
+  await mockLocalTestPreflight(page);
   await page.route('**/irondev-api/api/environment', async (route) => {
     await route.fulfill({
       status: 200,
@@ -478,9 +480,7 @@ async function mockWorkspace(page: Page) {
   await page.route('**/irondev-api/api/projects', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 7, tenantId: 3, name: 'BookSeller', description: 'Dogfood project' }]) });
   });
-  await page.route('**/irondev-api/api/workbench/projects/7/open', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projectId: 7 }) });
-  });
+  await mockWorkbenchProjectOpen(page, 7, { name: 'BookSeller' });
   await page.route('**/irondev-api/api/v1/ai-connections', async (route) => {
     await route.fulfill({
       status: 200,

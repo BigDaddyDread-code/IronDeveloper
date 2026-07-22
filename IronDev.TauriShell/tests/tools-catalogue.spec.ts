@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { workbenchProjectEntryContext } from './helpers/mockWorkbench';
 
 test('Tools shows backend registration truth without configuration or invocation controls', async ({ page }) => {
   await mockToolsWorkspace(page);
@@ -176,19 +177,9 @@ async function mockToolsWorkspace(page: Page, options: ToolsMockOptions = {}): P
   await page.route('**/irondev-api/api/projects', (route) =>
     json(route, [{ id: 7, tenantId: 3, name: 'BookSeller', localPath: 'C:\\repos\\BookSeller' }])
   );
-  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) => json(route, {
-    projectId: 7,
-    tenantId: 3,
-    name: 'BookSeller',
-    projectLifecyclePhase: 'Shaping',
-    executionReadiness: 'NotConfigured',
-    repositoryBinding: null,
-    workbenchSessionId: 7007,
-    leaseEpoch: 1,
-    wasResumed: true,
-    wasTakenOver: false,
-    clientOperationId: '00000000-0000-0000-0000-000000000007'
-  }));
+  await page.route('**/irondev-api/api/workbench/projects/7/open', (route) =>
+    json(route, workbenchProjectEntryContext(route, 7, { name: 'BookSeller' }))
+  );
   await page.route('**/irondev-api/api/projects/7/tickets', (route) => json(route, []));
   await page.route('**/irondev-api/api/projects/7/chat/sessions', (route) => json(route, []));
 
