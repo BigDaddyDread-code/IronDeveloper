@@ -228,6 +228,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IBuilderRepositoryBranchObserver, BuilderRepositoryBranchObserver>();
 builder.Services.AddScoped<IWorkbenchBuilderAuthorizationService,
     WorkbenchBuilderAuthorizationService>();
+builder.Services.AddScoped<IWorkbenchBuilderPromptPreparationService,
+    WorkbenchBuilderPromptPreparationService>();
 builder.Services.AddScoped<IWorkbenchSandboxRecoveryService, WorkbenchSandboxRecoveryService>();
 // Qualification availability is policy-gated, but cleanup must continue after a
 // restart even when an operator disables new sandbox runs. An unavailable cleanup

@@ -254,6 +254,11 @@
                              "id":  "2026-07-workbench-pr07a-builder-authorization",
                              "path":  "Database/migrate_workbench_builder_authorization.sql",
                              "description":  "Adds authorization-free canonical Builder work-package cores with exact Work Item contracts, acceptance criteria, permitted files, readiness/index/model/sandbox snapshots, ordered provenance, and scoped single-use start authorizations without creating Builder runs or execution envelopes."
+                        },
+                        {
+                             "id":  "2026-07-workbench-pr07b-builder-prompt-preparation",
+                             "path":  "Database/migrate_workbench_builder_prompt_preparation.sql",
+                             "description":  "Atomically revalidates and consumes one exact Builder authorization, creates a durable Builder AgentRun, freezes the effective profile and exact role context, and records prompt, tool-manifest, context, and provider-input hashes without invoking a provider."
                         }
                    ]
 }

@@ -329,6 +329,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_sandbox_qualification.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_repository_readiness.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_builder_authorization.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_builder_prompt_preparation.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -659,6 +660,21 @@ public abstract class ApiTestBase
                     ENABLE TRIGGER dbo.trg_TicketProposalCommitments_AppendOnly
                         ON dbo.TicketProposalCommitments;
             END;
+            IF OBJECT_ID('dbo.WorkbenchOutboxEvents', 'U') IS NOT NULL
+                DELETE FROM dbo.WorkbenchOutboxEvents;
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultBuilderAgentRunId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
+                    SET ResultBuilderAgentRunId=NULL;';
+            IF OBJECT_ID('dbo.BuilderAgentRuns', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderAgentRuns_PreparationImmutable', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderAgentRuns_PreparationImmutable
+                        ON dbo.BuilderAgentRuns;
+                DELETE FROM dbo.BuilderAgentRuns;
+                IF OBJECT_ID('dbo.TR_BuilderAgentRuns_PreparationImmutable', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderAgentRuns_PreparationImmutable
+                        ON dbo.BuilderAgentRuns;
+            END;
             IF COL_LENGTH('dbo.ClientOperations', 'ResultBuilderWorkPackageCoreId') IS NOT NULL
                AND COL_LENGTH('dbo.ClientOperations', 'ResultBuilderExecutionAuthorizationId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
@@ -779,6 +795,19 @@ public abstract class ApiTestBase
             END
             IF OBJECT_ID('dbo.TicketProposalSets', 'U') IS NOT NULL DELETE FROM dbo.TicketProposalSets;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultBuilderAgentRunId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
+                    SET ResultBuilderAgentRunId=NULL;';
+            IF OBJECT_ID('dbo.BuilderAgentRuns', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderAgentRuns_PreparationImmutable', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderAgentRuns_PreparationImmutable
+                        ON dbo.BuilderAgentRuns;
+                DELETE FROM dbo.BuilderAgentRuns;
+                IF OBJECT_ID('dbo.TR_BuilderAgentRuns_PreparationImmutable', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderAgentRuns_PreparationImmutable
+                        ON dbo.BuilderAgentRuns;
+            END;
             IF COL_LENGTH('dbo.ClientOperations', 'ResultBuilderWorkPackageCoreId') IS NOT NULL
                AND COL_LENGTH('dbo.ClientOperations', 'ResultBuilderExecutionAuthorizationId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations

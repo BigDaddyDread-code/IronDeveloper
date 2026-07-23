@@ -2660,6 +2660,43 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "The canonical work-package core is content-hashed and authorization-free. Exact Work Item contract, acceptance criteria, permitted files, readiness, repository observation, complete code-index snapshot, code-owned Builder contract versions, model profile, sandbox policy, qualified image, and evidence identities enforce scope. Authorizations are exact-hash, fifteen-minute, single-use grants; this slice creates no run, attempt, prompt, provider call, or execution envelope."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-builder-prompt-preparation",
+                        "path":  "Database/migrate_workbench_builder_prompt_preparation.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.BuilderAgentRuns",
+                                               "Builder AgentRun result reference on dbo.ClientOperations",
+                                               "Builder AgentRun reference on dbo.WorkbenchOutboxEvents",
+                                               "atomic preparation validation trigger",
+                                               "immutable prepared-input trigger"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.BuilderExecutionAuthorizations",
+                                              "dbo.BuilderWorkPackageCores",
+                                              "dbo.BuilderWorkPackageTickets",
+                                              "dbo.BuilderWorkPackageArtifactReferences",
+                                              "dbo.BuilderWorkPackageRepositoryContexts",
+                                              "dbo.RepositoryBindings",
+                                              "dbo.vw_WorkbenchEffectiveProjectReadiness",
+                                              "dbo.ProjectTechnicalReadinessEvidence",
+                                              "dbo.ProjectTickets",
+                                              "dbo.WorkItems",
+                                              "dbo.WorkItemContracts",
+                                              "dbo.ProjectUnderstandings",
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.ClientOperations",
+                                              "dbo.WorkbenchOutboxEvents"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-07B exact Builder prompt preparation service"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Consumes one exact single-use authorization and persists the frozen Builder profile, role context, prompt, declared tool manifest, provider input, and hashes in one serializable transaction. ProviderInvokedAtUtc remains null and no provider is called."
                     }
                 ]
 }

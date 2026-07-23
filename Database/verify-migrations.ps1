@@ -545,6 +545,13 @@ try {
              ,@{ Name = "Builder ClientOperation result links"; Sql = "SELECT CASE WHEN COL_LENGTH(N'dbo.ClientOperations', N'ResultBuilderWorkPackageCoreId') IS NULL OR COL_LENGTH(N'dbo.ClientOperations', N'ResultBuilderExecutionAuthorizationId') IS NULL THEN 0 ELSE 1 END" }
              ,@{ Name = "Builder ClientOperation result authority"; Sql = "SELECT CASE WHEN COUNT(*)=2 THEN 1 ELSE 0 END FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.ClientOperations') AND name IN (N'FK_ClientOperations_BuilderWorkPackageCore', N'FK_ClientOperations_BuilderExecutionAuthorization') AND is_not_trusted=0" }
              ,@{ Name = "Builder typed outbox authority"; Sql = "SELECT CASE WHEN COUNT(*)=2 THEN 1 ELSE 0 END FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.WorkbenchOutboxEvents') AND name IN (N'FK_WorkbenchOutboxEvents_BuilderWorkPackageCore', N'FK_WorkbenchOutboxEvents_BuilderExecutionAuthorization') AND is_not_trusted=0" }
+             ,@{ Name = "Prepared Builder AgentRun table"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.BuilderAgentRuns', N'U') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Builder AgentRun exact authorization and core authority"; Sql = "SELECT CASE WHEN COUNT(*)=2 THEN 1 ELSE 0 END FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name IN (N'FK_BuilderAgentRuns_Authorization', N'FK_BuilderAgentRuns_CoreHash') AND is_not_trusted=0" }
+             ,@{ Name = "Builder AgentRun one-use authorization"; Sql = "SELECT COUNT(*) FROM sys.key_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name=N'UQ_BuilderAgentRuns_Authorization'" }
+             ,@{ Name = "Builder AgentRun preparation validation"; Sql = "SELECT COUNT(*) FROM sys.triggers WHERE parent_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name=N'TR_BuilderAgentRuns_ValidatePreparation' AND is_disabled=0" }
+             ,@{ Name = "Builder AgentRun immutable prepared input"; Sql = "SELECT COUNT(*) FROM sys.triggers WHERE parent_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name=N'TR_BuilderAgentRuns_PreparationImmutable' AND is_disabled=0" }
+             ,@{ Name = "Builder AgentRun provider not invoked"; Sql = "SELECT CASE WHEN COUNT(*)=2 THEN 1 ELSE 0 END FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name IN (N'CK_BuilderAgentRuns_Status', N'CK_BuilderAgentRuns_NoInvocation') AND is_not_trusted=0" }
+             ,@{ Name = "Builder AgentRun operation result authority"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.ClientOperations') AND name=N'FK_ClientOperations_BuilderAgentRun' AND is_not_trusted=0" }
          )
 
         foreach ($check in $checks) {
