@@ -548,10 +548,9 @@ public sealed class WorkbenchTicketProposalCommitService : IWorkbenchTicketPropo
         CancellationToken cancellationToken) =>
         connection.QuerySingleOrDefaultAsync<string>(new CommandDefinition(
             """
-            SELECT TOP (1) ExecutionReadiness
-            FROM dbo.ProjectReadinessAssessments WITH (HOLDLOCK)
-            WHERE TenantId=@TenantId AND ProjectId=@ProjectId
-            ORDER BY Revision DESC;
+            SELECT ExecutionReadiness
+            FROM dbo.vw_WorkbenchEffectiveProjectReadiness WITH (HOLDLOCK)
+            WHERE TenantId=@TenantId AND ProjectId=@ProjectId;
             """,
             new { command.TenantId, command.ProjectId },
             transaction,

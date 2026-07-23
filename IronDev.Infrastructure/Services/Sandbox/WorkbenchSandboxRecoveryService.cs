@@ -346,6 +346,15 @@ public sealed class WorkbenchSandboxRecoveryService : IWorkbenchSandboxRecoveryS
                 throw new SandboxQualificationIntegrityException(
                     "The stale sandbox client operation could not be completed.");
 
+            var effectiveReadiness = await connection.QuerySingleAsync<string>(new CommandDefinition(
+                """
+                SELECT ExecutionReadiness
+                FROM dbo.vw_WorkbenchEffectiveProjectReadiness
+                WHERE TenantId=@TenantId AND ProjectId=@ProjectId;
+                """,
+                new { claim.TenantId, claim.ProjectId },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
             await InsertOutboxAsync(
                 connection,
                 transaction,
@@ -363,7 +372,7 @@ public sealed class WorkbenchSandboxRecoveryService : IWorkbenchSandboxRecoveryS
                     state = terminal.State,
                     evidenceManifestSha256 = outcome.Execution?.EvidenceManifestSha256,
                     cleanupConfirmed = outcome.CleanupConfirmed,
-                    executionReadiness = ProjectExecutionReadinessStates.NotConfigured
+                    executionReadiness = effectiveReadiness
                 }),
                 now,
                 cancellationToken).ConfigureAwait(false);

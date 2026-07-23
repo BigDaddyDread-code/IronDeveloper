@@ -2577,6 +2577,43 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Records exact fenced sandbox attempts and immutable canonical evidence while preserving NotConfigured readiness. Missing digests, feeds, HCS access, or policy controls fail closed; qualification grants no Builder authority."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-repository-readiness",
+                        "path":  "Database/migrate_workbench_repository_readiness.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.TechnicalValidationAttempts",
+                                               "dbo.RepositoryStateObservations",
+                                               "dbo.BuildValidationRecords",
+                                               "dbo.TestValidationRecords",
+                                               "dbo.CodeIndexSnapshots",
+                                               "dbo.BuilderModelConfigurationRecords",
+                                               "dbo.ProjectTechnicalReadinessEvidence",
+                                               "dbo.vw_WorkbenchEffectiveProjectReadiness",
+                                               "technical validation result references on dbo.ClientOperations"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users",
+                                              "dbo.RepositoryBindings",
+                                              "dbo.RepositoryBindingRevisions",
+                                              "dbo.ProjectExecutionProfiles",
+                                              "dbo.ProjectExecutionProfileRevisions",
+                                              "dbo.SandboxQualificationAttempts",
+                                              "dbo.SandboxEvidenceManifests",
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.ClientOperations",
+                                              "dbo.ProjectReadinessAssessments"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-06B mechanically current readiness and code-index evidence"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "Stores immutable exact-currentness evidence and a fail-closed effective projection. It does not create work packages, authorize Builder execution, or execute project changes."
                     }
                 ]
 }

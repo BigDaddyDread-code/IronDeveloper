@@ -380,6 +380,67 @@ export interface WorkbenchSandboxQualificationResult {
   attempt: SandboxQualificationAttemptSnapshot;
 }
 
+export type RepositoryExecutionReadiness = 'NotConfigured' | 'ValidationRequired' | 'Ready';
+
+export type RepositoryReadinessGateName =
+  | 'RepositoryBindingQualified'
+  | 'RepositoryCleanAtBaseline'
+  | 'ExecutionProfilePinned'
+  | 'RestorePassed'
+  | 'BuildPassed'
+  | 'TestCommandPassed'
+  | 'CodeIndexCurrent'
+  | 'SandboxQualified'
+  | 'BuilderModelConfigured';
+
+export interface RepositoryReadinessGateResult {
+  gate: RepositoryReadinessGateName;
+  passed: boolean;
+  reasonCode: string;
+}
+
+export interface ExecutionAvailabilityCheck {
+  state: 'Available' | 'Unavailable';
+  reasonCode: string;
+  safeMessage: string;
+  checkedAtUtc: string;
+  isAvailable: boolean;
+}
+
+export interface RepositoryReadinessEvaluationResult {
+  executionReadiness: RepositoryExecutionReadiness;
+  reasonCode: string;
+  currentAuthoritySha256: string | null;
+  gates: RepositoryReadinessGateResult[];
+  availability: ExecutionAvailabilityCheck | null;
+  isReady: boolean;
+}
+
+export interface WorkbenchRepositoryReadinessContext {
+  projectId: number;
+  projectLifecyclePhase: string;
+  evaluation: RepositoryReadinessEvaluationResult;
+}
+
+export interface RefreshRepositoryReadinessRequest {
+  workbenchSessionId: number;
+  leaseEpoch: number;
+  clientOperationId: string;
+  expectedRepositoryBindingRevision: number;
+  expectedExecutionProfileRevision: number;
+}
+
+export interface RefreshRepositoryReadinessResult {
+  projectId: number;
+  clientOperationId: string;
+  isReplay: boolean;
+  repositoryStateObservationId: string;
+  buildValidationRecordId: string;
+  testValidationRecordId: string;
+  codeIndexSnapshotId: string;
+  evaluation: RepositoryReadinessEvaluationResult;
+}
+
 export type ProjectUnderstandingFactState = 'Unknown' | 'Inferred' | 'Confirmed' | 'Conflicted';
 
 export interface ProjectUnderstandingFact {

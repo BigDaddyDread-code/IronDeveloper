@@ -2,6 +2,7 @@ using IronDev.Api.Auth;
 using IronDev.Core.Auth;
 using IronDev.Core.Sandbox;
 using IronDev.Core.Workbench;
+using IronDev.Infrastructure.Services;
 using IronDev.Infrastructure.Services.Sandbox;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,18 +17,127 @@ public sealed class WorkbenchRepositoryController : ControllerBase
     private readonly IWorkbenchRepositorySetupService _repositorySetup;
     private readonly IWorkbenchRepositoryProvisioningService _repositoryProvisioning;
     private readonly IWorkbenchSandboxQualificationService _sandboxQualification;
+    private readonly IWorkbenchRepositoryReadinessService _repositoryReadiness;
     private readonly ICurrentTenantContext _tenant;
 
     public WorkbenchRepositoryController(
         IWorkbenchRepositorySetupService repositorySetup,
         IWorkbenchRepositoryProvisioningService repositoryProvisioning,
         IWorkbenchSandboxQualificationService sandboxQualification,
+        IWorkbenchRepositoryReadinessService repositoryReadiness,
         ICurrentTenantContext tenant)
     {
         _repositorySetup = repositorySetup;
         _repositoryProvisioning = repositoryProvisioning;
         _sandboxQualification = sandboxQualification;
+        _repositoryReadiness = repositoryReadiness;
         _tenant = tenant;
+    }
+
+    [HttpGet("readiness")]
+    public async Task<ActionResult<WorkbenchRepositoryReadinessContext>> GetReadiness(
+        int projectId,
+        CancellationToken cancellationToken)
+    {
+        var actor = CurrentActor();
+        try
+        {
+            return Ok(await _repositoryReadiness.GetContextAsync(
+                new GetWorkbenchRepositoryReadinessContextQuery(
+                    _tenant.TenantId,
+                    actor.UserId,
+                    projectId),
+                cancellationToken));
+        }
+        catch (WorkbenchProjectNotAccessibleException)
+        {
+            return ProjectNotFound();
+        }
+        catch (RepositoryReadinessValidationException exception)
+        {
+            return BadRequest(Error("repository_readiness_invalid", exception.Message));
+        }
+    }
+
+    [HttpPost("readiness-validations")]
+    public async Task<ActionResult<RefreshRepositoryReadinessResult>> ValidateTechnicalReadiness(
+        int projectId,
+        ValidateTechnicalReadinessRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actor = CurrentActor();
+        try
+        {
+            return Ok(await _repositoryReadiness.RefreshAsync(
+                new RefreshRepositoryReadinessCommand(
+                    _tenant.TenantId,
+                    actor.UserId,
+                    projectId,
+                    request.WorkbenchSessionId,
+                    request.LeaseEpoch,
+                    request.ClientOperationId,
+                    request.ExpectedRepositoryBindingRevision,
+                    request.ExpectedExecutionProfileRevision),
+                cancellationToken));
+        }
+        catch (RepositoryReadinessForbiddenException exception)
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                Error(RepositoryReadinessForbiddenException.ErrorCode, exception.Message));
+        }
+        catch (WorkbenchProjectNotAccessibleException)
+        {
+            return ProjectNotFound();
+        }
+        catch (RepositoryReadinessStaleConfigurationException exception)
+        {
+            return Conflict(Error(RepositoryReadinessStaleConfigurationException.ErrorCode, exception.Message));
+        }
+        catch (RepositoryReadinessOperationMismatchException exception)
+        {
+            return Conflict(Error(RepositoryReadinessOperationMismatchException.ErrorCode, exception.Message));
+        }
+        catch (WorkbenchLeaseFenceException exception)
+        {
+            return Conflict(Error(WorkbenchLeaseFenceException.ErrorCode, exception.Message));
+        }
+        catch (RepositoryReadinessInProgressException exception)
+        {
+            return Conflict(Error(RepositoryReadinessInProgressException.ErrorCode, exception.Message));
+        }
+        catch (RepositoryReadinessNotAllowedException exception)
+        {
+            return Conflict(Error(RepositoryReadinessNotAllowedException.ErrorCode, exception.Message));
+        }
+        catch (RepositoryReadinessObservationException exception)
+        {
+            return UnprocessableEntity(new
+            {
+                error = RepositoryReadinessObservationException.ErrorCode,
+                reasonCode = exception.ReasonCode,
+                message = exception.Message
+            });
+        }
+        catch (RepositoryReadinessExecutionException exception)
+        {
+            return UnprocessableEntity(new
+            {
+                error = RepositoryReadinessExecutionException.ErrorCode,
+                reasonCode = exception.ReasonCode,
+                message = exception.Message
+            });
+        }
+        catch (RepositoryReadinessIntegrityException)
+        {
+            return UnprocessableEntity(Error(
+                RepositoryReadinessIntegrityException.ErrorCode,
+                "Technical-readiness authority or evidence failed integrity validation."));
+        }
+        catch (RepositoryReadinessValidationException exception)
+        {
+            return BadRequest(Error("repository_readiness_invalid", exception.Message));
+        }
     }
 
     [HttpGet("sandbox")]
@@ -358,6 +468,13 @@ public sealed class WorkbenchRepositoryController : ControllerBase
         string ReasonCode,
         string Message,
         SandboxCapability Capability);
+
+    public sealed record ValidateTechnicalReadinessRequest(
+        long WorkbenchSessionId,
+        long LeaseEpoch,
+        Guid ClientOperationId,
+        long ExpectedRepositoryBindingRevision,
+        long ExpectedExecutionProfileRevision);
 
     private CurrentUserContext CurrentActor() => new(
         HttpContext.RequestServices.GetRequiredService<IHttpContextAccessor>());

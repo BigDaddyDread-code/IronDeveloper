@@ -324,7 +324,7 @@ public sealed class WorkbenchRepositorySetupApiTests : ApiTestBase
         Assert.AreEqual(confirmed.ExecutionProfile.Id, context.ExecutionProfile?.Id);
         Assert.AreEqual(confirmed.ConfirmationId, context.LatestConfirmation?.ConfirmationId);
         Assert.AreEqual(operationId, context.LatestConfirmation?.ClientOperationId);
-        Assert.AreEqual(RepositorySetupReasonCodes.RepositoryProvisioningPending,
+        Assert.AreEqual(RepositoryReadinessReasonCodes.RepositoryNotConfigured,
             context.ReadinessReasonCode);
 
         var understandingResponse = await client.GetAsync(

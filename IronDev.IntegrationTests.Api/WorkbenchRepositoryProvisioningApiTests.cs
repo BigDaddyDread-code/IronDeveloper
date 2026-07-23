@@ -217,7 +217,7 @@ public sealed class WorkbenchRepositoryProvisioningApiTests : ApiTestBase
         Assert.AreEqual("main", state.DefaultBranch);
         Assert.AreEqual(result.BaselineCommit, state.BaselineCommit);
         Assert.AreEqual(setup.Plan.TargetPath, state.LocalPath);
-        Assert.AreEqual(ProjectExecutionReadinessStates.NotConfigured, state.ExecutionReadiness);
+        Assert.AreEqual(ProjectExecutionReadinessStates.ValidationRequired, state.ExecutionReadiness);
         Assert.AreEqual(ProjectLifecyclePhases.Shaping, state.LifecyclePhase);
         Assert.AreEqual(0, state.ProjectFiles);
         Assert.AreEqual(0, state.CodeIndexEntries);
@@ -237,7 +237,7 @@ public sealed class WorkbenchRepositoryProvisioningApiTests : ApiTestBase
         Assert.AreNotEqual(Guid.Empty, result.ReceiptId);
         Assert.IsFalse(result.IsReplay);
         Assert.AreEqual(ProjectLifecyclePhases.Shaping, result.ProjectLifecyclePhase);
-        Assert.AreEqual(ProjectExecutionReadinessStates.NotConfigured, result.ExecutionReadiness);
+        Assert.AreEqual(ProjectExecutionReadinessStates.ValidationRequired, result.ExecutionReadiness);
         Assert.AreEqual(RepositoryBindingStates.Qualified, result.RepositoryBinding.BindingState);
         Assert.AreEqual("main", result.RepositoryBinding.DefaultBranch);
         Assert.AreEqual("main", result.BranchName);
