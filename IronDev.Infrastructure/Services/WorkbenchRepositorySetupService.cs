@@ -896,23 +896,19 @@ public sealed class WorkbenchRepositorySetupService : IWorkbenchRepositorySetupS
         var sql = $"""
             SELECT project.Id AS ProjectId, project.Name, project.LocalPath,
                    COALESCE(lifecycle.Phase, N'Shaping') AS ProjectLifecyclePhase,
-                   COALESCE(readiness.ExecutionReadiness, N'NotConfigured') AS ExecutionReadiness,
-                   COALESCE(readiness.ReasonCode, N'RepositoryNotConfigured') AS ReadinessReasonCode,
+                   readiness.ExecutionReadiness,
+                   readiness.ReasonCode AS ReadinessReasonCode,
                    COALESCE(understanding.Revision, 0) AS UnderstandingRevision,
                    COALESCE(understanding.UnderstandingJson, NCHAR(123)+NCHAR(125)) AS UnderstandingJson
             FROM dbo.Projects project{lockHint}
+            INNER JOIN dbo.vw_WorkbenchEffectiveProjectReadiness readiness
+                ON readiness.TenantId=project.TenantId AND readiness.ProjectId=project.Id
             OUTER APPLY (
                 SELECT TOP (1) value.Phase
                 FROM dbo.ProjectLifecyclePhases value{lockHint}
                 WHERE value.TenantId=project.TenantId AND value.ProjectId=project.Id
                 ORDER BY value.Revision DESC
             ) lifecycle
-            OUTER APPLY (
-                SELECT TOP (1) value.ExecutionReadiness, value.ReasonCode
-                FROM dbo.ProjectReadinessAssessments value{lockHint}
-                WHERE value.TenantId=project.TenantId AND value.ProjectId=project.Id
-                ORDER BY value.Revision DESC
-            ) readiness
             OUTER APPLY (
                 SELECT TOP (1) value.Revision, value.UnderstandingJson
                 FROM dbo.ProjectUnderstandings value{lockHint}

@@ -15733,6 +15733,105 @@
         }
       }
     },
+    "/api/workbench/projects/{projectId}/repository/readiness": {
+      "get": {
+        "tags": [
+          "WorkbenchRepository"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchRepositoryReadinessContext"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchRepositoryReadinessContext"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchRepositoryReadinessContext"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/projects/{projectId}/repository/readiness-validations": {
+      "post": {
+        "tags": [
+          "WorkbenchRepository"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateTechnicalReadinessRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateTechnicalReadinessRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateTechnicalReadinessRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshRepositoryReadinessResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshRepositoryReadinessResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshRepositoryReadinessResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workbench/projects/{projectId}/repository/sandbox": {
       "get": {
         "tags": [
@@ -23959,6 +24058,38 @@
           "boundary": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExecutionAvailabilityCheck": {
+        "required": [
+          "checkedAtUtc",
+          "reasonCode",
+          "safeMessage",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "safeMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isAvailable": {
+            "type": "boolean",
+            "readOnly": true
           }
         },
         "additionalProperties": false
@@ -32559,6 +32690,42 @@
         },
         "additionalProperties": false
       },
+      "RefreshRepositoryReadinessResult": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isReplay": {
+            "type": "boolean"
+          },
+          "repositoryStateObservationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "buildValidationRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "testValidationRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "codeIndexSnapshotId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/RepositoryReadinessEvaluationResult"
+          }
+        },
+        "additionalProperties": false
+      },
       "RegenerateTicketProposalSetRequest": {
         "type": "object",
         "properties": {
@@ -33584,6 +33751,68 @@
             "nullable": true
           },
           "baselineCommit": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositoryReadinessEvaluationResult": {
+        "type": "object",
+        "properties": {
+          "executionReadiness": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentAuthoritySha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepositoryReadinessGateResult"
+            },
+            "nullable": true
+          },
+          "availability": {
+            "$ref": "#/components/schemas/ExecutionAvailabilityCheck"
+          },
+          "isReady": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositoryReadinessGateName": {
+        "enum": [
+          "RepositoryBindingQualified",
+          "RepositoryCleanAtBaseline",
+          "ExecutionProfilePinned",
+          "RestorePassed",
+          "BuildPassed",
+          "TestCommandPassed",
+          "CodeIndexCurrent",
+          "SandboxQualified",
+          "BuilderModelConfigured"
+        ],
+        "type": "string"
+      },
+      "RepositoryReadinessGateResult": {
+        "type": "object",
+        "properties": {
+          "gate": {
+            "$ref": "#/components/schemas/RepositoryReadinessGateName"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "reasonCode": {
             "type": "string",
             "nullable": true
           }
@@ -41632,6 +41861,32 @@
         },
         "additionalProperties": false
       },
+      "ValidateTechnicalReadinessRequest": {
+        "type": "object",
+        "properties": {
+          "workbenchSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leaseEpoch": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRepositoryBindingRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expectedExecutionProfileRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "WorkbenchAgentRunRecoveryContext": {
         "type": "object",
         "properties": {
@@ -41790,6 +42045,23 @@
           },
           "repositoryBinding": {
             "$ref": "#/components/schemas/RepositoryBindingSnapshot"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbenchRepositoryReadinessContext": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "projectLifecyclePhase": {
+            "type": "string",
+            "nullable": true
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/RepositoryReadinessEvaluationResult"
           }
         },
         "additionalProperties": false

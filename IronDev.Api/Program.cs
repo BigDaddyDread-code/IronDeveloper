@@ -217,6 +217,13 @@ builder.Services.AddSingleton<ISandboxExecutionService, HcsHyperVSandboxExecutio
 builder.Services.AddSingleton<ISandboxSourceSnapshotBuilder, SandboxSourceSnapshotBuilder>();
 builder.Services.AddScoped<IWorkbenchSandboxQualificationService,
     WorkbenchSandboxQualificationService>();
+builder.Services.AddScoped<IRepositoryReadinessObserver, RepositoryReadinessObserver>();
+builder.Services.AddScoped<IBuilderStableConfigurationProvider, BuilderStableConfigurationProvider>();
+builder.Services.AddScoped<IExecutionAvailabilityChecker, ExecutionAvailabilityChecker>();
+builder.Services.AddSingleton<IRepositoryReadinessRefreshFailureInjector,
+    NoOpRepositoryReadinessRefreshFailureInjector>();
+builder.Services.AddScoped<IWorkbenchRepositoryReadinessService,
+    WorkbenchRepositoryReadinessService>();
 builder.Services.AddScoped<IWorkbenchSandboxRecoveryService, WorkbenchSandboxRecoveryService>();
 // Qualification availability is policy-gated, but cleanup must continue after a
 // restart even when an operator disables new sandbox runs. An unavailable cleanup

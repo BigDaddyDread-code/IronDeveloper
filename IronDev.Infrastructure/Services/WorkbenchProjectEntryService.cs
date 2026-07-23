@@ -81,8 +81,10 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                 """
                 SELECT p.Id AS ProjectId, p.TenantId, p.Name, p.LocalPath,
                        COALESCE(phase.Phase, N'Shaping') AS ProjectLifecyclePhase,
-                       COALESCE(readiness.ExecutionReadiness, N'NotConfigured') AS ExecutionReadiness
+                       readiness.ExecutionReadiness
                 FROM dbo.Projects p
+                INNER JOIN dbo.vw_WorkbenchEffectiveProjectReadiness readiness
+                    ON readiness.TenantId=p.TenantId AND readiness.ProjectId=p.Id
                 INNER JOIN dbo.ProjectMembers member
                     ON member.TenantId=p.TenantId AND member.ProjectId=p.Id
                    AND member.UserId=@ActorUserId AND member.Status=N'Active'
@@ -95,12 +97,6 @@ public sealed class WorkbenchProjectEntryService : IWorkbenchProjectEntryService
                     WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id
                     ORDER BY value.Revision DESC
                 ) phase
-                OUTER APPLY (
-                    SELECT TOP (1) value.ExecutionReadiness
-                    FROM dbo.ProjectReadinessAssessments value
-                    WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id
-                    ORDER BY value.Revision DESC
-                ) readiness
                 WHERE p.TenantId=@TenantId AND p.Id=@ProjectId;
                 """,
                 command,

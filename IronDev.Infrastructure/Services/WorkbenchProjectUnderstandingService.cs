@@ -476,6 +476,8 @@ public sealed class WorkbenchProjectUnderstandingService : IWorkbenchProjectUnde
                    phase.Phase AS ProjectLifecyclePhase,
                    readiness.ExecutionReadiness
             FROM dbo.Projects project
+            INNER JOIN dbo.vw_WorkbenchEffectiveProjectReadiness readiness
+                ON readiness.TenantId=project.TenantId AND readiness.ProjectId=project.Id
             CROSS APPLY
             (
                 SELECT TOP (1) value.Revision, value.UnderstandingJson
@@ -490,13 +492,6 @@ public sealed class WorkbenchProjectUnderstandingService : IWorkbenchProjectUnde
                 WHERE value.TenantId=project.TenantId AND value.ProjectId=project.Id
                 ORDER BY value.Revision DESC
             ) phase
-            CROSS APPLY
-            (
-                SELECT TOP (1) value.ExecutionReadiness
-                FROM dbo.ProjectReadinessAssessments value
-                WHERE value.TenantId=project.TenantId AND value.ProjectId=project.Id
-                ORDER BY value.Revision DESC
-            ) readiness
             WHERE project.TenantId=@TenantId AND project.Id=@ProjectId;
             """,
             new { TenantId = tenantId, ProjectId = projectId },

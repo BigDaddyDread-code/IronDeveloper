@@ -36,10 +36,11 @@ public sealed class WorkbenchProductionSandboxContractTests
         var service = Read(
             "IronDev.Infrastructure/Services/Sandbox/WorkbenchSandboxQualificationService.cs");
 
-        StringAssert.Contains(service, "value.ExecutionReadiness");
+        StringAssert.Contains(service, "INNER JOIN dbo.vw_WorkbenchEffectiveProjectReadiness readiness");
         StringAssert.Contains(service, "readiness.ExecutionReadiness");
         Assert.IsFalse(service.Contains("value.Readiness", StringComparison.Ordinal));
         Assert.IsFalse(service.Contains("readiness.Readiness", StringComparison.Ordinal));
+        Assert.IsFalse(service.Contains("FROM dbo.ProjectReadinessAssessments value", StringComparison.Ordinal));
     }
 
     [TestMethod]

@@ -17,7 +17,10 @@ import type {
   RepositorySetupPlanPreview,
   RepositorySetupProfileSummary,
   WorkbenchSandboxContext,
-  WorkbenchSandboxRepositoryAuthority
+  WorkbenchSandboxRepositoryAuthority,
+  RefreshRepositoryReadinessRequest,
+  RepositoryReadinessGateName,
+  WorkbenchRepositoryReadinessContext
 } from '../../api/types';
 import { useProjectContext } from '../../state/useProjectContext';
 import { useSessionContext } from '../../state/useSessionContext';
@@ -30,7 +33,7 @@ interface ProjectSetupScreenProps {
 }
 
 type LoadState = 'loading' | 'loaded' | 'unavailable';
-type BusyAction = 'plan' | 'confirm' | 'provision' | 'qualifySandbox' | null;
+type BusyAction = 'plan' | 'confirm' | 'provision' | 'qualifySandbox' | 'validateReadiness' | null;
 
 interface PendingConfirmation extends ConfirmRepositorySetupRequest {
   projectId: number;
@@ -48,9 +51,15 @@ interface PendingSandboxQualification extends StartSandboxQualificationRequest {
   baselineCommit: string;
 }
 
+interface PendingReadinessValidation extends RefreshRepositoryReadinessRequest {
+  projectId: number;
+  userId: number;
+}
+
 const pendingConfirmationPrefix = 'irondev.repository-setup-confirmation';
 const pendingProvisioningPrefix = 'irondev.repository-provisioning';
 const pendingSandboxQualificationPrefix = 'irondev.sandbox-qualification';
+const pendingReadinessValidationPrefix = 'irondev.repository-readiness-validation';
 const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function pendingConfirmationKey(projectId: number, session: ActiveWorkbenchSession): string {
@@ -195,6 +204,63 @@ function clearPendingSandboxQualification(projectId: number, userId: number): vo
   }
 }
 
+function pendingReadinessValidationKey(projectId: number, userId: number): string {
+  return `${pendingReadinessValidationPrefix}:${userId}:${projectId}`;
+}
+
+function loadPendingReadinessValidation(
+  projectId: number,
+  userId: number,
+  session: ActiveWorkbenchSession
+): PendingReadinessValidation | null {
+  try {
+    const raw = window.sessionStorage.getItem(pendingReadinessValidationKey(projectId, userId));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<PendingReadinessValidation>;
+    return value.projectId === projectId && value.userId === userId &&
+      typeof value.clientOperationId === 'string' && uuidPattern.test(value.clientOperationId) &&
+      typeof value.expectedRepositoryBindingRevision === 'number' &&
+      Number.isSafeInteger(value.expectedRepositoryBindingRevision) && value.expectedRepositoryBindingRevision > 0 &&
+      typeof value.expectedExecutionProfileRevision === 'number' &&
+      Number.isSafeInteger(value.expectedExecutionProfileRevision) && value.expectedExecutionProfileRevision > 0
+      ? {
+          ...(value as PendingReadinessValidation),
+          workbenchSessionId: session.workbenchSessionId,
+          leaseEpoch: session.leaseEpoch
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingReadinessValidation(
+  attempt: PendingReadinessValidation,
+  session: ActiveWorkbenchSession
+): boolean {
+  try {
+    window.sessionStorage.setItem(
+      pendingReadinessValidationKey(attempt.projectId, attempt.userId),
+      JSON.stringify({
+        ...attempt,
+        workbenchSessionId: session.workbenchSessionId,
+        leaseEpoch: session.leaseEpoch
+      })
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearPendingReadinessValidation(projectId: number, userId: number): void {
+  try {
+    window.sessionStorage.removeItem(pendingReadinessValidationKey(projectId, userId));
+  } catch {
+    // Storage cleanup does not change the authoritative API outcome.
+  }
+}
+
 function isDefinitiveResponse(error: unknown): boolean {
   if (!(error instanceof IronDevApiError) || error.status < 400 || error.status >= 500 || error.status === 408 || error.status === 429) {
     return false;
@@ -249,6 +315,13 @@ function responseCode(error: unknown): string | null {
 function isRecoverableSandboxResponse(error: unknown): boolean {
   const code = responseCode(error);
   return code === 'sandbox_qualification_in_progress' ||
+    code === 'workbench_lease_fence_rejected' ||
+    code === 'workbench_lease_fence';
+}
+
+function isRecoverableReadinessResponse(error: unknown): boolean {
+  const code = responseCode(error);
+  return code === 'repository_readiness_in_progress' ||
     code === 'workbench_lease_fence_rejected' ||
     code === 'workbench_lease_fence';
 }
@@ -334,8 +407,13 @@ export function ProjectSetupScreen({
   const [sandboxLoadState, setSandboxLoadState] = useState<LoadState>('loading');
   const [sandboxErrorMessage, setSandboxErrorMessage] = useState<string | null>(null);
   const [pendingSandboxQualification, setPendingSandboxQualification] = useState<PendingSandboxQualification | null>(null);
+  const [readinessContext, setReadinessContext] = useState<WorkbenchRepositoryReadinessContext | null>(null);
+  const [readinessLoadState, setReadinessLoadState] = useState<LoadState>('loading');
+  const [readinessErrorMessage, setReadinessErrorMessage] = useState<string | null>(null);
+  const [pendingReadinessValidation, setPendingReadinessValidation] = useState<PendingReadinessValidation | null>(null);
   const generationRef = useRef(0);
   const sandboxGenerationRef = useRef(0);
+  const readinessGenerationRef = useRef(0);
 
   useEffect(() => {
     const generation = ++generationRef.current;
@@ -545,6 +623,66 @@ export function ProjectSetupScreen({
     userId
   ]);
 
+  useEffect(() => {
+    const generation = ++readinessGenerationRef.current;
+    const controller = new AbortController();
+    setReadinessContext(null);
+    setReadinessErrorMessage(null);
+    setReadinessLoadState('loading');
+
+    if (!authority || userId === null || context?.projectId !== projectId || !repositoryQualified ||
+        !confirmedBinding || confirmedBinding.projectId !== projectId ||
+        !executionProfile || executionProfile.projectId !== projectId) {
+      setPendingReadinessValidation(null);
+      setReadinessLoadState('unavailable');
+      return () => {
+        controller.abort();
+        if (readinessGenerationRef.current === generation) readinessGenerationRef.current += 1;
+      };
+    }
+
+    const stored = loadPendingReadinessValidation(projectId, userId, authority);
+    const storedIsCurrent = stored !== null &&
+      stored.expectedRepositoryBindingRevision === confirmedBinding.revision &&
+      stored.expectedExecutionProfileRevision === executionProfile.revision;
+    if (stored && !storedIsCurrent) {
+      clearPendingReadinessValidation(projectId, userId);
+      setPendingReadinessValidation(null);
+      setReadinessErrorMessage('The saved readiness validation no longer matches the current repository and profile revisions. Start a new validation.');
+    } else {
+      setPendingReadinessValidation(stored);
+    }
+
+    void session.client.getWorkbenchRepositoryReadinessContext(projectId, controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted || readinessGenerationRef.current !== generation) return;
+        setReadinessContext(result);
+        setReadinessLoadState('loaded');
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || readinessGenerationRef.current !== generation) return;
+        setReadinessLoadState('unavailable');
+        setReadinessErrorMessage(describeError(error, 'Technical readiness context is unavailable.'));
+      });
+
+    return () => {
+      controller.abort();
+      if (readinessGenerationRef.current === generation) readinessGenerationRef.current += 1;
+    };
+  }, [
+    authority?.leaseEpoch,
+    authority?.workbenchSessionId,
+    confirmedBinding?.id,
+    confirmedBinding?.revision,
+    context?.projectId,
+    executionProfile?.id,
+    executionProfile?.revision,
+    projectId,
+    repositoryQualified,
+    session.client,
+    userId
+  ]);
+
   const sandboxAuthorityMatchesRepository = Boolean(
     sandboxContext?.repositoryAuthority &&
     sandboxContext.projectId === projectId &&
@@ -557,6 +695,12 @@ export function ProjectSetupScreen({
     sandboxContext.repositoryAuthority.projectExecutionProfileId === executionProfile.id &&
     sandboxContext.repositoryAuthority.projectExecutionProfileRevision === executionProfile.revision &&
     sandboxContext.repositoryAuthority.baselineCommit === confirmedBinding.baselineCommit
+  );
+  const currentSandboxQualificationPassed = Boolean(
+    sandboxAuthorityMatchesRepository &&
+    sandboxContext?.repositoryAuthority &&
+    sandboxContext.latestAttempt?.state === 'Passed' &&
+    sandboxAttemptMatchesAuthority(sandboxContext.latestAttempt, sandboxContext.repositoryAuthority)
   );
 
   const createPlan = useCallback(async () => {
@@ -900,6 +1044,109 @@ export function ProjectSetupScreen({
     userId
   ]);
 
+  const validateReadiness = useCallback(async () => {
+    if (!authority || userId === null || busyAction !== null || !repositoryQualified ||
+        !confirmedBinding || !executionProfile) return;
+
+    if (!pendingReadinessValidation && !currentSandboxQualificationPassed) {
+      setReadinessErrorMessage('Qualify the production sandbox for the current repository binding, profile revision, and baseline before validating technical readiness.');
+      return;
+    }
+
+    if (pendingReadinessValidation &&
+        (pendingReadinessValidation.expectedRepositoryBindingRevision !== confirmedBinding.revision ||
+         pendingReadinessValidation.expectedExecutionProfileRevision !== executionProfile.revision)) {
+      clearPendingReadinessValidation(projectId, userId);
+      setPendingReadinessValidation(null);
+      setReadinessErrorMessage('The saved readiness validation is stale for the current repository or profile revision. Start a new validation.');
+      return;
+    }
+
+    const attempt: PendingReadinessValidation = pendingReadinessValidation
+      ? {
+          ...pendingReadinessValidation,
+          workbenchSessionId: authority.workbenchSessionId,
+          leaseEpoch: authority.leaseEpoch
+        }
+      : {
+          projectId,
+          userId,
+          workbenchSessionId: authority.workbenchSessionId,
+          leaseEpoch: authority.leaseEpoch,
+          clientOperationId: crypto.randomUUID(),
+          expectedRepositoryBindingRevision: confirmedBinding.revision,
+          expectedExecutionProfileRevision: executionProfile.revision
+        };
+    if (!savePendingReadinessValidation(attempt, authority)) {
+      setReadinessErrorMessage('IronDev could not preserve the exact readiness operation in this browser session, so no validation request was sent.');
+      return;
+    }
+
+    const generation = readinessGenerationRef.current;
+    setPendingReadinessValidation(attempt);
+    setBusyAction('validateReadiness');
+    setReadinessErrorMessage(null);
+    try {
+      const result = await session.client.refreshWorkbenchRepositoryReadiness(projectId, {
+        workbenchSessionId: attempt.workbenchSessionId,
+        leaseEpoch: attempt.leaseEpoch,
+        clientOperationId: attempt.clientOperationId,
+        expectedRepositoryBindingRevision: attempt.expectedRepositoryBindingRevision,
+        expectedExecutionProfileRevision: attempt.expectedExecutionProfileRevision
+      });
+      clearPendingReadinessValidation(projectId, userId);
+      if (readinessGenerationRef.current !== generation) return;
+      setPendingReadinessValidation(null);
+      setReadinessContext({
+        projectId,
+        projectLifecyclePhase: readinessContext?.projectLifecyclePhase ?? context?.projectLifecyclePhase ?? 'Shaping',
+        evaluation: result.evaluation
+      });
+      setReadinessLoadState('loaded');
+    } catch (error: unknown) {
+      const recoverable = isRecoverableReadinessResponse(error);
+      const definitive = isDefinitiveResponse(error) && !recoverable;
+      if (definitive) clearPendingReadinessValidation(projectId, userId);
+      if (readinessGenerationRef.current !== generation) return;
+      if (definitive) {
+        setPendingReadinessValidation(null);
+      } else {
+        const currentFenceAttempt = {
+          ...attempt,
+          workbenchSessionId: authority.workbenchSessionId,
+          leaseEpoch: authority.leaseEpoch
+        };
+        if (savePendingReadinessValidation(currentFenceAttempt, authority)) {
+          setPendingReadinessValidation(currentFenceAttempt);
+        } else {
+          setPendingReadinessValidation(null);
+          setReadinessLoadState('unavailable');
+        }
+      }
+      const code = responseCode(error);
+      setReadinessErrorMessage(!definitive
+        ? code === 'workbench_lease_fence_rejected' || code === 'workbench_lease_fence'
+          ? 'Workbench write authority changed while this exact readiness validation was active. Retry the same operation with the current Workbench fence.'
+          : 'IronDev could not determine whether technical validation completed. Retry the exact same operation safely.'
+        : describeError(error, 'Technical readiness validation did not start.'));
+    } finally {
+      if (readinessGenerationRef.current === generation) setBusyAction(null);
+    }
+  }, [
+    authority,
+    busyAction,
+    confirmedBinding,
+    context?.projectLifecyclePhase,
+    currentSandboxQualificationPassed,
+    executionProfile,
+    pendingReadinessValidation,
+    projectId,
+    readinessContext?.projectLifecyclePhase,
+    repositoryQualified,
+    session.client,
+    userId
+  ]);
+
   const returnToConfiguration = () => {
     setPlan(null);
     setConfirmationChecked(false);
@@ -988,7 +1235,13 @@ export function ProjectSetupScreen({
             pendingSandboxQualification={pendingSandboxQualification}
             sandboxBusy={busyAction === 'qualifySandbox'}
             sandboxErrorMessage={sandboxErrorMessage}
+            readinessContext={readinessContext}
+            readinessLoadState={readinessLoadState}
+            pendingReadinessValidation={pendingReadinessValidation}
+            readinessBusy={busyAction === 'validateReadiness'}
+            readinessErrorMessage={readinessErrorMessage}
             onQualifySandbox={() => void qualifySandbox()}
+            onValidateReadiness={() => void validateReadiness()}
             onContinue={onOpenBoard}
           />
         ) : provisioningInProgress ? (
@@ -1439,7 +1692,13 @@ function QualifiedRepository({
   pendingSandboxQualification,
   sandboxBusy,
   sandboxErrorMessage,
+  readinessContext,
+  readinessLoadState,
+  pendingReadinessValidation,
+  readinessBusy,
+  readinessErrorMessage,
   onQualifySandbox,
+  onValidateReadiness,
   onContinue
 }: {
   binding: RepositoryBindingSnapshot;
@@ -1453,11 +1712,24 @@ function QualifiedRepository({
   pendingSandboxQualification: PendingSandboxQualification | null;
   sandboxBusy: boolean;
   sandboxErrorMessage: string | null;
+  readinessContext: WorkbenchRepositoryReadinessContext | null;
+  readinessLoadState: LoadState;
+  pendingReadinessValidation: PendingReadinessValidation | null;
+  readinessBusy: boolean;
+  readinessErrorMessage: string | null;
   onQualifySandbox: () => void;
+  onValidateReadiness: () => void;
   onContinue: () => void;
 }) {
   const branchName = provisioning?.branchName ?? latestAttempt?.branchName ?? binding.defaultBranch ?? '';
   const baselineCommit = provisioning?.baselineCommit ?? latestAttempt?.baselineCommit ?? binding.baselineCommit ?? '';
+  const effectiveReadiness = readinessContext?.evaluation.executionReadiness ?? readiness;
+  const sandboxPassedForCurrentAuthority = Boolean(
+    sandboxAuthorityMatches &&
+    sandboxContext?.repositoryAuthority &&
+    sandboxContext.latestAttempt?.state === 'Passed' &&
+    sandboxAttemptMatchesAuthority(sandboxContext.latestAttempt, sandboxContext.repositoryAuthority)
+  );
   return (
     <>
       <section className="fl-project-setup__ready fl-repository-setup__confirmed" data-testid="repositorySetup.qualified">
@@ -1472,11 +1744,11 @@ function QualifiedRepository({
           {provisioning ? <div><dt>Manifest SHA-256</dt><dd><code>{provisioning.manifestSha256}</code></dd></div> : null}
           {provisioning ? <div><dt>Git tree ID</dt><dd><code>{provisioning.gitTreeId}</code></dd></div> : null}
           <div><dt>Project lifecycle</dt><dd>{lifecycle}</dd></div>
-          <div><dt>Execution readiness</dt><dd>{readiness}</dd></div>
+          <div><dt>Execution readiness</dt><dd>{effectiveReadiness}</dd></div>
         </dl>
         <div className="fl-project-setup__safety-boundary">
           <strong>Technical readiness is still separate</strong>
-          <p>Qualified means the repository artifact and Git baseline were verified. Repository qualification did not itself restore, build, test, index, run sandbox qualification, or authorize Builder. Any sandbox evidence shown below comes from the separate qualification step. Execution readiness remains NotConfigured.</p>
+          <p>Qualified means the repository artifact and Git baseline were verified. Repository qualification did not itself restore, build, test, index, run sandbox qualification, or authorize Builder. The current technical projection is owned by the readiness evidence panel below.</p>
         </div>
         <button className="fl-btn fl-pri" type="button" onClick={onContinue}>Continue to project</button>
       </section>
@@ -1489,7 +1761,136 @@ function QualifiedRepository({
         errorMessage={sandboxErrorMessage}
         onQualify={onQualifySandbox}
       />
+      <TechnicalReadinessPanel
+        context={readinessContext}
+        loadState={readinessLoadState}
+        pending={pendingReadinessValidation}
+        canValidate={sandboxPassedForCurrentAuthority}
+        busy={readinessBusy}
+        errorMessage={readinessErrorMessage}
+        onValidate={onValidateReadiness}
+      />
     </>
+  );
+}
+
+const readinessGateLabels: Record<RepositoryReadinessGateName, string> = {
+  RepositoryBindingQualified: 'Repository binding qualified',
+  RepositoryCleanAtBaseline: 'Repository clean at baseline',
+  ExecutionProfilePinned: 'Execution profile pinned',
+  RestorePassed: 'Restore passed',
+  BuildPassed: 'Build passed',
+  TestCommandPassed: 'Test command passed',
+  CodeIndexCurrent: 'Code index current',
+  SandboxQualified: 'Sandbox qualified',
+  BuilderModelConfigured: 'Builder model configured'
+};
+
+function TechnicalReadinessPanel({
+  context,
+  loadState,
+  pending,
+  canValidate,
+  busy,
+  errorMessage,
+  onValidate
+}: {
+  context: WorkbenchRepositoryReadinessContext | null;
+  loadState: LoadState;
+  pending: PendingReadinessValidation | null;
+  canValidate: boolean;
+  busy: boolean;
+  errorMessage: string | null;
+  onValidate: () => void;
+}) {
+  if (loadState === 'loading') {
+    return (
+      <section className="fl-project-setup__next fl-project-setup__next--loading" data-testid="repositorySetup.readiness">
+        <span className="fl-eyebrow">Technical readiness</span>
+        <h2>Loading current technical evidence</h2>
+        <p>Currentness is calculated from exact repository, profile, baseline, command, sandbox, and index bindings.</p>
+      </section>
+    );
+  }
+
+  if ((loadState === 'unavailable' || !context) && !pending) {
+    return (
+      <section className="fl-project-setup__unavailable" data-testid="repositorySetup.readinessUnavailable">
+        <span className="fl-eyebrow">Technical readiness</span>
+        <h2>Technical readiness is unavailable</h2>
+        <p>The qualified repository remains available for Workbench shaping and ticket creation.</p>
+        <p>No Builder authorization is created by viewing or validating readiness.</p>
+        {errorMessage ? <div className="fl-error" role="alert">{errorMessage}</div> : null}
+      </section>
+    );
+  }
+
+  const evaluation = context?.evaluation ?? null;
+  return (
+    <section className="fl-project-setup__next" data-testid="repositorySetup.readiness">
+      <span className="fl-eyebrow">Technical readiness</span>
+      <h2>{evaluation ? `Technical readiness: ${evaluation.executionReadiness}` : 'Recover technical readiness validation'}</h2>
+      <p>Evidence is current only when every authoritative ID, revision, hash, baseline, observation, and index binding matches.</p>
+
+      {evaluation ? (
+        <ol className="fl-repository-readiness__gates" aria-label="Technical readiness gates">
+          {evaluation.gates.map((gate) => (
+            <li
+              key={gate.gate}
+              data-testid={`repositorySetup.readinessGate.${gate.gate}`}
+              data-state={gate.passed ? 'passed' : 'required'}
+            >
+              <strong>{readinessGateLabels[gate.gate]}</strong>
+              <span>{gate.passed ? 'Passed' : 'Validation required'}</span>
+              <code>{gate.reasonCode}</code>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+
+      {evaluation ? (
+        <div className="fl-project-setup__safety-boundary" data-testid="repositorySetup.readinessAvailability">
+          <strong>Provider availability is a separate start-time check</strong>
+          {evaluation.availability ? (
+            <>
+              <p>{evaluation.availability.state}: {evaluation.availability.safeMessage}</p>
+              <p><code>{evaluation.availability.reasonCode}</code> at {evaluation.availability.checkedAtUtc}</p>
+            </>
+          ) : (
+            <p>No provider availability check is recorded. That does not change durable technical readiness.</p>
+          )}
+          <p>A provider outage may block a later Builder start, but it never changes Ready to another durable readiness state.</p>
+        </div>
+      ) : null}
+
+      <div className="fl-project-setup__safety-boundary">
+        <strong>Technical evidence, not permission</strong>
+        <p>Ready means this exact project configuration is technically capable of an execution attempt. Ready is never Builder authorization. One exact work package requires a separate, single-use authorization later.</p>
+      </div>
+
+      {pending ? (
+        <dl className="fl-repository-setup__plan" data-testid="repositorySetup.readinessRecovery">
+          <PlanRow label="Exact recovery operation" value={pending.clientOperationId} code testId="repositorySetup.readinessRecovery.operation" />
+          <PlanRow label="Expected binding revision" value={String(pending.expectedRepositoryBindingRevision)} />
+          <PlanRow label="Expected profile revision" value={String(pending.expectedExecutionProfileRevision)} />
+          <PlanRow label="Current Workbench session" value={String(pending.workbenchSessionId)} />
+          <PlanRow label="Current lease epoch" value={String(pending.leaseEpoch)} />
+        </dl>
+      ) : null}
+      {errorMessage ? <div className="fl-error" role="alert">{errorMessage}</div> : null}
+      <button
+        className="fl-btn fl-pri"
+        type="button"
+        data-testid="repositorySetup.validateReadiness"
+        disabled={busy || (!pending && !canValidate)}
+        onClick={onValidate}
+      >
+        {busy
+          ? pending ? 'Recovering exact readiness validation...' : 'Validating technical readiness...'
+          : pending ? 'Retry exact readiness validation'
+            : canValidate ? 'Validate technical readiness' : 'Qualify sandbox first'}
+      </button>
+    </section>
   );
 }
 

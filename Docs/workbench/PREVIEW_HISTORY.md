@@ -18,8 +18,21 @@ The machine-readable current version is `workbench-version.json`. Each preview u
 | `0.1.0-preview.12` | PR-05A | `workbench-pr05a` | Repository/profile authorities, deterministic setup-plan review, approved-root safety, explicit confirmation, and unsupported-profile reporting with zero filesystem writes |
 | `0.1.0-preview.13` | PR-05B | `workbench-pr05b` | Confirmed-plan provisioning through isolated staging, pinned product-neutral rendering, controlled Git initialization, atomic install, crash-safe replay, and no technical-readiness claims |
 | `0.1.0-preview.14` | PR-06A | `workbench-pr06a` | Fail-closed production sandbox capability, Hyper-V isolation policy, digest/feed verification, bounded qualification evidence, and cleanup/recovery without readiness or Builder authority |
+| `0.1.0-preview.15` | PR-06B | `workbench-pr06b` | Immutable repository observations, restore/build/test records, code-index snapshots, exact evidence currentness, nine-gate readiness, and provider-availability separation |
 
-Start the current PR-06A preview alongside the earlier previews:
+Start the current PR-06B preview alongside the earlier previews:
+
+```powershell
+.\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `
+  -EnableConversationAuthority -PreviewId workbench-pr06b `
+  -ApiBaseUrl http://127.0.0.1:5410 -UiPort 5391
+```
+
+The PR-06B preview owns database `IronDeveloper_Test_workbench_pr06b`, workspace `C:\IronDevTestWorkspaces\workbench-pr06b`, logs `C:\IronDevTestLogs\workbench-pr06b`, API `http://127.0.0.1:5410`, and UI `http://127.0.0.1:5391`.
+
+PR-06B materializes immutable repository observations, restore/build/test validation records, and a file-level code-index snapshot only from the server-owned qualified repository and exact PR-06A evidence. Readiness is calculated from nine explicit gates by comparing current repository, profile, command, toolchain, image, feed, template, sandbox-policy, observation, index, and Builder-model configuration authority. A newer timestamp cannot rescue stale evidence. No browser path or command becomes authority, and the legacy project indexing fields receive only a one-way compatibility projection. Live provider availability is reported separately and cannot change durable `Ready` state. Readiness does not create or grant Builder authorization; PR-07 owns one exact, hash-bound, single-use Builder start.
+
+The earlier PR-06A preview remains available for sandbox-boundary comparison:
 
 ```powershell
 .\tools\localtest\start-pr-manual-test.ps1 -FreshSession -BrowserOnly -Reset `

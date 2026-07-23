@@ -375,6 +375,77 @@ public abstract class IntegrationTestBase
             IF OBJECT_ID('dbo.ProjectRenameProposals', 'U') IS NOT NULL DELETE FROM dbo.ProjectRenameProposals;
             IF OBJECT_ID('dbo.ProjectUnderstandings', 'U') IS NOT NULL DELETE FROM dbo.ProjectUnderstandings;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultTechnicalValidationAttemptId') IS NOT NULL
+               AND COL_LENGTH('dbo.ClientOperations', 'ResultProjectTechnicalReadinessEvidenceId') IS NOT NULL
+               AND COL_LENGTH('dbo.ClientOperations', 'ResultProjectReadinessAssessmentId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
+                    SET ResultTechnicalValidationAttemptId=NULL,
+                        ResultProjectTechnicalReadinessEvidenceId=NULL,
+                        ResultProjectReadinessAssessmentId=NULL;';
+            IF OBJECT_ID('dbo.ProjectTechnicalReadinessEvidence', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_ProjectTechnicalReadinessEvidence_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_ProjectTechnicalReadinessEvidence_AppendOnly
+                        ON dbo.ProjectTechnicalReadinessEvidence;
+                DELETE FROM dbo.ProjectTechnicalReadinessEvidence;
+                IF OBJECT_ID('dbo.TR_ProjectTechnicalReadinessEvidence_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_ProjectTechnicalReadinessEvidence_AppendOnly
+                        ON dbo.ProjectTechnicalReadinessEvidence;
+            END;
+            IF OBJECT_ID('dbo.BuilderModelConfigurationRecords', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderModelConfigurationRecords_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderModelConfigurationRecords_AppendOnly
+                        ON dbo.BuilderModelConfigurationRecords;
+                DELETE FROM dbo.BuilderModelConfigurationRecords;
+                IF OBJECT_ID('dbo.TR_BuilderModelConfigurationRecords_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderModelConfigurationRecords_AppendOnly
+                        ON dbo.BuilderModelConfigurationRecords;
+            END;
+            IF OBJECT_ID('dbo.CodeIndexSnapshots', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_CodeIndexSnapshots_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_CodeIndexSnapshots_AppendOnly ON dbo.CodeIndexSnapshots;
+                DELETE FROM dbo.CodeIndexSnapshots;
+                IF OBJECT_ID('dbo.TR_CodeIndexSnapshots_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_CodeIndexSnapshots_AppendOnly ON dbo.CodeIndexSnapshots;
+            END;
+            IF OBJECT_ID('dbo.TestValidationRecords', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_TestValidationRecords_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_TestValidationRecords_AppendOnly ON dbo.TestValidationRecords;
+                DELETE FROM dbo.TestValidationRecords;
+                IF OBJECT_ID('dbo.TR_TestValidationRecords_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_TestValidationRecords_AppendOnly ON dbo.TestValidationRecords;
+            END;
+            IF OBJECT_ID('dbo.BuildValidationRecords', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuildValidationRecords_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuildValidationRecords_AppendOnly ON dbo.BuildValidationRecords;
+                DELETE FROM dbo.BuildValidationRecords;
+                IF OBJECT_ID('dbo.TR_BuildValidationRecords_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuildValidationRecords_AppendOnly ON dbo.BuildValidationRecords;
+            END;
+            IF OBJECT_ID('dbo.RepositoryStateObservations', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_RepositoryStateObservations_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_RepositoryStateObservations_AppendOnly
+                        ON dbo.RepositoryStateObservations;
+                DELETE FROM dbo.RepositoryStateObservations;
+                IF OBJECT_ID('dbo.TR_RepositoryStateObservations_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_RepositoryStateObservations_AppendOnly
+                        ON dbo.RepositoryStateObservations;
+            END;
+            IF OBJECT_ID('dbo.TechnicalValidationAttempts', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_TechnicalValidationAttempts_TerminalImmutable', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_TechnicalValidationAttempts_TerminalImmutable
+                        ON dbo.TechnicalValidationAttempts;
+                DELETE FROM dbo.TechnicalValidationAttempts;
+                IF OBJECT_ID('dbo.TR_TechnicalValidationAttempts_TerminalImmutable', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_TechnicalValidationAttempts_TerminalImmutable
+                        ON dbo.TechnicalValidationAttempts;
+            END;
             IF COL_LENGTH('dbo.ClientOperations', 'ResultSandboxQualificationAttemptId') IS NOT NULL
                AND COL_LENGTH('dbo.ClientOperations', 'ResultSandboxEvidenceManifestId') IS NOT NULL
                 EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
