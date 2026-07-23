@@ -249,6 +249,11 @@
                              "id":  "2026-07-workbench-pr06b-repository-readiness",
                              "path":  "Database/migrate_workbench_repository_readiness.sql",
                              "description":  "Adds fenced technical-validation attempts, exact repository observations, restore/build/test/index/model evidence, a companion readiness ledger, and the mechanically current effective-readiness projection without Builder execution authority."
+                        },
+                        {
+                             "id":  "2026-07-workbench-pr07a-builder-authorization",
+                             "path":  "Database/migrate_workbench_builder_authorization.sql",
+                             "description":  "Adds authorization-free canonical Builder work-package cores with exact Work Item contracts, acceptance criteria, permitted files, readiness/index/model/sandbox snapshots, ordered provenance, and scoped single-use start authorizations without creating Builder runs or execution envelopes."
                         }
                    ]
 }

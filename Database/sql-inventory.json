@@ -2614,6 +2614,52 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Stores immutable exact-currentness evidence and a fail-closed effective projection. It does not create work packages, authorize Builder execution, or execute project changes."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-builder-authorization",
+                        "path":  "Database/migrate_workbench_builder_authorization.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.BuilderWorkPackageCores",
+                                               "dbo.BuilderWorkPackageTickets",
+                                               "dbo.BuilderWorkPackageArtifactReferences",
+                                               "dbo.BuilderWorkPackageRepositoryContexts",
+                                               "dbo.BuilderExecutionAuthorizations",
+                                               "Builder work-package and authorization result references on dbo.ClientOperations",
+                                               "Builder work-package and authorization references on dbo.WorkbenchOutboxEvents",
+                                               "append-only core and child triggers",
+                                               "terminal-immutable authorization trigger"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.Projects",
+                                              "dbo.Users",
+                                               "dbo.ProjectMembers",
+                                               "dbo.ProjectTickets",
+                                               "dbo.WorkItems",
+                                               "dbo.WorkItemContracts",
+                                               "dbo.ProjectUnderstandings",
+                                              "dbo.RepositoryBindings",
+                                              "dbo.RepositoryBindingRevisions",
+                                              "dbo.ProjectExecutionProfiles",
+                                              "dbo.ProjectExecutionProfileRevisions",
+                                              "dbo.RepositoryStateObservations",
+                                               "dbo.TechnicalValidationAttempts",
+                                               "dbo.ProjectTechnicalReadinessEvidence",
+                                               "dbo.CodeIndexSnapshots",
+                                               "dbo.BuilderModelConfigurationRecords",
+                                              "dbo.vw_WorkbenchEffectiveProjectReadiness",
+                                              "dbo.WorkbenchWriteLeases",
+                                              "dbo.ClientOperations",
+                                              "dbo.WorkbenchOutboxEvents"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-07A exact work-package Builder authorization"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "The canonical work-package core is content-hashed and authorization-free. Exact Work Item contract, acceptance criteria, permitted files, readiness, repository observation, complete code-index snapshot, code-owned Builder contract versions, model profile, sandbox policy, qualified image, and evidence identities enforce scope. Authorizations are exact-hash, fifteen-minute, single-use grants; this slice creates no run, attempt, prompt, provider call, or execution envelope."
                     }
                 ]
 }
