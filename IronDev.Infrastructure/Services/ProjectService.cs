@@ -51,14 +51,12 @@ public sealed class ProjectService : IProjectService
                    p.LastIndexedUtc, p.IndexingStatus, p.IndexedFileCount,
                    phase.Phase AS LifecyclePhase, readiness.ExecutionReadiness
             FROM dbo.Projects p
+            INNER JOIN dbo.vw_WorkbenchEffectiveProjectReadiness readiness
+                ON readiness.TenantId=p.TenantId AND readiness.ProjectId=p.Id
             OUTER APPLY (
                 SELECT TOP (1) value.Phase FROM dbo.ProjectLifecyclePhases value
                 WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id ORDER BY value.Revision DESC
             ) phase
-            OUTER APPLY (
-                SELECT TOP (1) value.ExecutionReadiness FROM dbo.ProjectReadinessAssessments value
-                WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id ORDER BY value.Revision DESC
-            ) readiness
             WHERE p.TenantId = @TenantId
             ORDER BY p.CreatedDate DESC;
             """;
@@ -89,14 +87,12 @@ public sealed class ProjectService : IProjectService
                    p.LastIndexedUtc, p.IndexingStatus, p.IndexedFileCount,
                    phase.Phase AS LifecyclePhase, readiness.ExecutionReadiness
             FROM dbo.Projects p
+            INNER JOIN dbo.vw_WorkbenchEffectiveProjectReadiness readiness
+                ON readiness.TenantId=p.TenantId AND readiness.ProjectId=p.Id
             OUTER APPLY (
                 SELECT TOP (1) value.Phase FROM dbo.ProjectLifecyclePhases value
                 WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id ORDER BY value.Revision DESC
             ) phase
-            OUTER APPLY (
-                SELECT TOP (1) value.ExecutionReadiness FROM dbo.ProjectReadinessAssessments value
-                WHERE value.TenantId=p.TenantId AND value.ProjectId=p.Id ORDER BY value.Revision DESC
-            ) readiness
             WHERE p.Id = @ProjectId
               AND p.TenantId = @TenantId;
             """;
@@ -187,6 +183,7 @@ public sealed class ProjectService : IProjectService
             SELECT CASE
                 WHEN OBJECT_ID(N'dbo.ProjectLifecyclePhases', N'U') IS NOT NULL
                  AND OBJECT_ID(N'dbo.ProjectReadinessAssessments', N'U') IS NOT NULL
+                 AND OBJECT_ID(N'dbo.vw_WorkbenchEffectiveProjectReadiness', N'V') IS NOT NULL
                 THEN 1 ELSE 0 END;
             """,
             cancellationToken: cancellationToken)) == 1;

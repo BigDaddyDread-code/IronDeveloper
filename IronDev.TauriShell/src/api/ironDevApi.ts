@@ -121,6 +121,10 @@ import type {
   WorkbenchSandboxContext,
   WorkbenchSandboxQualificationResult,
   WorkbenchSandboxRepositoryAuthority,
+  RefreshRepositoryReadinessRequest,
+  RefreshRepositoryReadinessResult,
+  RepositoryReadinessEvaluationResult,
+  WorkbenchRepositoryReadinessContext,
   ProjectExecutionProfileSnapshot,
   ProjectRenameProposal,
   ProjectUnderstandingConflict,
@@ -524,6 +528,35 @@ class IronDevApiClient {
     );
     if (!isWorkbenchSandboxQualificationResult(result, projectId, request)) {
       throw new IronDevApiProtocolError('Workbench sandbox qualification');
+    }
+    return result;
+  }
+
+  async getWorkbenchRepositoryReadinessContext(
+    projectId: number,
+    signal?: AbortSignal
+  ): Promise<WorkbenchRepositoryReadinessContext> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/repository/readiness`,
+      { method: 'GET', signal }
+    );
+    if (!isWorkbenchRepositoryReadinessContext(result, projectId)) {
+      throw new IronDevApiProtocolError('Workbench repository readiness context');
+    }
+    return result;
+  }
+
+  async refreshWorkbenchRepositoryReadiness(
+    projectId: number,
+    request: RefreshRepositoryReadinessRequest,
+    signal?: AbortSignal
+  ): Promise<RefreshRepositoryReadinessResult> {
+    const result = await this.request<unknown>(
+      `/api/workbench/projects/${projectId}/repository/readiness-validations`,
+      { method: 'POST', body: request, signal }
+    );
+    if (!isRefreshRepositoryReadinessResult(result, projectId, request)) {
+      throw new IronDevApiProtocolError('Workbench repository readiness refresh');
     }
     return result;
   }
@@ -2851,7 +2884,7 @@ function isRepositoryProvisioningResult(
       value.clientOperationId !== request.clientOperationId ||
       typeof value.isReplay !== 'boolean' ||
       !isNonEmptyString(value.projectLifecyclePhase) ||
-      value.executionReadiness !== 'NotConfigured' ||
+      value.executionReadiness !== 'ValidationRequired' ||
       !isNonEmptyString(value.readinessReasonCode) ||
       !isNonEmptyString(value.projectLocalPath) ||
       !isRepositoryBindingSnapshot(value.repositoryBinding, projectId) ||
@@ -2870,6 +2903,85 @@ function isRepositoryProvisioningResult(
   return value.repositoryBinding.defaultBranch === value.branchName &&
     value.repositoryBinding.baselineCommit === value.baselineCommit &&
     value.projectLocalPath === value.repositoryBinding.canonicalPath;
+}
+
+const repositoryReadinessGateOrder = [
+  'RepositoryBindingQualified',
+  'RepositoryCleanAtBaseline',
+  'ExecutionProfilePinned',
+  'RestorePassed',
+  'BuildPassed',
+  'TestCommandPassed',
+  'CodeIndexCurrent',
+  'SandboxQualified',
+  'BuilderModelConfigured'
+] as const;
+
+function isRepositoryReadinessEvaluation(value: unknown): value is RepositoryReadinessEvaluationResult {
+  if (!isJsonRecord(value) ||
+      typeof value.executionReadiness !== 'string' || !executionReadinessStates.has(value.executionReadiness) ||
+      !isNonEmptyString(value.reasonCode) ||
+      !(value.currentAuthoritySha256 === null || isLowerSha256(value.currentAuthoritySha256)) ||
+      typeof value.isReady !== 'boolean' ||
+      !Array.isArray(value.gates) || value.gates.length !== repositoryReadinessGateOrder.length ||
+      !(value.availability === null || isExecutionAvailabilityCheck(value.availability))) {
+    return false;
+  }
+
+  for (let index = 0; index < repositoryReadinessGateOrder.length; index += 1) {
+    const gate = value.gates[index];
+    if (!isJsonRecord(gate) || gate.gate !== repositoryReadinessGateOrder[index] ||
+        typeof gate.passed !== 'boolean' || !isNonEmptyString(gate.reasonCode)) {
+      return false;
+    }
+  }
+
+  const allPassed = value.gates.every((gate) => (gate as Record<string, unknown>).passed === true);
+  const repositoryConfigured = (value.gates[0] as Record<string, unknown>).passed === true;
+  const profileConfigured = (value.gates[2] as Record<string, unknown>).passed === true;
+  return value.isReady === (value.executionReadiness === 'Ready') &&
+    (value.executionReadiness === 'Ready'
+      ? allPassed
+      : value.executionReadiness === 'ValidationRequired'
+        ? repositoryConfigured && profileConfigured && !allPassed
+        : !repositoryConfigured || !profileConfigured);
+}
+
+function isExecutionAvailabilityCheck(value: unknown): boolean {
+  return isJsonRecord(value) &&
+    (value.state === 'Available' || value.state === 'Unavailable') &&
+    isNonEmptyString(value.reasonCode) &&
+    isNonEmptyString(value.safeMessage) &&
+    isTimestampString(value.checkedAtUtc) &&
+    typeof value.isAvailable === 'boolean' &&
+    value.isAvailable === (value.state === 'Available');
+}
+
+function isWorkbenchRepositoryReadinessContext(
+  value: unknown,
+  projectId: number
+): value is WorkbenchRepositoryReadinessContext {
+  return isJsonRecord(value) &&
+    value.projectId === projectId &&
+    typeof value.projectLifecyclePhase === 'string' &&
+    projectLifecyclePhases.has(value.projectLifecyclePhase) &&
+    isRepositoryReadinessEvaluation(value.evaluation);
+}
+
+function isRefreshRepositoryReadinessResult(
+  value: unknown,
+  projectId: number,
+  request: RefreshRepositoryReadinessRequest
+): value is RefreshRepositoryReadinessResult {
+  return isJsonRecord(value) &&
+    value.projectId === projectId &&
+    value.clientOperationId === request.clientOperationId &&
+    typeof value.isReplay === 'boolean' &&
+    isNonEmptyUuidString(value.repositoryStateObservationId) &&
+    isNonEmptyUuidString(value.buildValidationRecordId) &&
+    isNonEmptyUuidString(value.testValidationRecordId) &&
+    isNonEmptyUuidString(value.codeIndexSnapshotId) &&
+    isRepositoryReadinessEvaluation(value.evaluation);
 }
 
 const sandboxCapabilityStates = new Set([

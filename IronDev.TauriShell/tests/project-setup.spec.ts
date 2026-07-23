@@ -20,6 +20,23 @@ const SANDBOX_ATTEMPT_ID = '99999999-9999-4999-8999-999999999999';
 const SANDBOX_OPERATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OTHER_BINDING_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const OTHER_PROFILE_AUTHORITY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const READINESS_OBSERVATION_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const READINESS_BUILD_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const READINESS_TEST_ID = '12121212-1212-4212-8212-121212121212';
+const READINESS_INDEX_ID = '13131313-1313-4313-8313-131313131313';
+const READINESS_AUTHORITY_SHA = '7'.repeat(64);
+
+const READINESS_GATES = [
+  'RepositoryBindingQualified',
+  'RepositoryCleanAtBaseline',
+  'ExecutionProfilePinned',
+  'RestorePassed',
+  'BuildPassed',
+  'TestCommandPassed',
+  'CodeIndexCurrent',
+  'SandboxQualified',
+  'BuilderModelConfigured'
+] as const;
 
 type Compatibility = 'Compatible' | 'Incompatible' | 'NeedsConfirmation' | 'NoPreference';
 type PlanState = 'ReadyForConfirmation' | 'UnsupportedProfile' | 'EnvironmentUnavailable' | 'NeedsConfirmation';
@@ -29,6 +46,7 @@ interface MockState {
   confirmationBodies: Array<Record<string, unknown>>;
   provisioningBodies: Array<Record<string, unknown>>;
   sandboxQualificationBodies: Array<Record<string, unknown>>;
+  readinessValidationBodies: Array<Record<string, unknown>>;
   oldSetupRequests: string[];
 }
 
@@ -57,6 +75,14 @@ interface MockOptions {
   sandboxContext?: (projectId: number) => unknown;
   onSandboxContext?: (route: Route, projectId: number, requestNumber: number) => Promise<void> | void;
   onSandboxQualification?: (
+    route: Route,
+    body: Record<string, unknown>,
+    projectId: number,
+    requestNumber: number
+  ) => Promise<void> | void;
+  readinessContext?: (projectId: number) => unknown;
+  onReadinessContext?: (route: Route, projectId: number, requestNumber: number) => Promise<void> | void;
+  onReadinessValidation?: (
     route: Route,
     body: Record<string, unknown>,
     projectId: number,
@@ -318,8 +344,8 @@ function provisioningResult(body: Record<string, unknown>, projectId = 7, isRepl
     clientOperationId: body.clientOperationId,
     isReplay,
     projectLifecyclePhase: 'Delivery',
-    executionReadiness: 'NotConfigured',
-    readinessReasonCode: 'RepositoryTechnicalReadinessPending',
+    executionReadiness: 'ValidationRequired',
+    readinessReasonCode: 'RepositoryTechnicalValidationPending',
     projectLocalPath: setupPlan(projectId).targetPath,
     repositoryBinding: repositoryBinding(projectId, 'Qualified', expectedBindingRevision + 2),
     executionProfile: executionProfile(projectId, expectedProfileRevision),
@@ -379,7 +405,7 @@ function workbenchSandboxContext(
   return {
     projectId,
     projectLifecyclePhase: 'Shaping',
-    executionReadiness: 'NotConfigured',
+    executionReadiness: 'ValidationRequired',
     repositoryAuthority: {
       repositoryBindingId: BINDING_ID,
       repositoryBindingRevision: 3,
@@ -411,6 +437,66 @@ function sandboxQualificationResult(
   };
 }
 
+function readinessEvaluation(
+  executionReadiness: 'NotConfigured' | 'ValidationRequired' | 'Ready' = 'ValidationRequired',
+  availabilityState: 'Available' | 'Unavailable' = 'Available'
+) {
+  const configured = executionReadiness !== 'NotConfigured';
+  const ready = executionReadiness === 'Ready';
+  return {
+    executionReadiness,
+    reasonCode: ready ? 'RepositoryTechnicalReadinessCurrent' : configured ? 'RepositoryObservationRequired' : 'RepositoryBindingNotQualified',
+    currentAuthoritySha256: configured ? READINESS_AUTHORITY_SHA : null,
+    gates: READINESS_GATES.map((gate, index) => ({
+      gate,
+      passed: ready || (configured && (index === 0 || index === 2)),
+      reasonCode: ready || (configured && (index === 0 || index === 2))
+        ? 'RepositoryTechnicalReadinessCurrent'
+        : `${gate}Required`
+    })),
+    availability: {
+      state: availabilityState,
+      reasonCode: availabilityState === 'Available' ? 'BuilderProviderAvailable' : 'BuilderProviderUnavailable',
+      safeMessage: availabilityState === 'Available'
+        ? 'The configured Builder provider is reachable for a start-time check.'
+        : 'The configured Builder provider is temporarily unavailable.',
+      checkedAtUtc: '2026-07-23T01:00:00Z',
+      isAvailable: availabilityState === 'Available'
+    },
+    isReady: ready
+  };
+}
+
+function workbenchReadinessContext(
+  projectId = 7,
+  executionReadiness: 'NotConfigured' | 'ValidationRequired' | 'Ready' = 'ValidationRequired',
+  availabilityState: 'Available' | 'Unavailable' = 'Available'
+) {
+  return {
+    projectId,
+    projectLifecyclePhase: 'Shaping',
+    evaluation: readinessEvaluation(executionReadiness, availabilityState)
+  };
+}
+
+function readinessValidationResult(
+  body: Record<string, unknown>,
+  projectId = 7,
+  isReplay = false,
+  availabilityState: 'Available' | 'Unavailable' = 'Available'
+) {
+  return {
+    projectId,
+    clientOperationId: body.clientOperationId,
+    isReplay,
+    repositoryStateObservationId: READINESS_OBSERVATION_ID,
+    buildValidationRecordId: READINESS_BUILD_ID,
+    testValidationRecordId: READINESS_TEST_ID,
+    codeIndexSnapshotId: READINESS_INDEX_ID,
+    evaluation: readinessEvaluation('Ready', availabilityState)
+  };
+}
+
 async function json(route: Route, body: unknown, status = 200) {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
@@ -427,6 +513,7 @@ async function mockRepositorySetup(page: Page, options: MockOptions = {}): Promi
     confirmationBodies: [],
     provisioningBodies: [],
     sandboxQualificationBodies: [],
+    readinessValidationBodies: [],
     oldSetupRequests: []
   };
   let planRequests = 0;
@@ -435,6 +522,8 @@ async function mockRepositorySetup(page: Page, options: MockOptions = {}): Promi
   let contextRequests = 0;
   let sandboxContextRequests = 0;
   let sandboxQualificationRequests = 0;
+  let readinessContextRequests = 0;
+  let readinessValidationRequests = 0;
 
   await page.addInitScript(() => {
     window.localStorage.setItem('irondev.token', 'test-token');
@@ -511,6 +600,22 @@ async function mockRepositorySetup(page: Page, options: MockOptions = {}): Promi
       return options.onSandboxQualification(route, body, projectId, sandboxQualificationRequests);
     }
     await json(route, sandboxQualificationResult(body, projectId));
+  });
+  await page.route('**/irondev-api/api/workbench/projects/*/repository/readiness', async (route) => {
+    readinessContextRequests += 1;
+    const projectId = projectIdFrom(route);
+    if (options.onReadinessContext) return options.onReadinessContext(route, projectId, readinessContextRequests);
+    await json(route, options.readinessContext?.(projectId) ?? workbenchReadinessContext(projectId));
+  });
+  await page.route('**/irondev-api/api/workbench/projects/*/repository/readiness-validations', async (route) => {
+    readinessValidationRequests += 1;
+    const projectId = projectIdFrom(route);
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    state.readinessValidationBodies.push(body);
+    if (options.onReadinessValidation) {
+      return options.onReadinessValidation(route, body, projectId, readinessValidationRequests);
+    }
+    await json(route, readinessValidationResult(body, projectId));
   });
   await page.route('**/irondev-api/api/workbench/projects/*/repository/setup-plans', async (route) => {
     planRequests += 1;
@@ -838,7 +943,7 @@ test('complete SetupConfirmed authority can provision only by immutable ids and 
   const qualified = page.getByTestId('repositorySetup.qualified');
   await expect(qualified).toContainText('Repository shell provisioned');
   await expect(qualified).toContainText('Qualified');
-  await expect(qualified).toContainText('NotConfigured');
+  await expect(qualified).toContainText('ValidationRequired');
   await expect(qualified).toContainText(BASELINE_COMMIT);
   await expect(qualified).toContainText(TREE_ID);
   await expect(qualified).toContainText('Repository qualification did not itself restore, build, test, index');
@@ -1134,7 +1239,7 @@ test('Qualified reload requires matching projected local path, branch, baseline,
   await expect(qualified).toContainText(setupPlan(7).targetPath);
   await expect(qualified).toContainText('main');
   await expect(qualified).toContainText(BASELINE_COMMIT);
-  await expect(qualified).toContainText('NotConfigured');
+  await expect(qualified).toContainText('ValidationRequired');
   await expect(page.getByTestId('repositorySetup.provision')).toHaveCount(0);
 });
 
@@ -1204,6 +1309,163 @@ test('unconfigured and legacy-unverified projects never show provisioning author
   expect(state.provisioningBodies).toHaveLength(0);
 });
 
+test('qualified repository with no current evidence is ValidationRequired across all nine gates', async ({ page }) => {
+  await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    readinessContext: (projectId) => workbenchReadinessContext(projectId, 'ValidationRequired')
+  });
+  await openSetup(page);
+
+  const readiness = page.getByTestId('repositorySetup.readiness');
+  await expect(readiness).toContainText('Technical readiness: ValidationRequired');
+  await expect(readiness.locator('[data-testid^="repositorySetup.readinessGate."]')).toHaveCount(9);
+  await expect(page.getByTestId('repositorySetup.readinessGate.RepositoryBindingQualified')).toContainText('Passed');
+  await expect(page.getByTestId('repositorySetup.readinessGate.ExecutionProfilePinned')).toContainText('Passed');
+  await expect(page.getByTestId('repositorySetup.readinessGate.RestorePassed')).toContainText('Validation required');
+  await expect(readiness).toContainText('Ready is never Builder authorization');
+});
+
+test('readiness validation waits for exact current passed sandbox qualification', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(projectId, 'Available', null)
+  });
+  await openSetup(page);
+
+  const readinessAction = page.getByTestId('repositorySetup.validateReadiness');
+  await expect(page.getByTestId('repositorySetup.sandbox')).toBeVisible();
+  await expect(readinessAction).toHaveText('Qualify sandbox first');
+  await expect(readinessAction).toBeDisabled();
+  expect(state.readinessValidationBodies).toHaveLength(0);
+});
+
+test('Ready displays all nine technical gates in normative order', async ({ page }) => {
+  await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(projectId, 'Available', sandboxAttempt('Passed')),
+    readinessContext: (projectId) => workbenchReadinessContext(projectId, 'Ready')
+  });
+  await openSetup(page);
+
+  const readiness = page.getByTestId('repositorySetup.readiness');
+  await expect(readiness).toContainText('Technical readiness: Ready');
+  const labels = await readiness.locator('[data-testid^="repositorySetup.readinessGate."] strong').allTextContents();
+  expect(labels).toEqual([
+    'Repository binding qualified',
+    'Repository clean at baseline',
+    'Execution profile pinned',
+    'Restore passed',
+    'Build passed',
+    'Test command passed',
+    'Code index current',
+    'Sandbox qualified',
+    'Builder model configured'
+  ]);
+  for (const gate of READINESS_GATES) {
+    await expect(page.getByTestId(`repositorySetup.readinessGate.${gate}`)).toContainText('Passed');
+  }
+  await expect(page.getByTestId('repositorySetup.validateReadiness')).toBeEnabled();
+});
+
+test('provider outage remains a separate availability check and leaves durable readiness Ready', async ({ page }) => {
+  await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(projectId, 'Available', sandboxAttempt('Passed')),
+    readinessContext: (projectId) => workbenchReadinessContext(projectId, 'Ready', 'Unavailable')
+  });
+  await openSetup(page);
+
+  await expect(page.getByTestId('repositorySetup.readiness')).toContainText('Technical readiness: Ready');
+  const availability = page.getByTestId('repositorySetup.readinessAvailability');
+  await expect(availability).toContainText('Unavailable');
+  await expect(availability).toContainText('temporarily unavailable');
+  await expect(availability).toContainText('never changes Ready');
+});
+
+test('readiness in-progress 409 preserves one exact ClientOperation for retry', async ({ page }) => {
+  const state = await mockRepositorySetup(page, {
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(projectId, 'Available', sandboxAttempt('Passed')),
+    readinessContext: (projectId) => workbenchReadinessContext(projectId, 'ValidationRequired'),
+    onReadinessValidation: (route, body, projectId, requestNumber) => requestNumber === 1
+      ? json(route, {
+          error: 'repository_readiness_in_progress',
+          message: 'The exact readiness validation operation is still running.'
+        }, 409)
+      : json(route, readinessValidationResult(body, projectId, true))
+  });
+  await openSetup(page);
+
+  await page.getByTestId('repositorySetup.validateReadiness').click();
+  const recovery = page.getByTestId('repositorySetup.readinessRecovery');
+  await expect(recovery).toBeVisible();
+  const operationId = String(state.readinessValidationBodies[0].clientOperationId);
+  await expect(page.getByTestId('repositorySetup.readinessRecovery.operation')).toContainText(operationId);
+
+  await page.getByTestId('repositorySetup.validateReadiness').click();
+  await expect(page.getByTestId('repositorySetup.readiness')).toContainText('Technical readiness: Ready');
+
+  expect(state.readinessValidationBodies).toHaveLength(2);
+  expect(state.readinessValidationBodies[1]).toEqual(state.readinessValidationBodies[0]);
+  expect(state.readinessValidationBodies[1].clientOperationId).toBe(operationId);
+  const pendingKeys = await page.evaluate(() => Object.keys(sessionStorage)
+    .filter((key) => key.startsWith('irondev.repository-readiness-validation')));
+  expect(pendingKeys).toEqual([]);
+});
+
+test('ambiguous readiness response replays one operation under the renewed Workbench lease', async ({ page }) => {
+  let activeAuthority = { workbenchSessionId: 7007, leaseEpoch: 1 };
+  const state = await mockRepositorySetup(page, {
+    authority: () => activeAuthority,
+    context: (projectId) => configuredRepositoryContext(projectId, 'Qualified'),
+    sandboxContext: (projectId) => workbenchSandboxContext(projectId, 'Available', sandboxAttempt('Passed')),
+    readinessContext: (projectId) => workbenchReadinessContext(projectId, 'ValidationRequired'),
+    onReadinessValidation: (route, body, projectId, requestNumber) => {
+      if (requestNumber === 1) {
+        const malformed = readinessValidationResult(body, projectId);
+        return json(route, {
+          ...malformed,
+          evaluation: { ...malformed.evaluation, gates: [...malformed.evaluation.gates].reverse() }
+        });
+      }
+      return json(route, readinessValidationResult(body, projectId, true));
+    }
+  });
+  await openSetup(page);
+
+  await page.getByTestId('repositorySetup.validateReadiness').click();
+  await expect(page.getByTestId('repositorySetup.readinessRecovery')).toBeVisible();
+  const operationId = String(state.readinessValidationBodies[0].clientOperationId);
+  await expect(page.getByTestId('repositorySetup.readinessRecovery.operation')).toContainText(operationId);
+
+  activeAuthority = { workbenchSessionId: 9009, leaseEpoch: 9 };
+  await page.reload();
+  const recovery = page.getByTestId('repositorySetup.readinessRecovery');
+  await expect(recovery).toBeVisible({ timeout: 15_000 });
+  await expect(recovery).toContainText('9009');
+  await expect(recovery).toContainText('9');
+  await expect(page.getByTestId('repositorySetup.readinessRecovery.operation')).toContainText(operationId);
+  await page.getByTestId('repositorySetup.validateReadiness').click();
+  await expect(page.getByTestId('repositorySetup.readiness')).toContainText('Technical readiness: Ready');
+
+  expect(state.readinessValidationBodies).toHaveLength(2);
+  expect(state.readinessValidationBodies[0]).toMatchObject({
+    workbenchSessionId: 7007,
+    leaseEpoch: 1,
+    expectedRepositoryBindingRevision: 3,
+    expectedExecutionProfileRevision: 1
+  });
+  expect(state.readinessValidationBodies[1]).toEqual({
+    ...state.readinessValidationBodies[0],
+    workbenchSessionId: 9009,
+    leaseEpoch: 9
+  });
+  expect(state.readinessValidationBodies[1].clientOperationId).toBe(operationId);
+  const pendingKeys = await page.evaluate(() => Object.keys(sessionStorage)
+    .filter((key) => key.startsWith('irondev.repository-readiness-validation')));
+  expect(pendingKeys).toEqual([]);
+});
+
 test('qualified repository runs sandbox qualification only with exact server authority', async ({ page }) => {
   const state = await mockRepositorySetup(page, {
     context: (projectId) => configuredRepositoryContext(projectId, 'Qualified')
@@ -1212,7 +1474,7 @@ test('qualified repository runs sandbox qualification only with exact server aut
 
   const sandbox = page.getByTestId('repositorySetup.sandbox');
   await expect(sandbox).toContainText('Available');
-  await expect(sandbox).toContainText('NotConfigured');
+  await expect(sandbox).toContainText('ValidationRequired');
   await page.getByTestId('repositorySetup.qualifySandbox').click();
 
   const attempt = page.getByTestId('repositorySetup.sandboxAttempt');
@@ -1222,7 +1484,7 @@ test('qualified repository runs sandbox qualification only with exact server aut
   await expect(attempt).toContainText('Confirmed before passing evidence was published');
   await expect(sandbox).toContainText('does not change execution readiness');
   await expect(sandbox).toContainText('grant Builder authorization');
-  await expect(page.getByTestId('repositorySetup.qualified')).toContainText('Any sandbox evidence shown below comes from the separate qualification step');
+  await expect(page.getByTestId('repositorySetup.qualified')).toContainText('current technical projection is owned by the readiness evidence panel below');
 
   expect(state.sandboxQualificationBodies).toHaveLength(1);
   expect(Object.keys(state.sandboxQualificationBodies[0]).sort()).toEqual([
