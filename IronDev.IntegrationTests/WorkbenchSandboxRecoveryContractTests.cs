@@ -110,14 +110,29 @@ public sealed class WorkbenchSandboxRecoveryContractTests
     [TestMethod]
     public void ExistingPendingOperation_IsRecoveredOrMaterializedAndNeverSilentlyReexecuted()
     {
-        var source = Read("IronDev.Infrastructure/Services/Sandbox/WorkbenchSandboxQualificationService.cs");
-        var recoveryBranch = Between(
+        var source = Read("IronDev.Infrastructure/Services/Sandbox/WorkbenchSandboxQualificationService.cs")
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        var completedEvidenceRecovery = Between(
             source,
             "if (claim.IsExistingPending)",
-            "else\n                    {");
+            "completedEvidenceRecovered = execution is not null;");
+        var executionNullBranch = Between(
+            source,
+            "if (execution is null)",
+            "\n            catch (Exception exception)");
+        var normalizedExecutionNullBranch = executionNullBranch.Replace("\r\n", "\n", StringComparison.Ordinal);
+        var freshExecutionStart = normalizedExecutionNullBranch.IndexOf(
+            "else\n                    {\n                        snapshot = await _snapshots.CreateOrRecoverAsync(",
+            StringComparison.Ordinal);
 
-        StringAssert.Contains(recoveryBranch, "RecoverExecutionAsync");
-        Assert.IsFalse(recoveryBranch.Contains("ExecuteAsync", StringComparison.Ordinal));
+        StringAssert.Contains(completedEvidenceRecovery, "TryRecoverCompletedAsync");
+        Assert.IsFalse(completedEvidenceRecovery.Contains("ExecuteAsync", StringComparison.Ordinal));
+        Assert.IsTrue(freshExecutionStart > 0);
+        var pendingRecovery = normalizedExecutionNullBranch[..freshExecutionStart];
+        StringAssert.Contains(pendingRecovery, "pendingAttemptRecovered = true;");
+        StringAssert.Contains(pendingRecovery, "RecoverExecutionAsync");
+        Assert.IsFalse(pendingRecovery.Contains("_sandbox.ExecuteAsync", StringComparison.Ordinal));
+        StringAssert.Contains(normalizedExecutionNullBranch[freshExecutionStart..], "_sandbox.ExecuteAsync");
         StringAssert.Contains(source, "IsExistingPending: false");
         StringAssert.Contains(source, "IsExistingPending: true");
         StringAssert.Contains(source, "throw new SandboxQualificationInProgressException();");

@@ -463,7 +463,7 @@ public sealed class WorkbenchRepositoryProvisioningService : IWorkbenchRepositor
                     (TenantId, ProjectId, Revision, ExecutionReadiness, ReasonCode,
                      Summary, AssessedByActorUserId, AssessedAtUtc)
                 VALUES
-                    (@TenantId, @ProjectId, @Revision, N'NotConfigured', @ReasonCode,
+                    (@TenantId, @ProjectId, @Revision, N'ValidationRequired', @ReasonCode,
                      @Summary, @ActorUserId, @AssessedAtUtc);
                 """,
                 new
@@ -546,7 +546,7 @@ public sealed class WorkbenchRepositoryProvisioningService : IWorkbenchRepositor
                 command.ClientOperationId,
                 false,
                 project.ProjectLifecyclePhase,
-                ProjectExecutionReadinessStates.NotConfigured,
+                ProjectExecutionReadinessStates.ValidationRequired,
                 RepositorySetupReasonCodes.RepositoryTechnicalValidationPending,
                 qualifiedBinding.CanonicalPath,
                 qualifiedBinding,
@@ -571,7 +571,7 @@ public sealed class WorkbenchRepositoryProvisioningService : IWorkbenchRepositor
                 baselineCommit = evidence.BaselineCommit,
                 manifestSha256 = evidence.ManifestSha256,
                 gitTreeId = evidence.GitTreeId,
-                executionReadiness = ProjectExecutionReadinessStates.NotConfigured,
+                executionReadiness = ProjectExecutionReadinessStates.ValidationRequired,
                 readinessReasonCode = RepositorySetupReasonCodes.RepositoryTechnicalValidationPending
             });
             await InsertOutboxAsync(

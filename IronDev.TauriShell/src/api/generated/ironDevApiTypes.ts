@@ -11739,6 +11739,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/projects/{projectId}/repository/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["WorkbenchRepositoryReadinessContext"];
+                        "application/json": components["schemas"]["WorkbenchRepositoryReadinessContext"];
+                        "text/json": components["schemas"]["WorkbenchRepositoryReadinessContext"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/projects/{projectId}/repository/readiness-validations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    projectId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ValidateTechnicalReadinessRequest"];
+                    "text/json": components["schemas"]["ValidateTechnicalReadinessRequest"];
+                    "application/*+json": components["schemas"]["ValidateTechnicalReadinessRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RefreshRepositoryReadinessResult"];
+                        "application/json": components["schemas"]["RefreshRepositoryReadinessResult"];
+                        "text/json": components["schemas"]["RefreshRepositoryReadinessResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workbench/projects/{projectId}/repository/sandbox": {
         parameters: {
             query?: never;
@@ -14919,6 +15003,14 @@ export interface components {
             effectiveHash: string | null;
             boundary?: string | null;
         };
+        ExecutionAvailabilityCheck: {
+            state: string | null;
+            reasonCode: string | null;
+            safeMessage: string | null;
+            /** Format: date-time */
+            checkedAtUtc: string;
+            readonly isAvailable?: boolean;
+        };
         ExternalReferenceDto: {
             provider?: string | null;
             kind?: string | null;
@@ -17334,6 +17426,22 @@ export interface components {
             description?: string | null;
             actionType?: string | null;
         };
+        RefreshRepositoryReadinessResult: {
+            /** Format: int32 */
+            projectId?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            isReplay?: boolean;
+            /** Format: uuid */
+            repositoryStateObservationId?: string;
+            /** Format: uuid */
+            buildValidationRecordId?: string;
+            /** Format: uuid */
+            testValidationRecordId?: string;
+            /** Format: uuid */
+            codeIndexSnapshotId?: string;
+            evaluation?: components["schemas"]["RepositoryReadinessEvaluationResult"];
+        };
         RegenerateTicketProposalSetRequest: {
             /** Format: int64 */
             workbenchSessionId?: number;
@@ -17623,6 +17731,21 @@ export interface components {
             receiptId?: string | null;
             branchName?: string | null;
             baselineCommit?: string | null;
+        };
+        RepositoryReadinessEvaluationResult: {
+            executionReadiness?: string | null;
+            reasonCode?: string | null;
+            currentAuthoritySha256?: string | null;
+            gates?: components["schemas"]["RepositoryReadinessGateResult"][] | null;
+            availability?: components["schemas"]["ExecutionAvailabilityCheck"];
+            readonly isReady?: boolean;
+        };
+        /** @enum {string} */
+        RepositoryReadinessGateName: "RepositoryBindingQualified" | "RepositoryCleanAtBaseline" | "ExecutionProfilePinned" | "RestorePassed" | "BuildPassed" | "TestCommandPassed" | "CodeIndexCurrent" | "SandboxQualified" | "BuilderModelConfigured";
+        RepositoryReadinessGateResult: {
+            gate?: components["schemas"]["RepositoryReadinessGateName"];
+            passed?: boolean;
+            reasonCode?: string | null;
         };
         RepositorySetupConfirmationResult: {
             /** Format: int32 */
@@ -19802,6 +19925,18 @@ export interface components {
         UpdateLocalPathRequest: {
             localPath?: string | null;
         };
+        ValidateTechnicalReadinessRequest: {
+            /** Format: int64 */
+            workbenchSessionId?: number;
+            /** Format: int64 */
+            leaseEpoch?: number;
+            /** Format: uuid */
+            clientOperationId?: string;
+            /** Format: int64 */
+            expectedRepositoryBindingRevision?: number;
+            /** Format: int64 */
+            expectedExecutionProfileRevision?: number;
+        };
         WorkbenchAgentRunRecoveryContext: {
             submissionAvailable?: boolean;
             unavailableCategory?: string | null;
@@ -19865,6 +20000,12 @@ export interface components {
             /** Format: uuid */
             clientOperationId?: string;
             repositoryBinding?: components["schemas"]["RepositoryBindingSnapshot"];
+        };
+        WorkbenchRepositoryReadinessContext: {
+            /** Format: int32 */
+            projectId?: number;
+            projectLifecyclePhase?: string | null;
+            evaluation?: components["schemas"]["RepositoryReadinessEvaluationResult"];
         };
         WorkbenchSandboxContext: {
             /** Format: int32 */

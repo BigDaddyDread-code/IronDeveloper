@@ -916,6 +916,15 @@ public sealed class WorkbenchSandboxQualificationService : IWorkbenchSandboxQual
                 },
                 transaction,
                 cancellationToken: cancellationToken));
+            var effectiveReadiness = await connection.QuerySingleAsync<string>(new CommandDefinition(
+                """
+                SELECT ExecutionReadiness
+                FROM dbo.vw_WorkbenchEffectiveProjectReadiness
+                WHERE TenantId=@TenantId AND ProjectId=@ProjectId;
+                """,
+                new { command.TenantId, command.ProjectId },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
             await InsertOutboxAsync(
                 connection,
                 transaction,
@@ -931,7 +940,7 @@ public sealed class WorkbenchSandboxQualificationService : IWorkbenchSandboxQual
                     state,
                     evidenceManifestSha256 = execution?.EvidenceManifestSha256,
                     cleanupConfirmed,
-                    executionReadiness = ProjectExecutionReadinessStates.NotConfigured
+                    executionReadiness = effectiveReadiness
                 }),
                 now,
                 cancellationToken).ConfigureAwait(false);
@@ -1040,8 +1049,10 @@ public sealed class WorkbenchSandboxQualificationService : IWorkbenchSandboxQual
             """
             SELECT project.Id AS ProjectId,
                    COALESCE(lifecycle.Phase, N'Shaping') AS ProjectLifecyclePhase,
-                   COALESCE(readiness.ExecutionReadiness, N'NotConfigured') AS ExecutionReadiness
+                   readiness.ExecutionReadiness
             FROM dbo.Projects project
+            INNER JOIN dbo.vw_WorkbenchEffectiveProjectReadiness readiness
+                ON readiness.TenantId=project.TenantId AND readiness.ProjectId=project.Id
             OUTER APPLY
             (
                 SELECT TOP (1) value.Phase
@@ -1049,13 +1060,6 @@ public sealed class WorkbenchSandboxQualificationService : IWorkbenchSandboxQual
                 WHERE value.TenantId=project.TenantId AND value.ProjectId=project.Id
                 ORDER BY value.Revision DESC
             ) lifecycle
-            OUTER APPLY
-            (
-                SELECT TOP (1) value.ExecutionReadiness
-                FROM dbo.ProjectReadinessAssessments value
-                WHERE value.TenantId=project.TenantId AND value.ProjectId=project.Id
-                ORDER BY value.Revision DESC
-            ) readiness
             WHERE project.TenantId=@TenantId AND project.Id=@ProjectId;
             """,
             new { TenantId = tenantId, ProjectId = projectId },
