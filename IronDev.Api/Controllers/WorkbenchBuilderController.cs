@@ -12,14 +12,80 @@ namespace IronDev.Api.Controllers;
 public sealed class WorkbenchBuilderController : ControllerBase
 {
     private readonly IWorkbenchBuilderAuthorizationService _builder;
+    private readonly IWorkbenchBuilderPromptPreparationService _promptPreparation;
     private readonly ICurrentTenantContext _tenant;
 
     public WorkbenchBuilderController(
         IWorkbenchBuilderAuthorizationService builder,
+        IWorkbenchBuilderPromptPreparationService promptPreparation,
         ICurrentTenantContext tenant)
     {
         _builder = builder;
+        _promptPreparation = promptPreparation;
         _tenant = tenant;
+    }
+
+    [HttpPost("agent-runs")]
+    [ProducesResponseType(typeof(PreparedBuilderAgentRun), StatusCodes.Status201Created)]
+    public async Task<ActionResult<PreparedBuilderAgentRun>> PrepareAgentRun(
+        int projectId,
+        PrepareBuilderAgentRunRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actor = CurrentActor();
+        try
+        {
+            var result = await _promptPreparation.PrepareAsync(
+                new PrepareBuilderAgentRunCommand(
+                    _tenant.TenantId,
+                    actor.UserId,
+                    projectId,
+                    request.WorkbenchSessionId,
+                    request.LeaseEpoch,
+                    request.ClientOperationId,
+                    request.BuilderExecutionAuthorizationId,
+                    request.BuilderWorkPackageCoreId,
+                    request.ExpectedCoreSha256),
+                cancellationToken);
+            return result.IsReplay
+                ? Ok(result)
+                : StatusCode(StatusCodes.Status201Created, result);
+        }
+        catch (BuilderPromptPreparationValidationException exception)
+        {
+            return BadRequest(Error(
+                BuilderPromptPreparationValidationException.ErrorCode,
+                exception.Message));
+        }
+        catch (BuilderPromptPreparationOperationMismatchException exception)
+        {
+            return Conflict(Error(
+                BuilderPromptPreparationOperationMismatchException.ErrorCode,
+                exception.Message));
+        }
+        catch (BuilderPromptPreparationConflictException exception)
+        {
+            return Conflict(new
+            {
+                error = BuilderPromptPreparationConflictException.ErrorCode,
+                reasonCode = exception.ReasonCode,
+                message = exception.Message
+            });
+        }
+        catch (BuilderPromptPreparationIntegrityException)
+        {
+            return UnprocessableEntity(Error(
+                BuilderPromptPreparationIntegrityException.ErrorCode,
+                "Builder prompt preparation failed integrity verification."));
+        }
+        catch (WorkbenchLeaseFenceException exception)
+        {
+            return Conflict(Error(WorkbenchLeaseFenceException.ErrorCode, exception.Message));
+        }
+        catch (WorkbenchProjectNotAccessibleException)
+        {
+            return ProjectNotFound();
+        }
     }
 
     [HttpGet]
@@ -200,4 +266,12 @@ public sealed class WorkbenchBuilderController : ControllerBase
         long WorkbenchSessionId,
         long LeaseEpoch,
         Guid ClientOperationId);
+
+    public sealed record PrepareBuilderAgentRunRequest(
+        long WorkbenchSessionId,
+        long LeaseEpoch,
+        Guid ClientOperationId,
+        Guid BuilderExecutionAuthorizationId,
+        Guid BuilderWorkPackageCoreId,
+        string ExpectedCoreSha256);
 }

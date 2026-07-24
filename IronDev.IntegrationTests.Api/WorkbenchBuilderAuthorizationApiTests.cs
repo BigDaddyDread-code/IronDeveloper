@@ -598,6 +598,125 @@ public sealed class WorkbenchBuilderAuthorizationApiTests : ApiTestBase
             completedOperations: 0);
     }
 
+    [TestMethod]
+    public async Task PrepareBuilderAgentRun_AtomicallyConsumesAuthorization_FreezesInput_AndReplays()
+    {
+        using var scenario = new AuthorizationScenario();
+        using var factory = scenario.CreateFactory();
+        using var client = await AuthenticatedClientAsync(factory);
+        var fixture = await CreateReadyDeliveryProjectAsync(
+            client, "Atomic Builder prompt preparation",
+            scenario.Observer, scenario.Branch, "Sign in");
+        var package = await CreateWorkPackageAsync(
+            client, fixture, Guid.NewGuid(), [fixture.Tickets[0].Id]);
+        var grant = await GrantAsync(client, fixture, package, Guid.NewGuid());
+        var operationId = Guid.NewGuid();
+
+        var response = await client.PostAsJsonAsync(
+            AgentRunsUrl(fixture.ProjectId),
+            PreparationPayload(fixture, operationId, grant, package));
+        Assert.AreEqual(
+            HttpStatusCode.Created, response.StatusCode,
+            await response.Content.ReadAsStringAsync());
+        var prepared = await ReadAsync<PreparedBuilderAgentRun>(response);
+        Assert.AreEqual(BuilderAgentRunStates.Prepared, prepared.Status);
+        Assert.AreEqual(grant.Authorization.Id, prepared.BuilderExecutionAuthorizationId);
+        Assert.AreEqual(package.Core.Id, prepared.BuilderWorkPackageCoreId);
+        Assert.AreEqual(package.BuilderWorkPackageCoreHash, prepared.BuilderWorkPackageCoreSha256);
+        Assert.AreEqual(prepared.PreparedAtUtc, prepared.ProviderInvocationPermittedAtUtc);
+        Assert.IsTrue(new[]
+        {
+            prepared.EffectiveProfileSha256,
+            prepared.RoleContextSha256,
+            prepared.PromptSha256,
+            prepared.ToolManifestSha256,
+            prepared.ProviderInputSha256
+        }.All(static hash => hash.Length == 64));
+
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            var row = await connection.QuerySingleAsync<PreparedRunDatabaseRow>(
+                """
+                SELECT run.Status, run.ProviderInvokedAtUtc,
+                       run.RoleContextJson, run.ToolManifestJson,
+                       authz.ConsumedAtUtc,
+                       authz.ConsumedByBuilderExecutionRunId
+                FROM dbo.BuilderAgentRuns run
+                INNER JOIN dbo.BuilderExecutionAuthorizations authz
+                    ON authz.Id=run.BuilderExecutionAuthorizationId
+                WHERE run.Id=@BuilderAgentRunId;
+                """,
+                new { prepared.BuilderAgentRunId });
+            Assert.AreEqual(BuilderAgentRunStates.Prepared, row.Status);
+            Assert.IsNull(row.ProviderInvokedAtUtc);
+            Assert.IsNotNull(row.ConsumedAtUtc);
+            Assert.AreEqual(prepared.BuilderAgentRunId, row.ConsumedByBuilderExecutionRunId);
+            StringAssert.Contains(row.RoleContextJson, "\"acceptanceCriteria\"");
+            StringAssert.Contains(row.RoleContextJson, "\"singleUseAuthorizationId\"");
+            StringAssert.Contains(row.ToolManifestJson, "\"mayWriteActiveRepository\":false");
+        }
+
+        var replayResponse = await client.PostAsJsonAsync(
+            AgentRunsUrl(fixture.ProjectId),
+            PreparationPayload(fixture, operationId, grant, package));
+        Assert.AreEqual(
+            HttpStatusCode.OK, replayResponse.StatusCode,
+            await replayResponse.Content.ReadAsStringAsync());
+        var replay = await ReadAsync<PreparedBuilderAgentRun>(replayResponse);
+        Assert.IsTrue(replay.IsReplay);
+        Assert.AreEqual(prepared.BuilderAgentRunId, replay.BuilderAgentRunId);
+
+        var secondUse = await client.PostAsJsonAsync(
+            AgentRunsUrl(fixture.ProjectId),
+            PreparationPayload(fixture, Guid.NewGuid(), grant, package));
+        Assert.AreEqual(
+            HttpStatusCode.Conflict, secondUse.StatusCode,
+            await secondUse.Content.ReadAsStringAsync());
+        await AssertErrorAndReasonAsync(
+            secondUse,
+            BuilderPromptPreparationConflictException.ErrorCode,
+            BuilderPromptPreparationReasonCodes.AuthorizationConsumed);
+    }
+
+    [TestMethod]
+    public async Task PrepareBuilderAgentRun_RefusesChangedBaseline_BeforeRunOrConsumption()
+    {
+        using var scenario = new AuthorizationScenario();
+        using var factory = scenario.CreateFactory();
+        using var client = await AuthenticatedClientAsync(factory);
+        var fixture = await CreateReadyDeliveryProjectAsync(
+            client, "Stale Builder prompt preparation",
+            scenario.Observer, scenario.Branch, "Sign in");
+        var package = await CreateWorkPackageAsync(
+            client, fixture, Guid.NewGuid(), [fixture.Tickets[0].Id]);
+        var grant = await GrantAsync(client, fixture, package, Guid.NewGuid());
+        scenario.Branch.HeadCommit = new string('f', 40);
+
+        var response = await client.PostAsJsonAsync(
+            AgentRunsUrl(fixture.ProjectId),
+            PreparationPayload(fixture, Guid.NewGuid(), grant, package));
+        Assert.AreEqual(
+            HttpStatusCode.Conflict, response.StatusCode,
+            await response.Content.ReadAsStringAsync());
+        await AssertErrorAndReasonAsync(
+            response,
+            BuilderPromptPreparationConflictException.ErrorCode,
+            BuilderPromptPreparationReasonCodes.RepositoryBaselineChanged);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var runCount = await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM dbo.BuilderAgentRuns WHERE TenantId=1 AND ProjectId=@ProjectId;",
+            new { fixture.ProjectId });
+        var consumedCount = await connection.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(*) FROM dbo.BuilderExecutionAuthorizations
+            WHERE TenantId=1 AND ProjectId=@ProjectId AND ConsumedAtUtc IS NOT NULL;
+            """,
+            new { fixture.ProjectId });
+        Assert.AreEqual(0, runCount);
+        Assert.AreEqual(0, consumedCount);
+    }
+
     private static async Task<ReadyDeliveryFixture> CreateReadyDeliveryProjectAsync(
         HttpClient client,
         string name,
@@ -828,6 +947,20 @@ public sealed class WorkbenchBuilderAuthorizationApiTests : ApiTestBase
         expectedCoreHash = package.BuilderWorkPackageCoreHash
     };
 
+    private static object PreparationPayload(
+        ReadyDeliveryFixture fixture,
+        Guid operationId,
+        BuilderAuthorizationResult grant,
+        BuilderWorkPackageResult package) => new
+    {
+        fixture.WorkbenchSessionId,
+        fixture.LeaseEpoch,
+        clientOperationId = operationId,
+        builderExecutionAuthorizationId = grant.Authorization.Id,
+        builderWorkPackageCoreId = package.Core.Id,
+        expectedCoreSha256 = package.BuilderWorkPackageCoreHash
+    };
+
     private static object FencePayload(ReadyDeliveryFixture fixture, Guid operationId) => new
     {
         fixture.WorkbenchSessionId,
@@ -840,6 +973,9 @@ public sealed class WorkbenchBuilderAuthorizationApiTests : ApiTestBase
 
     private static string AuthorizationsUrl(int projectId) =>
         $"/api/workbench/projects/{projectId}/builder/authorizations";
+
+    private static string AgentRunsUrl(int projectId) =>
+        $"/api/workbench/projects/{projectId}/builder/agent-runs";
 
     private static string RevocationsUrl(int projectId, Guid authorizationId) =>
         $"/api/workbench/projects/{projectId}/builder/authorizations/{authorizationId:D}/revocations";
@@ -1372,6 +1508,14 @@ public sealed class WorkbenchBuilderAuthorizationApiTests : ApiTestBase
         long BindingRevision,
         long ProfileRevision,
         IReadOnlyList<ProjectTicket> Tickets);
+
+    private sealed record PreparedRunDatabaseRow(
+        string Status,
+        DateTime? ProviderInvokedAtUtc,
+        string RoleContextJson,
+        string ToolManifestJson,
+        DateTime? ConsumedAtUtc,
+        Guid? ConsumedByBuilderExecutionRunId);
 
     private sealed class Pr07AWriteCounts
     {
