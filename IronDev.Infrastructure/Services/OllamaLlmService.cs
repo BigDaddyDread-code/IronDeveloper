@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace IronDev.Infrastructure.Services;
 
 public sealed class OllamaLlmService
-    : ILLMService, IWorkbenchBusinessAnalystRoleAwareLlmService
+    : ILLMService, IWorkbenchBusinessAnalystRoleAwareLlmService, IWorkbenchBuilderRoleAwareLlmService
 {
     private readonly HttpClient _httpClient;
     private readonly string _model;
@@ -118,6 +118,39 @@ public sealed class OllamaLlmService
         {
             throw new InvalidOperationException($"Ollama call failed: {ex.Message}", ex);
         }
+    }
+
+    public async Task<BuilderProviderResponse> GetBuilderResponseAsync(
+        BuilderProviderEnvelope envelope,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new OllamaChatRequest
+        {
+            Model = _model,
+            Messages = BuilderProviderMessageMapper.Map(envelope).Select(message => new OllamaChatMessage
+            {
+                Role = message.Role == AgentModelRole.System ? "system" : "user",
+                Content = message.Content
+            }).ToArray(),
+            Format = "json",
+            Options = new OllamaChatOptions { NumberOfPredictedTokens = 16_000 },
+            Stream = false
+        };
+        var started = Stopwatch.GetTimestamp();
+        var response = await _httpClient.PostAsJsonAsync("/api/chat", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<OllamaChatResponse>(
+            cancellationToken: cancellationToken);
+        return new BuilderProviderResponse(
+            body?.Message?.Content ?? string.Empty,
+            envelope.SafeRequestId, null,
+            new AgentModelUsage
+            {
+                InputTokens = Math.Max(0, body?.PromptEvaluationCount ?? 0),
+                OutputTokens = Math.Max(0, body?.EvaluationCount ?? 0)
+            },
+            body?.PromptEvaluationCount is not null && body.EvaluationCount is not null,
+            Stopwatch.GetElapsedTime(started).Ticks / TimeSpan.TicksPerMillisecond);
     }
 
     private sealed class OllamaRequest

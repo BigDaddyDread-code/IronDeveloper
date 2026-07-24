@@ -13,16 +13,64 @@ public sealed class WorkbenchBuilderController : ControllerBase
 {
     private readonly IWorkbenchBuilderAuthorizationService _builder;
     private readonly IWorkbenchBuilderPromptPreparationService _promptPreparation;
+    private readonly IWorkbenchBuilderExecutionService _execution;
     private readonly ICurrentTenantContext _tenant;
 
     public WorkbenchBuilderController(
         IWorkbenchBuilderAuthorizationService builder,
         IWorkbenchBuilderPromptPreparationService promptPreparation,
+        IWorkbenchBuilderExecutionService execution,
         ICurrentTenantContext tenant)
     {
         _builder = builder;
         _promptPreparation = promptPreparation;
+        _execution = execution;
         _tenant = tenant;
+    }
+
+    [HttpPost("agent-runs/{builderAgentRunId:guid}/executions")]
+    [ProducesResponseType(typeof(BuilderExecutionResult), StatusCodes.Status200OK)]
+    public async Task<ActionResult<BuilderExecutionResult>> ExecuteAgentRun(
+        int projectId,
+        Guid builderAgentRunId,
+        ExecuteBuilderAgentRunRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actor = CurrentActor();
+        try
+        {
+            return Ok(await _execution.ExecuteAsync(new ExecuteBuilderAgentRunCommand(
+                _tenant.TenantId, actor.UserId, projectId,
+                request.WorkbenchSessionId, request.LeaseEpoch, request.ClientOperationId,
+                builderAgentRunId, request.ExpectedProviderInputSha256), cancellationToken));
+        }
+        catch (BuilderExecutionValidationException exception)
+        {
+            return BadRequest(Error(BuilderExecutionValidationException.ErrorCode, exception.Message));
+        }
+        catch (BuilderExecutionConflictException exception)
+        {
+            return Conflict(new
+            {
+                error = BuilderExecutionConflictException.ErrorCode,
+                reasonCode = exception.ReasonCode,
+                message = exception.Message
+            });
+        }
+        catch (BuilderExecutionIntegrityException)
+        {
+            return UnprocessableEntity(Error(
+                BuilderExecutionIntegrityException.ErrorCode,
+                "Builder execution failed integrity verification."));
+        }
+        catch (WorkbenchLeaseFenceException exception)
+        {
+            return Conflict(Error(WorkbenchLeaseFenceException.ErrorCode, exception.Message));
+        }
+        catch (WorkbenchProjectNotAccessibleException)
+        {
+            return ProjectNotFound();
+        }
     }
 
     [HttpPost("agent-runs")]
@@ -274,4 +322,10 @@ public sealed class WorkbenchBuilderController : ControllerBase
         Guid BuilderExecutionAuthorizationId,
         Guid BuilderWorkPackageCoreId,
         string ExpectedCoreSha256);
+
+    public sealed record ExecuteBuilderAgentRunRequest(
+        long WorkbenchSessionId,
+        long LeaseEpoch,
+        Guid ClientOperationId,
+        string ExpectedProviderInputSha256);
 }

@@ -259,6 +259,11 @@
                              "id":  "2026-07-workbench-pr07b-builder-prompt-preparation",
                              "path":  "Database/migrate_workbench_builder_prompt_preparation.sql",
                              "description":  "Atomically revalidates and consumes one exact Builder authorization, creates a durable Builder AgentRun, freezes the effective profile and exact role context, and records prompt, tool-manifest, context, and provider-input hashes without invoking a provider."
+                        },
+                        {
+                             "id":  "2026-07-workbench-pr07c-builder-execution",
+                             "path":  "Database/migrate_workbench_builder_execution.sql",
+                             "description":  "Claims each prepared Builder AgentRun once, records bounded provider attempts, validates strict proposed-file output and scope, runs build evidence in the qualified sandbox, and preserves immutable patch, tool-call, terminal, and exact failure evidence without applying or approving a patch."
                         }
                    ]
 }

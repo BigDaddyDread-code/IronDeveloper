@@ -230,6 +230,9 @@ builder.Services.AddScoped<IWorkbenchBuilderAuthorizationService,
     WorkbenchBuilderAuthorizationService>();
 builder.Services.AddScoped<IWorkbenchBuilderPromptPreparationService,
     WorkbenchBuilderPromptPreparationService>();
+builder.Services.AddScoped<IWorkbenchBuilderModelGateway, WorkbenchBuilderModelGateway>();
+builder.Services.AddScoped<IWorkbenchBuilderSandboxRunner, WorkbenchBuilderSandboxRunner>();
+builder.Services.AddScoped<IWorkbenchBuilderExecutionService, WorkbenchBuilderExecutionService>();
 builder.Services.AddScoped<IWorkbenchSandboxRecoveryService, WorkbenchSandboxRecoveryService>();
 // Qualification availability is policy-gated, but cleanup must continue after a
 // restart even when an operator disables new sandbox runs. An unavailable cleanup

@@ -550,8 +550,12 @@ try {
              ,@{ Name = "Builder AgentRun one-use authorization"; Sql = "SELECT COUNT(*) FROM sys.key_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name=N'UQ_BuilderAgentRuns_Authorization'" }
              ,@{ Name = "Builder AgentRun preparation validation"; Sql = "SELECT COUNT(*) FROM sys.triggers WHERE parent_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name=N'TR_BuilderAgentRuns_ValidatePreparation' AND is_disabled=0" }
              ,@{ Name = "Builder AgentRun immutable prepared input"; Sql = "SELECT COUNT(*) FROM sys.triggers WHERE parent_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name=N'TR_BuilderAgentRuns_PreparationImmutable' AND is_disabled=0" }
-             ,@{ Name = "Builder AgentRun provider not invoked"; Sql = "SELECT CASE WHEN COUNT(*)=2 THEN 1 ELSE 0 END FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name IN (N'CK_BuilderAgentRuns_Status', N'CK_BuilderAgentRuns_NoInvocation') AND is_not_trusted=0" }
+             ,@{ Name = "Builder AgentRun execution state"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name=N'CK_BuilderAgentRuns_ExecutionState' AND is_not_trusted=0" }
+             ,@{ Name = "Builder AgentRun provider not invoked while prepared"; Sql = "SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.BuilderAgentRuns') AND name=N'CK_BuilderAgentRuns_ExecutionState' AND definition LIKE N'%Status%Prepared%ProviderInvokedAtUtc%IS NULL%' AND is_not_trusted=0" }
              ,@{ Name = "Builder AgentRun operation result authority"; Sql = "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.ClientOperations') AND name=N'FK_ClientOperations_BuilderAgentRun' AND is_not_trusted=0" }
+             ,@{ Name = "Builder bounded attempts"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.BuilderAgentRunAttempts', N'U') IS NULL THEN 0 ELSE 1 END" }
+             ,@{ Name = "Builder immutable proposed files"; Sql = "SELECT COUNT(*) FROM sys.triggers WHERE parent_id=OBJECT_ID(N'dbo.BuilderAgentRunProposedFiles') AND name=N'TR_BuilderAgentRunProposedFiles_Immutable' AND is_disabled=0" }
+             ,@{ Name = "Builder exact tool evidence"; Sql = "SELECT CASE WHEN OBJECT_ID(N'dbo.BuilderAgentRunToolCalls', N'U') IS NULL THEN 0 ELSE 1 END" }
          )
 
         foreach ($check in $checks) {

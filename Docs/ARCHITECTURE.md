@@ -445,3 +445,16 @@ Rules:
 The first governed tool is `code_standards.analyse_patch`. It is a read-only Code Standards tool, not a `CodeStandardsAgent`. BuilderAgent and TesterAgent may request it through the registry. The tool does not write files, run commands, mutate tickets, mutate memory, use the network, approve changes, or execute nested tool calls.
 
 The active Alpha execution order is tracked in [ALPHA_RELEASE_EXECUTION_ORDER.md](ALPHA_RELEASE_EXECUTION_ORDER.md). Passive-agent containment for the governed tool path is recorded in [ADR_018_PASSIVE_AGENT_CONTAINMENT.md](ADR_018_PASSIVE_AGENT_CONTAINMENT.md).
+### Builder execution (PR-07C)
+
+`WorkbenchBuilderExecutionService` is the only consumer of a prepared Builder AgentRun. It
+atomically claims the frozen run before provider invocation, revalidates repository,
+readiness, Builder-profile, prompt/input, and sandbox hashes, and permits no second claim.
+The Builder-specific gateway receives the exact frozen role context and declared tools.
+Strict output validation accepts only complete proposed files within package authority and
+rejects test-file edits. The proposal is overlaid onto an owned source snapshot and
+restore/build/test run through the qualified sandbox; the active repository is read-only.
+Provider attempts (maximum three), proposed files, raw patch, changed-file manifest,
+tool-call evidence, sandbox evidence hash, terminal status, and safe failure evidence are
+durable and immutable. This stage grants no patch approval, apply, ticket mutation, or
+authorization-creation authority.
