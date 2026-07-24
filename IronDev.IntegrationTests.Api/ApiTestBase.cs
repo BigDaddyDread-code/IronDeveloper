@@ -328,6 +328,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_repository_provisioning.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_sandbox_qualification.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_repository_readiness.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_builder_authorization.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -658,6 +659,61 @@ public abstract class ApiTestBase
                     ENABLE TRIGGER dbo.trg_TicketProposalCommitments_AppendOnly
                         ON dbo.TicketProposalCommitments;
             END;
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultBuilderWorkPackageCoreId') IS NOT NULL
+               AND COL_LENGTH('dbo.ClientOperations', 'ResultBuilderExecutionAuthorizationId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
+                    SET ResultBuilderExecutionAuthorizationId=NULL,
+                        ResultBuilderWorkPackageCoreId=NULL;';
+            IF OBJECT_ID('dbo.BuilderExecutionAuthorizations', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderExecutionAuthorizations_TerminalImmutable', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderExecutionAuthorizations_TerminalImmutable
+                        ON dbo.BuilderExecutionAuthorizations;
+                DELETE FROM dbo.BuilderExecutionAuthorizations;
+                IF OBJECT_ID('dbo.TR_BuilderExecutionAuthorizations_TerminalImmutable', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderExecutionAuthorizations_TerminalImmutable
+                        ON dbo.BuilderExecutionAuthorizations;
+            END;
+            IF OBJECT_ID('dbo.BuilderWorkPackageRepositoryContexts', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageRepositoryContexts_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderWorkPackageRepositoryContexts_AppendOnly
+                        ON dbo.BuilderWorkPackageRepositoryContexts;
+                DELETE FROM dbo.BuilderWorkPackageRepositoryContexts;
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageRepositoryContexts_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderWorkPackageRepositoryContexts_AppendOnly
+                        ON dbo.BuilderWorkPackageRepositoryContexts;
+            END;
+            IF OBJECT_ID('dbo.BuilderWorkPackageArtifactReferences', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageArtifactReferences_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderWorkPackageArtifactReferences_AppendOnly
+                        ON dbo.BuilderWorkPackageArtifactReferences;
+                DELETE FROM dbo.BuilderWorkPackageArtifactReferences;
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageArtifactReferences_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderWorkPackageArtifactReferences_AppendOnly
+                        ON dbo.BuilderWorkPackageArtifactReferences;
+            END;
+            IF OBJECT_ID('dbo.BuilderWorkPackageTickets', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageTickets_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderWorkPackageTickets_AppendOnly
+                        ON dbo.BuilderWorkPackageTickets;
+                DELETE FROM dbo.BuilderWorkPackageTickets;
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageTickets_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderWorkPackageTickets_AppendOnly
+                        ON dbo.BuilderWorkPackageTickets;
+            END;
+            IF OBJECT_ID('dbo.BuilderWorkPackageCores', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageCores_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderWorkPackageCores_AppendOnly
+                        ON dbo.BuilderWorkPackageCores;
+                DELETE FROM dbo.BuilderWorkPackageCores;
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageCores_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderWorkPackageCores_AppendOnly
+                        ON dbo.BuilderWorkPackageCores;
+            END;
             DELETE FROM dbo.ProjectTickets;
             IF OBJECT_ID('dbo.ProjectContextDocuments', 'U') IS NOT NULL DELETE FROM dbo.ProjectContextDocuments;
             IF OBJECT_ID('dbo.ProjectDocumentLinks', 'U') IS NOT NULL DELETE FROM dbo.ProjectDocumentLinks;
@@ -723,6 +779,61 @@ public abstract class ApiTestBase
             END
             IF OBJECT_ID('dbo.TicketProposalSets', 'U') IS NOT NULL DELETE FROM dbo.TicketProposalSets;
             IF OBJECT_ID('dbo.WorkbenchAgentRuns', 'U') IS NOT NULL DELETE FROM dbo.WorkbenchAgentRuns;
+            IF COL_LENGTH('dbo.ClientOperations', 'ResultBuilderWorkPackageCoreId') IS NOT NULL
+               AND COL_LENGTH('dbo.ClientOperations', 'ResultBuilderExecutionAuthorizationId') IS NOT NULL
+                EXEC sys.sp_executesql N'UPDATE dbo.ClientOperations
+                    SET ResultBuilderExecutionAuthorizationId=NULL,
+                        ResultBuilderWorkPackageCoreId=NULL;';
+            IF OBJECT_ID('dbo.BuilderExecutionAuthorizations', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderExecutionAuthorizations_TerminalImmutable', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderExecutionAuthorizations_TerminalImmutable
+                        ON dbo.BuilderExecutionAuthorizations;
+                DELETE FROM dbo.BuilderExecutionAuthorizations;
+                IF OBJECT_ID('dbo.TR_BuilderExecutionAuthorizations_TerminalImmutable', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderExecutionAuthorizations_TerminalImmutable
+                        ON dbo.BuilderExecutionAuthorizations;
+            END;
+            IF OBJECT_ID('dbo.BuilderWorkPackageRepositoryContexts', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageRepositoryContexts_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderWorkPackageRepositoryContexts_AppendOnly
+                        ON dbo.BuilderWorkPackageRepositoryContexts;
+                DELETE FROM dbo.BuilderWorkPackageRepositoryContexts;
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageRepositoryContexts_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderWorkPackageRepositoryContexts_AppendOnly
+                        ON dbo.BuilderWorkPackageRepositoryContexts;
+            END;
+            IF OBJECT_ID('dbo.BuilderWorkPackageArtifactReferences', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageArtifactReferences_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderWorkPackageArtifactReferences_AppendOnly
+                        ON dbo.BuilderWorkPackageArtifactReferences;
+                DELETE FROM dbo.BuilderWorkPackageArtifactReferences;
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageArtifactReferences_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderWorkPackageArtifactReferences_AppendOnly
+                        ON dbo.BuilderWorkPackageArtifactReferences;
+            END;
+            IF OBJECT_ID('dbo.BuilderWorkPackageTickets', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageTickets_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderWorkPackageTickets_AppendOnly
+                        ON dbo.BuilderWorkPackageTickets;
+                DELETE FROM dbo.BuilderWorkPackageTickets;
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageTickets_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderWorkPackageTickets_AppendOnly
+                        ON dbo.BuilderWorkPackageTickets;
+            END;
+            IF OBJECT_ID('dbo.BuilderWorkPackageCores', 'U') IS NOT NULL
+            BEGIN
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageCores_AppendOnly', 'TR') IS NOT NULL
+                    DISABLE TRIGGER dbo.TR_BuilderWorkPackageCores_AppendOnly
+                        ON dbo.BuilderWorkPackageCores;
+                DELETE FROM dbo.BuilderWorkPackageCores;
+                IF OBJECT_ID('dbo.TR_BuilderWorkPackageCores_AppendOnly', 'TR') IS NOT NULL
+                    ENABLE TRIGGER dbo.TR_BuilderWorkPackageCores_AppendOnly
+                        ON dbo.BuilderWorkPackageCores;
+            END;
             IF COL_LENGTH('dbo.ClientOperations', 'ResultTechnicalValidationAttemptId') IS NOT NULL
                AND COL_LENGTH('dbo.ClientOperations', 'ResultProjectTechnicalReadinessEvidenceId') IS NOT NULL
                AND COL_LENGTH('dbo.ClientOperations', 'ResultProjectReadinessAssessmentId') IS NOT NULL
