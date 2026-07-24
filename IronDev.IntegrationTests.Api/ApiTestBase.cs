@@ -330,6 +330,7 @@ public abstract class ApiTestBase
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_repository_readiness.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_builder_authorization.sql");
         await ApplySqlFileAsync(conn, "Database", "migrate_workbench_builder_prompt_preparation.sql");
+        await ApplySqlFileAsync(conn, "Database", "migrate_workbench_builder_execution.sql");
     }
 
     private const string DropGovernanceSql = """
@@ -667,6 +668,24 @@ public abstract class ApiTestBase
                     SET ResultBuilderAgentRunId=NULL;';
             IF OBJECT_ID('dbo.BuilderAgentRuns', 'U') IS NOT NULL
             BEGIN
+                IF OBJECT_ID('dbo.BuilderAgentRunToolCalls', 'U') IS NOT NULL
+                BEGIN
+                    DISABLE TRIGGER dbo.TR_BuilderAgentRunToolCalls_Immutable ON dbo.BuilderAgentRunToolCalls;
+                    DELETE FROM dbo.BuilderAgentRunToolCalls;
+                    ENABLE TRIGGER dbo.TR_BuilderAgentRunToolCalls_Immutable ON dbo.BuilderAgentRunToolCalls;
+                END;
+                IF OBJECT_ID('dbo.BuilderAgentRunProposedFiles', 'U') IS NOT NULL
+                BEGIN
+                    DISABLE TRIGGER dbo.TR_BuilderAgentRunProposedFiles_Immutable ON dbo.BuilderAgentRunProposedFiles;
+                    DELETE FROM dbo.BuilderAgentRunProposedFiles;
+                    ENABLE TRIGGER dbo.TR_BuilderAgentRunProposedFiles_Immutable ON dbo.BuilderAgentRunProposedFiles;
+                END;
+                IF OBJECT_ID('dbo.BuilderAgentRunAttempts', 'U') IS NOT NULL
+                BEGIN
+                    DISABLE TRIGGER dbo.TR_BuilderAgentRunAttempts_Immutable ON dbo.BuilderAgentRunAttempts;
+                    DELETE FROM dbo.BuilderAgentRunAttempts;
+                    ENABLE TRIGGER dbo.TR_BuilderAgentRunAttempts_Immutable ON dbo.BuilderAgentRunAttempts;
+                END;
                 IF OBJECT_ID('dbo.TR_BuilderAgentRuns_PreparationImmutable', 'TR') IS NOT NULL
                     DISABLE TRIGGER dbo.TR_BuilderAgentRuns_PreparationImmutable
                         ON dbo.BuilderAgentRuns;
@@ -800,6 +819,24 @@ public abstract class ApiTestBase
                     SET ResultBuilderAgentRunId=NULL;';
             IF OBJECT_ID('dbo.BuilderAgentRuns', 'U') IS NOT NULL
             BEGIN
+                IF OBJECT_ID('dbo.BuilderAgentRunToolCalls', 'U') IS NOT NULL
+                BEGIN
+                    DISABLE TRIGGER dbo.TR_BuilderAgentRunToolCalls_Immutable ON dbo.BuilderAgentRunToolCalls;
+                    DELETE FROM dbo.BuilderAgentRunToolCalls;
+                    ENABLE TRIGGER dbo.TR_BuilderAgentRunToolCalls_Immutable ON dbo.BuilderAgentRunToolCalls;
+                END;
+                IF OBJECT_ID('dbo.BuilderAgentRunProposedFiles', 'U') IS NOT NULL
+                BEGIN
+                    DISABLE TRIGGER dbo.TR_BuilderAgentRunProposedFiles_Immutable ON dbo.BuilderAgentRunProposedFiles;
+                    DELETE FROM dbo.BuilderAgentRunProposedFiles;
+                    ENABLE TRIGGER dbo.TR_BuilderAgentRunProposedFiles_Immutable ON dbo.BuilderAgentRunProposedFiles;
+                END;
+                IF OBJECT_ID('dbo.BuilderAgentRunAttempts', 'U') IS NOT NULL
+                BEGIN
+                    DISABLE TRIGGER dbo.TR_BuilderAgentRunAttempts_Immutable ON dbo.BuilderAgentRunAttempts;
+                    DELETE FROM dbo.BuilderAgentRunAttempts;
+                    ENABLE TRIGGER dbo.TR_BuilderAgentRunAttempts_Immutable ON dbo.BuilderAgentRunAttempts;
+                END;
                 IF OBJECT_ID('dbo.TR_BuilderAgentRuns_PreparationImmutable', 'TR') IS NOT NULL
                     DISABLE TRIGGER dbo.TR_BuilderAgentRuns_PreparationImmutable
                         ON dbo.BuilderAgentRuns;

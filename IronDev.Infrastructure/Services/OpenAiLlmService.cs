@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace IronDev.Infrastructure.Services;
 
 public sealed class OpenAiLlmService
-    : ILLMService, IWorkbenchBusinessAnalystRoleAwareLlmService
+    : ILLMService, IWorkbenchBusinessAnalystRoleAwareLlmService, IWorkbenchBuilderRoleAwareLlmService
 {
     private readonly ChatClient _chatClient;
 
@@ -78,6 +78,31 @@ public sealed class OpenAiLlmService
         {
             throw new InvalidOperationException($"OpenAI call failed: {ex.Message}", ex);
         }
+    }
+
+    public async Task<BuilderProviderResponse> GetBuilderResponseAsync(
+        BuilderProviderEnvelope envelope,
+        CancellationToken cancellationToken = default)
+    {
+        var messages = BuilderProviderMessageMapper.Map(envelope)
+            .Select(message => message.Role == AgentModelRole.System
+                ? (ChatMessage)new SystemChatMessage(message.Content)
+                : new UserChatMessage(message.Content)).ToArray();
+        var started = Stopwatch.GetTimestamp();
+        var completion = await _chatClient.CompleteChatAsync(messages,
+            new ChatCompletionOptions { ResponseFormat = ChatResponseFormat.CreateJsonObjectFormat() },
+            cancellationToken);
+        completion.GetRawResponse().Headers.TryGetValue("x-request-id", out var requestId);
+        return new BuilderProviderResponse(
+            string.Concat(completion.Value.Content.Select(part => part.Text)),
+            envelope.SafeRequestId, requestId,
+            new AgentModelUsage
+            {
+                InputTokens = completion.Value.Usage?.InputTokenCount ?? 0,
+                OutputTokens = completion.Value.Usage?.OutputTokenCount ?? 0
+            },
+            completion.Value.Usage is not null,
+            Stopwatch.GetElapsedTime(started).Ticks / TimeSpan.TicksPerMillisecond);
     }
 
     private static ChatMessage ToChatMessage(WorkbenchBusinessAnalystProviderMessage message) =>

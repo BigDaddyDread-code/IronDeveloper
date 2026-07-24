@@ -240,3 +240,8 @@ Global run endpoints still exist for compatibility and SSE consumers:
 - `GET /api/run-reports`
 
 Do not add new cockpit behavior to global run routes. New cockpit UI should use project-scoped ticket run endpoints.
+Builder execution is `POST /api/workbench/projects/{projectId}/builder/agent-runs/{builderAgentRunId}/executions`.
+The client supplies only its current Workbench fence, an idempotency identity, and the
+expected frozen provider-input hash. Paths, commands, provider/model, repair budget,
+sandbox policy, image, tools, and output authority are server-owned. The response is a
+proposal/evidence result only; it cannot approve or apply the patch.

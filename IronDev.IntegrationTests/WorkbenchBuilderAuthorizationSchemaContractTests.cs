@@ -135,7 +135,6 @@ public sealed class WorkbenchBuilderAuthorizationSchemaContractTests
             "IronDev.Infrastructure/Services/WorkbenchBuilderAuthorizationService.cs");
         var controller = Read(
             "IronDev.Api/Controllers/WorkbenchBuilderController.cs");
-        var combined = service + controller;
 
         foreach (var forbidden in new[]
                  {
@@ -150,8 +149,12 @@ public sealed class WorkbenchBuilderAuthorizationSchemaContractTests
                      "RunBuilder"
                  })
             Assert.IsFalse(
-                combined.Contains(forbidden, StringComparison.Ordinal),
+                service.Contains(forbidden, StringComparison.Ordinal),
                 $"PR-07A must not contain provider/run authority: {forbidden}");
+
+        StringAssert.Contains(controller, "_builder.CreateWorkPackageAsync(");
+        StringAssert.Contains(controller, "_builder.GrantAsync(");
+        StringAssert.Contains(controller, "_builder.RevokeAsync(");
     }
 
     [TestMethod]

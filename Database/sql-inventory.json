@@ -2697,6 +2697,32 @@
                         "appliedByManifest":  true,
                         "verifiedByScript":  true,
                         "notes":  "Consumes one exact single-use authorization and persists the frozen Builder profile, role context, prompt, declared tool manifest, provider input, and hashes in one serializable transaction. ProviderInvokedAtUtc remains null and no provider is called."
+                    },
+                    {
+                        "id":  "database.migrate-workbench-builder-execution",
+                        "path":  "Database/migrate_workbench_builder_execution.sql",
+                        "kind":  "migration-script",
+                        "bucket":  "required-runtime-schema",
+                        "ownerArea":  "workbench",
+                        "objectsCreated":  [
+                                               "dbo.BuilderAgentRunAttempts",
+                                               "dbo.BuilderAgentRunProposedFiles",
+                                               "dbo.BuilderAgentRunToolCalls",
+                                               "Builder AgentRun execution state and terminal evidence"
+                                           ],
+                        "objectsCalled":  [
+                                              "dbo.BuilderAgentRuns",
+                                              "dbo.BuilderWorkPackageCores",
+                                              "dbo.RepositoryBindings",
+                                              "dbo.ProjectExecutionProfiles",
+                                              "dbo.RepositoryProvisioningReceipts"
+                                          ],
+                        "referencedBy":  [
+                                             "Workbench PR-07C qualified Builder execution service"
+                                         ],
+                        "appliedByManifest":  true,
+                        "verifiedByScript":  true,
+                        "notes":  "One atomic execution claim permits provider invocation. At most three attempts may be recorded. Proposed files, raw patch, changed-file manifest, tool calls, sandbox evidence, terminal state, and safe failure evidence are durable. No approval, apply, ticket-contract mutation, or active-repository write authority is created."
                     }
                 ]
 }

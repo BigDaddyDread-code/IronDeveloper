@@ -717,6 +717,76 @@ public sealed class WorkbenchBuilderAuthorizationApiTests : ApiTestBase
         Assert.AreEqual(0, consumedCount);
     }
 
+    [TestMethod]
+    public async Task ExecuteBuilderAgentRun_ClaimsOnce_PersistsProposalAndSandboxEvidence_AndReplays()
+    {
+        using var scenario = new AuthorizationScenario();
+        using var factory = scenario.CreateFactory();
+        using var client = await AuthenticatedClientAsync(factory);
+        var fixture = await CreateReadyDeliveryProjectAsync(
+            client, "Real Builder execution boundary",
+            scenario.Observer, scenario.Branch, "Sign in");
+        var package = await CreateWorkPackageAsync(
+            client, fixture, Guid.NewGuid(), [fixture.Tickets[0].Id]);
+        var grant = await GrantAsync(client, fixture, package, Guid.NewGuid());
+        var preparationResponse = await client.PostAsJsonAsync(
+            AgentRunsUrl(fixture.ProjectId),
+            PreparationPayload(fixture, Guid.NewGuid(), grant, package));
+        var prepared = await ReadAsync<PreparedBuilderAgentRun>(preparationResponse);
+        var operationId = Guid.NewGuid();
+        var payload = new
+        {
+            fixture.WorkbenchSessionId,
+            fixture.LeaseEpoch,
+            clientOperationId = operationId,
+            expectedProviderInputSha256 = prepared.ProviderInputSha256
+        };
+
+        var response = await client.PostAsJsonAsync(
+            ExecutionUrl(fixture.ProjectId, prepared.BuilderAgentRunId), payload);
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode,
+            await response.Content.ReadAsStringAsync());
+        var result = await ReadAsync<BuilderExecutionResult>(response);
+        Assert.AreEqual(BuilderAgentRunTerminalStates.Succeeded, result.Status);
+        Assert.AreEqual(1, result.AttemptCount);
+        Assert.AreEqual(1, result.ProposedFiles.Count);
+        Assert.AreEqual("src/App.cs", result.ProposedFiles[0].RelativePath);
+        Assert.AreEqual(3, result.ToolCalls.Count);
+        Assert.AreEqual(64, result.RawPatchSha256.Length);
+        Assert.AreEqual(64, result.SandboxEvidenceManifestSha256!.Length);
+        Assert.AreEqual(1, scenario.Gateway.InvocationCount);
+        Assert.AreEqual(1, scenario.BuilderSandbox.InvocationCount);
+
+        var replayResponse = await client.PostAsJsonAsync(
+            ExecutionUrl(fixture.ProjectId, prepared.BuilderAgentRunId), payload);
+        var replay = await ReadAsync<BuilderExecutionResult>(replayResponse);
+        Assert.IsTrue(replay.IsReplay);
+        Assert.AreEqual(1, scenario.Gateway.InvocationCount);
+
+        var secondClaim = await client.PostAsJsonAsync(
+            ExecutionUrl(fixture.ProjectId, prepared.BuilderAgentRunId),
+            new
+            {
+                fixture.WorkbenchSessionId,
+                fixture.LeaseEpoch,
+                clientOperationId = Guid.NewGuid(),
+                expectedProviderInputSha256 = prepared.ProviderInputSha256
+            });
+        Assert.AreEqual(HttpStatusCode.Conflict, secondClaim.StatusCode);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        var counts = await connection.QuerySingleAsync<(int Attempts, int Files, int Tools)>(
+            """
+            SELECT
+              (SELECT COUNT(*) FROM dbo.BuilderAgentRunAttempts WHERE BuilderAgentRunId=@RunId),
+              (SELECT COUNT(*) FROM dbo.BuilderAgentRunProposedFiles WHERE BuilderAgentRunId=@RunId),
+              (SELECT COUNT(*) FROM dbo.BuilderAgentRunToolCalls WHERE BuilderAgentRunId=@RunId);
+            """, new { RunId = prepared.BuilderAgentRunId });
+        Assert.AreEqual(1, counts.Attempts);
+        Assert.AreEqual(1, counts.Files);
+        Assert.AreEqual(3, counts.Tools);
+    }
+
     private static async Task<ReadyDeliveryFixture> CreateReadyDeliveryProjectAsync(
         HttpClient client,
         string name,
@@ -977,6 +1047,9 @@ public sealed class WorkbenchBuilderAuthorizationApiTests : ApiTestBase
     private static string AgentRunsUrl(int projectId) =>
         $"/api/workbench/projects/{projectId}/builder/agent-runs";
 
+    private static string ExecutionUrl(int projectId, Guid runId) =>
+        $"/api/workbench/projects/{projectId}/builder/agent-runs/{runId:D}/executions";
+
     private static string RevocationsUrl(int projectId, Guid authorizationId) =>
         $"/api/workbench/projects/{projectId}/builder/authorizations/{authorizationId:D}/revocations";
 
@@ -1088,6 +1161,8 @@ public sealed class WorkbenchBuilderAuthorizationApiTests : ApiTestBase
         public ControllableBranchObserver Branch { get; } = new();
         public AdjustableTimeProvider Clock { get; } = new();
         public PassingSandboxExecutionService Sandbox { get; } = new();
+        public PassingBuilderModelGateway Gateway { get; } = new();
+        public PassingBuilderSandboxRunner BuilderSandbox { get; } = new();
 
         public WebApplicationFactory<Program> CreateFactory()
         {
@@ -1127,6 +1202,10 @@ public sealed class WorkbenchBuilderAuthorizationApiTests : ApiTestBase
                         AvailableExecutionChecker>();
                     services.RemoveAll<IBuilderRepositoryBranchObserver>();
                     services.AddSingleton<IBuilderRepositoryBranchObserver>(Branch);
+                    services.RemoveAll<IWorkbenchBuilderModelGateway>();
+                    services.AddSingleton<IWorkbenchBuilderModelGateway>(Gateway);
+                    services.RemoveAll<IWorkbenchBuilderSandboxRunner>();
+                    services.AddSingleton<IWorkbenchBuilderSandboxRunner>(BuilderSandbox);
                     services.RemoveAll<TimeProvider>();
                     services.AddSingleton<TimeProvider>(Clock);
                 });
@@ -1180,6 +1259,89 @@ public sealed class WorkbenchBuilderAuthorizationApiTests : ApiTestBase
                     File.SetAttributes(entry, attributes & ~FileAttributes.ReadOnly);
             }
             Directory.Delete(exact, recursive: true);
+        }
+    }
+
+    private sealed class PassingBuilderModelGateway : IWorkbenchBuilderModelGateway
+    {
+        public int InvocationCount { get; private set; }
+
+        public Task<BuilderProviderResponse> InvokeAsync(
+            BuilderPreparedExecutionInput input,
+            int attemptNumber,
+            string? repairEvidence,
+            CancellationToken cancellationToken = default)
+        {
+            InvocationCount++;
+            var output = JsonSerializer.Serialize(new
+            {
+                schemaVersion = BuilderRoleContract.OutputSchemaVersion,
+                proposedFiles = new[] { new { relativePath = "src/App.cs", content = "namespace App;" } }
+            });
+            return Task.FromResult(new BuilderProviderResponse(
+                output, $"builder-{input.BuilderAgentRunId:N}-{attemptNumber}",
+                "test-request", new IronDev.Core.Agents.AgentModelUsage(), true, 1));
+        }
+    }
+
+    private sealed class PassingBuilderSandboxRunner : IWorkbenchBuilderSandboxRunner
+    {
+        public int InvocationCount { get; private set; }
+
+        public Task<SandboxExecutionResult> ValidateAsync(
+            BuilderSandboxValidationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            InvocationCount++;
+            var completed = DateTimeOffset.UtcNow;
+            var manifest = new SandboxEvidenceManifest
+            {
+                SchemaVersion = 1, ExecutionId = request.ExecutionId,
+                ProjectId = request.WorkPackageCore.ProjectId,
+                RepositoryBindingId = request.WorkPackageCore.RepositoryBindingId,
+                RepositoryBindingRevision = request.WorkPackageCore.RepositoryBindingRevision,
+                BaselineCommit = request.WorkPackageCore.BaselineCommit,
+                WorktreeFingerprint = Hash("builder-proposal"),
+                ProjectExecutionProfileId = request.WorkPackageCore.EffectiveProfile.ProjectExecutionProfileId,
+                ProjectExecutionProfileRevision = request.WorkPackageCore.EffectiveProfile.ProjectExecutionProfileRevision,
+                ProfileDefinitionId = request.WorkPackageCore.EffectiveProfile.ProfileDefinitionId,
+                ProfileDescriptorRevision = request.WorkPackageCore.EffectiveProfile.ProfileDescriptorRevision,
+                DescriptorSha256 = request.WorkPackageCore.EffectiveProfile.ProfileDescriptorSha256,
+                TemplateBundleSha256 = request.WorkPackageCore.Sandbox.TemplateBundleSha256,
+                ToolchainManifestId = request.WorkPackageCore.Sandbox.ToolchainManifestId,
+                ContainerImageDigest = request.WorkPackageCore.Sandbox.QualifiedImageDigest,
+                SandboxPolicyVersion = request.WorkPackageCore.Sandbox.PolicyVersion,
+                SandboxPolicySha256 = request.WorkPackageCore.Sandbox.PolicySha256,
+                TrustedSupervisorVersion = "test-supervisor",
+                TrustedSupervisorSha256 = Hash("supervisor"),
+                OfflineFeedManifestSha256 = request.WorkPackageCore.Sandbox.OfflineFeedManifestSha256,
+                Status = SandboxExecutionStatus.Succeeded, ReasonCode = SandboxReasonCodes.Ready,
+                SafeSummary = "Builder proposal passed.", StartedAtUtc = completed.AddSeconds(-1),
+                CompletedAtUtc = completed,
+                Inspection = new SandboxRuntimeInspection
+                {
+                    RuntimeName = "test", IsolationMode = SandboxIsolationModes.HcsHyperV,
+                    ActualContainerImageDigest = request.WorkPackageCore.Sandbox.QualifiedImageDigest,
+                    VirtualCpuCount = 2, MemoryMaximumMiB = 4096, WritableScratchMaximumGiB = 12,
+                    MaximumUntrustedWorkloadProcessCount = 64, UntrustedWorkloadProcessScope = "sandbox",
+                    TrustedSupervisorVersion = "test-supervisor", TrustedSupervisorSha256 = Hash("supervisor"),
+                    SuspendedAssignmentBeforeResumeProven = true, UntrustedWorkloadProcessLimitProven = true,
+                    RestrictedLowIntegrityWorkloadIdentityProven = true, SupervisorHandleIsolationProven = true,
+                    WorkloadScratchAndEvidenceBoundaryProven = true, BrokerLaunchDenialProven = true,
+                    ProjectBytesCopiedAfterPreflightProven = true, NetworkEndpointCount = 0,
+                    HostWritableMountCount = 0, RepositoryInputReadOnly = true, OfflineFeedReadOnly = true,
+                    WasDestroyed = true, InspectedAtUtc = completed
+                },
+                Stages = [], Artifacts = []
+            };
+            var json = SandboxEvidenceManifestCodec.SerializeCanonical(manifest);
+            return Task.FromResult(new SandboxExecutionResult
+            {
+                ExecutionId = request.ExecutionId, Status = SandboxExecutionStatus.Succeeded,
+                ReasonCode = SandboxReasonCodes.Ready, SafeSummary = "Builder proposal passed.",
+                CleanedUp = true, EvidenceManifest = manifest, EvidenceManifestJson = json,
+                EvidenceManifestSha256 = SandboxCanonicalJson.Sha256(json)
+            });
         }
     }
 
